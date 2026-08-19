@@ -21,6 +21,7 @@ def test_api_key_requirement_depends_on_endpoint_and_format():
     assert llm_requires_api_key(base_url="http://localhost:11434/v1", api_format="openai") is False
     assert llm_requires_api_key(base_url="https://api.example.com/v1", api_format="openai") is True
     assert llm_requires_api_key(base_url="http://localhost:11434/v1", api_format="anthropic") is True
+    assert llm_requires_api_key(base_url="codex://local", api_format="codex_cli") is False
 
 
 def test_init_llm_check_allows_local_ollama_without_api_key(monkeypatch):
