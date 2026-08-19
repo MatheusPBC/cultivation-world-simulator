@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
 from src.i18n.story_styles import get_random_story_style
+from src.classes.language import language_manager
 
 
 class StoryTeller:
@@ -68,6 +69,11 @@ class StoryTeller:
             "event": event,
             "res": res,
             "style": get_random_story_style(),
+            "output_language": (
+                "Brazilian Portuguese (pt-BR)"
+                if str(language_manager.current) == "pt-BR"
+                else str(language_manager.current)
+            ),
             "story_prompt": prompt,
         }
 
@@ -146,6 +152,11 @@ class StoryTeller:
             "events": events_text,
             "details": details_text,
             "style": get_random_story_style(),
+            "output_language": (
+                "Brazilian Portuguese (pt-BR)"
+                if str(language_manager.current) == "pt-BR"
+                else str(language_manager.current)
+            ),
             "story_prompt": prompt
         }
         

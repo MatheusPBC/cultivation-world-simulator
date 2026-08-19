@@ -16,6 +16,7 @@ Event Details:
 {details}
 
 Writing style prompt: {style}
+Output language: {output_language}. Write all thinking and story text in this language.
 Extra theme prompt: {story_prompt}
 
 Note:
@@ -29,4 +30,3 @@ Return the results in JSON format only, in the format:
     "thinking": ..., // Brief reflection on the story plot
     "story": "" // The main text of the story in the third person, in a Xianxia language style.
 }}
-
