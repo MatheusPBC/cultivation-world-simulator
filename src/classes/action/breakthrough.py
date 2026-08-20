@@ -4,9 +4,11 @@ import random
 from src.i18n import t
 from src.classes.action import TimedAction
 from src.classes.action.cooldown import cooldown_action
+from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.event import Event
+from src.classes.state_delta import StateDelta
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.systems.cultivation import Realm
 from src.systems.tribulation import TribulationSelector
@@ -122,6 +124,7 @@ class Breakthrough(TimedAction):
         # 初始化状态
         self._last_result = None
         self._success_rate_cached = None
+        self._start_event_id = None
         # 预判是否生成故事与选择劫难
         old_realm = self.avatar.cultivation_progress.realm
         self._gen_story = old_realm in ALLOW_STORY_FROM_REALMS
@@ -132,9 +135,38 @@ class Breakthrough(TimedAction):
             self._calamity = None
             self._calamity_other = None
         content = t("{avatar} begins attempting breakthrough", avatar=self.avatar.name)
-        return Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=True)
+        event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=True)
+        self._start_event_id = event.id
+        return event
 
     # TimedAction 已统一 step 逻辑
+
+    def _record_causality(self, effect_event: Event) -> None:
+        # 被动记录：只在因果记录器存在时写入，且只在 owner（本方法之外的
+        # _execute）已经真正应用变更之后调用。参见 causal_recorder.py。
+        from src.sim.simulator_engine.causal_recorder import get_causal_recorder
+
+        recorder = get_causal_recorder(self.world)
+        if recorder is None:
+            return
+        if self._start_event_id:
+            recorder.record_link(
+                effect_event.id,
+                CausalLink(cause_event_id=self._start_event_id, relation=CausalRelation.TRIGGERED_BY),
+                priority=10,
+            )
+        if self._last_result and self._last_result[0] == "success":
+            _, old_realm, new_realm = self._last_result
+            recorder.record_delta(
+                effect_event.id,
+                StateDelta(
+                    owner_kind="avatar",
+                    owner_id=str(self.avatar.id),
+                    aspect="realm",
+                    before=old_realm,
+                    after=new_realm,
+                ),
+            )
 
     async def finish(self) -> list[Event]:
         if not self._last_result:
@@ -143,9 +175,11 @@ class Breakthrough(TimedAction):
         if not self._gen_story:
             # 不生成故事：不出现劫难，仅简单结果
             result_text = t("Breakthrough succeeded") if result_ok else t("Breakthrough failed")
-            core_text = t("{avatar} breakthrough result: {result}", 
+            core_text = t("{avatar} breakthrough result: {result}",
                          avatar=self.avatar.name, result=result_text)
-            return [Event(self.world.month_stamp, core_text, related_avatars=[self.avatar.id], is_major=True)]
+            core_event = Event(self.world.month_stamp, core_text, related_avatars=[self.avatar.id], is_major=True)
+            self._record_causality(core_event)
+            return [core_event]
 
         calamity = self._calamity
         calamity_display = TribulationSelector.get_display_name(str(calamity))
@@ -158,7 +192,9 @@ class Breakthrough(TimedAction):
                 rel_ids.append(self._calamity_other.id)
             except Exception:
                 pass
-        events: list[Event] = [Event(self.world.month_stamp, core_text, related_avatars=rel_ids, is_major=True)]
+        core_event = Event(self.world.month_stamp, core_text, related_avatars=rel_ids, is_major=True)
+        self._record_causality(core_event)
+        events: list[Event] = [core_event]
 
         # 故事参与者：本体 +（可选）相关角色
         prompt = TribulationSelector.get_story_prompt(str(calamity))

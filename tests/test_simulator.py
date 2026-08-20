@@ -378,3 +378,41 @@ async def test_phase_handle_sect_wars_auto_battles_and_teleports_loser(base_worl
     assert any("立即爆发战斗" in event.content for event in events)
     assert defender.pos_x == 4 and defender.pos_y == 4
     assert sect_b.war_weariness == 3
+
+
+# --- Task 3 acceptance: passive causal recorder must not alter step() behavior ---
+
+from src.sim.simulator_engine.context import SimulationStepContext
+from src.sim.simulator_engine.causal_recorder import CausalRecorder
+
+
+def test_context_create_bridges_and_step_clears_the_causal_recorder(base_world):
+    ctx = SimulationStepContext.create(base_world)
+
+    assert isinstance(ctx.causal, CausalRecorder)
+    assert base_world.step_causal_recorder is ctx.causal
+
+    from src.sim.simulator_engine.finalizer import finalize_step
+
+    finalize_step(ctx)
+
+    assert base_world.step_causal_recorder is None
+
+
+@pytest.mark.asyncio
+async def test_simulator_step_with_no_owner_recording_leaves_events_without_causal_metadata(
+    base_world, dummy_avatar, mock_llm_managers
+):
+    """With an empty recorder (nothing recorded this step, since no
+    breakthrough or population change happens here), step() must produce
+    events that are indistinguishable from pre-Task-3 behavior: no
+    causal_links, no causal_payload."""
+    sim = Simulator(base_world)
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+
+    events = await sim.step()
+
+    assert events  # sanity: the step actually produced events to check
+    for event in events:
+        assert event.causal_links == []
+        assert event.causal_payload is None

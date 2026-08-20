@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from src.classes.core.avatar import Avatar
 from src.classes.core.world import World
 from src.classes.event import Event
+from src.sim.simulator_engine.causal_recorder import CausalRecorder
 from src.systems.time import Month, MonthStamp
 
 
@@ -18,16 +19,22 @@ class SimulationStepContext:
     events: list[Event] = field(default_factory=list)
     processed_event_ids: set[str] = field(default_factory=set)
     month_stamp: MonthStamp | None = None
+    # 被动因果记录器：由已经完成变更的领域 owner 写入，finalize_step 统一drain。
+    causal: CausalRecorder = field(default_factory=CausalRecorder)
 
     @classmethod
     def create(cls, world: World) -> "SimulationStepContext":
         # 每轮开始时抓取一次在世角色快照，后续只允许通过 phase
         # 明确地修改这份列表，例如死亡结算阶段会原地移除死者。
-        return cls(
+        ctx = cls(
             world=world,
             living_avatars=world.avatar_manager.get_living_avatars(),
             month_stamp=world.month_stamp,
         )
+        # 桥接：部分 owner（如 Action）只能拿到 world，拿不到 ctx 本身，
+        # 与 get_decision_boundary_gateway(world) 是同一种挂载方式。
+        world.step_causal_recorder = ctx.causal
+        return ctx
 
     @property
     def is_january(self) -> bool:

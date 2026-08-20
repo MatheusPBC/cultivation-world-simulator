@@ -5,9 +5,11 @@ from src.classes.action.help_people import HelpPeople
 from src.classes.action.plunder_people import PlunderPeople
 from src.classes.alignment import Alignment
 from src.classes.environment.region import CityRegion
+from src.classes.event import FactKind
 from src.classes.items.auxiliary import Auxiliary, get_ten_thousand_souls_banner_bonus
 from src.classes.environment.tile import Tile, TileType
 from src.sim.simulator import Simulator
+from src.sim.simulator_engine.causal_recorder import CausalRecorder
 from src.sim.simulator_engine.phases.world import phase_update_city_population
 
 
@@ -158,3 +160,91 @@ class TestCityPopulation:
 
         loaded_city = loaded_world.map.regions[city_id]
         assert loaded_city.population == pytest.approx(88.8)
+
+    def test_no_causal_arg_reproduces_old_behavior(self, base_world):
+        """Calling the domain function the old way (positional world only)
+        must not emit events and must not require a recorder — Task 3
+        acceptance: recorder absent reproduces today's behaviour byte for byte."""
+        city = CityRegion(id=1, name="TestCity", desc="Test", population=40.0, population_capacity=100.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[1] = city
+
+        events = phase_update_city_population(base_world)
+
+        assert events == []
+        assert city.population == pytest.approx(40.0 + 0.03 * 40.0 * (1 - 40.0 / 100.0))
+
+    def test_causal_none_emits_no_events(self, base_world):
+        city = CityRegion(id=1, name="TestCity", desc="Test", population=40.0, population_capacity=100.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[1] = city
+
+        events = phase_update_city_population(base_world, None)
+
+        assert events == []
+
+    def test_causal_recorder_emits_state_transition_with_population_delta(self, base_world):
+        city = CityRegion(id=42, name="TestCity", desc="Test", population=40.0, population_capacity=100.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[42] = city
+
+        causal = CausalRecorder()
+        before = city.population
+
+        events = phase_update_city_population(base_world, causal)
+
+        expected_after = before + 0.03 * before * (1 - before / 100.0)
+        assert city.population == pytest.approx(expected_after)
+        assert len(events) == 1
+        event = events[0]
+        assert event.fact_kind == FactKind.STATE_TRANSITION
+
+        causal.attach_to(events)
+        deltas = event.causal_payload["deltas"]
+        assert len(deltas) == 1
+        assert deltas[0]["owner_kind"] == "region"
+        assert deltas[0]["owner_id"] == "42"
+        assert deltas[0]["aspect"] == "population"
+        assert float(deltas[0]["before"]) == pytest.approx(before)
+        assert float(deltas[0]["after"]) == pytest.approx(expected_after)
+
+    def test_causal_recorder_emits_no_event_when_population_does_not_change(self, base_world):
+        city = CityRegion(id=1, name="TestCity", desc="Test", population=100.0, population_capacity=100.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[1] = city
+
+        causal = CausalRecorder()
+        events = phase_update_city_population(base_world, causal)
+
+        assert events == []
+
+    def test_causal_recorder_present_does_not_perturb_logistic_result(self, base_world):
+        """The instrumentation must be purely additive: the population value
+        itself must be identical whether or not a recorder is passed."""
+        city_a = CityRegion(id=1, name="A", desc="Test", population=40.0, population_capacity=100.0)
+        city_b = CityRegion(id=2, name="B", desc="Test", population=40.0, population_capacity=100.0)
+        tile_a = Tile(0, 0, TileType.CITY)
+        tile_a.region = city_a
+        base_world.map.tiles[(0, 0)] = tile_a
+        base_world.map.regions[1] = city_a
+
+        phase_update_city_population(base_world, None)
+
+        tile_b = Tile(1, 0, TileType.CITY)
+        tile_b.region = city_b
+        base_world.map.tiles[(1, 0)] = tile_b
+        base_world.map.regions[2] = city_b
+        del base_world.map.tiles[(0, 0)]
+        del base_world.map.regions[1]
+
+        phase_update_city_population(base_world, CausalRecorder())
+
+        assert city_a.population == pytest.approx(city_b.population)

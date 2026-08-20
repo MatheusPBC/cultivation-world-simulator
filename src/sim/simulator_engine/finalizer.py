@@ -46,6 +46,8 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
                 propagation_kind="close_relation_major",
             )
 
+    ctx.causal.attach_to(final_events)
+
     if ctx.world.event_manager:
         for event in final_events:
             ctx.world.event_manager.add_event(event)
@@ -53,4 +55,7 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
     log_events(final_events)
     ctx.world.month_stamp = ctx.world.month_stamp + 1
     ctx.events = final_events
+    # 清理桥接引用：因果记录器只在本轮 step 内有效，避免 step 之外的代码
+    # （如 HTTP 请求处理）误读到上一轮遗留的记录器。
+    ctx.world.step_causal_recorder = None
     return final_events

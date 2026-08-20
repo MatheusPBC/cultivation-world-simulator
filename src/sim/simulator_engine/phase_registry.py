@@ -111,8 +111,10 @@ def update_celestial_phenomenon(simulator, ctx):
     ctx.add_events(world_phases.phase_update_celestial_phenomenon(simulator.world))
 
 
-def update_city_population(simulator, _ctx):
-    world_phases.phase_update_city_population(simulator.world)
+def update_city_population(simulator, ctx):
+    # 唯一需要转发 ctx（因果记录器）的 wrapper：该 flow 此前完全丢弃 ctx，
+    # 现在把 ctx.causal 转发给 owner，使其能在人口变化后记录 StateDelta。
+    ctx.add_events(world_phases.phase_update_city_population(simulator.world, ctx.causal))
 
 
 def update_dynasty_and_officials(simulator, ctx):

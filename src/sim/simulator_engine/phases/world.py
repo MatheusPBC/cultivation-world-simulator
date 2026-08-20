@@ -5,7 +5,8 @@ import asyncio
 from src.classes.core.avatar import Avatar
 from src.classes.celestial_phenomenon import get_random_celestial_phenomenon
 from src.classes.environment.region import CityRegion, CultivateRegion
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
+from src.classes.state_delta import StateDelta
 from src.classes.observe import get_avatar_observation_radius
 from src.i18n import t
 from src.systems.autonomous_custom_content_service import try_trigger_autonomous_custom_creation
@@ -196,11 +197,42 @@ def phase_update_celestial_phenomenon(world) -> list[Event]:
     return events
 
 
-def phase_update_city_population(world) -> None:
+def phase_update_city_population(world, causal=None) -> list[Event]:
     # 城市人口使用 logistic 公式按月自然变化。
+    # `causal` 是可选的 CausalRecorder（见 causal_recorder.py）：
+    # 缺省为 None 时行为与本次改动之前完全一致，不产生任何事件。
+    events: list[Event] = []
     for region in world.map.regions.values():
         if isinstance(region, CityRegion):
+            before = region.population
             region.update_population_monthly()
+            after = region.population
+            if causal is not None and after != before:
+                event = Event(
+                    world.month_stamp,
+                    t(
+                        "{region} population changed from {before} to {after}",
+                        region=region.name,
+                        before=f"{before:.1f}",
+                        after=f"{after:.1f}",
+                    ),
+                    related_avatars=None,
+                    is_major=False,
+                    fact_kind=FactKind.STATE_TRANSITION,
+                )
+                causal.record_delta(
+                    event.id,
+                    StateDelta(
+                        owner_kind="region",
+                        owner_id=str(region.id),
+                        aspect="population",
+                        before=str(before),
+                        after=str(after),
+                        magnitude=after - before,
+                    ),
+                )
+                events.append(event)
+    return events
 
 
 def phase_update_dynasty(world) -> list[Event]:
