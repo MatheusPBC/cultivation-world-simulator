@@ -38,7 +38,7 @@ def test_save_writes_full_map_snapshot(tmp_path):
     assert snapshot["preset_id"] == "mountain_frontier"
     assert snapshot["width"] == 84
     assert snapshot["height"] == 60
-    assert snapshot["schema_version"] == 2
+    assert snapshot["schema_version"] == 3
     assert snapshot["wilderness_tile"] == "plain"
     assert len(snapshot["region_rows"]) == 60
     assert snapshot["landmarks"]
@@ -99,5 +99,5 @@ def test_map_snapshot_persists_region_overrides(tmp_path):
         save_data = json.load(f)
 
     snapshot = save_data["world"]["map_snapshot"]
-    assert snapshot["region_overrides"]["101"]["name"] == "东南平原"
-    assert "河渠与海风" in snapshot["region_overrides"]["101"]["desc"]
+    assert snapshot["region_overrides"]["101"]["name_id"] == "MAP_REGION_CLASSIC_101_NAME"
+    assert snapshot["region_overrides"]["101"]["desc_id"] == "MAP_REGION_CLASSIC_101_DESC"

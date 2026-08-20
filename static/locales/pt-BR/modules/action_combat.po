@@ -1,0 +1,125 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Action: Assassinate
+msgid "assassinate_action_name"
+msgstr "Assassinar"
+
+msgid "assassinate_description"
+msgstr "Assassine o alvo; em caso de falha, inicia-se um combate"
+
+msgid "assassinate_requirements"
+msgstr "Sem restrições; requer tempo de recarga"
+
+msgid "assassinate_story_prompt_fail"
+msgstr ""
+"Esta é a história de uma tentativa de assassinato fracassada. O assassino "
+"tentou matar o alvo, mas foi prontamente detectado. Em seguida, os dois lados "
+"entraram em um confronto direto e feroz. Não mencione valores específicos de "
+"PV."
+
+msgid "assassinate_story_prompt_success"
+msgstr ""
+"Esta é a história de um assassinato bem-sucedido. Não é necessário descrever "
+"o combate; concentre-se em como o assassino ficou à espreita, aproximou-se e "
+"desferiu o golpe fatal e silencioso. O alvo nem sequer teve tempo de reagir "
+"antes de morrer."
+
+# Action: Attack
+msgid "attack_action_name"
+msgstr "Iniciar combate"
+
+msgid "attack_description"
+msgstr "Ataque o alvo e entre em combate"
+
+msgid "attack_requirements"
+msgstr "Sem restrições"
+
+msgid "attack_story_prompt"
+msgstr ""
+"Não mencione PV, pontos de dano ou qualquer expressão numérica específica. A "
+"batalha deve refletir as técnicas, os reinos de cultivo, os equipamentos e "
+"outros aspectos dos dois lados."
+
+# Action: Catch
+msgid "catch_action_name"
+msgstr "Domar fera"
+
+msgid "catch_description"
+msgstr ""
+"Tente domar uma fera espiritual para torná-la sua. Só é possível ter uma fera "
+"espiritual, mas uma de grau inferior pode ser substituída por outra de grau "
+"superior"
+
+msgid "catch_requirements"
+msgstr ""
+"Exclusivo da Seita das Cem Feras; exige uma área comum com animais; o reino "
+"do animal-alvo não pode ser superior ao do personagem"
+
+# Action: DevourPeople
+msgid "devour_people_action_name"
+msgstr "Devorar pessoas"
+
+msgid "devour_people_description"
+msgstr "Devore pessoas para aumentar significativamente o poder de combate"
+
+msgid "devour_people_requirements"
+msgstr "Possuir o Estandarte das Dez Mil Almas"
+
+# Action: Escape
+msgid "escape_action_name"
+msgstr "Fugir"
+
+msgid "escape_description"
+msgstr "Fuja do oponente, de acordo com a chance de sucesso"
+
+msgid "escape_requirements"
+msgstr "Sem restrições"
+
+# Action: Hunt
+msgid "hunt_action_name"
+msgstr "Caçar"
+
+msgid "hunt_description"
+msgstr "Cace animais na área atual para obter materiais de origem animal"
+
+msgid "hunt_requirements"
+msgstr ""
+"Exige uma área comum com animais, e o reino do personagem deve ser igual ou "
+"superior ao do animal"
+
+# Action: PlunderPeople
+msgid "plunder_people_action_name"
+msgstr "Saquear pessoas"
+
+msgid "plunder_people_description"
+msgstr "Saqueie pessoas na cidade para obter uma pequena quantia de Pedras Espirituais"
+
+msgid "plunder_people_requirements"
+msgstr "Apenas em áreas urbanas, e o alinhamento do personagem deve ser 'maligno'"
+
+msgid "{avatar} assassinated successfully! {target} fell without any defense."
+msgstr "{avatar} assassinou com sucesso! {target} caiu sem conseguir se defender."
+
+msgid "{avatar} begins devouring people in town"
+msgstr "{avatar} começou a devorar pessoas na cidade"
+
+msgid "{avatar} begins plundering people in town"
+msgstr "{avatar} começou a saquear pessoas na cidade"
+
+msgid "{avatar} failed to tame spirit beast"
+msgstr "{avatar} não conseguiu domar a fera espiritual"
+
+msgid "{avatar} lurks in the shadows, attempting to assassinate {target}..."
+msgstr "{avatar} espreita nas sombras, tentando assassinar {target}..."

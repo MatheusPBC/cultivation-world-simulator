@@ -1,0 +1,25 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt-BR\n"
+
+msgid "PERSONA_1015_NAME"
+msgstr "Afinidade com Outros Povos"
+
+msgid "PERSONA_1015_DESC"
+msgstr "Você sente curiosidade e simpatia naturais por cultivadores de outras raças e está disposto a criar laços apesar das diferenças de origem."
+
+msgid "PERSONA_1016_NAME"
+msgstr "Aversão a Outros Povos"
+
+msgid "PERSONA_1016_DESC"
+msgstr "Você rejeita instintivamente cultivadores de outras raças e tem dificuldade para confiar de verdade em quem vem de fora."
+
+msgid "WORLD_INFO_RACE_TITLE"
+msgstr "Raça"
+
+msgid "WORLD_INFO_RACE_NAME"
+msgstr "Raça"
+
+msgid "WORLD_INFO_RACE_DESC"
+msgstr "O mundo abriga cultivadores humanos e yao. Entre os yao há raposas, lobos, aves, serpentes, tartarugas e outras raças, cada qual com instintos próprios: raposas são astutas e sagazes; lobos, caçadores ferozes; aves se destacam na migração e no reconhecimento; serpentes são pacientes e venenosas; e tartarugas são longevas e resistentes. Os yao podem cultivar e ingressar em seitas que os aceitem, mas algumas seitas dedicadas aos ritos humanos ou à ordem confuciana não permitem sua entrada."

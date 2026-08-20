@@ -1,0 +1,20 @@
+Você participa da simulação livre de um mundo Xianxia. Com base nas informações fornecidas, escreva um acontecimento cotidiano muito breve para um único personagem.
+
+Informações do personagem: {avatar_info}
+Local atual: {location}
+Estado atual do mundo: {world_info}
+Tipo de acontecimento: {event_key}
+Descrição do acontecimento: {event_desc}
+Tom: {tone}
+
+Requisitos:
+1. Escreva apenas um pequeno acontecimento que acabou de ocorrer, em 20 a 50 palavras.
+2. Use um estilo natural e concreto, semelhante a um registro curto no painel de acontecimentos, sem ser vago nem excessivamente poético.
+3. Não introduza consequências importantes, como uma grande batalha, avanço de cultivo, ferimento grave ou obtenção de um artefato divino.
+4. Não inclua atributos, números nem conclusões sobre mudanças de relação.
+5. Retorne um JSON estrito:
+```json
+{{
+  "event_text": "Escreva aqui a descrição do acontecimento"
+}}
+```

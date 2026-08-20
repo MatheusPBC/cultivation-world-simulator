@@ -1,0 +1,70 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Technique System - Techniques
+msgid " Effect: {effect_desc}"
+msgstr " Efeito: {effect_desc}"
+
+msgid "Cave Dwelling"
+msgstr "Morada na Caverna"
+
+msgid "City Region"
+msgstr "Região Urbana"
+
+msgid "Normal Region"
+msgstr "Região Comum"
+
+msgid "Ruins"
+msgstr "Ruínas"
+
+msgid "dark_attribute"
+msgstr "Trevas"
+
+msgid "earth_attribute"
+msgstr "Terra"
+
+msgid "evil_attribute"
+msgstr "Mal"
+
+msgid "fire_attribute"
+msgstr "Fogo"
+
+# Technique Attribute
+msgid "gold_attribute"
+msgstr "Ouro"
+
+msgid "ice_attribute"
+msgstr "Gelo"
+
+# Technique Grade
+msgid "lower_grade"
+msgstr "Grau Inferior"
+
+msgid "middle_grade"
+msgstr "Grau Médio"
+
+msgid "thunder_attribute"
+msgstr "Trovão"
+
+msgid "upper_grade"
+msgstr "Grau Superior"
+
+msgid "water_attribute"
+msgstr "Água"
+
+msgid "wind_attribute"
+msgstr "Vento"
+
+msgid "wood_attribute"
+msgstr "Madeira"

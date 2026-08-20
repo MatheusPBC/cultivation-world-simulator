@@ -1,0 +1,64 @@
+Você edita a ambientação de um mundo Xianxia. Reescreva name e desc das entidades fornecidas de acordo com a história do mundo, o guia de estilo e o resumo atual do mapa.
+
+Regras:
+- Retorne somente JSON. Não use markdown.
+- Você pode retornar um rewrite_plan curto, com no máximo 3 frases, para descrever a abordagem de tradução deste lote. Não apresente uma análise longa.
+- Retorne exatamente a mesma quantidade de entidades recebidas.
+- Preserve cada id exatamente.
+- Não acrescente ids. Não omita ids.
+- Retorne somente id, name e desc.
+- Não mencione jogadores, sistemas, mecânicas do jogo, bônus numéricos, porcentagens nem mudanças explícitas de atributos.
+- Mantenha name conciso e desc concreta e visual.
+- Preserve a categoria original e a função de jogo de cada entidade.
+- Torne o estilo da história do mundo perceptível, sem repetir a mesma palavra em todos os nomes.
+- Não cole a palavra-chave da história do mundo diretamente na frente de cada nome antigo; transforme-a em motivos concretos, como instituições, terrenos, objetos, rumores, rituais, desgaste, pressão ou tabus.
+- Varie a estrutura dos nomes dentro do mesmo lote: substituição, inserção, metáfora e títulos locais são permitidos; não use o mesmo prefixo ou sufixo em todos eles.
+- Se "Previous error" não for "None", corrija esse erro nesta resposta.
+- Escreva todo o conteúdo textual retornado em português brasileiro claro e natural. Nomes próprios podem permanecer na forma original quando necessário.
+
+História do mundo:
+{world_lore}
+
+Guia de estilo:
+{style_guide}
+
+Resumo atual do mapa:
+{map_summary}
+
+Categoria das entidades:
+{entity_label}
+
+Requisitos de reescrita:
+{instructions}
+
+Erro anterior:
+{previous_error}
+
+Entidades:
+{entities_json}
+
+Categoria das entidades pareadas:
+{paired_entity_label}
+
+Entidades pareadas:
+{paired_entities_json}
+
+Retorne JSON:
+Se não houver entidades pareadas:
+{{
+  "rewrite_plan": "No máximo 3 frases explicando como este lote traduz a história do mundo sem criar repetição mecânica",
+  "{result_field}": [
+    {{"id": 1, "name": "...", "desc": "..."}}
+  ]
+}}
+
+Se houver entidades pareadas:
+{{
+  "rewrite_plan": "No máximo 3 frases explicando como este lote traduz a história do mundo sem criar repetição mecânica",
+  "{result_field}": [
+    {{"id": 1, "name": "...", "desc": "..."}}
+  ],
+  "{paired_result_field}": [
+    {{"id": 401, "name": "...", "desc": "..."}}
+  ]
+}}

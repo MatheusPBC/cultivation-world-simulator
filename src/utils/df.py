@@ -65,7 +65,8 @@ def load_csv(path: Path) -> List[Dict[str, Any]]:
         # -----------------------------------------------------------
         # Try to translate name, desc and title using their IDs.
         # If translation exists (and is not just the key itself), overwrite the value.
-        # Fallback is keeping the original value from CSV (usually Chinese reference).
+        # The gettext chain resolves the selected locale and then en-US. This keeps
+        # untranslated content readable instead of leaking the Chinese source CSV.
         
         title_id = row_dict.get("title_id")
         if title_id and isinstance(title_id, str):

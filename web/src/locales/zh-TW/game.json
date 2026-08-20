@@ -1,5 +1,23 @@
 {
   "population": "人口",
+  "world_journal": {
+    "title": "世界日誌",
+    "coming_soon": "即將推出",
+    "tabs": { "now": "現在", "focus": "焦點", "stories": "故事", "timeline": "時間軸" },
+    "periods": { "one": "本月", "three": "3 個月", "twelve": "1 年" },
+    "important_changes": "重要變更",
+    "important_empty": "此期間沒有重要變更。",
+    "ongoing": "進行中",
+    "ongoing_empty": "此期間沒有追蹤活動。",
+    "activity": "世界動態",
+    "total_events": "事件",
+    "major_events": "重要",
+    "story_events": "故事",
+    "active_avatars": "活躍角色",
+    "event_count": "{count} 則事件",
+    "loading": "正在載入日誌...",
+    "error": "無法載入日誌。"
+  },
   "status_bar": {
     "phenomenon": "天地靈機",
     "effect": "效果：",
@@ -600,7 +618,9 @@
     "no_events": "暫無相關事件",
     "back_to_list": "返回列表",
     "death_year": "第{year}年{month}月",
-    "rogue": "散修"
+    "rogue": "散修",
+    "status_alive": "在世",
+    "status_dead": "已故"
   },
   "world_secret": {
     "title": "世界秘密",

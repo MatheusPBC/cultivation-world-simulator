@@ -1,0 +1,82 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "World not initialized"
+msgstr "Mundo não inicializado"
+
+msgid "Avatar not found"
+msgstr "Avatar não encontrado"
+
+msgid "Objective set"
+msgstr "Objetivo definido"
+
+msgid "Objective cleared"
+msgstr "Objetivo removido"
+
+msgid "No user objective to clear"
+msgstr "Não há objetivo do usuário para remover"
+
+msgid "Invalid pic_id for avatar gender"
+msgstr "pic_id inválido para o gênero do avatar"
+
+msgid "Avatar portrait updated"
+msgstr "Retrato do avatar atualizado"
+
+msgid "Avatar deleted"
+msgstr "Avatar excluído"
+
+msgid "Finish the active roleplay before deleting this avatar"
+msgstr "Encerre a interpretação de papel ativa antes de excluir este avatar"
+
+msgid "Avatar adjustment applied"
+msgstr "Ajuste do avatar aplicado"
+
+msgid "Invalid pic_id for selected gender"
+msgstr "pic_id inválido para o gênero selecionado"
+
+msgid "Created avatar {avatar_name}"
+msgstr "Avatar {avatar_name} criado"
+
+msgid "Age {age} exceeds the maximum {max_age} for {realm}"
+msgstr "A idade {age} excede o máximo de {max_age} para {realm}"
+
+msgid "Phenomenon not found"
+msgstr "Fenômeno não encontrado"
+
+msgid "Phenomenon set to {phenomenon_name}"
+msgstr "Fenômeno definido como {phenomenon_name}"
+
+msgid "Invalid filename"
+msgstr "Nome de arquivo inválido"
+
+msgid "Game not initialized"
+msgstr "Jogo não inicializado"
+
+msgid "Invalid save name"
+msgstr "Nome de salvamento inválido"
+
+msgid "Save failed"
+msgstr "Falha ao salvar"
+
+msgid "Save deleted"
+msgstr "Salvamento excluído"
+
+msgid "File not found"
+msgstr "Arquivo não encontrado"
+
+msgid "Game loaded"
+msgstr "Jogo carregado"
+
+msgid "Load failed: {error}"
+msgstr "Falha ao carregar: {error}"
+
+msgid "Game reset to idle"
+msgstr "Jogo redefinido para o estado ocioso"
+
+msgid "Game paused"
+msgstr "Jogo pausado"
+
+msgid "Game resumed"
+msgstr "Jogo retomado"

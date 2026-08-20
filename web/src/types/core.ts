@@ -151,7 +151,6 @@ export interface AvatarDetail extends EntityBase {
   
   // 附加信息
   current_effects?: string;
-  "当前效果"?: string;
   sect_status_summary?: {
     sect_name: string;
     sect_rank: string;

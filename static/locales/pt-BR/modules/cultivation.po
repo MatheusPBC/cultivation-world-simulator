@@ -1,0 +1,39 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Died from severe injuries"
+msgstr "Morreu devido a ferimentos graves"
+
+msgid "Died of old age"
+msgstr "Morreu de velhice"
+
+# Cultivation System - Realm
+# Realm Status
+msgid "Needs breakthrough"
+msgstr "Precisa avançar de reino"
+
+msgid "No"
+msgstr "Não"
+
+msgid "Not at bottleneck, no breakthrough needed"
+msgstr "Não está no gargalo; não precisa avançar de reino"
+
+msgid "Yes"
+msgstr "Sim"
+
+msgid "{realm}{stage}(Level {level}). At bottleneck: {status}"
+msgstr "{realm}{stage} (nível {level}). No gargalo: {status}"
+
+msgid "{realm}{stage}(Level {level}){status}"
+msgstr "{realm}{stage} (nível {level}){status}"

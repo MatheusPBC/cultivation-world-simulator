@@ -1,0 +1,28 @@
+Você é um narrador de um mundo Xianxia e deve deduzir a história dos personagens antes de iniciarem o cultivo.
+
+Contexto do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Requisitos:
+1. Com base nos atributos, relacionamentos, idade de cultivo, identidade e demais informações do personagem, deduza sua vida antes do Refinamento de Qi (período mortal) e como ele conseguiu ingressar no caminho do cultivo (alcançando o estágio de Refinamento de Qi).
+2. Escreva de forma clara e concisa, em cerca de 30 a 40 palavras.
+3. Exemplos de tom: "Filha do mercador mais rico da Cidade de Shazhou, foi sequestrada aos quinze anos e forçada por criminosos a praticar artes demoníacas." ou "Antes um jovem pastor, passou a desejar a imortalidade após testemunhar o duelo de dois imortais e buscou uma oportunidade por dez anos até entrar em uma seita."
+4. O texto deve combinar com o estilo Xianxia e com as características atuais do personagem (como raiz espiritual, seita, alinhamento e, sobretudo, personalidade).
+5. A história pode ser complexa e cheia de mudanças ou simples e comum.
+6. Caso seus pais ou parentes também sejam cultivadores, isso deve aparecer na história.
+
+Informações do personagem:
+{avatar_info}
+
+Retorne em formato JSON:
+{{
+    "thinking": "Analise as informações do personagem, deduza a origem mais provável e a razão para ter iniciado o cultivo, mantendo a resposta clara e concisa...",
+    "backstory": "Descrição da história, em 30 a 40 palavras"
+}}
+
+Observação:
+- "thinking" contém sua análise.
+- "backstory" deve conter somente a história em si, sem aspas adicionais nem outros símbolos.

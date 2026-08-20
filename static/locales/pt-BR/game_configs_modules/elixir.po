@@ -1,0 +1,157 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. elixir.csv: 凝聚灵气，辅助练气期修士突破瓶颈的丹药（...
+msgid "ELIXIR_3001_DESC"
+msgstr "Uma pílula que condensa o qi espiritual para ajudar cultivadores no estágio de Refinamento de Qi a superar gargalos (o efeito dura 5 anos)."
+
+#. elixir.csv: 练气破境丹
+msgid "ELIXIR_3001_NAME"
+msgstr "Pílula de Avanço do Refinamento de Qi"
+
+#. elixir.csv: 蕴含筑基真意，辅助筑基期修士突破瓶颈的灵...
+msgid "ELIXIR_3002_DESC"
+msgstr "Uma pílula espiritual que contém a verdadeira essência do Estabelecimento da Fundação e ajuda cultivadores desse estágio a superar gargalos (o efeito dura 5 anos)."
+
+#. elixir.csv: 筑基破境丹
+msgid "ELIXIR_3002_NAME"
+msgstr "Pílula de Avanço do Estabelecimento da Fundação"
+
+#. elixir.csv: 凝结金丹之气，辅助金丹期修士碎丹成婴（药...
+msgid "ELIXIR_3003_DESC"
+msgstr "Condensa o qi da Formação do Núcleo para ajudar cultivadores desse estágio a romper o núcleo e formar a alma (o efeito dura 5 anos)."
+
+#. elixir.csv: 金丹破境丹
+msgid "ELIXIR_3003_NAME"
+msgstr "Pílula de Avanço da Formação do Núcleo"
+
+#. elixir.csv: 采用凡间珍草炼制，略微延缓衰老（限服一颗...
+msgid "ELIXIR_3005_DESC"
+msgstr "Refinada com ervas preciosas comuns"
+
+#. elixir.csv: 练气长生丹
+msgid "ELIXIR_3005_NAME"
+msgstr "Pílula da Longevidade do Refinamento de Qi"
+
+#. elixir.csv: 取天地灵草炼制，可延寿十载（限服一颗）。...
+msgid "ELIXIR_3006_DESC"
+msgstr "Refinada com ervas espirituais do Céu e da Terra"
+
+#. elixir.csv: 筑基长生丹
+msgid "ELIXIR_3006_NAME"
+msgstr "Pílula da Longevidade do Estabelecimento da Fundação"
+
+#. elixir.csv: 夺天地造化，凡人服之立毙，金丹修士服之延...
+msgid "ELIXIR_3007_DESC"
+msgstr "Usurpa a criação do Céu e da Terra; mortais morrem instantaneamente ao consumi-la"
+
+#. elixir.csv: 金丹长生丹
+msgid "ELIXIR_3007_NAME"
+msgstr "Pílula da Longevidade da Formação do Núcleo"
+
+#. elixir.csv: 蕴含一丝长生之气，元婴老怪以此续命（限服...
+msgid "ELIXIR_3008_DESC"
+msgstr "Contém um vestígio do qi da longevidade"
+
+#. elixir.csv: 元婴长生丹
+msgid "ELIXIR_3008_NAME"
+msgstr "Pílula da Longevidade da Alma Nascente"
+
+#. elixir.csv: 燃烧精血换取短暂爆发。3年内战力提升，但...
+msgid "ELIXIR_3009_DESC"
+msgstr "Queima a essência do sangue em troca de uma breve explosão de poder. O poder de combate aumenta por 3 anos, mas os meridianos ficam danificados e o poder de combate diminui durante os 10 anos seguintes."
+
+#. elixir.csv: 练气燃血丹
+msgid "ELIXIR_3009_NAME"
+msgstr "Pílula da Queima de Sangue do Refinamento de Qi"
+
+#. elixir.csv: 激发潜能的猛药。3年内战力大增，但10年...
+msgid "ELIXIR_3010_DESC"
+msgstr "Um remédio potente que estimula o potencial. O poder de combate aumenta muito por 3 anos, mas fica reduzido durante os 10 anos seguintes."
+
+#. elixir.csv: 筑基燃血丹
+msgid "ELIXIR_3010_NAME"
+msgstr "Pílula da Queima de Sangue do Estabelecimento da Fundação"
+
+#. elixir.csv: 金丹修士拼命时的选择。3年内战力暴涨，但...
+msgid "ELIXIR_3011_DESC"
+msgstr "A escolha dos cultivadores da Formação do Núcleo quando lutam pela própria vida. O poder de combate dispara por 3 anos, mas deixa ferimentos graves durante os 10 anos seguintes."
+
+#. elixir.csv: 金丹燃血丹
+msgid "ELIXIR_3011_NAME"
+msgstr "Pílula da Queima de Sangue da Formação do Núcleo"
+
+#. elixir.csv: 燃烧元婴本源。3年内获得毁天灭地的力量，...
+msgid "ELIXIR_3012_DESC"
+msgstr "Queima a origem da Alma Nascente. Concede poder capaz de destruir o mundo por 3 anos, mas deixa o usuário praticamente inválido durante os 10 anos seguintes."
+
+#. elixir.csv: 元婴燃血丹
+msgid "ELIXIR_3012_NAME"
+msgstr "Pílula da Queima de Sangue da Alma Nascente"
+
+#. elixir.csv: 普通的疗伤丹药，可恢复练气期修士的伤势（...
+msgid "ELIXIR_3013_DESC"
+msgstr "Uma pílula curativa comum que trata os ferimentos de cultivadores no estágio de Refinamento de Qi (dura 5 anos)."
+
+#. elixir.csv: 练气回春丹
+msgid "ELIXIR_3013_NAME"
+msgstr "Pílula Rejuvenescedora do Refinamento de Qi"
+
+#. elixir.csv: 药力温和醇厚，能快速愈合筑基期修士的肉身...
+msgid "ELIXIR_3014_DESC"
+msgstr "Seu poder medicinal é suave e encorpado"
+
+#. elixir.csv: 筑基回春丹
+msgid "ELIXIR_3014_NAME"
+msgstr "Pílula Rejuvenescedora do Estabelecimento da Fundação"
+
+#. elixir.csv: 蕴含生机之力，疗伤圣药（持续5年）。...
+msgid "ELIXIR_3015_DESC"
+msgstr "Um remédio curativo supremo que contém o poder da vitalidade (dura 5 anos)."
+
+#. elixir.csv: 金丹回春丹
+msgid "ELIXIR_3015_NAME"
+msgstr "Pílula Rejuvenescedora da Formação do Núcleo"
+
+#. elixir.csv: 蕴含造化生机，肉身修复极快（持续5年）。...
+msgid "ELIXIR_3016_DESC"
+msgstr "Contém a força criadora da vitalidade"
+
+#. elixir.csv: 元婴回春丹
+msgid "ELIXIR_3016_NAME"
+msgstr "Pílula Rejuvenescedora da Alma Nascente"
+
+msgid "ELIXIR_3017_DESC"
+msgstr "Refinada com orvalho de flores e ervas espirituais, pode melhorar levemente a tez e a aparência (limitada a uma pílula)."
+
+msgid "ELIXIR_3017_NAME"
+msgstr "Pílula da Preservação da Beleza do Refinamento de Qi"
+
+msgid "ELIXIR_3018_DESC"
+msgstr "Sua natureza medicinal é mais estável e nutre a carne, os ossos e a vitalidade ao longo do tempo, realçando ainda mais a aparência (limitada a uma pílula)."
+
+msgid "ELIXIR_3018_NAME"
+msgstr "Pílula da Preservação da Beleza do Estabelecimento da Fundação"
+
+msgid "ELIXIR_3019_DESC"
+msgstr "Infundida com essência espiritual da Formação do Núcleo, preserva o auge da beleza por muito tempo e impede que os anos a desgastem com facilidade (limitada a uma pílula)."
+
+msgid "ELIXIR_3019_NAME"
+msgstr "Pílula da Preservação da Beleza da Formação do Núcleo"
+
+msgid "ELIXIR_3020_DESC"
+msgstr "Contém um vestígio do qi da criação; ao consumi-la, a aparência permanece como se estivesse fixada em seu momento mais radiante (limitada a uma pílula)."
+
+msgid "ELIXIR_3020_NAME"
+msgstr "Pílula da Preservação da Beleza da Alma Nascente"

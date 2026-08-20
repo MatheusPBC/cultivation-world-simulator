@@ -1,0 +1,170 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid ""
+"\n"
+"(Selecting {replace} will sell old {label})"
+msgstr ""
+"\n"
+"(Selecionar {replace} venderá o {label} antigo)"
+
+# Sect Rank
+msgid "patriarch"
+msgstr "Patriarca"
+
+msgid "phenomenon_change"
+msgstr "{old_name} se dissipa, e os fenômenos celestiais voltam a surgir! {new_name}: {new_desc}."
+
+msgid "world_creation_phenomenon"
+msgstr "O mundo nasce, e fenômenos celestiais descem sobre ele! {name}: {desc}."
+
+msgid ""
+"{avatar_name} deliberated and redefined their long-term objective: "
+"{objective}"
+msgstr ""
+"{avatar_name} refletiu e redefiniu seu objetivo de longo prazo: "
+"{objective}"
+
+msgid "{avatar_name} determined their long-term objective: {objective}"
+msgstr "{avatar_name} definiu seu objetivo de longo prazo: {objective}"
+
+# Sect System - Sects
+msgid "Base effect"
+msgstr "Efeito base"
+
+msgid "Sect random event"
+msgstr "Evento aleatório da seita"
+
+msgid "Temporary effect"
+msgstr "Efeito temporário"
+
+msgid "{sect_name} (Alignment: {alignment}, Headquarters: {hq_name})"
+msgstr "{sect_name} (Alinhamento: {alignment}, Sede: {hq_name})"
+
+msgid ""
+"{sect_name} (Alignment: {alignment}, Style: {style}, Headquarters: "
+"{hq_name}){effect}"
+msgstr ""
+"{sect_name} (Alinhamento: {alignment}, Estilo: {style}, Sede: "
+"{hq_name}){effect}"
+
+msgid ""
+"{sect_name} (Orthodoxy: {orthodoxy}, Alignment: {alignment}, Headquarters: "
+"{hq_name})"
+msgstr ""
+"{sect_name} (Ortodoxia: {orthodoxy}, Alinhamento: {alignment}, Sede: "
+"{hq_name})"
+
+msgid ""
+"{sect_name} (Orthodoxy: {orthodoxy}, Alignment: {alignment}, Style: {style},"
+" Headquarters: {hq_name}){effect}"
+msgstr ""
+"{sect_name} (Ortodoxia: {orthodoxy}, Alinhamento: {alignment}, Estilo: {style},"
+" Sede: {hq_name}){effect}"
+
+msgid "Our sect has settled its priorities for the coming years; next we should guard our rules and foundations, recruit talent with care, reward and punish fairly, and expand our momentum through steady progress."
+msgstr "Nossa seita definiu suas prioridades para os próximos anos; agora devemos preservar nossas regras e fundamentos, recrutar talentos com cuidado, recompensar e punir com justiça e ampliar nossa influência por meio de um progresso constante."
+
+msgid "There is currently no celestial phenomenon."
+msgstr "Não há nenhum fenômeno celestial no momento."
+
+msgid "A celestial phenomenon is present, but its description is missing."
+msgstr "Há um fenômeno celestial presente, mas sua descrição está ausente."
+
+msgid "New disciples must abide by the sect rules."
+msgstr "Novos discípulos devem obedecer às regras da seita."
+
+msgid "{sect_name} has extended a recruitment invitation to you."
+msgstr "{sect_name} enviou a você um convite de recrutamento."
+
+msgid "Sect overview: {sect_info}"
+msgstr "Visão geral da seita: {sect_info}"
+
+msgid "Sect rules: {rule_desc}"
+msgstr "Regras da seita: {rule_desc}"
+
+msgid "If you accept, you will become a disciple of this sect."
+msgstr "Se aceitar, você se tornará discípulo desta seita."
+
+msgid "Accept invitation"
+msgstr "Aceitar convite"
+
+msgid "Join {sect_name} and become one of its disciples."
+msgstr "Junte-se a {sect_name} e torne-se um de seus discípulos."
+
+msgid "Decline invitation"
+msgstr "Recusar convite"
+
+msgid "Remain an independent cultivator."
+msgstr "Continue como cultivador independente."
+
+msgid "{avatar_name} accepted {sect_name}'s invitation."
+msgstr "{avatar_name} aceitou o convite de {sect_name}."
+
+msgid "{avatar_name} declined {sect_name}'s invitation."
+msgstr "{avatar_name} recusou o convite de {sect_name}."
+
+msgid "{sect_name} declared war on {target_name}; from this point on, the two sects are at war."
+msgstr "{sect_name} declarou guerra a {target_name}; a partir de agora, as duas seitas estão em guerra."
+
+msgid "{sect_name} made peace with {target_name}, and the state of war between them came to an end."
+msgstr "{sect_name} fez as pazes com {target_name}, encerrando o estado de guerra entre as duas seitas."
+
+msgid "{sect_name} spent {cost} spirit stones to recruit {avatar_name}; {avatar_name} officially became a disciple of the sect."
+msgstr "{sect_name} gastou {cost} pedras espirituais para recrutar {avatar_name}; {avatar_name} tornou-se oficialmente discípulo da seita."
+
+msgid "{sect_name} judged that {avatar_name} had gravely violated the sect rules and expelled them from the sect."
+msgstr "{sect_name} julgou que {avatar_name} havia violado gravemente as regras e o expulsou da seita."
+
+msgid "{sect_name} bestowed the technique \"{technique_name}\" upon {avatar_name}."
+msgstr "{sect_name} concedeu a técnica \"{technique_name}\" a {avatar_name}."
+
+msgid "{sect_name} granted {amount} spirit stones to {avatar_name} in support of their cultivation."
+msgstr "{sect_name} concedeu {amount} pedras espirituais a {avatar_name} para apoiar seu cultivo."
+
+msgid "recruited {count} rogue cultivators"
+msgstr "recrutou {count} cultivadores independentes"
+
+msgid "declared war {count} times"
+msgstr "declarou guerra {count} vezes"
+
+msgid "made peace {count} times"
+msgstr "fez as pazes {count} vezes"
+
+msgid "expelled {count} members"
+msgstr "expulsou {count} membros"
+
+msgid "bestowed techniques {count} times"
+msgstr "concedeu técnicas {count} vezes"
+
+msgid "granted spirit-stone support {count} times"
+msgstr "concedeu apoio em pedras espirituais {count} vezes"
+
+msgid "{sect_name} focused this round of sect decisions on consolidation and observation, with no major adjustments made."
+msgstr "{sect_name} concentrou esta rodada de decisões na consolidação e na observação, sem realizar grandes ajustes."
+
+msgid "{sect_name} this round of sect decisions:"
+msgstr "Decisões de {sect_name} nesta rodada:"
+
+msgid "Every successful recruit immediately costs {recruit_cost} spirit stones and increases future yearly member upkeep."
+msgstr "Cada recrutamento bem-sucedido custa imediatamente {recruit_cost} pedras espirituais e aumenta os futuros gastos anuais com membros."
+
+msgid "Each support action always costs {support_amount} spirit stones."
+msgstr "Cada ação de apoio sempre custa {support_amount} pedras espirituais."
+
+msgid "Granting techniques does not directly spend spirit stones, but it consumes sect inheritance resources; frequent rewards reduce the value and rarity of the sect's scripture collection."
+msgstr "Conceder técnicas não gasta pedras espirituais diretamente, mas consome recursos da herança da seita; recompensas frequentes reduzem o valor e a raridade da coleção de escrituras."
+
+msgid "[{month_stamp}] {content}"
+msgstr "[{month_stamp}] {content}"

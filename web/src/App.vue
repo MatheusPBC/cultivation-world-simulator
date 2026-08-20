@@ -12,9 +12,10 @@ import GameCanvas from './components/game/GameCanvas.vue'
 import RoleplayDock from './components/game/RoleplayDock.vue'
 import InfoPanelContainer from './components/game/panels/info/InfoPanelContainer.vue'
 import StatusBar from './components/layout/StatusBar.vue'
-import EventPanel from './components/game/panels/EventPanel.vue'
+import WorldJournalPanel from './components/game/panels/WorldJournalPanel.vue'
 import SystemMenu from './components/SystemMenu.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
+import MobileGameShell from './components/mobile/MobileGameShell.vue'
 import menuIcon from '@/assets/icons/ui/lucide/menu.svg'
 import playIcon from '@/assets/icons/ui/lucide/play.svg'
 import pauseIcon from '@/assets/icons/ui/lucide/pause.svg'
@@ -27,7 +28,10 @@ import { useBgm } from './composables/useBgm'
 import { useSidebarResize } from './composables/useSidebarResize'
 import { useAppShell } from './composables/useAppShell'
 import { useSystemMenuFlow } from './composables/useSystemMenuFlow'
+import { useIsMobile } from './composables/useIsMobile'
 import { logError } from './utils/appError'
+
+const isMobile = useIsMobile()
 
 // Stores
 import { useUiStore } from './stores/ui'
@@ -125,7 +129,10 @@ const {
   isManualPaused,
   performStartupCheck,
   handleMenuClose,
-  onGameBgmStart: () => useBgm().play('map'),
+  onGameBgmStart: () => {
+    // Avoid downloading a large track before mobile users ask for audio.
+    if (!isMobile.value) return useBgm().play('map')
+  },
   onResumeGame: () => systemStore.resume(),
 })
 
@@ -215,6 +222,8 @@ watch(sidebarWidth, width => {
 
         <div v-else-if="scene === 'initializing'" class="app-layout app-layout--shell"></div>
 
+        <MobileGameShell v-else-if="canRenderGameShell && isMobile" />
+
         <div v-else-if="canRenderGameShell" class="app-layout">
           <StatusBar />
           
@@ -272,7 +281,7 @@ watch(sidebarWidth, width => {
               @mousedown="onResizerMouseDown"
             ></div>
             <aside class="sidebar" :style="{ width: sidebarWidth + 'px' }">
-              <EventPanel />
+              <WorldJournalPanel />
             </aside>
           </div>
         </div>

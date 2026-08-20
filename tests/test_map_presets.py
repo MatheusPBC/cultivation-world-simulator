@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import polib
+
 from src.run.load_map import load_cultivation_world_map
 from src.run.map_presets import list_map_presets
 from src.run.map_snapshot import load_map_from_snapshot, serialize_map_snapshot
@@ -134,7 +136,7 @@ def test_map_snapshot_round_trip_restores_tiles_and_regions():
     game_map = load_cultivation_world_map("island_seas")
     snapshot = serialize_map_snapshot(game_map)
 
-    assert snapshot["schema_version"] == 2
+    assert snapshot["schema_version"] == 3
     assert snapshot["preset_id"] == "island_seas"
     assert snapshot["width"] == 84
     assert snapshot["height"] == 60
@@ -214,12 +216,67 @@ def test_public_map_region_coordinates_use_landmarks():
     assert city["y"] == game_map.landmarks[301]["y"]
 
 
-def test_map_region_overrides_are_applied_to_region_details():
-    game_map = load_cultivation_world_map("classic")
-    region = game_map.regions[101]
+def test_official_map_region_overrides_use_stable_locale_ids():
+    expected_ids: set[str] = set()
+    for map_id in ("classic", "island_seas", "mountain_frontier"):
+        source = read_map_source(PROJECT_ROOT / "static" / "game_configs" / "maps" / map_id / "map.json")
+        for region_id, override in source.region_overrides.items():
+            prefix = f"MAP_REGION_{map_id.upper()}_{region_id}"
+            assert override.name_id == f"{prefix}_NAME"
+            assert override.desc_id == f"{prefix}_DESC"
+            expected_ids.update((override.name_id, override.desc_id))
 
-    assert region.name == "东南平原"
-    assert "河渠与海风" in region.desc
+    assert len(expected_ids) == 132
+    for locale in ("en-US", "pt-BR"):
+        po = polib.pofile(str(PROJECT_ROOT / "static" / "locales" / locale / "modules" / "map_regions.po"))
+        translations = {entry.msgid: entry.msgstr for entry in po if not entry.obsolete}
+        assert set(translations) == expected_ids
+        assert all(value.strip() for value in translations.values())
+
+
+def test_public_map_preserves_world_lore_rewrite_after_localized_snapshot_load(tmp_path, monkeypatch):
+    from src import i18n
+    from src.classes.world_lore_snapshot import apply_world_lore_snapshot
+
+    po = polib.pofile(
+        str(PROJECT_ROOT / "static" / "locales" / "pt-BR" / "modules" / "map_regions.po")
+    )
+    mo_path = tmp_path / "pt-BR" / "LC_MESSAGES" / "messages.mo"
+    mo_path.parent.mkdir(parents=True)
+    po.save_as_mofile(str(mo_path))
+
+    original_language = str(language_manager)
+    monkeypatch.setattr(i18n, "_get_locale_dir", lambda: tmp_path)
+    try:
+        language_manager.set_language("pt-BR")
+        reload_translations()
+        original_map = load_cultivation_world_map("classic")
+        game_map = load_map_from_snapshot(serialize_map_snapshot(original_map))
+        assert game_map.regions[101].name == "Planícies do Sudeste"
+
+        world = World(map=game_map, month_stamp=create_month_stamp(Year(1), Month.JANUARY))
+        apply_world_lore_snapshot(
+            world,
+            {
+                "schema_version": 2,
+                "regions": {
+                    "101": {
+                        "name": "Vale das Cinzas Renascidas",
+                        "desc": "A antiga planície foi reescrita pela história deste mundo.",
+                    }
+                },
+            },
+        )
+        runtime = GameSessionRuntime(create_default_game_state())
+        runtime.set_world_and_sim(world, None)
+        response = get_world_map(runtime, sects_by_id={}, render_config={})
+    finally:
+        language_manager.set_language(original_language)
+        reload_translations()
+
+    region = next(region for region in response["regions"] if region["id"] == 101)
+    assert region["name"] == "Vale das Cinzas Renascidas"
+    assert region["desc"] == "A antiga planície foi reescrita pela história deste mundo."
 
 
 def test_map_presets_are_localized():

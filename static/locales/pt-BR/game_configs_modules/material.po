@@ -1,0 +1,221 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. material.csv: 普通的黑色铁矿，质地坚硬，适合打造练气期...
+msgid "MATERIAL_101_DESC"
+msgstr "Minério de ferro negro comum, de textura rígida, adequado para criar artefatos do estágio de Refinamento de Qi"
+
+#. material.csv: 玄铁
+msgid "MATERIAL_101_NAME"
+msgstr "Ferro Negro"
+
+#. material.csv: 通体赤红的铜矿，蕴含火灵之力，是筑基期炼...
+msgid "MATERIAL_102_DESC"
+msgstr "Minério de cobre inteiramente vermelho, contendo poder espiritual do fogo; um material comum no refinamento de artefatos do estágio de Estabelecimento da Fundação"
+
+#. material.csv: 赤精铜
+msgid "MATERIAL_102_NAME"
+msgstr "Cobre de Essência Rubra"
+
+#. material.csv: 银白色的稀有金属，延展性极佳且能传导灵力...
+msgid "MATERIAL_103_DESC"
+msgstr "Metal raro branco-prateado, de excelente maleabilidade e capaz de conduzir poder espiritual, adequado para artefatos do estágio de Formação do Núcleo"
+
+#. material.csv: 秘银
+msgid "MATERIAL_103_NAME"
+msgstr "Mithril"
+
+#. material.csv: 锐气逼人的金色矿石，坚不可摧，乃是元婴期...
+msgid "MATERIAL_104_DESC"
+msgstr "Minério dourado de aura cortante e indestrutível, um material de primeira linha para refinar artefatos natais do estágio de Alma Nascente"
+
+#. material.csv: 庚金
+msgid "MATERIAL_104_NAME"
+msgstr "Gengjin"
+
+#. material.csv: 奇草提炼的精华，具有神奇的治愈效果...
+msgid "MATERIAL_10_DESC"
+msgstr "Essência extraída de ervas exóticas, dotada de propriedades curativas mágicas"
+
+#. material.csv: 奇草精华
+msgid "MATERIAL_10_NAME"
+msgstr "Essência de Erva Exótica"
+
+#. material.csv: 灵木的珍贵木心，蕴含浓郁灵力，是制作法器...
+msgid "MATERIAL_11_DESC"
+msgstr "Precioso cerne de madeira espiritual, contendo denso poder espiritual; um material essencial na fabricação de artefatos"
+
+#. material.csv: 灵木心
+msgid "MATERIAL_11_NAME"
+msgstr "Cerne de Madeira Espiritual"
+
+#. material.csv: 沙漠仙人掌的灵药刻刺，能解百毒，制成针剂...
+msgid "MATERIAL_12_DESC"
+msgstr "Espinho medicinal espiritual de um cacto do deserto, capaz de neutralizar uma centena de venenos e muito eficaz quando transformado em injeção"
+
+#. material.csv: 仙人掌刺
+msgid "MATERIAL_12_NAME"
+msgstr "Espinho de Cacto"
+
+#. material.csv: 寒霜雪莲的洁白花瓣，蕴含极寒之气，是寒性...
+msgid "MATERIAL_13_DESC"
+msgstr "Pétala branca e pura de um Lótus da Neve Gélida, contendo qi de frio extremo; a melhor escolha entre os ingredientes medicinais de atributo gélido"
+
+#. material.csv: 雪莲花瓣
+msgid "MATERIAL_13_NAME"
+msgstr "Pétala de Lótus da Neve"
+
+#. material.csv: 水灵芝的蓝色孢子，能增强水行修炼者的灵力...
+msgid "MATERIAL_14_DESC"
+msgstr "Esporo azul de um Lingzhi Aquático, capaz de melhorar a circulação do poder espiritual de praticantes do elemento água"
+
+#. material.csv: 灵芝孢子
+msgid "MATERIAL_14_NAME"
+msgstr "Esporo de Lingzhi"
+
+#. material.csv: 雪绒花的纯白花蕊，具有安神镇静功效，是冥...
+msgid "MATERIAL_15_DESC"
+msgstr "Estame branco e puro de uma Flor de Neve, com propriedades calmantes e sedativas; um ingrediente medicinal ideal para auxiliar na meditação"
+
+#. material.csv: 雪绒花蕊
+msgid "MATERIAL_15_NAME"
+msgstr "Estame de Flor de Neve"
+
+#. material.csv: 千年古松的珍贵松脂，晶莹如琥珀，蕴含浓郁...
+msgid "MATERIAL_16_DESC"
+msgstr "Preciosa resina de um pinheiro milenar, cristalina como âmbar e repleta de poder espiritual; um material raro para refinar artefatos de alto nível"
+
+#. material.csv: 古松松脂
+msgid "MATERIAL_16_NAME"
+msgstr "Resina de Pinheiro Ancestral"
+
+#. material.csv: 五谷灵稻提炼的精华，能快速强化体质，是体...
+msgid "MATERIAL_17_DESC"
+msgstr "Essência extraída do arroz espiritual dos cinco grãos, capaz de fortalecer rapidamente a constituição; um ingrediente principal das pílulas de cultivo corporal"
+
+#. material.csv: 灵稻精华
+msgid "MATERIAL_17_NAME"
+msgstr "Essência de Arroz Espiritual"
+
+#. material.csv: 撼地神牛的独角，蕴含厚重的大地之力，是炼...
+msgid "MATERIAL_18_DESC"
+msgstr "Chifre único de um Touro Divino Abalador da Terra, contendo o denso poder da terra; um material de primeira linha para refinar artefatos pesados e formações defensivas"
+
+#. material.csv: 神牛角
+msgid "MATERIAL_18_NAME"
+msgstr "Chifre de Touro Divino"
+
+#. material.csv: 九曲清音竹中最精华的一节，敲击时能发出安...
+msgid "MATERIAL_19_DESC"
+msgstr "O segmento mais puro de um Bambu Melódico das Nove Curvas, que emite um som cristalino e tranquilizador quando golpeado; excelente material para criar artefatos de ondas sonoras"
+
+#. material.csv: 清音竹节
+msgid "MATERIAL_19_NAME"
+msgstr "Segmento de Bambu Melódico"
+
+#. material.csv: 灵性充沛的兔子细毛，质地柔软温暖，适合编...
+msgid "MATERIAL_1_DESC"
+msgstr "Pelagem fina de um coelho repleto de espiritualidade, macia e quente, adequada para tecer roupas resistentes ao frio"
+
+#. material.csv: 灵兔毛
+msgid "MATERIAL_1_NAME"
+msgstr "Pelo de Coelho Espiritual"
+
+#. material.csv: 冰魄骨蛇的内丹所在，虽为极寒之物，但吞服...
+msgid "MATERIAL_20_DESC"
+msgstr "Órgão que abriga o núcleo interno de uma Serpente Óssea de Essência Glacial. Embora seja um objeto de frio extremo, ingeri-lo aumenta muito a afinidade do cultivador com o qi gélido; um tesouro para praticantes de técnicas de gelo"
+
+#. material.csv: 冰魄蛇胆
+msgid "MATERIAL_20_NAME"
+msgstr "Vesícula da Serpente de Essência Glacial"
+
+#. material.csv: 叶面上天生带有星辰纹路的草叶，蕴含纯净的...
+msgid "MATERIAL_21_DESC"
+msgstr "Folha de erva que traz padrões estelares naturais na superfície e contém o puro poder das estrelas; um ingrediente principal das pílulas de atributo estelar"
+
+#. material.csv: 星纹叶
+msgid "MATERIAL_21_NAME"
+msgstr "Folha de Padrão Estelar"
+
+#. material.csv: 涅盘赤果的果核，即便果肉枯萎，核心仍锁有...
+msgid "MATERIAL_22_DESC"
+msgstr "Caroço de um Fruto Rubro do Nirvana. Mesmo que a polpa murche, o caroço ainda conserva um vestígio de força vital indestrutível; essencial para refinar pílulas de longevidade e remédios curativos supremos"
+
+#. material.csv: 赤果核
+msgid "MATERIAL_22_NAME"
+msgstr "Caroço de Fruto Rubro"
+
+#. material.csv: 凶猛魔狼的锋利狼牙，蕴含魔力，是锻造利器...
+msgid "MATERIAL_2_DESC"
+msgstr "Presa afiada de um feroz lobo demoníaco, contendo poder demoníaco; um material precioso para forjar armas cortantes"
+
+#. material.csv: 魔狼牙
+msgid "MATERIAL_2_NAME"
+msgstr "Presa de Lobo Demoníaco"
+
+#. material.csv: 青云鹿的羼玉之角，蕴含清灵之气，是炼丹的...
+msgid "MATERIAL_3_DESC"
+msgstr "Galhada semelhante a jade de um Cervo Qingyun, contendo qi espiritual puro; um ingrediente medicinal superior para a alquimia"
+
+#. material.csv: 青云鹿角
+msgid "MATERIAL_3_NAME"
+msgstr "Galhada de Qingyun"
+
+#. material.csv: 暗影豹的锋利爪子，轻盈而德，能增强武器的...
+msgid "MATERIAL_4_DESC"
+msgstr "Garra afiada de um Leopardo das Sombras, leve e ágil, capaz de aumentar a agilidade de uma arma"
+
+#. material.csv: 暗影豹爪
+msgid "MATERIAL_4_NAME"
+msgstr "Garra de Leopardo das Sombras"
+
+#. material.csv: 碧海龙龟的古老甲片，坚不可摧，蕴含海洋灵...
+msgid "MATERIAL_5_DESC"
+msgstr "Placa do casco ancestral de uma Tartaruga-Dragão do Mar Azul, indestrutível e repleta de poder espiritual oceânico; um material de primeira linha para armaduras"
+
+#. material.csv: 龙龟甲片
+msgid "MATERIAL_5_NAME"
+msgstr "Placa de Casco de Tartaruga-Dragão"
+
+#. material.csv: 石甲山熊的珍贵熊胆，能增强体质和力量，是...
+msgid "MATERIAL_6_DESC"
+msgstr "Preciosa vesícula de um Urso Montanhês de Armadura Rochosa, capaz de aumentar a constituição e a força; um ingrediente medicinal valioso para cultivadores corporais"
+
+#. material.csv: 山熊胆
+msgid "MATERIAL_6_NAME"
+msgstr "Vesícula de Urso Montanhês"
+
+#. material.csv: 风速马的飘逸鬃毛，轻如风羽，能用于炼制速...
+msgid "MATERIAL_7_DESC"
+msgstr "Crina esvoaçante de um Cavalo Veloz como o Vento, leve como uma pluma ao vento, usada para refinar artefatos de velocidade"
+
+#. material.csv: 风速马鬃
+msgid "MATERIAL_7_NAME"
+msgstr "Crina de Cavalo Veloz como o Vento"
+
+#. material.csv: 熔岩蜥蜴的赤红鳞片，耐高温且蕴含火系灵力...
+msgid "MATERIAL_8_DESC"
+msgstr "Escama vermelha de um Lagarto de Lava, resistente a altas temperaturas e contendo poder espiritual do elemento fogo; um material essencial para artefatos de atributo flamejante"
+
+#. material.csv: 熔岩鳞片
+msgid "MATERIAL_8_NAME"
+msgstr "Escama de Lava"
+
+#. material.csv: 毒瘴蛙的毒素囊袋，内含剧毒，是炼制毒类丹...
+msgid "MATERIAL_9_DESC"
+msgstr "Bolsa de toxina de um Sapo do Miasma Venenoso, contendo um veneno letal; um material raro para refinar pílulas venenosas"
+
+#. material.csv: 毒瘴囊
+msgid "MATERIAL_9_NAME"
+msgstr "Bolsa de Miasma Venenoso"

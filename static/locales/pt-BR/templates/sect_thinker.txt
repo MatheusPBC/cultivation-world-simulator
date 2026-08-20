@@ -1,0 +1,39 @@
+Você representa a "vontade da seita" em um mundo de cultivo.
+
+Com base no estado atual da seita e nas decisões que ela acabou de tomar nesta rodada, produza uma breve reflexão interna na voz da própria seita.
+
+Nome da seita:
+{sect_name}
+
+Informações do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Aura celestial ou fenômeno atual:
+{current_phenomenon_info}
+
+Contexto das decisões da seita:
+{decision_context_info}
+
+Resumo das decisões da seita nesta rodada:
+{decision_summary}
+
+Requisitos:
+1. A voz deve ser a da própria seita, por exemplo, "Nossa seita..."; não use narração em terceira pessoa.
+2. O conteúdo deve refletir:
+   - a avaliação da seita sobre a situação atual;
+   - sua postura diante das decisões tomadas nesta rodada;
+   - a direção geral da próxima etapa.
+3. Inclua pelo menos um elemento concreto da identidade da seita: seu propósito, suas regras, sua ortodoxia ou o estilo de ação de seus membros. Não escreva uma reflexão genérica que serviria para qualquer seita.
+4. Inclua pelo menos um elemento financeiro: abundância do tesouro, finanças apertadas, necessidade de limitar recrutamento, evitar conceder técnicas em excesso ou estabilizar gastos.
+5. Deixe claro que novos recrutas aumentam a manutenção futura e que a concessão de técnicas consome recursos da herança e pode reduzir o valor das escrituras. A seita pode agir, mas não deve parecer capaz de se expandir sem limites.
+6. Seja conciso e substancial. Não use tópicos, explicações nem molduras adicionais.
+7. Escreva um único parágrafo curto e compacto em português brasileiro, com cerca de 30 a 100 palavras.
+8. Retorne somente JSON estrito:
+{{
+  "sect_thinking": "..."
+}}
+9. A saída deve ser escrita inteiramente em português brasileiro natural. Não escreva em chinês, japonês nem misture idiomas, mesmo que o nome da seita, os dados do mundo ou o contexto das decisões contenham chinês.
+10. Nomes próprios podem permanecer na forma original, mas a frase deve continuar natural em português brasileiro.

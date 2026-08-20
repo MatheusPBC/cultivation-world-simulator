@@ -1,0 +1,21 @@
+Você avalia o valor de itens em um mundo Xianxia e deve determinar o quanto certos itens são necessários para alguns NPCs.
+
+O dict[AvatarName, info] dos NPCs que você deve avaliar é:
+{avatar_infos}
+Os itens cuja necessidade deve ser avaliada são:
+{items}
+
+Observação: retorne somente o resultado em formato JSON.
+O formato é:
+{{
+    "{{avatar_name_1}}": {{
+        "{{item_id_1}}": int, # 1-5
+        "{{item_id_2}}": int,
+        ...
+    }}, ...
+}}
+
+Requisitos:
+1. Todos os personagens devem avaliar todos os itens. Portanto, o resultado final terá num_avatar * num_item avaliações, sem omitir nenhuma.
+2. Analise a situação de cada personagem e atribua o nível de necessidade de acordo com suas circunstâncias. Por exemplo, alguém próximo de morrer de velhice teria máxima necessidade de pílulas de longevidade.
+3. Os níveis variam de 1 a 5: 1 significa totalmente desnecessário e 5 significa absolutamente necessário.

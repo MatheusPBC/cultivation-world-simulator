@@ -32,3 +32,13 @@ def load_template(path: Path | str) -> str:
     path = Path(path)
     return path.read_text(encoding="utf-8")
 
+
+def append_output_locale_instruction(prompt: str) -> str:
+    """Append the active game's localized output-language contract."""
+    from src.i18n.template_resolver import resolve_locale_template_path
+
+    instruction_path = resolve_locale_template_path("llm_output_language.txt")
+    instruction = load_template(instruction_path).strip()
+    if not instruction:
+        return prompt
+    return f"{prompt.rstrip()}\n\n---\n{instruction}"

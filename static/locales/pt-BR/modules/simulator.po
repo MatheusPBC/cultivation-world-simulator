@@ -1,0 +1,44 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2026-08-19 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "(Choosing to replace will sell the old {label})"
+msgstr "(Ao optar pela substituição, o item antigo de {label} será vendido)"
+
+msgid ", keep current '{old_name}'"
+msgstr ", manter '{old_name}' atual"
+
+msgid ", replace old {label} '{old_name}'"
+msgstr ", substituir {label} antigo, '{old_name}'"
+
+msgid ", sell old {label} '{old_name}'"
+msgstr ", vender {label} antigo, '{old_name}'"
+
+# Simulator & Event Translations
+msgid ""
+"{avatar_name} passed by {region_name}, found it ownerless, and occupied it."
+msgstr ""
+"{avatar_name} passou por {region_name}, viu que não pertencia a ninguém e "
+"ocupou o local."
+
+msgid "{dynasty_title} has enthroned a new ruler, and {emperor_name} ascends as emperor."
+msgstr "{dynasty_title} entronizou um novo governante: {emperor_name} ascende ao trono como imperador."
+
+msgid "Emperor {emperor_name} of {dynasty_title} has passed away at the age of {age}."
+msgstr "O imperador {emperor_name}, de {dynasty_title}, faleceu aos {age} anos."
+
+msgid "A new emperor ascends in {dynasty_title}: {emperor_name} inherits the throne."
+msgstr "Um novo imperador ascende em {dynasty_title}: {emperor_name} herda o trono."
+
+msgid "{avatar} neglected governance for too long, losing court reputation and falling from {old_rank} to {new_rank}."
+msgstr "{avatar} negligenciou o governo por tempo demais, perdeu prestígio na corte e caiu de {old_rank} para {new_rank}."

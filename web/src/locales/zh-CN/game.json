@@ -1,5 +1,23 @@
 {
   "population": "人口",
+  "world_journal": {
+    "title": "世界日志",
+    "coming_soon": "即将推出",
+    "tabs": { "now": "当前", "focus": "关注", "stories": "故事", "timeline": "时间线" },
+    "periods": { "one": "本月", "three": "3个月", "twelve": "1年" },
+    "important_changes": "重要变更",
+    "important_empty": "此期间没有重要变更。",
+    "ongoing": "进行中",
+    "ongoing_empty": "此期间没有追踪活动。",
+    "activity": "世界动态",
+    "total_events": "事件",
+    "major_events": "重要",
+    "story_events": "故事",
+    "active_avatars": "活跃角色",
+    "event_count": "{count} 条事件",
+    "loading": "正在加载日志...",
+    "error": "无法加载日志。"
+  },
   "status_bar": {
     "phenomenon": "天地灵机",
     "effect": "效果：",
@@ -619,6 +637,8 @@
     "no_events": "暂无相关事件",
     "back_to_list": "返回列表",
     "death_year": "第{year}年{month}月",
-    "rogue": "散修"
+    "rogue": "散修",
+    "status_alive": "在世",
+    "status_dead": "已故"
   }
 }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Any
+from typing import Callable, Any, Literal
 
 from fastapi import APIRouter, Query
 
@@ -98,6 +98,10 @@ def create_public_query_router(
                 limit=limit,
             )
         )
+
+    @router.get("/api/v1/query/world/journal")
+    def get_world_journal_v1(period_months: Literal["1", "3", "12"] = "1"):
+        return ok_response(query_service.get_world_journal(period_months=int(period_months)))
 
     @router.get("/api/v1/query/rankings")
     def get_rankings_v1():

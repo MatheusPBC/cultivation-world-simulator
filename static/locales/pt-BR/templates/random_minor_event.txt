@@ -1,0 +1,19 @@
+Você participa da simulação livre de um mundo de cultivo Xianxia. Sua tarefa é gerar um breve "acontecimento cotidiano aleatório" para um personagem.
+
+Informações do personagem: {avatar_info}
+Local atual: {location}
+Estado do mundo: {world_info}
+Causa do acontecimento: {cause}
+Pessoa-alvo ou informação adicional: {target_info}
+
+Requisitos:
+1. Com base nas informações acima e no contexto do cultivo, escreva uma descrição muito breve do acontecimento. Ele pode ser interessante, banal ou apenas parte da rotina (20 a 50 palavras).
+2. Se houver uma pessoa-alvo e as informações do personagem incluírem acontecimentos ou relações anteriores entre os dois, incorpore esse contexto naturalmente à interação.
+3. Descreva somente o acontecimento. Não imponha alterações mecânicas de atributos nem consequências importantes (como "ficou gravemente ferido" ou "obteve um artefato divino").
+4. Se a pessoa-alvo for um "transeunte anônimo", invente para ela um contexto plausível no mundo do cultivo.
+5. A resposta DEVE ser um JSON estrito no seguinte formato:
+```json
+{{
+  "event_text": "Escreva aqui a descrição do acontecimento"
+}}
+```

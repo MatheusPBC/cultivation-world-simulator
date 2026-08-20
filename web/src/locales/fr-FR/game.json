@@ -1,5 +1,23 @@
 {
   "population": "Population",
+  "world_journal": {
+    "title": "Journal du monde",
+    "coming_soon": "Bientôt disponible",
+    "tabs": { "now": "Maintenant", "focus": "À suivre", "stories": "Histoires", "timeline": "Chronologie" },
+    "periods": { "one": "Ce mois-ci", "three": "3 mois", "twelve": "1 an" },
+    "important_changes": "Changements importants",
+    "important_empty": "Aucun changement important sur cette période.",
+    "ongoing": "En cours",
+    "ongoing_empty": "Aucune activité suivie sur cette période.",
+    "activity": "Activité du monde",
+    "total_events": "Événements",
+    "major_events": "Importants",
+    "story_events": "Histoires",
+    "active_avatars": "Personnages actifs",
+    "event_count": "{count} événements",
+    "loading": "Chargement du journal...",
+    "error": "Impossible de charger le journal."
+  },
   "status_bar": {
     "phenomenon": "Phénomène du monde",
     "effect": "Effet : ",
@@ -600,7 +618,9 @@
     "no_events": "Aucun événement lié",
     "back_to_list": "Retour à la liste",
     "death_year": "An {year}, Mois {month}",
-    "rogue": "Errant"
+    "rogue": "Errant",
+    "status_alive": "En vie",
+    "status_dead": "Décédé"
   },
   "world_secret": {
     "title": "Secret du monde",

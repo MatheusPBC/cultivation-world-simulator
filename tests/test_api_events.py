@@ -11,6 +11,7 @@ Uses FastAPI TestClient to test the API directly.
 import pytest
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -212,6 +213,74 @@ class TestGetEventsAPI:
             assert detail["code"] == "WORLD_NOT_READY"
         finally:
             main.game_instance.update(original)
+
+
+class TestWorldJournalAPI:
+    """Tests for the deterministic World Journal overview."""
+
+    def test_get_world_journal_summarizes_the_selected_period(
+        self,
+        client_with_world,
+        mock_world_with_events,
+    ):
+        mock_world_with_events.month_stamp = create_month_stamp(Year(100), Month.MAY)
+        mock_world_with_events.avatar_manager.avatars.update(
+            {
+                "a1": SimpleNamespace(
+                    id="a1",
+                    name="Alice",
+                    current_action_name="Cultivating",
+                    is_dead=False,
+                ),
+                "a2": SimpleNamespace(
+                    id="a2",
+                    name="Bob",
+                    current_action_name="Travelling",
+                    is_dead=False,
+                ),
+            }
+        )
+        event_count_before = mock_world_with_events.event_manager.count()
+
+        response = client_with_world.get("/api/v1/query/world/journal?period_months=3")
+
+        assert response.status_code == 200, response.json()
+        data = response.json()["data"]
+
+        assert data["period"] == {
+            "months": 3,
+            "start_month_stamp": 1202,
+            "end_month_stamp": 1204,
+        }
+        assert data["activity"] == {
+            "total_events": 3,
+            "major_events": 1,
+            "story_events": 1,
+            "routine_events": 1,
+            "active_avatar_count": 2,
+        }
+        assert [event["content"] for event in data["highlights"]] == ["Major event"]
+        assert all(event["id"] for event in data["highlights"])
+        assert data["ongoing"] == [
+            {
+                "avatar_id": "a1",
+                "avatar_name": "Alice",
+                "action": "Cultivating",
+                "event_count": 3,
+            },
+            {
+                "avatar_id": "a2",
+                "avatar_name": "Bob",
+                "action": "Travelling",
+                "event_count": 1,
+            },
+        ]
+        assert mock_world_with_events.event_manager.count() == event_count_before
+
+    def test_get_world_journal_rejects_unsupported_period(self, client_with_world):
+        response = client_with_world.get("/api/v1/query/world/journal?period_months=2")
+
+        assert response.status_code == 422
 
 
 class TestCleanupEventsAPI:

@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 from src.config.data_paths import get_data_paths
 from src.i18n.locale_registry import (
     get_default_locale,
+    get_fallback_locale,
     get_project_root,
     normalize_locale_code,
 )
@@ -70,14 +71,15 @@ def update_paths_for_language(lang_code: str | None = None):
 
     locales_dir = Path(resources.get("locales_dir", project_root / "static" / "locales"))
     target_dir = locales_dir / lang_code
+    resource_dir = target_dir if target_dir.exists() else locales_dir / get_fallback_locale()
 
     CONFIG.paths.locales = locales_dir
     CONFIG.paths.shared_game_configs = Path(
         resources.get("shared_game_configs_dir", project_root / "static" / "game_configs")
     )
-    CONFIG.paths.localized_game_configs = target_dir / "game_configs"
+    CONFIG.paths.localized_game_configs = resource_dir / "game_configs"
     CONFIG.paths.game_configs = CONFIG.paths.shared_game_configs
-    CONFIG.paths.templates = target_dir / "templates"
+    CONFIG.paths.templates = resource_dir / "templates"
 
     if not CONFIG.paths.game_configs.exists():
         print(f"[Config] Warning: Game configs dir not found at {CONFIG.paths.game_configs}")
@@ -86,4 +88,3 @@ def update_paths_for_language(lang_code: str | None = None):
 
 # 模块加载时初始化默认语言下的路径，避免 import 时 KeyError。
 update_paths_for_language()
-

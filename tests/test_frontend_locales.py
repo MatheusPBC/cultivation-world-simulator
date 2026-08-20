@@ -9,6 +9,41 @@ from src.classes.weapon_type import WeaponType
 from src.i18n.locale_registry import get_locale_codes, get_source_locale
 
 class TestFrontendLocales:
+    def test_world_journal_keys_are_available_in_all_locales(self):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        required_keys = {
+            "title",
+            "coming_soon",
+            "tabs.now",
+            "tabs.focus",
+            "tabs.stories",
+            "tabs.timeline",
+            "periods.one",
+            "periods.three",
+            "periods.twelve",
+            "important_changes",
+            "important_empty",
+            "ongoing",
+            "ongoing_empty",
+            "activity",
+            "total_events",
+            "major_events",
+            "story_events",
+            "active_avatars",
+            "event_count",
+            "loading",
+            "error",
+        }
+
+        for locale in get_locale_codes():
+            locale_path = os.path.join(base_dir, "web", "src", "locales", locale, "game.json")
+            with open(locale_path, "r", encoding="utf-8") as file:
+                journal = json.load(file).get("world_journal", {})
+
+            journal_keys = self.get_all_keys(journal)
+            missing_keys = required_keys - journal_keys
+            assert not missing_keys, f"{locale}/game.json missing World Journal keys: {sorted(missing_keys)}"
+
     def test_popup_types_coverage(self):
         """Verify popup entity type keys are mapped in frontend locales."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

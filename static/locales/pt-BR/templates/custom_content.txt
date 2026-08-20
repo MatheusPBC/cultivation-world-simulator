@@ -1,0 +1,29 @@
+Você auxilia na criação de conteúdo para um mundo de cultivo. Com base no pedido do jogador, crie um novo {category_label}.
+
+Restrições de criação:
+1. {scope_hint}
+2. Você só pode combinar efeitos existentes. Não crie nenhuma mecânica nova.
+3. Não use when, _desc, eval(...), avatar.xxx, special_data nem legal_actions.
+4. Procure seguir o estilo dos materiais de referência fornecidos, sem copiar diretamente seus nomes ou descrições.
+5. Os requisitos adicionais do jogador são:
+{user_prompt}
+6. O resultado deve combinar com um mundo de cultivo e atender aos requisitos adicionais do jogador.
+
+Efeitos permitidos:
+{allowed_effects}
+
+{reference_hint}
+{reference_items}
+
+Retorne somente um objeto JSON, sem explicações adicionais. Use este formato:
+{{
+  "thinking": "Justificativa breve do design",
+  "name": "Nome",
+  "desc": "Descrição",
+  "effects": {{
+    "effect_key": "value"
+  }},
+  "attribute": "GOLD/WOOD/WATER/FIRE/EARTH/ICE/WIND/DARK/THUNDER/EVIL, apenas para técnicas",
+  "grade": "LOWER/MIDDLE/UPPER, apenas para técnicas",
+  "weapon_type": "SWORD/SABER/SPEAR/STAFF/FAN/WHIP/ZITHER/FLUTE/HIDDEN_WEAPON, apenas para armas"
+}}

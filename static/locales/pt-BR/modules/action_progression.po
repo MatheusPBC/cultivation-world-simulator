@@ -1,0 +1,230 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "breakthrough probability increased by {val:.1%}"
+msgstr "Probabilidade de avanço aumentada em {val:.1%}."
+
+# Action: Breakthrough
+msgid "breakthrough_action_name"
+msgstr "Avanço de reino"
+
+msgid "breakthrough_description"
+msgstr ""
+"Tente avançar de reino (o sucesso aumenta a longevidade máxima; a falha a "
+"reduz; quanto maior o reino, menor a chance de sucesso)"
+
+msgid "breakthrough_requirements"
+msgstr "O personagem deve estar no gargalo e não pode executar esta ação consecutivamente"
+
+# Action: Cast
+msgid "cast_action_name"
+msgstr "Forjar tesouro"
+
+msgid "cast_description"
+msgstr ""
+"Consuma materiais para tentar forjar tesouros (target_realm: QI_REFINEMENT, "
+"FOUNDATION_ESTABLISHMENT, CORE_FORMATION, NASCENT_SOUL)"
+
+msgid "cast_requirements"
+msgstr "Possuir 5 materiais do mesmo reino"
+
+# Action: DualCultivation
+msgid "dual_cultivation_action_name"
+msgstr "Cultivo dual"
+
+msgid "dual_cultivation_description"
+msgstr "Cultivo por meio da intimidade; o alvo pode aceitar ou recusar"
+
+msgid "dual_cultivation_requirements"
+msgstr "Alvo dentro do alcance de interação; não pode ser executado consecutivamente"
+
+msgid "dual_cultivation_story_prompt"
+msgstr ""
+"Dois cultivadores desenvolvem sentimentos durante o cultivo dual. Descreva "
+"uma experiência elegante e sutil de cultivo dual, com romance implícito, "
+"que reflita suas personalidades, diferenças de reino e momentos românticos "
+"e ternos. Não mencione valores numéricos de experiência."
+
+# Action: Educate
+msgid "educate_action_name"
+msgstr "Educar"
+
+msgid "educate_description"
+msgstr ""
+"Cultivo confucionista. Eduque as pessoas da cidade para acumular mérito e "
+"sorte."
+
+msgid "educate_requirements"
+msgstr "Requer ortodoxia confucionista e estar em uma cidade"
+
+msgid "govern_action_name"
+msgstr "Governar"
+
+msgid "govern_description"
+msgstr "Cuide dos assuntos administrativos da corte em uma cidade para obter reputação na corte e salário."
+
+msgid "govern_requirements"
+msgstr "É preciso estar em uma cidade; dura três meses."
+
+msgid "excellent progress"
+msgstr "progresso excelente"
+
+msgid "gained {val} cultivation"
+msgstr "Ganhou {val} de cultivo."
+
+# Action: Harvest
+msgid "harvest_action_name"
+msgstr "Colher"
+
+msgid "harvest_description"
+msgstr "Colha plantas na área atual para obter materiais vegetais"
+
+msgid "harvest_requirements"
+msgstr ""
+"Estar em uma área normal com plantas, e o reino do personagem deve ser "
+"maior ou igual ao reino da planta"
+
+# Action: Meditate
+msgid "meditate_action_name"
+msgstr "Meditar"
+
+msgid "meditate_description"
+msgstr ""
+"Cultivo budista. Acalme a mente por meio da meditação zen, com uma chance "
+"de iluminação que concede um enorme ganho de cultivo."
+
+msgid "meditate_requirements"
+msgstr "Requer ortodoxia budista"
+
+# Action: NurtureWeapon
+msgid "nurture_weapon_action_name"
+msgstr "Nutrir arma"
+
+msgid "nurture_weapon_description"
+msgstr "Nutra a arma para aumentar a proficiência com ela"
+
+msgid "nurture_weapon_requirements"
+msgstr "Sem restrições"
+
+# Action: Refine
+msgid "refine_action_name"
+msgstr "Refinar elixir"
+
+msgid "refine_description"
+msgstr ""
+"Consuma materiais para tentar refinar elixires (target_realm: QI_REFINEMENT, "
+"FOUNDATION_ESTABLISHMENT, CORE_FORMATION, NASCENT_SOUL)"
+
+msgid "refine_requirements"
+msgstr "Possuir 3 materiais do mesmo reino"
+
+# Action: Respire
+msgid "respire_action_name"
+msgstr "Respirar qi"
+
+msgid "respire_description"
+msgstr ""
+"Harmonize-se com o Dao Celestial e respire qi. Quanto maior a densidade de "
+"energia espiritual, melhor o efeito."
+
+msgid "respire_requirements"
+msgstr "Requer ortodoxia taoista ou condição de cultivador independente"
+
+msgid "respire_sect_hq_members_only"
+msgstr "Apenas discípulos desta seita podem respirar qi em sua sede."
+
+msgid "respire_efficiency_sect_hq"
+msgstr "progresso constante (sede da seita)"
+
+# Action: SelfHeal
+msgid "self_heal_action_name"
+msgstr "Autocura"
+
+msgid "self_heal_description"
+msgstr "Cure ferimentos por meio da meditação; recupere-se por completo na sede da seita"
+
+msgid "self_heal_requirements"
+msgstr "PV atual não está cheio"
+
+msgid "slow progress (essence mismatch)"
+msgstr "progresso lento (essência incompatível)"
+
+msgid "slow progress (sparse essence)"
+msgstr "progresso lento (essência escassa)"
+
+# Action: Temper
+msgid "temper_action_name"
+msgstr "Têmpera corporal"
+
+msgid "temper_description"
+msgstr ""
+"Fortaleça o corpo por meio de treinamento extremo, sem depender de ajuda "
+"externa nem de qi espiritual."
+
+msgid "temper_requirements"
+msgstr "Requer ortodoxia marcial"
+
+msgid "{avatar} begins Zen Meditation."
+msgstr "{avatar} começou a meditação zen."
+
+msgid "{avatar} begins attempting breakthrough"
+msgstr "{avatar} começou a tentar um avanço de reino."
+
+msgid "{avatar} begins attempting to cast {realm}-tier treasure"
+msgstr "{avatar} começou a tentar forjar um tesouro de grau {realm}."
+
+msgid "{avatar} begins attempting to refine {realm}-tier elixir"
+msgstr "{avatar} começou a tentar refinar um elixir de grau {realm}."
+
+msgid "{avatar} begins educating people in {city}."
+msgstr "{avatar} começou a educar as pessoas em {city}."
+
+msgid "{avatar} begins governing in {city}."
+msgstr "{avatar} começou a governar em {city}."
+
+msgid "{avatar} begins tempering body strength"
+msgstr "{avatar} começou a fortalecer o corpo."
+
+msgid "{avatar} completed meditation with a peaceful mind."
+msgstr "{avatar} concluiu a meditação com a mente serena."
+
+msgid "{avatar} finished educating people. Merit accumulated (+{exp})."
+msgstr "{avatar} terminou de educar as pessoas. Mérito acumulado (+{exp})."
+
+msgid "{avatar} governed effectively in {city}. Court reputation +{reputation}, salary +{salary} spirit stones."
+msgstr "{avatar} governou {city} com eficiência. Reputação na corte +{reputation}, salário +{salary} pedras espirituais."
+
+msgid "{avatar} was promoted from {old_rank} to {new_rank} for distinguished governance."
+msgstr "{avatar} foi promovido de {old_rank} para {new_rank} por sua excelente administração."
+
+msgid "{avatar} was governing in {city}."
+msgstr "{avatar} estava governando em {city}."
+
+msgid "{avatar} completed a round of governance, and new ripples spread through court and countryside."
+msgstr "{avatar} concluiu um ciclo de governo, e novas repercussões se espalharam pela corte e pelo interior."
+
+msgid "{avatar} healing completed (recovered {amount} HP, current HP {hp})"
+msgstr "{avatar} concluiu a cura (recuperou {amount} PV, PV atual: {hp})"
+
+msgid "{avatar} successfully cast {realm}-tier {label} '{item}'"
+msgstr "{avatar} forjou com sucesso {label} '{item}', de grau {realm}"
+
+msgid "{avatar} successfully refined {realm}-tier elixir '{item}'"
+msgstr "{avatar} refinou com sucesso o elixir '{item}', de grau {realm}"
+
+msgid "{initiator} invites {target} for dual cultivation"
+msgstr "{initiator} convida {target} para o cultivo dual"
+
+msgid "Must be in a City to govern."
+msgstr "É preciso estar em uma cidade para governar."

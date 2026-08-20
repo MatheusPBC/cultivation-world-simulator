@@ -5,6 +5,7 @@ import { useDeleteAvatarPanel } from '@/composables/useDeleteAvatarPanel'
 import searchIcon from '@/assets/icons/ui/lucide/search.svg'
 import trashIcon from '@/assets/icons/ui/lucide/trash-2.svg'
 import refreshIcon from '@/assets/icons/ui/lucide/refresh-cw.svg'
+import { formatGenderLabel, formatRealmLabel } from '@/utils/cultivationText'
 
 const { t } = useI18n()
 
@@ -55,7 +56,7 @@ const {
          <div class="avatar-info">
            <div class="name">{{ avatar.name }}</div>
            <div class="details">
-              {{ avatar.gender }} | {{ avatar.age }} {{ t(uiKey('age_unit')) }} | {{ t('realms.' + avatar.realm) }} | {{ avatar.sect_name }}
+              {{ formatGenderLabel(avatar.gender, t) }} | {{ avatar.age }} {{ t(uiKey('age_unit')) }} | {{ formatRealmLabel(avatar.realm, t) }} | {{ avatar.sect_name }}
            </div>
          </div>
          <n-button

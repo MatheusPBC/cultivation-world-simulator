@@ -3004,6 +3004,531 @@ msgstr "Dense mountain ranges make caves and sect grounds feel more perilous."
 msgid "MAP_PRESET_SIZE_MEDIUM"
 msgstr "Medium"
 
+msgid "MAP_REGION_CLASSIC_101_NAME"
+msgstr "Southeastern Plains"
+
+msgid "MAP_REGION_CLASSIC_101_DESC"
+msgstr ""
+"The gentlest heartland of the southeastern provinces, where fertile fields, "
+"canals, and sea winds open onto a broad plain."
+
+msgid "MAP_REGION_CLASSIC_102_NAME"
+msgstr "Western Drifting Sands"
+
+msgid "MAP_REGION_CLASSIC_102_DESC"
+msgstr ""
+"A western frontier where desert and sea winds meet among yellow dunes, salt "
+"flats, and broken stone."
+
+msgid "MAP_REGION_CLASSIC_104_NAME"
+msgstr "Northern Frostlands"
+
+msgid "MAP_REGION_CLASSIC_104_DESC"
+msgstr ""
+"A frozen plain stretching inland from the high, cold country, swept by "
+"unending icy winds."
+
+msgid "MAP_REGION_CLASSIC_105_NAME"
+msgstr "Far Tides of the Eastern Sea"
+
+msgid "MAP_REGION_CLASSIC_105_DESC"
+msgstr ""
+"A vast eastern sea where tides and shipping lanes cross through open water."
+
+msgid "MAP_REGION_CLASSIC_106_NAME"
+msgstr "Celestial River Estuary"
+
+msgid "MAP_REGION_CLASSIC_106_DESC"
+msgstr ""
+"Calm waters where river and sea meet, gentle enough for frequent boat "
+"traffic."
+
+msgid "MAP_REGION_CLASSIC_107_NAME"
+msgstr "Eastern Ridge Mountains"
+
+msgid "MAP_REGION_CLASSIC_107_DESC"
+msgstr ""
+"A long eastern mountain chain whose rolling spine divides the peaks from the"
+" sea."
+
+msgid "MAP_REGION_CLASSIC_109_NAME"
+msgstr "Central Grasslands"
+
+msgid "MAP_REGION_CLASSIC_109_DESC"
+msgstr ""
+"Broad grasslands woven with low hills, well suited to mortals and "
+"cultivation sects living side by side."
+
+msgid "MAP_REGION_CLASSIC_110_NAME"
+msgstr "Qingyun Forest Sea"
+
+msgid "MAP_REGION_CLASSIC_110_DESC"
+msgstr ""
+"An endless forest spread like a sea of clouds, rising in green waves "
+"whenever the wind passes."
+
+msgid "MAP_REGION_CLASSIC_302_NAME"
+msgstr "Southern Frontier City"
+
+msgid "MAP_REGION_CLASSIC_302_DESC"
+msgstr ""
+"A trading city on the edge of the southern rainforest, where herbs, beast "
+"bones, and distant travelers converge."
+
+msgid "MAP_REGION_CLASSIC_403_NAME"
+msgstr "Nanling Tranquil Sea Cliffs"
+
+msgid "MAP_REGION_CLASSIC_403_DESC"
+msgstr ""
+"A sect perched on coastal cliffs, its halls half hidden as sea mist climbs "
+"the ridge through the sound of tides."
+
+msgid "MAP_REGION_CLASSIC_409_NAME"
+msgstr "Eastern Ridge Floating Isles"
+
+msgid "MAP_REGION_CLASSIC_409_DESC"
+msgstr ""
+"Floating islands above the eastern mountains, their terraced heights linked "
+"by cloud bridges and flying vessels."
+
+msgid "MAP_REGION_ISLAND_SEAS_101_NAME"
+msgstr "Lone Isle of the Central Sea"
+
+msgid "MAP_REGION_ISLAND_SEAS_101_DESC"
+msgstr "A midsized island adrift in a vast expanse of deep blue water."
+
+msgid "MAP_REGION_ISLAND_SEAS_102_NAME"
+msgstr "Northern Sand Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_102_DESC"
+msgstr ""
+"A sandy island in the northern shallows, where reefs and ocher dunes meet a "
+"shoreline constantly reshaped by waves."
+
+msgid "MAP_REGION_ISLAND_SEAS_105_NAME"
+msgstr "Boundless Sea Realm"
+
+msgid "MAP_REGION_ISLAND_SEAS_105_DESC"
+msgstr ""
+"Here the sea itself is the land, and shipping routes and currents form its "
+"only roads."
+
+msgid "MAP_REGION_ISLAND_SEAS_106_NAME"
+msgstr "Tidal Passage"
+
+msgid "MAP_REGION_ISLAND_SEAS_106_DESC"
+msgstr ""
+"A navigable channel along the boundary of deep and shallow water, forming a "
+"natural route between islands."
+
+msgid "MAP_REGION_ISLAND_SEAS_118_NAME"
+msgstr "Outer Penglai Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_118_DESC"
+msgstr ""
+"A solitary island far from the main archipelago, like a shard of jade "
+"scattered upon the sea."
+
+msgid "MAP_REGION_ISLAND_SEAS_103_NAME"
+msgstr "Western Rain Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_103_DESC"
+msgstr ""
+"A humid western island where rainforest hugs the coast and ancient vines "
+"disappear into the sea mist."
+
+msgid "MAP_REGION_ISLAND_SEAS_104_NAME"
+msgstr "Northern Ice Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_104_DESC"
+msgstr ""
+"An island ringed by northern cold currents, where sea winds drive snow "
+"across frozen shores and tundra."
+
+msgid "MAP_REGION_ISLAND_SEAS_107_NAME"
+msgstr "Eastern Crag Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_107_DESC"
+msgstr ""
+"A rocky island rising from the eastern sea, with cliffs, reefs, and mountain"
+" ridges pressed close together."
+
+msgid "MAP_REGION_ISLAND_SEAS_108_NAME"
+msgstr "Snow Isle of the Cold Current"
+
+msgid "MAP_REGION_ISLAND_SEAS_108_DESC"
+msgstr ""
+"A snow-peaked island shaped by northern currents, its icy cliffs gleaming "
+"like a white ridge afloat on the sea."
+
+msgid "MAP_REGION_ISLAND_SEAS_109_NAME"
+msgstr "Central Sea Green Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_109_DESC"
+msgstr ""
+"A mild, green island near the center of the archipelago and one of its few "
+"broad, welcoming landing places."
+
+msgid "MAP_REGION_ISLAND_SEAS_110_NAME"
+msgstr "Greenwood Inner Bay"
+
+msgid "MAP_REGION_ISLAND_SEAS_110_DESC"
+msgstr ""
+"A forested isle embraced by a bay, where shade and damp sea winds gather "
+"abundant wood essence."
+
+msgid "MAP_REGION_ISLAND_SEAS_111_NAME"
+msgstr "Crimson Reef Fire Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_111_DESC"
+msgstr ""
+"A volcanic island in the western chain, where red reefs reach into the sea "
+"and hot mist escapes through cracks."
+
+msgid "MAP_REGION_ISLAND_SEAS_112_NAME"
+msgstr "Sea-Farm Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_112_DESC"
+msgstr ""
+"A rare fertile flat in the central islands, where fresh water and sea winds "
+"nourish wide fields."
+
+msgid "MAP_REGION_ISLAND_SEAS_113_NAME"
+msgstr "Darktide Poison Bay"
+
+msgid "MAP_REGION_ISLAND_SEAS_113_DESC"
+msgstr ""
+"A poisoned marsh bay on the southwestern chain, thick with foul water, "
+"hidden currents, heat, and miasma."
+
+msgid "MAP_REGION_ISLAND_SEAS_114_NAME"
+msgstr "Southern Reef Mountains"
+
+msgid "MAP_REGION_ISLAND_SEAS_114_DESC"
+msgstr ""
+"A rugged belt of mountain reefs among the southern islands, where every "
+"short land route is cut by a strait."
+
+msgid "MAP_REGION_ISLAND_SEAS_115_NAME"
+msgstr "Bamboo-Shadow Isles"
+
+msgid "MAP_REGION_ISLAND_SEAS_115_DESC"
+msgstr ""
+"Small bamboo-covered isles scattered across the south-central sea, their "
+"rustling leaves often drowned by the tide."
+
+msgid "MAP_REGION_ISLAND_SEAS_116_NAME"
+msgstr "Northern Mist Wastes"
+
+msgid "MAP_REGION_ISLAND_SEAS_116_DESC"
+msgstr ""
+"A cold, barren northern island where sea fog and frozen ground hold the land"
+" in deep silence."
+
+msgid "MAP_REGION_ISLAND_SEAS_117_NAME"
+msgstr "Western Gravel Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_117_DESC"
+msgstr ""
+"A gravel-covered isle beside the northwestern sands, its shores buried under"
+" weathered stone and salt crust."
+
+msgid "MAP_REGION_ISLAND_SEAS_201_NAME"
+msgstr "Eastern Sea Metal Sanctuary"
+
+msgid "MAP_REGION_ISLAND_SEAS_201_DESC"
+msgstr ""
+"A metal-aspected sanctuary deep within the eastern crags, where sea winds "
+"enter the caves and become clear sword song."
+
+msgid "MAP_REGION_ISLAND_SEAS_202_NAME"
+msgstr "Greenwood Bay Grotto-Heaven"
+
+msgid "MAP_REGION_ISLAND_SEAS_202_DESC"
+msgstr ""
+"A wood-aspected grotto-heaven in Greenwood Bay, gathering the damp breath of"
+" the forest and the vitality of the sea."
+
+msgid "MAP_REGION_ISLAND_SEAS_203_NAME"
+msgstr "Northern Sea Mystic Waters"
+
+msgid "MAP_REGION_ISLAND_SEAS_203_DESC"
+msgstr ""
+"A water-aspected secret realm deep in the northern sea, circled by currents "
+"and lit by jade glimmers in reef caves."
+
+msgid "MAP_REGION_ISLAND_SEAS_205_NAME"
+msgstr "Cold Current Mystic Palace"
+
+msgid "MAP_REGION_ISLAND_SEAS_205_DESC"
+msgstr ""
+"An earth-aspected palace within the snowy isle, where ice and bedrock "
+"resonate through walls smooth as jade."
+
+msgid "MAP_REGION_ISLAND_SEAS_301_NAME"
+msgstr "Central Sea City"
+
+msgid "MAP_REGION_ISLAND_SEAS_301_DESC"
+msgstr ""
+"The archipelago's central port, layered with shipyards, bridge markets, and "
+"floating docks."
+
+msgid "MAP_REGION_ISLAND_SEAS_302_NAME"
+msgstr "Sea-Farm City"
+
+msgid "MAP_REGION_ISLAND_SEAS_302_DESC"
+msgstr ""
+"A farming and trading city on Sea-Farm Isle, where freshwater wells stand "
+"beside salt stores and grain markets."
+
+msgid "MAP_REGION_ISLAND_SEAS_303_NAME"
+msgstr "Sandreef City"
+
+msgid "MAP_REGION_ISLAND_SEAS_303_DESC"
+msgstr ""
+"A reefside city on Northern Sand Isle, reached by tide and sail rather than "
+"desert caravan."
+
+msgid "MAP_REGION_ISLAND_SEAS_304_NAME"
+msgstr "Cold Bay City"
+
+msgid "MAP_REGION_ISLAND_SEAS_304_DESC"
+msgstr ""
+"A sheltered city on Northern Ice Isle, where a protected harbor and warm-"
+"stone streets welcome water cultivators."
+
+msgid "MAP_REGION_ISLAND_SEAS_305_NAME"
+msgstr "Mooncatcher Harbor"
+
+msgid "MAP_REGION_ISLAND_SEAS_305_DESC"
+msgstr ""
+"A moonlit harbor on the southeastern outer isle, favored by voyaging "
+"cultivators who anchor to watch the tides."
+
+msgid "MAP_REGION_ISLAND_SEAS_401_NAME"
+msgstr "Cloudpiercer Crag"
+
+msgid "MAP_REGION_ISLAND_SEAS_401_DESC"
+msgstr ""
+"A cliffside sect on the eastern crag isle, its cloud bridges hanging above "
+"the churning surf."
+
+msgid "MAP_REGION_ISLAND_SEAS_405_NAME"
+msgstr "Thousand Mechanisms Reef Valley"
+
+msgid "MAP_REGION_ISLAND_SEAS_405_DESC"
+msgstr ""
+"A mechanism-filled valley whose reef caves, stone bridges, and hidden doors "
+"turn the entire island into a maze."
+
+msgid "MAP_REGION_ISLAND_SEAS_410_NAME"
+msgstr "Southern Reef Echo Valley"
+
+msgid "MAP_REGION_ISLAND_SEAS_410_DESC"
+msgstr ""
+"A valley in the southern reef mountains where sea wind draws long, zither-"
+"like notes through holes in the rock."
+
+msgid "MAP_REGION_ISLAND_SEAS_411_NAME"
+msgstr "Eastern Sea Labyrinth Heaven"
+
+msgid "MAP_REGION_ISLAND_SEAS_411_DESC"
+msgstr ""
+"A folded mountain gate on the eastern crag isle, where sea fog confuses "
+"mountain paths with sea routes."
+
+msgid "MAP_REGION_ISLAND_SEAS_413_NAME"
+msgstr "Eastern Grove Sage Isle"
+
+msgid "MAP_REGION_ISLAND_SEAS_413_DESC"
+msgstr ""
+"A coastal academy among eastern forests, where lectures and recitation "
+"mingle with the sound of tides."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_104_NAME"
+msgstr "Northern Snow Ridge"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_104_DESC"
+msgstr ""
+"A high snowline spread along the ridge, where cutting winds turn even level "
+"ground into hard slopes."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_107_NAME"
+msgstr "Broken Ridge Peaks"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_107_DESC"
+msgstr ""
+"The mountain range's hardest spine, where crowded peaks fracture into ridge "
+"after ridge."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_108_NAME"
+msgstr "Cold Jade Heights"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_108_DESC"
+msgstr ""
+"Snowbound high peaks with sweeping views and some of the frontier's most "
+"difficult crossings."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_110_NAME"
+msgstr "Forest Valley Pass"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_110_DESC"
+msgstr ""
+"Forest and gorge running side by side to form a winding, hidden passage "
+"through the mountains."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_111_NAME"
+msgstr "Volcanic Forecourt"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_111_DESC"
+msgstr ""
+"A borderland around the volcano where heated rock and cold winds meet head-"
+"on."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_114_NAME"
+msgstr "Heart of Ten Thousand Mountains"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_114_DESC"
+msgstr ""
+"The crowded heart of the range, dense with narrow roads, sheer ground, and "
+"overlapping peaks."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_101_NAME"
+msgstr "Mountain Pass Flats"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_101_DESC"
+msgstr ""
+"A rare flat between the mountains where the river valley opens and frontier "
+"settlements gather."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_102_NAME"
+msgstr "Western Loess Foothills"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_102_DESC"
+msgstr ""
+"Dry loess and scree on the western foothills, scoured by sand blown through "
+"the pass but far from an open desert."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_103_NAME"
+msgstr "Southern Ridge Rainforest"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_103_DESC"
+msgstr ""
+"A hot, dense forest below the southern mountains, wrapped in rain and mist "
+"that cling to the slopes."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_105_NAME"
+msgstr "Narrow Eastern Sea"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_105_DESC"
+msgstr ""
+"A narrow sea pressed against eastern cliffs, its coast broken into small "
+"harbors by the mountains."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_106_NAME"
+msgstr "Rushing Gorge River"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_106_DESC"
+msgstr ""
+"A swift river cutting through the mountains, its roar echoing off canyon "
+"walls beside the valley roads."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_112_NAME"
+msgstr "Fertile Valley Fields"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_112_DESC"
+msgstr ""
+"River-fed fields tucked between the mountains, small in area but precious as"
+" the frontier's granary."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_113_NAME"
+msgstr "Southern Foothill Poison Marsh"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_113_DESC"
+msgstr ""
+"A wetland deep in the southern foothills, where cold mountain runoff and "
+"rotting soil form treacherous bogs."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_115_NAME"
+msgstr "Violet Bamboo Hollow"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_115_DESC"
+msgstr ""
+"A secluded hollow where violet bamboo clings to rock walls and the wind "
+"carries an austere, crystalline sound."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_116_NAME"
+msgstr "Northeastern Tundra"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_116_DESC"
+msgstr ""
+"Frozen highlands northeast of the range, where winds crossing the snowline "
+"linger for months."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_117_NAME"
+msgstr "Starshard Slope"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_117_DESC"
+msgstr ""
+"A scree slope beyond the western ridge, made nearly impassable by weathered "
+"stone and tales of fallen star-metal."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_118_NAME"
+msgstr "Relic Isle of the Eastern Sea"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_118_DESC"
+msgstr ""
+"A solitary isle beyond the narrow eastern sea, like a fragment broken from "
+"the meeting place of mountain and ocean."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_201_NAME"
+msgstr "Western Ridge Metal Sanctuary"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_201_DESC"
+msgstr ""
+"A metal-aspected sanctuary deep in the western broken peaks, where sword "
+"song rebounds between stone walls."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_203_NAME"
+msgstr "Gorge River Mystic Waters"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_203_DESC"
+msgstr ""
+"A water-aspected secret realm at a bend in the gorge river, where rapids "
+"split the cliffs and cold essence gathers in deep pools."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_302_NAME"
+msgstr "Western Ridge Waystation"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_302_DESC"
+msgstr ""
+"A frontier waystation at the western pass, supplying miners, hunters, and "
+"cultivators bound for distant lands."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_304_NAME"
+msgstr "Gorge River City"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_304_DESC"
+msgstr ""
+"A river city below the gorge, where mountain goods and spiritual materials "
+"flow downstream to market."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_409_NAME"
+msgstr "Southern Foothill Floating Isles"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_409_DESC"
+msgstr ""
+"Floating islands above the poisonous southern marsh, linked by cloud bridges"
+" and flying vessels that avoid the miasma below."
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_411_NAME"
+msgstr "Southern Mountain Labyrinth Heaven"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_411_DESC"
+msgstr ""
+"A folded mountain gate in the southern range, where paths and formations "
+"overlap until direction becomes nearly impossible to judge."
+
 msgid ", defended {region}"
 msgstr ", defended {region}"
 

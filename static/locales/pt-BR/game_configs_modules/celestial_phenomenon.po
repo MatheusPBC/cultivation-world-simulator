@@ -1,0 +1,145 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "CELESTIAL_PHENOMENON_10_DESC"
+msgstr "O qi espiritual do céu e da terra ressurge com toda a força. O cultivo avança a passos largos e todos os seres florescem, tornando este o momento ideal para se dedicar por inteiro ao progresso."
+
+msgid "CELESTIAL_PHENOMENON_10_NAME"
+msgstr "Ressurgimento do Qi"
+
+msgid "CELESTIAL_PHENOMENON_11_DESC"
+msgstr "O qi espiritual se esgota e a Era do Fim do Dharma se aproxima. Cultivar é como remar contra a corrente; convém poupar recursos e firmar o coração do Dao."
+
+msgid "CELESTIAL_PHENOMENON_11_NAME"
+msgstr "Esgotamento do Qi"
+
+msgid "CELESTIAL_PHENOMENON_12_DESC"
+msgstr "O qi demoníaco toma os céus e o caminho maligno prospera. Cultivadores demoníacos encontram condições perfeitas, enquanto os justos devem evitar confrontos e concentrar-se em acumular forças."
+
+msgid "CELESTIAL_PHENOMENON_12_NAME"
+msgstr "Ascensão do Caminho Demoníaco"
+
+msgid "CELESTIAL_PHENOMENON_13_DESC"
+msgstr "Uma imponente energia virtuosa reprime todo o mal. Cultivadores justos parecem receber auxílio divino, enquanto os demoníacos devem agir com discrição para escapar do infortúnio."
+
+msgid "CELESTIAL_PHENOMENON_13_NAME"
+msgstr "Energia Virtuosa"
+
+msgid "CELESTIAL_PHENOMENON_14_DESC"
+msgstr "Armas divinas despertam e incontáveis lâminas ressoam. A proficiência com armas cresce em ritmo extraordinário, favorecendo o treino marcial e o refinamento das técnicas."
+
+msgid "CELESTIAL_PHENOMENON_14_NAME"
+msgstr "Despertar das Armas Divinas"
+
+msgid "CELESTIAL_PHENOMENON_15_DESC"
+msgstr "Yin e Yang entram em harmonia, unindo céu e terra. A complementação mútua acelera muito o progresso, sendo a ocasião perfeita para encontrar um companheiro do Dao e desfrutar o cultivo duplo."
+
+msgid "CELESTIAL_PHENOMENON_15_NAME"
+msgstr "Harmonia entre Yin e Yang"
+
+msgid "CELESTIAL_PHENOMENON_16_DESC"
+msgstr "Um brilho sanguíneo alcança os céus e a ânsia de matar se torna difícil de conter. Embora o poder de combate aumente muito, as oportunidades desaparecem; é hora de tomar a iniciativa e provar o Dao pela batalha."
+
+msgid "CELESTIAL_PHENOMENON_16_NAME"
+msgstr "Calamidade da Matança"
+
+msgid "CELESTIAL_PHENOMENON_17_DESC"
+msgstr "O mundo vive em paz e todos os seres repousam tranquilos. Embora o cultivo árduo progrida devagar, oportunidades surgem com frequência; convém viajar em busca de encontros afortunados."
+
+msgid "CELESTIAL_PHENOMENON_17_NAME"
+msgstr "Era de Paz"
+
+msgid "CELESTIAL_PHENOMENON_18_DESC"
+msgstr "O destino concede seu favor e a sorte se concentra sobre os escolhidos, para quem tudo corre bem. Aos demais, resta apenas admirar sem tentar forçar a fortuna."
+
+msgid "CELESTIAL_PHENOMENON_18_NAME"
+msgstr "Bênção da Sorte"
+
+msgid "CELESTIAL_PHENOMENON_19_DESC"
+msgstr "A lua de sangue paira no céu e agita os corações. O poder de combate se eleva, mas o cultivo em retiro se torna difícil; convém conquistar recursos pela batalha."
+
+msgid "CELESTIAL_PHENOMENON_19_NAME"
+msgstr "Lua de Sangue"
+
+msgid "CELESTIAL_PHENOMENON_1_DESC"
+msgstr "O qi espiritual do céu e da terra se torna abundante, acelerando muito o cultivo e despertando um desejo ainda maior de progredir."
+
+msgid "CELESTIAL_PHENOMENON_1_NAME"
+msgstr "Qi Púrpura do Oriente"
+
+msgid "CELESTIAL_PHENOMENON_20_DESC"
+msgstr "Os portões celestiais se abrem e o Grande Dao se revela. Compreensão e cultivo parecem receber auxílio divino: chegou a hora de romper reinos e ascender à imortalidade."
+
+msgid "CELESTIAL_PHENOMENON_20_NAME"
+msgstr "Portão da Ascensão"
+
+msgid "CELESTIAL_PHENOMENON_21_DESC"
+msgstr "As leis do céu e da terra se tornam claras e quase tangíveis; os gargalos cedem como papel ao menor toque. Não desperdice esta oportunidade celestial de avançar."
+
+msgid "CELESTIAL_PHENOMENON_21_NAME"
+msgstr "Manifestação das Leis"
+
+msgid "CELESTIAL_PHENOMENON_22_DESC"
+msgstr "O espaço-tempo entra em desordem e fenômenos estranhos se multiplicam. Até os lugares mais perigosos escondem oportunidades supremas; é o momento de enfrentar riscos e explorar o desconhecido."
+
+msgid "CELESTIAL_PHENOMENON_22_NAME"
+msgstr "Turbulência Espaço-Temporal"
+
+msgid "CELESTIAL_PHENOMENON_2_DESC"
+msgstr "A energia hostil do metal impregna o mundo com uma atmosfera mortífera, tornando os cultivadores mais sanguinários e propensos a atacar uns aos outros."
+
+msgid "CELESTIAL_PHENOMENON_2_NAME"
+msgstr "Ano da Hostilidade Metálica"
+
+msgid "CELESTIAL_PHENOMENON_3_DESC"
+msgstr "A virtude da madeira nutre uma vitalidade exuberante. As colheitas dobram e os ferimentos se curam com extrema rapidez, sendo a época ideal para buscar tesouros naturais por toda parte."
+
+msgid "CELESTIAL_PHENOMENON_3_NAME"
+msgstr "Era do Espírito da Madeira"
+
+msgid "CELESTIAL_PHENOMENON_4_DESC"
+msgstr "O elemento água flui livremente, elevando tanto a eficiência quanto a velocidade do cultivo. É uma excelente ocasião para entrar em retiro."
+
+msgid "CELESTIAL_PHENOMENON_4_NAME"
+msgstr "Ciclo da Virtude da Água"
+
+msgid "CELESTIAL_PHENOMENON_5_DESC"
+msgstr "O fogo celestial arde e a calamidade se aproxima. O poder de combate aumenta drasticamente, mas a longevidade se esvai; é preciso encerrar as batalhas depressa e disputar a própria vida com os céus."
+
+msgid "CELESTIAL_PHENOMENON_5_NAME"
+msgstr "Era da Calamidade de Fogo"
+
+msgid "CELESTIAL_PHENOMENON_6_DESC"
+msgstr "A virtude da terra é profunda e sustenta todas as coisas. O corpo se torna resistente e o vigor transborda, permitindo enfrentar inimigos poderosos sem temor."
+
+msgid "CELESTIAL_PHENOMENON_6_NAME"
+msgstr "Era da Terra Profunda"
+
+msgid "CELESTIAL_PHENOMENON_7_DESC"
+msgstr "Os cinco elementos saem de ordem e céu e terra mergulham no caos. O cultivo convencional exige o dobro do esforço para metade do resultado, mas os gargalos enfraquecem e favorecem tentativas de avanço."
+
+msgid "CELESTIAL_PHENOMENON_7_NAME"
+msgstr "Caos dos Cinco Elementos"
+
+msgid "CELESTIAL_PHENOMENON_8_DESC"
+msgstr "O Dao Celestial se manifesta, retirando de quem tem em excesso para favorecer quem tem pouco. O progresso dos cultivadores mais poderosos é contido, enquanto os iniciantes devem aproveitar a chance de alcançá-los."
+
+msgid "CELESTIAL_PHENOMENON_8_NAME"
+msgstr "Equilíbrio do Dao Celestial"
+
+msgid "CELESTIAL_PHENOMENON_9_DESC"
+msgstr "A calamidade se aproxima e a hostilidade se espalha. Embora o poder de combate aumente, a fortuna se torna escassa; é preciso agir com a cautela de quem caminha sobre gelo fino."
+
+msgid "CELESTIAL_PHENOMENON_9_NAME"
+msgstr "Calamidade Iminente"

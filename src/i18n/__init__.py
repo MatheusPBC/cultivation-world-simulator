@@ -49,76 +49,55 @@ def _get_current_lang() -> str:
         return get_default_locale()
 
 
+def _append_translation(
+    root: Optional[gettext.GNUTranslations],
+    translation: Optional[gettext.GNUTranslations],
+) -> Optional[gettext.GNUTranslations]:
+    """Append a catalog to a gettext fallback chain."""
+    if translation is None:
+        return root
+    if root is None:
+        return translation
+    root.add_fallback(translation)
+    return root
+
+
+def _load_domain(locale_dir: Path, locale_name: str, domain: str) -> Optional[gettext.GNUTranslations]:
+    try:
+        return gettext.translation(domain, localedir=str(locale_dir), languages=[locale_name])
+    except FileNotFoundError:
+        return None
+
+
+def _load_translation_chain(lang: str) -> Optional[gettext.GNUTranslations]:
+    """Load locale catalogs followed by the registry fallback locale catalogs."""
+    locale_dir = _get_locale_dir()
+    locales = [lang]
+    fallback_locale = get_fallback_locale()
+    if fallback_locale != lang:
+        locales.append(fallback_locale)
+
+    trans: Optional[gettext.GNUTranslations] = None
+    for locale_name in locales:
+        gettext_locale = _lang_to_locale(locale_name)
+        for domain in ("messages", "game_configs"):
+            trans = _append_translation(
+                trans,
+                _load_domain(locale_dir, gettext_locale, domain),
+            )
+    return trans
+
+
 def _get_translation() -> Optional[gettext.GNUTranslations]:
-    """
-    Get translation object for current language.
-    
-    Returns:
-        GNUTranslations object or None if not found.
-    """
-    lang = _get_current_lang()
-    
-    if lang not in _translations:
-        locale_dir = _get_locale_dir()
-        locale_name = _lang_to_locale(lang)
-        
-        try:
-            trans = gettext.translation(
-                "messages",
-                localedir=str(locale_dir),
-                languages=[locale_name]
-            )
-        except FileNotFoundError:
-            trans = None
-
-        try:
-            config_trans = gettext.translation(
-                "game_configs",
-                localedir=str(locale_dir),
-                languages=[locale_name]
-            )
-            if trans:
-                trans.add_fallback(config_trans)
-            else:
-                trans = config_trans
-        except FileNotFoundError:
-            pass
-
-        _translations[lang] = trans
-    
-    return _translations.get(lang)
+    """Get the translation chain for the current language."""
+    return _get_translation_for_locale(_get_current_lang())
 
 
 def _get_translation_for_locale(lang_code: str) -> Optional[gettext.GNUTranslations]:
     lang = coerce_locale_code(lang_code, enabled_only=True)
 
     if lang not in _translations:
-        locale_dir = _get_locale_dir()
-        locale_name = _lang_to_locale(lang)
-
-        try:
-            trans = gettext.translation(
-                "messages",
-                localedir=str(locale_dir),
-                languages=[locale_name]
-            )
-        except FileNotFoundError:
-            trans = None
-
-        try:
-            config_trans = gettext.translation(
-                "game_configs",
-                localedir=str(locale_dir),
-                languages=[locale_name]
-            )
-            if trans:
-                trans.add_fallback(config_trans)
-            else:
-                trans = config_trans
-        except FileNotFoundError:
-            pass
-
-        _translations[lang] = trans
+        _translations[lang] = _load_translation_chain(lang)
 
     return _translations.get(lang)
 

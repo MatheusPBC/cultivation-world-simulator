@@ -12,8 +12,8 @@ import { getAvatarAssetIds, normalizeAvatarAssetLibraries } from '@/utils/avatar
 import { formatEntityGrade } from '@/utils/cultivationText'
 import type { AvatarAssetLibraries } from '@/utils/avatarAssets'
 
-export const GENDER_MALE = '男'
-export const GENDER_FEMALE = '女'
+export const GENDER_MALE = 'male'
+export const GENDER_FEMALE = 'female'
 
 export const DEFAULT_RACE_OPTIONS = [
   { label: 'Human', value: 'human' },

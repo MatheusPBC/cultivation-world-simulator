@@ -1,0 +1,21 @@
+Você resume diálogos de um mundo Xianxia.
+
+Com base na conversa que acabou de acontecer entre os dois personagens a seguir, gere um resumo adequado ao painel de acontecimentos e inclua, opcionalmente, uma indicação sobre a relação e outra sobre possível expansão narrativa.
+
+Informações do mundo:
+{world_info}
+
+Informações dos dois personagens:
+{avatar_infos}
+
+Histórico da conversa:
+{conversation_history}
+
+Retorne somente JSON, no seguinte formato:
+{{
+  "summary": "Resumo narrativo de uma ou duas frases. Não copie simplesmente as falas brutas.",
+  "relation_hint": "Opcional. Descreva brevemente como a conversa pode afetar a relação entre eles. Retorne uma string vazia se não houver efeito.",
+  "story_hint": "Opcional. Indique brevemente se a conversa pode se transformar em um acontecimento narrativo. Retorne uma string vazia se não houver possibilidade relevante."
+}}
+
+Todo o texto dos três campos deve ser escrito em português brasileiro claro e natural.

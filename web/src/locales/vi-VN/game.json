@@ -1,5 +1,23 @@
 {
   "population": "Dan So",
+  "world_journal": {
+    "title": "Nhật ký Thế giới",
+    "coming_soon": "Sắp ra mắt",
+    "tabs": { "now": "Hiện tại", "focus": "Trọng tâm", "stories": "Câu chuyện", "timeline": "Dòng thời gian" },
+    "periods": { "one": "Tháng này", "three": "3 tháng", "twelve": "1 năm" },
+    "important_changes": "Thay đổi quan trọng",
+    "important_empty": "Không có thay đổi quan trọng trong giai đoạn này.",
+    "ongoing": "Đang diễn ra",
+    "ongoing_empty": "Không có hoạt động được theo dõi trong giai đoạn này.",
+    "activity": "Hoạt động thế giới",
+    "total_events": "Sự kiện",
+    "major_events": "Quan trọng",
+    "story_events": "Câu chuyện",
+    "active_avatars": "Nhân vật hoạt động",
+    "event_count": "{count} sự kiện",
+    "loading": "Đang tải nhật ký...",
+    "error": "Không thể tải nhật ký."
+  },
   "status_bar": {
     "phenomenon": "Thiên Tượng Thế Giới",
     "effect": "Hiệu quả: ",
@@ -600,7 +618,9 @@
     "no_events": "Không có sự kiện liên quan",
     "back_to_list": "Quay lại danh sách",
     "death_year": "Năm {year} tháng {month}",
-    "rogue": "Tán tu"
+    "rogue": "Tán tu",
+    "status_alive": "Còn sống",
+    "status_dead": "Đã mất"
   },
   "world_secret": {
     "title": "Bí Mật Thế Giới",

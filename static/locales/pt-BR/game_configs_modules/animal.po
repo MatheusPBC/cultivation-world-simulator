@@ -1,0 +1,127 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. animal.csv: 拥有上古血脉的巨型妖兽，皮毛如铁，行走间...
+msgid "ANIMAL_10_DESC"
+msgstr ""
+"Uma fera demoníaca gigantesca de linhagem ancestral, com pelo duro como "
+"ferro, força imensa e passos que fazem a terra tremer"
+
+#. animal.csv: 撼地神牛
+msgid "ANIMAL_10_NAME"
+msgstr "Touro Divino Abalador da Terra"
+
+#. animal.csv: 生存于冻土深处的冷血妖兽，身躯由半透明的...
+msgid "ANIMAL_11_DESC"
+msgstr ""
+"Uma fera demoníaca de sangue frio que vive nas profundezas do pergelissolo. "
+"Seu corpo é formado por ossos translúcidos e geada; silenciosa, ela é capaz "
+"de congelar suas presas num instante"
+
+#. animal.csv: 冰魄骨蛇
+msgid "ANIMAL_11_NAME"
+msgstr "Serpente Óssea de Essência Glacial"
+
+#. animal.csv: 天性机敏的灵性兔子，毛色雪白，蕴含微弱灵...
+msgid "ANIMAL_1_DESC"
+msgstr ""
+"Um coelho espiritual de natureza esperta, pelo branco como a neve e tênue "
+"poder espiritual; é dócil e fácil de domesticar"
+
+#. animal.csv: 灵兔
+msgid "ANIMAL_1_NAME"
+msgstr "Coelho Espiritual"
+
+#. animal.csv: 凶猛的魔性狼族，体型巨大，拥有强大的魔力...
+msgid "ANIMAL_2_DESC"
+msgstr ""
+"Um feroz lobo demoníaco de tamanho gigantesco, dotado de imenso poder "
+"demoníaco, garras afiadas e presas letais"
+
+#. animal.csv: 魔狼
+msgid "ANIMAL_2_NAME"
+msgstr "Lobo Demoníaco"
+
+#. animal.csv: 栖息于平原地带的温和灵兽，通体青色，角如...
+msgid "ANIMAL_3_DESC"
+msgstr ""
+"Uma fera espiritual dócil que habita as planícies, com corpo inteiramente "
+"azul e galhadas semelhantes a jade, hábil em perceber alterações no qi "
+"espiritual"
+
+#. animal.csv: 青云鹿
+msgid "ANIMAL_3_NAME"
+msgstr "Cervo Qingyun"
+
+#. animal.csv: 南疆蛮荒中的敏捷猎手，身形如影，爪牙锋利...
+msgid "ANIMAL_4_DESC"
+msgstr ""
+"Um caçador ágil das terras selvagens da Fronteira Sul, com corpo semelhante "
+"a uma sombra, garras e presas afiadas e grande habilidade na caça furtiva"
+
+#. animal.csv: 暗影豹
+msgid "ANIMAL_4_NAME"
+msgstr "Leopardo das Sombras"
+
+#. animal.csv: 无边碧海的古老灵兽，龟甲如碧玉，能操控海...
+msgid "ANIMAL_5_DESC"
+msgstr ""
+"Uma antiga fera espiritual do infinito mar azul, com casco semelhante a "
+"jade verde, capaz de controlar a água do mar e dotada de uma longevidade "
+"extraordinária"
+
+#. animal.csv: 碧海龙龟
+msgid "ANIMAL_5_NAME"
+msgstr "Tartaruga-Dragão do Mar Azul"
+
+#. animal.csv: 青峰山脉的强壮守护者，皮毛坚如磐石，力大...
+msgid "ANIMAL_6_DESC"
+msgstr ""
+"Um poderoso guardião das Montanhas Qingfeng, com pelo duro como rocha, "
+"força imensa e natureza simples e honesta"
+
+#. animal.csv: 石甲山熊
+msgid "ANIMAL_6_NAME"
+msgstr "Urso Montanhês de Armadura Rochosa"
+
+#. animal.csv: 驰骋于碧野千里的神骏灵兽，四蹄生风，速度...
+msgid "ANIMAL_7_DESC"
+msgstr ""
+"Uma majestosa fera espiritual que galopa por milhares de li em campos "
+"verdejantes, com cascos envoltos em vento, velocidade fulminante e crina "
+"esvoaçante"
+
+#. animal.csv: 风速马
+msgid "ANIMAL_7_NAME"
+msgstr "Cavalo Veloz como o Vento"
+
+#. animal.csv: 炎狱火山中的火系灵兽，鳞片赤红如火，能在...
+msgid "ANIMAL_8_DESC"
+msgstr ""
+"Uma fera espiritual do elemento fogo que vive no Vulcão de Lava, com "
+"escamas vermelhas como chamas, capaz de nadar no magma e cuspir fogo"
+
+#. animal.csv: 熔岩蜥蜴
+msgid "ANIMAL_8_NAME"
+msgstr "Lagarto de Lava"
+
+#. animal.csv: 迷雾沼泽的剧毒生物，体色斑斓，能释放致命...
+msgid "ANIMAL_9_DESC"
+msgstr ""
+"Uma criatura altamente venenosa do Pântano Nebuloso, com padrões coloridos "
+"pelo corpo, capaz de liberar gás tóxico letal e hábil em se esconder"
+
+#. animal.csv: 毒瘴蛙
+msgid "ANIMAL_9_NAME"
+msgstr "Sapo do Miasma Venenoso"

@@ -1,0 +1,89 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. cultivate_region.csv: CULTIVATE_REGION_201_DESC
+msgid "CULTIVATE_REGION_201_DESC"
+msgstr ""
+"Uma morada cavernosa do elemento Metal nas profundezas das Montanhas "
+"Qingfeng, onde o qi da essência metálica se condensa e o som de espadas nunca "
+"cessa. É a terra sagrada suprema para cultivadores do atributo Metal."
+
+#. cultivate_region.csv: CULTIVATE_REGION_201_NAME
+msgid "CULTIVATE_REGION_201_NAME"
+msgstr "Mansão Dourada Taibai"
+
+#. cultivate_region.csv: CULTIVATE_REGION_202_DESC
+msgid "CULTIVATE_REGION_202_DESC"
+msgstr ""
+"Uma morada cavernosa do elemento Madeira na Floresta Qingyun, repleta de "
+"vitalidade e ervas espirituais. É a terra sagrada suprema para cultivadores "
+"do atributo Madeira."
+
+#. cultivate_region.csv: CULTIVATE_REGION_202_NAME
+msgid "CULTIVATE_REGION_202_NAME"
+msgstr "Gruta Celestial Qingmu"
+
+#. cultivate_region.csv: CULTIVATE_REGION_203_DESC
+msgid "CULTIVATE_REGION_203_DESC"
+msgstr ""
+"Uma morada cavernosa do elemento Água nas profundezas do ilimitado mar azul, "
+"com milhares de quilômetros de ondas azuis e essência da Água capaz de "
+"condensar a alma. É a terra sagrada suprema para cultivadores do atributo Água."
+
+#. cultivate_region.csv: CULTIVATE_REGION_203_NAME
+msgid "CULTIVATE_REGION_203_NAME"
+msgstr "Reino Secreto Xuanshui"
+
+#. cultivate_region.csv: CULTIVATE_REGION_204_DESC
+msgid "CULTIVATE_REGION_204_DESC"
+msgstr ""
+"Uma morada cavernosa do elemento Fogo junto ao Vulcão de Lava, onde as "
+"chamas alcançam o céu e o fogo verdadeiro é puro. É a terra sagrada suprema "
+"para cultivadores do atributo Fogo."
+
+#. cultivate_region.csv: CULTIVATE_REGION_204_NAME
+msgid "CULTIVATE_REGION_204_NAME"
+msgstr "Morada Cavernosa Lihuo"
+
+#. cultivate_region.csv: CULTIVATE_REGION_205_DESC
+msgid "CULTIVATE_REGION_205_DESC"
+msgstr ""
+"Uma morada cavernosa do elemento Terra nas Montanhas Qingfeng, onde a terra "
+"profunda sustenta todas as coisas e as montanhas ressoam. É a terra sagrada "
+"suprema para cultivadores do atributo Terra."
+
+#. cultivate_region.csv: CULTIVATE_REGION_205_NAME
+msgid "CULTIVATE_REGION_205_NAME"
+msgstr "Palácio Místico Houtu"
+
+#. cultivate_region.csv: CULTIVATE_REGION_206_DESC
+msgid "CULTIVATE_REGION_206_DESC"
+msgstr ""
+"Ruínas ancestrais nas profundezas da floresta tropical, cobertas por vinhas "
+"antigas, onde o qi espiritual dos elementos Madeira e Metal se mistura. "
+"Guardam técnicas de cultivo ancestrais e fórmulas de ervas espirituais."
+
+#. cultivate_region.csv: CULTIVATE_REGION_206_NAME
+msgid "CULTIVATE_REGION_206_NAME"
+msgstr "Ruínas de Guyue"
+
+#. cultivate_region.csv: CULTIVATE_REGION_207_DESC
+msgid "CULTIVATE_REGION_207_DESC"
+msgstr ""
+"Ruínas de uma civilização ancestral submersas no mar, densas em qi espiritual "
+"do elemento Água. Tesouros surgem ocasionalmente durante as marés."
+
+#. cultivate_region.csv: CULTIVATE_REGION_207_NAME
+msgid "CULTIVATE_REGION_207_NAME"
+msgstr "Ruínas de Canghai"

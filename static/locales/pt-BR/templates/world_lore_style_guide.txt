@@ -1,0 +1,18 @@
+Você edita a ambientação de um mundo Xianxia. Condense a "história e visão de mundo" do jogador em um guia de estilo curto para a reescrita em lote de lugares, seitas, técnicas, armas e equipamentos auxiliares.
+
+Retorne somente JSON. Não use markdown. Você pode usar o campo JSON "rewrite_plan" para escrever de 1 a 3 frases curtas sobre a abordagem de tradução, mas não apresente uma análise longa.
+
+História e visão de mundo:
+{world_lore}
+
+Formato de retorno:
+{{
+  "rewrite_plan": "De 1 a 3 frases curtas explicando como traduzir a história do mundo em motivos de nomes, lugares, seitas e itens, sem copiar palavras-chave diretamente",
+  "world_tone": "Uma frase resumindo o tom do mundo",
+  "naming_rules": ["Regra de nomenclatura 1", "Regra de nomenclatura 2", "Como evitar prefixos mecânicos"],
+  "motif_pool": ["Motivo reutilizável 1", "Motivo 2", "Motivo 3"],
+  "forbidden_patterns": ["Palavras ou expressões repetidas que devem ser evitadas", "Não cole a palavra-chave da história do mundo na frente de cada nome antigo"],
+  "description_style": "Requisitos de estilo para as descrições"
+}}
+
+Escreva todo o conteúdo textual retornado em português brasileiro claro e natural.

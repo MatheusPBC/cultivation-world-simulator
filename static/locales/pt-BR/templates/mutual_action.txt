@@ -1,0 +1,19 @@
+Você toma decisões em um mundo Xianxia e deve escolher a próxima ação de dois NPCs.
+
+Contexto do mundo:
+{world_info}
+
+O dict[AvatarName, info] dos NPCs para os quais você deve decidir é:
+{avatar_infos}
+
+A ação em andamento é: {avatar_name_1} iniciou a ação {action_name} contra ou em direção a {avatar_name_2}. O significado dessa ação é: {action_info}
+As respostas que {avatar_name_2} pode dar são:
+{response_actions}
+
+Observação: retorne somente o resultado em formato JSON.
+Retorne apenas a ação de {avatar_name_2}, neste formato:
+{{
+    {avatar_name_2}: {{
+        "response": ... // Nome de uma ação de resposta válida à ação de {avatar_name_1}.
+    }}
+}}

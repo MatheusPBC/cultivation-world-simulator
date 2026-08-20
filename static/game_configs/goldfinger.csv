@@ -1,7 +1,7 @@
-id,name_id,desc_id,key,name,rarity,condition,effects,mechanism_type,desc,story_prompt,exclusion_keys,mechanism_config
-,名称ID,描述ID,Key,名称,稀有度(N/R/SR/SSR),选取条件,JSON形式,机制类型,描述,给AI的提示词,互斥Key,机制配置
-1,,,CHILD_OF_FORTUNE,气运之子,SSR,,"{extra_luck: 20}",effect_only,你仿佛生来便被天地眷顾，很多人求而不得的机缘总会向你靠近。,若角色拥有“气运之子”外挂，请把“天命偏爱、机缘主动靠近、顺势而为”作为故事中的重要线索。,,{}
-2,,,BLESSED_WITH_GOOD_FORTUNE,福缘深厚,SR,,"{extra_luck: 12, extra_epiphany_probability: 0.05, extra_fortune_probability: 0.01}",effect_only,你福缘深厚，常常能在险处见转机，在寻常处见收获。,若角色拥有“福缘深厚”外挂，请把“逢凶化吉、小处见福、顺手撞见好事”作为故事中的重要线索。,,{}
-3,,,TRANSMIGRATOR,穿越者,SR,,"{extra_luck: 8, extra_epiphany_probability: 0.04, extra_breakthrough_success_rate: 0.03}",story_driven,你来自另一个世界，现代的记忆与思维仍在影响你看待修仙界的方式。,若角色拥有“穿越者”外挂，请重点描写其现代思维、异世界错位感，以及试图用现代经验理解或处理修仙问题的视角。,,{}
-4,,,REINCARNATOR,重生者,SSR,,"{extra_luck: 10, extra_breakthrough_success_rate: 0.06, extra_epiphany_probability: 0.03}",story_driven,你像是带着上一世的残影归来，对某些选择与危险有说不清的敏锐直觉。,若角色拥有“重生者”外挂，请重点描写其前世残留记忆、避坑冲动、旧日执念与对未来的误判。,,{}
-5,,,OLD_GRANDPA,随身老爷爷,SSR,,"{extra_luck: 6, extra_epiphany_probability: 0.08, extra_breakthrough_success_rate: 0.08}",story_driven,你的命运里像是始终藏着一位看不见的前辈，在关键时刻指点、催促，甚至与你争执。,若角色拥有“随身老爷爷”外挂，请重点描写那位隐秘前辈的指点、争执、隐瞒与安排，让故事带出明显的陪伴视角。,,{}
+id,name_id,desc_id,story_prompt_id,key,name,rarity,condition,effects,mechanism_type,desc,story_prompt,exclusion_keys,mechanism_config
+,名称ID,描述ID,叙事提示ID,Key,名称,稀有度(N/R/SR/SSR),选取条件,JSON形式,机制类型,描述,给AI的提示词,互斥Key,机制配置
+1,GOLDFINGER_1_NAME,GOLDFINGER_1_DESC,GOLDFINGER_1_STORY_PROMPT,CHILD_OF_FORTUNE,气运之子,SSR,,"{extra_luck: 20}",effect_only,你仿佛生来便被天地眷顾，很多人求而不得的机缘总会向你靠近。,若角色拥有“气运之子”外挂，请把“天命偏爱、机缘主动靠近、顺势而为”作为故事中的重要线索。,,{}
+2,GOLDFINGER_2_NAME,GOLDFINGER_2_DESC,GOLDFINGER_2_STORY_PROMPT,BLESSED_WITH_GOOD_FORTUNE,福缘深厚,SR,,"{extra_luck: 12, extra_epiphany_probability: 0.05, extra_fortune_probability: 0.01}",effect_only,你福缘深厚，常常能在险处见转机，在寻常处见收获。,若角色拥有“福缘深厚”外挂，请把“逢凶化吉、小处见福、顺手撞见好事”作为故事中的重要线索。,,{}
+3,GOLDFINGER_3_NAME,GOLDFINGER_3_DESC,GOLDFINGER_3_STORY_PROMPT,TRANSMIGRATOR,穿越者,SR,,"{extra_luck: 8, extra_epiphany_probability: 0.04, extra_breakthrough_success_rate: 0.03}",story_driven,你来自另一个世界，现代的记忆与思维仍在影响你看待修仙界的方式。,若角色拥有“穿越者”外挂，请重点描写其现代思维、异世界错位感，以及试图用现代经验理解或处理修仙问题的视角。,,{}
+4,GOLDFINGER_4_NAME,GOLDFINGER_4_DESC,GOLDFINGER_4_STORY_PROMPT,REINCARNATOR,重生者,SSR,,"{extra_luck: 10, extra_breakthrough_success_rate: 0.06, extra_epiphany_probability: 0.03}",story_driven,你像是带着上一世的残影归来，对某些选择与危险有说不清的敏锐直觉。,若角色拥有“重生者”外挂，请重点描写其前世残留记忆、避坑冲动、旧日执念与对未来的误判。,,{}
+5,GOLDFINGER_5_NAME,GOLDFINGER_5_DESC,GOLDFINGER_5_STORY_PROMPT,OLD_GRANDPA,随身老爷爷,SSR,,"{extra_luck: 6, extra_epiphany_probability: 0.08, extra_breakthrough_success_rate: 0.08}",story_driven,你的命运里像是始终藏着一位看不见的前辈，在关键时刻指点、催促，甚至与你争执。,若角色拥有“随身老爷爷”外挂，请重点描写那位隐秘前辈的指点、争执、隐瞒与安排，让故事带出明显的陪伴视角。,,{}

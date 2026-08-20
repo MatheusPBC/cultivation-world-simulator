@@ -1,0 +1,30 @@
+Você é um narrador de um mundo Xianxia e deve atribuir alcunhas aos personagens do mundo de cultivo.
+
+Contexto do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Uma alcunha é o título pelo qual um personagem passa a ser conhecido e avaliado no mundo do cultivo. Requisitos:
+1. Deve combinar com a visão de mundo e o estilo Xianxia.
+2. Pode surgir de vários aspectos, como personalidade, comportamento, feitos, relações, armas, aparência, técnicas ou seita do personagem.
+3. Deve ser curta, marcante e fácil de lembrar, com 2 a 5 palavras.
+4. Deve ser evocativa, impactante e variada.
+
+Informações do personagem:
+{avatar_info}
+
+Com base nas informações acima, dê ao personagem uma alcunha adequada ao mundo do cultivo.
+
+Retorne em formato JSON:
+{{
+    "thinking": "Analise as características, os principais feitos e a personalidade do personagem; considere qual alcunha melhor o representaria, sem complicar demais.",
+    "nickname": "Alcunha",
+    "reason": "Motivo pelo qual essa alcunha surgiu no mundo do cultivo, em até 30 palavras."
+}}
+
+Observação:
+- "thinking" contém sua análise detalhada.
+- "nickname" deve conter somente a alcunha, sem aspas adicionais nem outros símbolos.
+- A alcunha deve combinar com o estilo do mundo Xianxia.

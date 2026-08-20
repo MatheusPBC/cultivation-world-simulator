@@ -1,0 +1,22 @@
+Você é um romancista de um mundo Xianxia e deve gerar uma conversa entre dois NPCs.
+
+O dict[AvatarName, info] dos NPCs para os quais você deve decidir é:
+{avatar_infos}
+As ações que os NPCs planejam realizar em seguida são:
+{planned_actions}
+
+Observação: retorne somente o resultado em formato JSON.
+O formato é:
+{{
+    "{avatar_name_2}": {{
+        "thinking": ..., // Breve reflexão sobre como a conversa deve prosseguir.
+        "conversation_content": ... // Trecho de diálogo com várias falas alternadas, em estilo de romance e terceira pessoa, incluindo expressões e ações, com 100 a 300 palavras.
+    }}
+}}
+
+Requisitos:
+1. Os personagens podem se tratar pelo nome ou pela alcunha, caso exista.
+2. Se já conversaram antes, a conversa pode continuar a anterior, mas não deve ser repetitiva.
+3. A conversa entre {avatar_name_1} e {avatar_name_2} pode ser amistosa, hostil ou apenas casual.
+4. Se um dos personagens for yao, o diálogo deve revelar sua raça pela escolha de palavras, interesses, sentidos ou hábitos corporais. A expressão racial prevalece sobre a personalidade comum; não escreva um yao como se fosse apenas um cultivador humano com outro rótulo de raça.
+5. Todo o conteúdo narrativo e todas as falas devem ser escritos em português brasileiro claro e natural. Nomes próprios podem permanecer na forma original.

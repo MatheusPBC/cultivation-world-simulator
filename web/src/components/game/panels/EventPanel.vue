@@ -84,6 +84,8 @@ const {
 <style scoped>
 .sidebar-section {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -130,6 +132,8 @@ const {
 
 .event-list {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   overflow-y: auto;
   padding: 8px 12px;
 }
@@ -154,5 +158,39 @@ const {
   color: #666;
   font-size: 11px;
   border-bottom: 1px solid #2a2a2a;
+}
+
+@media (max-width: 760px) {
+  .sidebar-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .sidebar-header h3 {
+    white-space: normal;
+  }
+
+  .filter-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .roleplay-event-lock,
+  .event-filter {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .roleplay-event-lock,
+  .event-filter--scope {
+    grid-column: 1 / -1;
+  }
+
+  .event-list {
+    padding: 8px 10px;
+  }
 }
 </style>

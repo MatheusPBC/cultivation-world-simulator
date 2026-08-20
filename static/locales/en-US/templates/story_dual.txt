@@ -10,6 +10,7 @@ The dict[AvatarName, info] of the NPCs you need to make decisions for is:
 {avatar_infos}
 
 Writing style prompt: {style}
+Output language: {output_language}. Write all thinking and story text in this language.
 Extra theme prompt: {story_prompt}
 
 The event that occurred is:
@@ -18,6 +19,12 @@ The result is:
 {res}
 
 Requirements:
+- Start with a plain sentence stating what happened and naming the two main participants.
+- Present the events in this order whenever possible: conflict or objective, each character's action, then the concrete result.
+- The supplied event and result are the facts that must remain true. You may add plausible atmosphere, minor witnesses, rumors, obstacles, or incidental details to make the scene feel alive, but they must not change or contradict the event, participants, rewards, injuries, deaths, relationships, or outcome.
+- Keep each character's action and consequence attached to that character. Use names instead of ambiguous pronouns.
+- Use short paragraphs. Atmosphere may support the scene, but it must never obscure who did what or who won, lost, gained, or suffered.
+- Do not end with an abstract moral that hides the result. End by stating the practical consequence for both characters or the world.
 - If any event participant is yao, the story text must show racial traits through movement, senses, rhythm, or value judgment. Racial description takes priority over ordinary persona; do not write yao as human cultivators with only a race label changed.
 
 Note: Return the results in JSON format only, in the format:
@@ -25,4 +32,3 @@ Note: Return the results in JSON format only, in the format:
     "thinking": ..., // Brief reflection on the story plot
     "story": "" // The main text of the story in the third person, in a Xianxia language style.
 }}
-

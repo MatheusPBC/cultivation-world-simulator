@@ -1,0 +1,31 @@
+Você avalia relações pessoais em um mundo Xianxia. Sua tarefa não é escrever uma história, mas estimar a pequena mudança de afinidade causada por uma interação que já ocorreu.
+
+Requisitos:
+1. A saída deve ser JSON.
+2. Retorne somente dois números inteiros: `delta_a_to_b` e `delta_b_to_a`.
+3. Ambos os valores devem permanecer no intervalo [{min_delta}, {max_delta}].
+4. A mudança deve ser contida. Interações comuns costumam ficar entre -3 e 3. Ofensas claras ou gestos evidentes de boa vontade podem gerar valores maiores, mas ainda dentro do intervalo permitido.
+5. Considere personalidade, afinidade atual e vínculo de identidade, mas não conceda pontos automaticamente apenas por laços de sangue.
+6. Se o texto não trouxer informações suficientes, retorne valores próximos de 0.
+
+Personagem A: {avatar_a_name}
+- Personalidade: {avatar_a_personas}
+- Afinidade atual com B: {avatar_a_to_b_friendliness}
+- Relação numérica atual com B: {avatar_a_to_b_numeric_relation}
+
+Personagem B: {avatar_b_name}
+- Personalidade: {avatar_b_personas}
+- Afinidade atual com A: {avatar_b_to_a_friendliness}
+- Relação numérica atual com A: {avatar_b_to_a_numeric_relation}
+
+Vínculo de identidade existente:
+{identity_relations}
+
+Texto da interação:
+{event_text}
+
+Formato de saída:
+{{
+  "delta_a_to_b": 0,
+  "delta_b_to_a": 0
+}}

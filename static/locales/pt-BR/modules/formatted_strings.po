@@ -1,0 +1,56 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2026-08-19 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " But you already have '{current_auxiliary}'."
+msgstr " Mas você já possui '{current_auxiliary}'."
+
+msgid " But you already have '{current_weapon}'."
+msgstr " Mas você já possui '{current_weapon}'."
+
+msgid " But you already have『{auxiliary_name}』."
+msgstr " Mas você já possui \"{auxiliary_name}\"."
+
+msgid " But you already have『{weapon_name}』."
+msgstr " Mas você já possui \"{weapon_name}\"."
+
+msgid " This conflicts with your current technique '{current_technique}'."
+msgstr " Isso entra em conflito com sua técnica atual, '{current_technique}'."
+
+msgid " This conflicts with your current technique『{technique_name}』."
+msgstr " Isso entra em conflito com sua técnica atual, \"{technique_name}\"."
+
+msgid "Comprehended technique '{technique}', {exchange_result}"
+msgstr "Compreendeu a técnica '{technique}', {exchange_result}"
+
+msgid "Comprehended technique『{technique_name}』, {exchange_text}"
+msgstr "Compreendeu a técnica \"{technique_name}\", {exchange_text}"
+
+msgid "Discovered auxiliary『{auxiliary_name}』, {exchange_text}"
+msgstr "Descobriu o equipamento auxiliar \"{auxiliary_name}\", {exchange_text}"
+
+msgid "Discovered weapon『{weapon_name}』, {exchange_text}"
+msgstr "Descobriu a arma \"{weapon_name}\", {exchange_text}"
+
+msgid "Found auxiliary equipment '{auxiliary}', {exchange_result}"
+msgstr "Encontrou o equipamento auxiliar '{auxiliary}', {exchange_result}"
+
+msgid "Found weapon '{weapon}', {exchange_result}"
+msgstr "Encontrou a arma '{weapon}', {exchange_result}"
+
+# Formatted Strings
+msgid "{weapon_name}, Proficiency: {proficiency}%"
+msgstr "{weapon_name}, Proficiência: {proficiency}%"
+
+msgid "【{name}】 {gender} {age} years old"
+msgstr "{name} - {gender}, {age} anos"

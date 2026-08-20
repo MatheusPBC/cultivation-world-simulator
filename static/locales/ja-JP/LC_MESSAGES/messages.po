@@ -2828,6 +2828,402 @@ msgstr "山脈が密集し、洞府や宗門の配置がより険しく感じら
 msgid "MAP_PRESET_SIZE_MEDIUM"
 msgstr "中型"
 
+msgid "MAP_REGION_CLASSIC_101_NAME"
+msgstr "東南平原"
+
+msgid "MAP_REGION_CLASSIC_101_DESC"
+msgstr "九州東南部でもっとも穏やかな内陸地。肥沃な田野と水路、潮風が一面の平原を織りなしている。"
+
+msgid "MAP_REGION_CLASSIC_102_NAME"
+msgstr "西境流砂"
+
+msgid "MAP_REGION_CLASSIC_102_DESC"
+msgstr "砂漠と潮風が交わる西の辺境。黄砂、塩原、砕石が入り交じる荒涼の地。"
+
+msgid "MAP_REGION_CLASSIC_104_NAME"
+msgstr "北境霜原"
+
+msgid "MAP_REGION_CLASSIC_104_DESC"
+msgstr "極寒の高地から内陸へ延びる凍てついた平原。氷の風が一年中吹き荒れている。"
+
+msgid "MAP_REGION_CLASSIC_105_NAME"
+msgstr "東海遠潮"
+
+msgid "MAP_REGION_CLASSIC_105_DESC"
+msgstr "東方に広がる大海原。潮流と航路が、果てしない海面で幾重にも交差する。"
+
+msgid "MAP_REGION_CLASSIC_106_NAME"
+msgstr "天河湾口"
+
+msgid "MAP_REGION_CLASSIC_106_DESC"
+msgstr "河川と海が交わる穏やかな水域。流れが緩く、舟の往来が絶えない。"
+
+msgid "MAP_REGION_CLASSIC_107_NAME"
+msgstr "東嶺山脈"
+
+msgid "MAP_REGION_CLASSIC_107_DESC"
+msgstr "東方に連なる長大な山脈。うねる背骨のような稜線が、山と海を隔てている。"
+
+msgid "MAP_REGION_CLASSIC_109_NAME"
+msgstr "中州草原"
+
+msgid "MAP_REGION_CLASSIC_109_DESC"
+msgstr "広大な草原と緩やかな丘陵が連なる、凡人と修仙宗門が共に暮らすのに適した地。"
+
+msgid "MAP_REGION_CLASSIC_110_NAME"
+msgstr "青雲林海"
+
+msgid "MAP_REGION_CLASSIC_110_DESC"
+msgstr "雲海のごとく果てなく広がる森林。風が渡るたび、幾重もの緑の波が立つ。"
+
+msgid "MAP_REGION_CLASSIC_302_NAME"
+msgstr "南境辺城"
+
+msgid "MAP_REGION_CLASSIC_302_DESC"
+msgstr "南方の密林の縁に築かれた交易都市。薬草や妖獣の骨、遠路を旅する商人が集う。"
+
+msgid "MAP_REGION_CLASSIC_403_NAME"
+msgstr "南嶺静海崖"
+
+msgid "MAP_REGION_CLASSIC_403_DESC"
+msgstr "海辺の断崖に構える宗門。潮騒の中、海霧が尾根を這い上り、殿閣を半ば覆い隠している。"
+
+msgid "MAP_REGION_CLASSIC_409_NAME"
+msgstr "東嶺浮空島"
+
+msgid "MAP_REGION_CLASSIC_409_DESC"
+msgstr "東嶺山脈の上空に浮かぶ島々。幾層もの高台を雲橋と飛舟が結んでいる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_101_NAME"
+msgstr "中海孤島"
+
+msgid "MAP_REGION_ISLAND_SEAS_101_DESC"
+msgstr "紺碧の大海原にぽつりと浮かぶ、中ほどの大きさの島。"
+
+msgid "MAP_REGION_ISLAND_SEAS_102_NAME"
+msgstr "北海砂島"
+
+msgid "MAP_REGION_ISLAND_SEAS_102_DESC"
+msgstr "北の浅瀬に浮かぶ砂の島。岩礁と黄褐色の砂丘が連なり、波が絶えず海岸線を塗り替える。"
+
+msgid "MAP_REGION_ISLAND_SEAS_105_NAME"
+msgstr "無垠海国"
+
+msgid "MAP_REGION_ISLAND_SEAS_105_DESC"
+msgstr "海そのものが大地となり、船路と潮流だけが道を形作る海域。"
+
+msgid "MAP_REGION_ISLAND_SEAS_106_NAME"
+msgstr "潮汐航路"
+
+msgid "MAP_REGION_ISLAND_SEAS_106_DESC"
+msgstr "深瀬と浅瀬の境に生まれた航行可能な水路。島々を結ぶ天然の道となっている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_118_NAME"
+msgstr "蓬莱外島"
+
+msgid "MAP_REGION_ISLAND_SEAS_118_DESC"
+msgstr "主島群から遠く離れた孤島。海に散った一片の玉のように佇んでいる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_103_NAME"
+msgstr "西海雨島"
+
+msgid "MAP_REGION_ISLAND_SEAS_103_DESC"
+msgstr "西の海に浮かぶ湿潤な島。密林が海岸まで迫り、古木の蔓が潮霧の中へ消えてゆく。"
+
+msgid "MAP_REGION_ISLAND_SEAS_104_NAME"
+msgstr "北寒氷島"
+
+msgid "MAP_REGION_ISLAND_SEAS_104_DESC"
+msgstr "北方の寒流に囲まれた氷の島。潮風が粉雪を巻き上げ、凍てつく岸辺と凍原を吹き抜ける。"
+
+msgid "MAP_REGION_ISLAND_SEAS_107_NAME"
+msgstr "東海岩島"
+
+msgid "MAP_REGION_ISLAND_SEAS_107_DESC"
+msgstr "東の海にそびえる岩山の島。断崖、岩礁、尾根がひしめき合っている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_108_NAME"
+msgstr "寒潮雪島"
+
+msgid "MAP_REGION_ISLAND_SEAS_108_DESC"
+msgstr "北海の寒流が形作った雪峰の島。海光を映す氷崖は、海に浮かぶ白い稜線のように輝く。"
+
+msgid "MAP_REGION_ISLAND_SEAS_109_NAME"
+msgstr "中海緑島"
+
+msgid "MAP_REGION_ISLAND_SEAS_109_DESC"
+msgstr "群島の中央近くにある温暖で緑豊かな島。広く穏やかな数少ない上陸地でもある。"
+
+msgid "MAP_REGION_ISLAND_SEAS_110_NAME"
+msgstr "青木内湾"
+
+msgid "MAP_REGION_ISLAND_SEAS_110_DESC"
+msgstr "湾に抱かれた森の島。木陰と湿った潮風が重なり、豊かな木行の霊気を育む。"
+
+msgid "MAP_REGION_ISLAND_SEAS_111_NAME"
+msgstr "赤礁火島"
+
+msgid "MAP_REGION_ISLAND_SEAS_111_DESC"
+msgstr "西の島列にある火山島。赤い岩礁が海へ伸び、裂け目から熱い霧が立ち上る。"
+
+msgid "MAP_REGION_ISLAND_SEAS_112_NAME"
+msgstr "海田島"
+
+msgid "MAP_REGION_ISLAND_SEAS_112_DESC"
+msgstr "中央の島々では珍しい肥沃な平地。淡水と潮風が広々とした田畑を潤している。"
+
+msgid "MAP_REGION_ISLAND_SEAS_113_NAME"
+msgstr "暗潮毒湾"
+
+msgid "MAP_REGION_ISLAND_SEAS_113_DESC"
+msgstr "南西の島列にある毒沼の湾。腐水、暗流、湿熱、瘴気が渦巻いている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_114_NAME"
+msgstr "南礁群山"
+
+msgid "MAP_REGION_ISLAND_SEAS_114_DESC"
+msgstr "南の島々に連なる険しい山礁地帯。わずかな陸路さえ、至る所で海峡に断ち切られている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_115_NAME"
+msgstr "竹影群島"
+
+msgid "MAP_REGION_ISLAND_SEAS_115_DESC"
+msgstr "中南部の海に散らばる竹林の小島。葉擦れの音は、しばしば潮騒に呑まれる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_116_NAME"
+msgstr "北霧荒島"
+
+msgid "MAP_REGION_ISLAND_SEAS_116_DESC"
+msgstr "北方に浮かぶ寒冷で荒涼とした島。海霧と凍土が、島全体を深い静寂に閉ざしている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_117_NAME"
+msgstr "西海礫島"
+
+msgid "MAP_REGION_ISLAND_SEAS_117_DESC"
+msgstr "北西の砂島に寄り添う礫の島。風化した石と塩の殻が岸辺を埋め尽くしている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_201_NAME"
+msgstr "東海金府"
+
+msgid "MAP_REGION_ISLAND_SEAS_201_DESC"
+msgstr "東海岩島の奥深くにある金行の洞府。海風が洞窟へ入ると、澄んだ剣鳴へと変わる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_202_NAME"
+msgstr "青木湾洞天"
+
+msgid "MAP_REGION_ISLAND_SEAS_202_DESC"
+msgstr "青木内湾にある木行の洞天。湿潤な森の気と海の生命力がここに凝集している。"
+
+msgid "MAP_REGION_ISLAND_SEAS_203_NAME"
+msgstr "北海玄水境"
+
+msgid "MAP_REGION_ISLAND_SEAS_203_DESC"
+msgstr "北海深奥に潜む水行の秘境。周囲を暗流が巡り、岩礁の洞窟には碧の光が揺らめく。"
+
+msgid "MAP_REGION_ISLAND_SEAS_205_NAME"
+msgstr "寒潮玄宮"
+
+msgid "MAP_REGION_ISLAND_SEAS_205_DESC"
+msgstr "寒潮雪島に秘められた土行の玄宮。氷と岩盤が共鳴し、洞壁は玉のように滑らかである。"
+
+msgid "MAP_REGION_ISLAND_SEAS_301_NAME"
+msgstr "中海城"
+
+msgid "MAP_REGION_ISLAND_SEAS_301_DESC"
+msgstr "群島中央の港湾都市。造船所、橋上の市、浮き桟橋が幾重にも連なっている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_302_NAME"
+msgstr "海田城"
+
+msgid "MAP_REGION_ISLAND_SEAS_302_DESC"
+msgstr "海田島に築かれた農業と交易の都。淡水井戸、塩蔵、穀物市が軒を連ねる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_303_NAME"
+msgstr "砂礁城"
+
+msgid "MAP_REGION_ISLAND_SEAS_303_DESC"
+msgstr "北海砂島の岩礁沿いに築かれた都。砂漠の隊商ではなく、潮と帆船が人々を運んでくる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_304_NAME"
+msgstr "寒湾城"
+
+msgid "MAP_REGION_ISLAND_SEAS_304_DESC"
+msgstr "北寒氷島の風を避ける都。守られた港と温石の街路が、水行の修仙者を迎え入れる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_305_NAME"
+msgstr "攬月港"
+
+msgid "MAP_REGION_ISLAND_SEAS_305_DESC"
+msgstr "東南の外島にある月明かりの港。遠洋を旅する修仙者が錨を下ろし、潮を眺める名所である。"
+
+msgid "MAP_REGION_ISLAND_SEAS_401_NAME"
+msgstr "絶雲岩"
+
+msgid "MAP_REGION_ISLAND_SEAS_401_DESC"
+msgstr "東海岩島の断崖に構える宗門。渦巻く波濤の上に、雲橋が架かっている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_405_NAME"
+msgstr "千機礁谷"
+
+msgid "MAP_REGION_ISLAND_SEAS_405_DESC"
+msgstr "仕掛けに満ちた谷。岩礁の洞窟、石橋、隠し扉が島全体を巨大な迷宮に変えている。"
+
+msgid "MAP_REGION_ISLAND_SEAS_410_NAME"
+msgstr "南礁回音谷"
+
+msgid "MAP_REGION_ISLAND_SEAS_410_DESC"
+msgstr "南礁群山にある反響の谷。海風が岩穴を抜けるたび、琴に似た長い音色を奏でる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_411_NAME"
+msgstr "東海迷踪天"
+
+msgid "MAP_REGION_ISLAND_SEAS_411_DESC"
+msgstr "東海岩島にある折り畳まれた山門。出入りする海霧が、山道と海路の見分けを惑わせる。"
+
+msgid "MAP_REGION_ISLAND_SEAS_413_NAME"
+msgstr "東林聖賢島"
+
+msgid "MAP_REGION_ISLAND_SEAS_413_DESC"
+msgstr "東方の森に抱かれた海辺の書院。講義と読誦の声が潮騒と響き合う。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_104_NAME"
+msgstr "北境雪嶺"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_104_DESC"
+msgstr "高山の雪線が稜線沿いに広がり、鋭い寒風が平地さえ険しい斜面へと変える。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_107_NAME"
+msgstr "断嶺群峰"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_107_DESC"
+msgstr "山脈でもっとも険しい骨格部。密集した峰々が幾重もの断崖の稜線を形作る。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_108_NAME"
+msgstr "寒玉高峰"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_108_DESC"
+msgstr "万年雪に閉ざされた高峰地帯。眺望は開けているが、辺境でも指折りの難所である。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_110_NAME"
+msgstr "林谷隠道"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_110_DESC"
+msgstr "森林と峡谷が並び走り、山中を縫う曲がりくねった隠れ道を成している。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_111_NAME"
+msgstr "火山前庭"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_111_DESC"
+msgstr "火山外縁の境界地。灼熱の岩と冷たい風が真正面からせめぎ合う。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_114_NAME"
+msgstr "万山腹地"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_114_DESC"
+msgstr "幾重もの峰が密集する山脈の中心地。道は狭く、地は険しく、峰々が折り重なる。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_101_NAME"
+msgstr "山口平原"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_101_DESC"
+msgstr "山々の間に開けた希少な平地。河谷がここで広がり、辺境の集落が寄り集まっている。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_102_NAME"
+msgstr "西麓黄土丘陵"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_102_DESC"
+msgstr "西麓に広がる乾いた黄土と崩石の斜面。峠から砂風が吹き込むが、開けた大砂漠ではない。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_103_NAME"
+msgstr "南嶺密林"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_103_DESC"
+msgstr "南の山麓に広がる蒸し暑い密林。雨と霧が斜面にまとわりつき、いつまでも晴れない。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_105_NAME"
+msgstr "東境狭海"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_105_DESC"
+msgstr "東の断崖に沿って延びる狭い海。山々に迫られた海岸は、途切れ途切れの小港を形作る。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_106_NAME"
+msgstr "峡河奔流"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_106_DESC"
+msgstr "山々を切り裂いて奔る急流。峡壁に轟音がこだまし、谷沿いに道が延びている。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_112_NAME"
+msgstr "谷地良田"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_112_DESC"
+msgstr "山間で川の恵みを受ける田畑。広くはないが、辺境を支える貴重な穀倉地帯である。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_113_NAME"
+msgstr "南麓毒沢"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_113_DESC"
+msgstr "南麓の森深くにある湿地。冷たい山水と腐植土が混じり合い、危険な泥沼を成している。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_115_NAME"
+msgstr "紫竹山窪"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_115_DESC"
+msgstr "紫竹が岩壁に根を張る人里離れた窪地。風が渡ると、冷ややかで澄んだ音が響く。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_116_NAME"
+msgstr "東北凍原"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_116_DESC"
+msgstr "山脈の東北に広がる凍てついた高原。雪線を越えた寒風が、幾月もここに居座る。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_117_NAME"
+msgstr "西嶺砕星坡"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_117_DESC"
+msgstr "西の稜線外縁に広がる崩石の斜面。風化岩と星鉄落下の伝承により、歩みを進めることすら難しい。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_118_NAME"
+msgstr "東海遺島"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_118_DESC"
+msgstr "東境狭海の彼方に浮かぶ孤島。山と海の境から剥がれ落ちた欠片のように見える。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_201_NAME"
+msgstr "西嶺金府"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_201_DESC"
+msgstr "西嶺の断峰深くにある金行の洞府。澄んだ剣鳴が石壁の間を幾度も反響する。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_203_NAME"
+msgstr "峡河玄水境"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_203_DESC"
+msgstr "峡河の屈曲部にある水行の秘境。急流が断崖を割り、深潭には冷たい霊気が凝り集う。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_302_NAME"
+msgstr "西嶺駅城"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_302_DESC"
+msgstr "西の峠に築かれた辺境の宿駅都市。鉱夫や猟師、遠方を目指す修仙者がここで物資を整える。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_304_NAME"
+msgstr "峡河城"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_304_DESC"
+msgstr "峡河の下流に築かれた河港都市。山の産物と霊材が急流に乗り、市へと集まる。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_409_NAME"
+msgstr "南麓浮空島"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_409_DESC"
+msgstr "南麓の毒沢上空に浮かぶ島々。雲橋と飛舟で結ばれ、眼下の瘴気を避けて行き来できる。"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_411_NAME"
+msgstr "南山迷踪天"
+
+msgid "MAP_REGION_MOUNTAIN_FRONTIER_411_DESC"
+msgstr "南の群山に秘められた折り畳みの山門。山道と陣法が幾重にも重なり、方角を見定めることは至難である。"
+
 msgid ", defended {region}"
 msgstr "、{region} を守り切った"
 

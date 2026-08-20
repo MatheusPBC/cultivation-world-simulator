@@ -332,11 +332,7 @@ def get_world_state(
     # valid avatars whenever it rebuilds its local store.
     for avatar in world.avatar_manager.avatars.values():
         cultivation_display = build_avatar_cultivation_display(avatar)
-        action_name = "unknown"
-        curr = getattr(avatar, "current_action", None)
-        if curr:
-            act = getattr(curr, "action", None)
-            action_name = getattr(act, "name", str(curr))
+        action_name = avatar.current_action_name
         avatars.append(
             {
                 "id": str(getattr(avatar, "id", "no_id")),
@@ -418,13 +414,12 @@ def get_world_map(runtime, *, sects_by_id: dict[int, Any], render_config: dict[s
             if hasattr(region, "center_loc") and region.center_loc and hasattr(region, "get_region_type"):
                 region_type = region.get_region_type()
             landmark = (getattr(world.map, "landmarks", {}) or {}).get(int(region.id), {})
-            region_override = (getattr(world.map, "region_overrides", {}) or {}).get(int(region.id), {})
             region_x = int(landmark.get("x", region.center_loc[0])) if isinstance(landmark, dict) else region.center_loc[0]
             region_y = int(landmark.get("y", region.center_loc[1])) if isinstance(landmark, dict) else region.center_loc[1]
             region_dict = {
                 "id": region.id,
-                "name": str(region_override.get("name") or region.name),
-                "desc": str(region_override.get("desc") or region.desc),
+                "name": str(region.name),
+                "desc": str(region.desc),
                 "type": region_type,
                 "x": region_x,
                 "y": region_y,
@@ -529,6 +524,87 @@ def get_events_page(
         "events": serialize_events_for_client(events, world=world),
         "next_cursor": next_cursor,
         "has_more": has_more,
+    }
+
+
+def get_world_journal(
+    runtime,
+    *,
+    serialize_events_for_client: Callable[[list[Any]], list[dict[str, Any]]],
+    period_months: int,
+) -> dict[str, Any]:
+    """Build a deterministic overview from persisted facts in a closed period."""
+    world = _require_world(runtime)
+    event_manager = getattr(world, "event_manager", None)
+    if event_manager is None:
+        raise_public_error(
+            status_code=503,
+            code="EVENTS_NOT_READY",
+            message="Event manager not initialized",
+        )
+
+    end_month_stamp = int(world.month_stamp)
+    start_month_stamp = end_month_stamp - period_months + 1
+    period_events: list[Any] = []
+    cursor: str | None = None
+
+    while True:
+        events, next_cursor, has_more = event_manager.get_events_paginated(
+            cursor=cursor,
+            limit=500,
+        )
+        for event in events:
+            event_month_stamp = int(event.month_stamp)
+            if start_month_stamp <= event_month_stamp <= end_month_stamp:
+                period_events.append(event)
+
+        if not has_more or next_cursor is None:
+            break
+        cursor = next_cursor
+
+    major_count = sum(bool(event.is_major) and not bool(event.is_story) for event in period_events)
+    story_count = sum(bool(event.is_story) for event in period_events)
+    avatar_event_counts: dict[str, int] = {}
+    for event in period_events:
+        for avatar_id in event.related_avatars or []:
+            avatar_id_str = str(avatar_id)
+            avatar_event_counts[avatar_id_str] = avatar_event_counts.get(avatar_id_str, 0) + 1
+
+    highlights = [
+        event
+        for event in period_events
+        if bool(event.is_major) and not bool(event.is_story)
+    ][:5]
+    ongoing: list[dict[str, Any]] = []
+    for avatar_id, event_count in avatar_event_counts.items():
+        avatar = world.avatar_manager.get_avatar(avatar_id)
+        if avatar is None or bool(getattr(avatar, "is_dead", False)):
+            continue
+        ongoing.append(
+            {
+                "avatar_id": avatar_id,
+                "avatar_name": str(getattr(avatar, "name", avatar_id)),
+                "action": str(getattr(avatar, "current_action_name", "")),
+                "event_count": event_count,
+            }
+        )
+    ongoing.sort(key=lambda item: (-item["event_count"], item["avatar_name"], item["avatar_id"]))
+
+    return {
+        "period": {
+            "months": period_months,
+            "start_month_stamp": start_month_stamp,
+            "end_month_stamp": end_month_stamp,
+        },
+        "activity": {
+            "total_events": len(period_events),
+            "major_events": major_count,
+            "story_events": story_count,
+            "routine_events": len(period_events) - major_count - story_count,
+            "active_avatar_count": len(avatar_event_counts),
+        },
+        "highlights": serialize_events_for_client(highlights, world=world),
+        "ongoing": ongoing[:5],
     }
 
 

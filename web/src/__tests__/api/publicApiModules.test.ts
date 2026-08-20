@@ -44,6 +44,28 @@ describe('public api module migration', () => {
     expect(page).toEqual({ events: [], nextCursor: null, hasMore: false })
   })
 
+  it('eventApi fetches the deterministic world journal period', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    const journal = {
+      period: { months: 3, start_month_stamp: 1202, end_month_stamp: 1204 },
+      activity: {
+        total_events: 3,
+        major_events: 1,
+        story_events: 1,
+        routine_events: 1,
+        active_avatar_count: 2,
+      },
+      highlights: [],
+      ongoing: [],
+    }
+    getMock.mockResolvedValue(journal)
+
+    const result = await eventApi.fetchWorldJournal(3)
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/world/journal?period_months=3')
+    expect(result).toEqual(journal)
+  })
+
   it('eventApi cleans up events through /api/v1 command endpoint', async () => {
     const { eventApi } = await import('@/api/modules/event')
     deleteMock.mockResolvedValue({ deleted: 12 })

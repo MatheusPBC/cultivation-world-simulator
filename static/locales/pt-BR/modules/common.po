@@ -1,0 +1,261 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid " (and sold old {item} at reduced price)"
+msgstr " (e vendeu o item antigo {item} por um preço reduzido)"
+
+msgid "Animal realms in current area exceed character realm"
+msgstr "Os reinos dos animais na área atual superam o reino do personagem"
+
+msgid "Assassination failed! Both sides engaged in fierce battle."
+msgstr "O assassinato fracassou! Os dois lados entraram em uma batalha feroz."
+
+msgid "Breakthrough failed"
+msgstr "O avanço fracassou"
+
+msgid "Breakthrough succeeded"
+msgstr "O avanço foi bem-sucedido"
+
+msgid "Can only execute in city areas"
+msgstr "Só pode ser executado em áreas urbanas"
+
+msgid "Cannot resolve region: {region}"
+msgstr "Não foi possível localizar a região: {region}"
+
+msgid "Cannot sell this type: {name}"
+msgstr "Não é possível vender este tipo: {name}"
+
+msgid "Casting succeeded! Obtained {realm} {label} '{item}'"
+msgstr "A forja foi bem-sucedida! Obteve {label} '{item}', de grau {realm}"
+
+msgid "Cultivation has reached bottleneck, cannot continue cultivating"
+msgstr "O cultivo chegou a um gargalo e não pode continuar"
+
+msgid "Current HP is full"
+msgstr "Os PV já estão no máximo"
+
+msgid "Current area {region} has no animals"
+msgstr "Não há animais na área atual, {region}"
+
+msgid "Do not possess equipment: {name}"
+msgstr "Não possui o equipamento: {name}"
+
+msgid "Do not possess item/equipment: {name}"
+msgstr "Não possui o item ou equipamento: {name}"
+
+msgid "Do not possess material: {name}"
+msgstr "Não possui o material: {name}"
+
+msgid ""
+"Forbidden illegal action (missing Ten Thousand Souls Banner or permission)"
+msgstr ""
+"Ação ilegal proibida (falta o Estandarte das Dez Mil Almas ou a permissão)"
+
+msgid ""
+"Insufficient materials, need {cost} {realm}-tier materials, currently have "
+"{count}"
+msgstr ""
+"Materiais insuficientes: são necessários {cost} materiais de grau {realm}, "
+"mas há apenas {count}"
+
+msgid "Insufficient spirit stones"
+msgstr "Pedras Espirituais insuficientes"
+
+msgid "Invalid direction: {direction}"
+msgstr "Direção inválida: {direction}"
+
+msgid "Invalid realm: {realm}"
+msgstr "Reino inválido: {realm}"
+
+msgid "Missing HP information"
+msgstr "Faltam informações de PV"
+
+msgid "Missing target parameter"
+msgstr "Falta o parâmetro de alvo"
+
+msgid "Must be in a City to educate people."
+msgstr "É necessário estar em uma cidade para educar as pessoas."
+
+msgid "Not at bottleneck, cannot breakthrough"
+msgstr "Não está em um gargalo; não é possível avançar"
+
+msgid "Not currently in normal area"
+msgstr "Não está em uma área comum no momento"
+
+msgid "Only evil alignment can execute"
+msgstr "Apenas personagens de alinhamento maligno podem executar esta ação"
+
+msgid "Only righteous alignment can execute"
+msgstr "Apenas personagens de alinhamento justo podem executar esta ação"
+
+msgid "Refining succeeded! Obtained {realm} elixir '{item}'"
+msgstr "O refinamento foi bem-sucedido! Obteve o elixir '{item}', de grau {realm}"
+
+msgid "Syncing language setting: {lang}..."
+msgstr "Sincronizando a configuração de idioma: {lang}..."
+
+msgid "Target does not exist"
+msgstr "O alvo não existe"
+
+msgid "Target is already dead"
+msgstr "O alvo já está morto"
+
+msgid "Target realm not specified"
+msgstr "O reino do alvo não foi especificado"
+
+msgid "The population of {city} has increased due to {avatar}'s teachings."
+msgstr "A população de {city} aumentou graças aos ensinamentos de {avatar}."
+
+msgid "This area has no shop"
+msgstr "Esta área não possui loja"
+
+msgid "This cave dwelling has been occupied by {name}, cannot respire"
+msgstr "Esta morada cavernosa está ocupada por {name}; não é possível respirar Qi"
+
+msgid "Unknown item: {name}"
+msgstr "Item desconhecido: {name}"
+
+msgid "Your orthodoxy does not support Body Tempering."
+msgstr "Sua ortodoxia não permite o Temperamento Corporal."
+
+msgid "Your orthodoxy does not support Confucian Education."
+msgstr "Sua ortodoxia não permite a Educação Confucionista."
+
+msgid "Your orthodoxy does not support Qi Respiration."
+msgstr "Sua ortodoxia não permite a Respiração de Qi."
+
+msgid "Your orthodoxy does not support Zen Meditation."
+msgstr "Sua ortodoxia não permite a Meditação Zen."
+
+msgid ""
+"[{region}] is another sect's territory, you are not a disciple of that sect"
+msgstr ""
+"[{region}] é território de outra seita, e você não é discípulo dessa seita"
+
+msgid "action_chess"
+msgstr "Xadrez"
+
+msgid "action_chess_desc"
+msgstr "Jogue xadrez para aguçar a mente."
+
+msgid "action_chess_story_prompt"
+msgstr "Duas pessoas estão jogando xadrez."
+
+msgid "action_devourpeople_short_name"
+msgstr "Devorar pessoas"
+
+msgid "Prefers male cultivators"
+msgstr "Prefere cultivadores homens"
+
+msgid "Prefers female cultivators"
+msgstr "Prefere cultivadoras mulheres"
+
+msgid "Prefers righteous cultivators"
+msgstr "Prefere cultivadores justos"
+
+msgid "Prefers evil cultivators"
+msgstr "Prefere cultivadores malignos"
+
+msgid "Prefers neutral cultivators"
+msgstr "Prefere cultivadores neutros"
+
+msgid "Prefers Confucian cultivators"
+msgstr "Prefere cultivadores confucionistas"
+
+msgid "Prefers Daoist cultivators"
+msgstr "Prefere cultivadores taoistas"
+
+msgid "Prefers Buddhist cultivators"
+msgstr "Prefere cultivadores budistas"
+
+msgid "Prefers martial cultivators"
+msgstr "Prefere cultivadores marciais"
+
+msgid "Prefers worldly cultivators"
+msgstr "Prefere cultivadores mundanos"
+
+msgid "Prefers orthodox gentlemen"
+msgstr "Prefere cavalheiros ortodoxos"
+
+msgid "Prefers secluded cultivators"
+msgstr "Prefere cultivadores reclusos"
+
+msgid "Prefers solitary mountain cultivators"
+msgstr "Prefere cultivadores solitários das montanhas"
+
+msgid "Prefers {value}"
+msgstr "Prefere {value}"
+
+msgid "official_rank_none"
+msgstr "Sem posto"
+
+msgid "official_rank_county_magistrate"
+msgstr "Magistrado do condado"
+
+msgid "official_rank_commandery_governor"
+msgstr "Governador da comenda"
+
+msgid "official_rank_provincial_governor"
+msgstr "Governador provincial"
+
+msgid "official_rank_grand_chancellor"
+msgstr "Grão-chanceler"
+
+msgid "dynasty_style_law_and_arms"
+msgstr "Lei e armas"
+
+msgid "dynasty_style_pure_discourse_and_orthodoxy"
+msgstr "Discurso puro e ortodoxia"
+
+msgid "dynasty_style_civil_governance"
+msgstr "Governança civil"
+
+msgid "dynasty_style_elegant_courtly_rule"
+msgstr "Governo cortesão elegante"
+
+msgid "dynasty_style_wild_marches"
+msgstr "Fronteiras selvagens"
+
+msgid "dynasty_style_pragmatic_commerce"
+msgstr "Comércio pragmático"
+
+msgid "dynasty_style_stoic_frontier_guard"
+msgstr "Guarda estoica da fronteira"
+
+msgid "dynasty_style_horsemanship_and_arms"
+msgstr "Equitação e armas"
+
+msgid "dynasty_style_strict_law_and_central_power"
+msgstr "Lei rigorosa e poder central"
+
+msgid "dynasty_style_pragmatic_conservatism"
+msgstr "Conservadorismo pragmático"
+
+msgid "dynasty_style_flexible_statecraft"
+msgstr "Governo flexível"
+
+msgid "dynasty_style_endure_and_strike_late"
+msgstr "Resistir e atacar no momento certo"
+
+msgid "dynasty_title_format"
+msgstr "Dinastia {name}"
+
+msgid "dynasty_royal_house_format"
+msgstr "Casa {surname}"
+
+msgid "Action on cooldown, {remain} month(s) remaining"
+msgstr "Ação em recarga; restam {remain} mês(es)"
+
+msgid "Focus on governance affairs, malevolent incidents, local strongmen, and political rivals creating obstacles."
+msgstr "Concentre-se em assuntos de governo, incidentes maliciosos, poderosos locais e rivais políticos criando obstáculos."

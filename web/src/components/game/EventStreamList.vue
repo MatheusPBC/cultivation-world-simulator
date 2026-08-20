@@ -123,12 +123,16 @@ function handleSubjectClick(subject: EventSubject) {
 <style scoped>
 .event-stream-list {
   height: 100%;
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
 .event-stream-list__row {
   display: flex;
+  width: 100%;
+  min-width: 0;
   gap: 8px;
   padding: 5px 0;
   border-bottom: 1px solid #2a2a2a;
@@ -213,6 +217,8 @@ button.event-stream-list__subject {
   width: 100%;
   min-width: 0;
   white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .event-stream-list__empty {
@@ -229,5 +235,18 @@ button.event-stream-list__subject {
 .event-stream-list__link:hover {
   opacity: 0.8;
   text-decoration: underline;
+}
+
+@media (max-width: 760px) {
+  .event-stream-list__row {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 0;
+  }
+
+  .event-stream-list__date {
+    flex-basis: auto;
+    font-size: 11px;
+  }
 }
 </style>

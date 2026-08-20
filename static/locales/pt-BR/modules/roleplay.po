@@ -1,0 +1,83 @@
+msgid "World is not initialized yet"
+msgstr "O mundo ainda não foi inicializado"
+
+msgid "Target avatar does not exist"
+msgstr "O avatar alvo não existe"
+
+msgid "{avatar_name} needs a new command"
+msgstr "{avatar_name} precisa de um novo comando"
+
+msgid "World paused and waiting for your roleplay command."
+msgstr "O mundo está pausado e aguarda seu comando de interpretação."
+
+msgid "There is already a pending roleplay request"
+msgstr "Já existe uma solicitação de interpretação pendente"
+
+msgid "{avatar_name} needs to make a choice"
+msgstr "{avatar_name} precisa fazer uma escolha"
+
+msgid "The other party falls silent for a moment and does not reply immediately."
+msgstr "A outra pessoa fica em silêncio por um momento e não responde de imediato."
+
+msgid "{target_avatar_name} pauses to think and responds to the topic."
+msgstr "{target_avatar_name} para, pensa e responde ao assunto."
+
+msgid "{avatar_name} and {target_avatar_name} talked for {turns} turns and both gained a new impression of the topic at hand."
+msgstr "{avatar_name} e {target_avatar_name} conversaram por {turns} turnos e ambos passaram a ver o assunto sob uma nova perspectiva."
+
+msgid "{avatar_name} is talking with {target_avatar_name}"
+msgstr "{avatar_name} está conversando com {target_avatar_name}"
+
+msgid "World paused and waiting for you to continue speaking as {avatar_name} with {target_avatar_name}."
+msgstr "O mundo está pausado e aguarda você continuar falando como {avatar_name} com {target_avatar_name}."
+
+msgid "There is already another avatar under roleplay control"
+msgstr "Outro avatar já está sob controle de interpretação"
+
+msgid "Roleplay target does not match"
+msgstr "O alvo da interpretação não corresponde"
+
+msgid "The current request is not waiting for a roleplay command"
+msgstr "A solicitação atual não está aguardando um comando de interpretação"
+
+msgid "Roleplay request does not exist or has expired"
+msgstr "A solicitação de interpretação não existe ou expirou"
+
+msgid "Please enter a roleplay command"
+msgstr "Digite um comando de interpretação"
+
+msgid "Failed to generate a valid action plan from this command"
+msgstr "Não foi possível gerar um plano de ação válido a partir deste comando"
+
+msgid "Roleplay command submitted"
+msgstr "Comando de interpretação enviado"
+
+msgid "The current request is not waiting for a roleplay choice"
+msgstr "A solicitação atual não está aguardando uma escolha de interpretação"
+
+msgid "Roleplay choice state is invalid, please trigger it again"
+msgstr "O estado da escolha de interpretação é inválido; acione-a novamente"
+
+msgid "This roleplay choice has already been handled"
+msgstr "Esta escolha de interpretação já foi processada"
+
+msgid "Roleplay choice submitted"
+msgstr "Escolha de interpretação enviada"
+
+msgid "The current request is not in a roleplay conversation"
+msgstr "A solicitação atual não está em uma conversa de interpretação"
+
+msgid "Roleplay conversation request does not exist or has expired"
+msgstr "A solicitação de conversa de interpretação não existe ou expirou"
+
+msgid "Roleplay conversation session does not exist or has expired"
+msgstr "A sessão de conversa de interpretação não existe ou expirou"
+
+msgid "Please enter dialogue content"
+msgstr "Digite o conteúdo do diálogo"
+
+msgid "Conversation updated"
+msgstr "Conversa atualizada"
+
+msgid "Conversation ended"
+msgstr "Conversa encerrada"

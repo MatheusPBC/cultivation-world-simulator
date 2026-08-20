@@ -1,0 +1,181 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. sect.csv: SECT_10_DESC
+msgid "SECT_10_DESC"
+msgstr "A Seita do Som que Arrebata Almas ocupa o Vale dos Ecos, onde torres de qin, plataformas de tambores, corredores de provação e campos de formações coletoras de almas se espalham pela encosta. Quando os ventos do vale se erguem, até a mais tênue nota de uma corda pode crescer e se tornar um golpe letal que dilacera o espírito. A seita se divide entre os ramos do som ilusório, do som assassino e do apaziguamento da alma; seus discípulos estudam não apenas teoria musical e técnicas, mas também ritmo, respiração, condução das emoções e controle espiritual. A superfície parece elegante, mas a atmosfera é perigosamente tensa, e o que mais assusta nesse lugar muitas vezes não é a raiva declarada, e sim uma melodia suave que surge no momento exato."
+
+#. sect.csv: SECT_10_NAME
+msgid "SECT_10_NAME"
+msgstr "Seita do Som que Arrebata Almas"
+
+#. sect.csv: SECT_10_RULE_DESC
+msgid "SECT_10_RULE_DESC"
+msgstr "Você pode enfeitiçar inimigos, mas jamais deve perder o controle e capturar a alma de outros discípulos nem prejudicar os alicerces da seita; quem desonrar a seita e ainda se recusar a se conter será expulso."
+
+#. sect.csv: SECT_11_DESC
+msgid "SECT_11_DESC"
+msgstr "A Seita da Dedução Celestial ergue-se em Mizhongtian, onde um único pico oculta incontáveis espaços dobrados, sobrepostos pela Plataforma da Dedução Celestial, pela Galeria das Dez Mil Formações, pelo vale de testes e por poços geomânticos. Um discípulo que não compreenda mapas de formações pode nem sequer encontrar o caminho de casa. Seus ramos incluem dedução celestial, formações das veias terrestres, formações de artefatos e formações defensivas. Seus membros são hábeis em deduzir diagramas e usam discos de formação para canalizar temporariamente o poder das veias terrestres através de terras espirituais, terrenos da seita, minas, campos de ervas e domínios de feras, estabelecendo formações de reunião espiritual, proteção das montanhas, cura, clareza e muitas outras. Seja ao dispor uma pequena formação ou remodelar uma paisagem inteira, prezam pela precisão e pela ordem. A seita atrai mentes obcecadas por estruturas e leis e costuma formar mestres frios que tratam as relações humanas como variáveis a serem calculadas."
+
+#. sect.csv: SECT_11_NAME
+msgid "SECT_11_NAME"
+msgstr "Seita da Dedução Celestial"
+
+#. sect.csv: SECT_11_RULE_DESC
+msgid "SECT_11_RULE_DESC"
+msgstr "Você não deve usar formações para levar calamidade a cidades mortais nem provocar reações adversas contra outros discípulos; se cair no mal e ainda se recusar a se arrepender, será expulso da seita."
+
+#. sect.csv: SECT_12_DESC
+msgid "SECT_12_DESC"
+msgstr "O Palácio do Brilho Eterno fica no Céu da Aurora, em meio à noite perpétua do extremo norte, onde o Salão da Luz Duradoura, altares de chamas sagradas, piscinas de purificação da medula e campos de treinamento radiantes permanecem iluminados para sempre pela aurora. Gelo e fogo coexistem ali, conferindo a toda a cidade-palácio uma dignidade quase milagrosa. Seus cultivadores seguem sobretudo os caminhos do refinamento corporal, da proteção da vida e da longevidade, valorizando armas e disciplina marcial tanto quanto banhos medicinais, artes secretas e a compreensão da própria fonte da vida. O palácio reverencia a luz, a resistência e a constância; seus membros costumam carregar imensa disciplina e responsabilidade, mesmo que isso os consuma em silêncio."
+
+#. sect.csv: SECT_12_NAME
+msgid "SECT_12_NAME"
+msgstr "Palácio do Brilho Eterno"
+
+#. sect.csv: SECT_12_RULE_DESC
+msgid "SECT_12_RULE_DESC"
+msgstr "Você não deve ferir mortais para refinar o corpo nem macular o caminho ortodoxo da luz; se mergulhar no cultivo maligno e permanecer incorrigível, será expulso do palácio."
+
+#. sect.csv: SECT_13_DESC
+msgid "SECT_13_DESC"
+msgstr "A Academia Haoran ergue-se na Floresta dos Sábios, onde salas de aula, o Salão da Lei Clara, bibliotecas de estelas e trilhas de pedra que põem o coração à prova se espalham sob as árvores. Antes mesmo do sino da manhã, o som da leitura já atravessa o bosque, e os discípulos que passam costumam vestir mantos impecáveis e falar com ponderação. Suas tradições abrangem o estudo dos clássicos, o raciocínio jurídico, a governança e o cultivo literário; seus eruditos fazem mais do que ler e nutrir o qi, pois também debatem políticas, aprimoram a conduta e ensinam as gerações futuras. A academia valoriza a integridade, a reputação e a transmissão da linhagem dos mestres, formando tanto cavalheiros de espírito nobre quanto figuras obstinadas que se recusam a ceder."
+
+#. sect.csv: SECT_13_NAME
+msgid "SECT_13_NAME"
+msgstr "Academia Haoran"
+
+#. sect.csv: SECT_13_RULE_DESC
+msgid "SECT_13_RULE_DESC"
+msgstr "Você não deve enganar seus mestres, oprimir o povo nem se entregar ao caminho demoníaco; se as provas forem conclusivas e ainda assim se recusar a se arrepender, será expulso da academia."
+
+#. sect.csv: SECT_14_DESC
+msgid "SECT_14_DESC"
+msgstr "A Seita de Sangue Rakshasa governa o Lago de Sangue Shura, onde altares do rio de sangue, salões de mérito, cavernas de refinamento ósseo e plataformas de extração de essência funcionam dia e noite sob um ar carregado de névoa sanguínea, vapores medicinais e ferrugem. Seus caminhos internos abrangem o combate de sangue, o cultivo sacrificial, a pilhagem e o refinamento corporal, e os recursos são distribuídos diretamente conforme os resultados em batalha, as oferendas e a notoriedade pessoal. Os fortes ascendem com velocidade aterradora, enquanto os fracos são engolidos com a mesma rapidez. É um lugar devotado à forma mais nua da ordem do poder, onde a crueldade é corriqueira e palavras vazias valem menos que a força comprovada em sangue."
+
+#. sect.csv: SECT_14_NAME
+msgid "SECT_14_NAME"
+msgstr "Seita de Sangue Rakshasa"
+
+#. sect.csv: SECT_14_RULE_DESC
+msgid "SECT_14_RULE_DESC"
+msgstr "Você pode lutar e pilhar, mas jamais deve trair a Seita de Sangue, desviar espólios nem usar artes vis contra a própria seita; quem violar essa grave proibição será expulso."
+
+#. sect.csv: SECT_1_DESC
+msgid "SECT_1_DESC"
+msgstr "A Seita da Espada dos Altos Céus ergue-se entre os picos de Jueyun, onde portões de montanha, pavilhões de espada e plataformas de provação sobem em níveis sob vendavais astrais que sopram o ano inteiro. Dentro da seita, os caminhos do controle da espada, da espada relampejante e do cultivo da espada coexistem, e os discípulos escalam os penhascos ao amanhecer e ao anoitecer em busca de compreensão diante das estelas de espada. É um lugar que reverencia a precisão e a pureza, valoriza tanto a reputação quanto a iluminação pessoal e forma prodígios meteóricos e talentos solitários aprisionados pela obsessão."
+
+#. sect.csv: SECT_1_NAME
+msgid "SECT_1_NAME"
+msgstr "Seita da Espada dos Altos Céus"
+
+#. sect.csv: SECT_1_RULE_DESC
+msgid "SECT_1_RULE_DESC"
+msgstr "Você não deve conspirar com o mal nem massacrar inocentes; se cair no caminho demoníaco e ainda recusar a correção após repetidas advertências, será expulso do portão da montanha."
+
+#. sect.csv: SECT_2_DESC
+msgid "SECT_2_DESC"
+msgstr "A Montanha das Dez Mil Feras fica nas profundezas das Cem Mil Montanhas, onde noventa e nove grutas celestiais sobrepostas confinam uma vasta coleção de criaturas, desde feras espirituais de baixo grau até reis demoníacos assassinos. Currais, campos de alimentação com sangue e altares de vinculação espiritual nunca ficam realmente silenciosos. Seus discípulos costumam seguir os caminhos do domínio, da criação ou do refinamento sanguíneo de feras; alguns tratam suas criaturas como companheiras, enquanto outros as veem como força descartável. A atmosfera da montanha é primitiva e dominadora, ensinando os discípulos a subjugar as feras pela força e a temperar os próprios instintos de sobrevivência segundo a lei da natureza selvagem."
+
+#. sect.csv: SECT_2_NAME
+msgid "SECT_2_NAME"
+msgstr "Montanha das Dez Mil Feras"
+
+#. sect.csv: SECT_2_RULE_DESC
+msgid "SECT_2_RULE_DESC"
+msgstr "Você pode lutar e matar, mas não deve trair o portão da montanha, conspirar com inimigos externos nem permitir que suas feras ataquem outros discípulos; quem cometer esse grave tabu será expulso."
+
+#. sect.csv: SECT_3_DESC
+msgid "SECT_3_DESC"
+msgstr "O Pavilhão que Escuta as Marés ergue-se sobre os penhascos de Jinghaiya, onde salões de jade espiritual gélido refletem as marés ao luar e o brilho das estrelas. Seus verdadeiros tesouros não são armas, mas a Parede de Jade para Contemplar o Mar, os observatórios das marés e os mapas estelares usados na dedução celestial. Os discípulos treinam observando as estrelas, ouvindo as marés e praticando a adivinhação; falam pouco enquanto aprendem a interpretar as mudanças no vento, nas ondas e nos movimentos mais sutis do coração humano. Todo o pavilhão parece frio e distante, como se todos enxergassem o mundo através da névoa, formando tanto sábios desprendidos quanto almas reclusas que mergulharam fundo demais nos segredos celestiais."
+
+#. sect.csv: SECT_3_NAME
+msgid "SECT_3_NAME"
+msgstr "Pavilhão que Escuta as Marés"
+
+#. sect.csv: SECT_3_RULE_DESC
+msgid "SECT_3_RULE_DESC"
+msgstr "Você não deve perturbar as adivinhações do pavilhão por desejo pessoal nem vender os segredos celestiais da seita; se a ofensa for especialmente grave, será expulso."
+
+#. sect.csv: SECT_4_DESC
+msgid "SECT_4_DESC"
+msgstr "O Dao dos Nove Submundos governa as ilhas do Mar Morto, onde salões de condução das almas, pontes de travessia, depósitos de cadáveres e corredores de lanternas fantasmagóricas se erguem em meio à névoa marítima que dura o ano inteiro. Ir e vir por esse lugar é como caminhar pela fresta entre a vida e a morte. Seus ramos incluem o refinamento de almas, a travessia dos mortos e as artes Yin; os discípulos cultivam ao lado de espíritos mortos, marionetes cadavéricas e correntes de qi do submundo, desenvolvendo uma visão da mortalidade distinta daquela dos cultivadores comuns. A ordem interna é severa e a atmosfera, terrivelmente fria, formando seguidores silenciosos, contidos e assustadoramente dispostos a tratar tudo como um preço a ser pago."
+
+#. sect.csv: SECT_4_NAME
+msgid "SECT_4_NAME"
+msgstr "Dao dos Nove Submundos"
+
+#. sect.csv: SECT_4_RULE_DESC
+msgid "SECT_4_RULE_DESC"
+msgstr "Você pode cultivar artes Yin, mas não deve desafiar as ordens do mestre nem capturar almas sem autorização para ferir outros discípulos; quem violar essa grave regra será expulso."
+
+#. sect.csv: SECT_5_DESC
+msgid "SECT_5_DESC"
+msgstr "A Seita dos Mil Mecanismos se oculta nas profundezas do Vale Qianji. De longe, seus terraços e salões parecem intrincados e elegantes, mas escondem corredores mecânicos, oficinas de marionetes, arsenais de veneno e túneis secretos onde cada tijolo pode conter uma armadilha mortal. Seus discípulos se dividem entre mestres de mecanismos, fabricantes de marionetes, especialistas em venenos, mestres de Gu e agentes furtivos. Precisam compreender tanto a construção quanto a emboscada e aprender a sobreviver por meio de insetos, dispositivos venenosos e passagens ocultas. A linhagem Gu se destaca no uso de receptáculos para lançar artes sutis, recorrendo aos Gu do Afundamento da Mente, da Devoção do Sangue, da Erosão da Essência e da Desordem do Coração para influenciar inimigos a partir das sombras. O sucesso faz o efeito perdurar; o fracasso pode revelar seu rastro. A seita valoriza a eficiência, o sigilo e os resultados, por isso a cooperação costuma se apoiar em benefícios mútuos, fazendo do lugar um berço de estrategistas brilhantes e rivalidades sempre tensas."
+
+#. sect.csv: SECT_5_NAME
+msgid "SECT_5_NAME"
+msgstr "Seita dos Mil Mecanismos"
+
+#. sect.csv: SECT_5_RULE_DESC
+msgid "SECT_5_RULE_DESC"
+msgstr "Você não deve vazar projetos secretos de mecanismos nem assassinar membros da própria seita; se conspirar com o caminho justo e se voltar contra a seita, será expulso."
+
+#. sect.csv: SECT_6_DESC
+msgid "SECT_6_DESC"
+msgstr "O Pavilhão do Sonho Embriagado ergue-se num céu oculto dentro de uma cidade movimentada, onde câmaras de incenso, terraços à beira d'água, salões de música e piscinas oníricas se conectam sob canções incessantes durante o dia e o brilho das lanternas à noite. O cultivo ali depende de muito mais que o cultivo dual; os discípulos também estudam artes do incenso, música, dança, negociação e leitura das emoções humanas, muitas vezes combinando técnicas de encanto com apresentações e coleta de informações. O pavilhão se destaca em transformar desejos mortais em combustível para o cultivo e em perceber o calor ou a frieza de cada relação, de modo que seus membros podem se tornar extraordinariamente perspicazes ou se perder no labirinto entre o afeto verdadeiro e o falso."
+
+#. sect.csv: SECT_6_NAME
+msgid "SECT_6_NAME"
+msgstr "Pavilhão do Sonho Embriagado"
+
+#. sect.csv: SECT_6_RULE_DESC
+msgid "SECT_6_RULE_DESC"
+msgstr "Você pode se entregar ao mundo mortal, mas não deve extrair a essência de alguém até a morte nem trair seus mestres e ancestrais; quem violar esse grave preceito será expulso."
+
+#. sect.csv: SECT_7_DESC
+msgid "SECT_7_DESC"
+msgstr "O Templo Zen de Sumeru ergue-se na Ilha Pudu, em meio ao Mar das Tempestades, tendo como centro o Pagode Vajra e, ao redor, salões para subjugar demônios, plataformas de sinos, penhascos de austeridade e banhos medicinais. Quando os sinos começam a tocar, toda a ilha parece imobilizada por uma luz budista invisível. Seus discípulos seguem os caminhos da meditação, do cultivo marcial ou da prática dos guardiões, estudando escrituras e temperando o corpo, ao mesmo tempo que são enviados com frequência para proteger o mar contra criaturas malignas e acolher os aflitos. Embora solene e austero por fora, o templo não é desprovido de vida, e muitos monges guardam profunda compaixão mundana sob sua determinação de ferro."
+
+#. sect.csv: SECT_7_NAME
+msgid "SECT_7_NAME"
+msgstr "Templo Zen de Sumeru"
+
+#. sect.csv: SECT_7_RULE_DESC
+msgid "SECT_7_RULE_DESC"
+msgstr "É estritamente proibido matar mortais de forma indiscriminada, conspirar com espíritos malignos ou ferir outros discípulos; os culpados de ofensas graves que ainda recusarem o arrependimento serão expulsos."
+
+#. sect.csv: SECT_8_DESC
+msgid "SECT_8_DESC"
+msgstr "O Salão do Demônio das Sombras espreita nas profundezas do Pântano Sombrio, onde torres ocultas se elevam acima das copas e passagens secretas serpenteiam sob o lodo. Celas sombrias, campos de furtividade, poços de miasma venenoso e postos de inteligência se sobrepõem de tal forma que forasteiros raramente compreendem sua verdadeira configuração. Seus discípulos se dividem entre assassinato, técnicas de fuga, perseguição e manejo de cadáveres; desde o primeiro dia, aprendem a apagar rastros, ocultar intenções e sobreviver a situações desesperadoras. O afeto é raro nesse lugar; todos observam e desconfiam uns dos outros, mas essa mesma dureza forja um entendimento tácito que só se revela à beira da morte."
+
+#. sect.csv: SECT_8_NAME
+msgid "SECT_8_NAME"
+msgstr "Salão do Demônio das Sombras"
+
+#. sect.csv: SECT_8_RULE_DESC
+msgid "SECT_8_RULE_DESC"
+msgstr "O assassinato é permitido, mas trair o próprio salão ou revelar fortalezas ocultas não; se desertar para o caminho justo e vender outros discípulos, será expulso."
+
+#. sect.csv: SECT_9_DESC
+msgid "SECT_9_DESC"
+msgstr "A Aliança dos Inúmeros Tesouros ocupa as ilhas flutuantes de Duobao, onde salões de leilão, a Torre dos Mil Fornos, docas de navios das nuvens, grandes cofres e casas mercantis se unem numa seita que mais parece uma cidade imortal que nunca fecha. Seus cultivadores levam o comércio tão a sério quanto o cultivo e se dividem entre forja, avaliação, transporte, contabilidade e comércio exterior. Muitos discípulos aprendem desde a infância a precificar mercadorias, negociar, redigir contratos e manter as rotas comerciais ativas. A aliança valoriza acima de tudo a circulação e a eficiência, e todos compreendem como os recursos se transformam em influência, tornando-a mais pragmática, ordeira e zelosa da reputação que a maioria das seitas."
+
+#. sect.csv: SECT_9_NAME
+msgid "SECT_9_NAME"
+msgstr "Aliança dos Inúmeros Tesouros"
+
+#. sect.csv: SECT_9_RULE_DESC
+msgid "SECT_9_RULE_DESC"
+msgstr "Você pode buscar o lucro, mas não deve desviar recursos do tesouro da seita nem vender a aliança ao inimigo; se a ofensa for especialmente vil, será expulso."

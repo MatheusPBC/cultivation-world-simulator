@@ -3191,6 +3191,71 @@ msgstr ""
 msgid "PERSONA_1018_NAME"
 msgstr "Gu Immortal"
 
+msgid "GOLDFINGER_1_NAME"
+msgstr "Child of Fortune"
+
+msgid "GOLDFINGER_1_DESC"
+msgstr ""
+"You seem born under the favor of Heaven and Earth; opportunities others can "
+"only dream of naturally find their way to you."
+
+msgid "GOLDFINGER_1_STORY_PROMPT"
+msgstr ""
+"For a Child of Fortune, make destiny's favor, approaching opportunities, and"
+" acting with the current central elements of the story."
+
+msgid "GOLDFINGER_2_NAME"
+msgstr "Blessed with Good Fortune"
+
+msgid "GOLDFINGER_2_DESC"
+msgstr ""
+"Your fortune runs deep: danger often reveals a way out, and ordinary moments"
+" yield rewards others would overlook."
+
+msgid "GOLDFINGER_2_STORY_PROMPT"
+msgstr ""
+"For someone Blessed with Good Fortune, emphasize favorable reversals, small "
+"blessings, and unexpected everyday discoveries."
+
+msgid "GOLDFINGER_3_NAME"
+msgstr "Transmigrator"
+
+msgid "GOLDFINGER_3_DESC"
+msgstr ""
+"You came from another world, and modern memories and habits still shape how "
+"you understand the cultivation world."
+
+msgid "GOLDFINGER_3_STORY_PROMPT"
+msgstr ""
+"For a Transmigrator, emphasize modern thinking, displacement between worlds,"
+" and attempts to apply past experience to cultivation problems."
+
+msgid "GOLDFINGER_4_NAME"
+msgstr "Reincarnator"
+
+msgid "GOLDFINGER_4_DESC"
+msgstr ""
+"You seem to have returned with fragments of a former life and possess an "
+"uncanny intuition about certain choices and dangers."
+
+msgid "GOLDFINGER_4_STORY_PROMPT"
+msgstr ""
+"For a Reincarnator, emphasize residual memories, the urge to avoid old "
+"mistakes, past obsessions, and possible errors about the future."
+
+msgid "GOLDFINGER_5_NAME"
+msgstr "Companion Elder"
+
+msgid "GOLDFINGER_5_DESC"
+msgstr ""
+"An unseen senior seems hidden within your fate, offering guidance at "
+"decisive moments, pushing you onward, and sometimes arguing with you."
+
+msgid "GOLDFINGER_5_STORY_PROMPT"
+msgstr ""
+"For someone with a Companion Elder, emphasize the hidden mentor's guidance, "
+"disputes, secrets, and plans as a constant presence in the journey."
+
 #. plant.csv: 顽强生长在戈壁岩缝中的奇异植物，叶片坚硬...
 msgid "PLANT_10_DESC"
 msgstr ""

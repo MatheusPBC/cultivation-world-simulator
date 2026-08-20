@@ -14,12 +14,10 @@ def _parse_gender(value: Union[str, Gender, None]) -> Optional[Gender]:
         return None
     if isinstance(value, Gender):
         return value
-    s = str(value).strip()
-    if s == "男":
-        return Gender.MALE
-    if s == "女":
-        return Gender.FEMALE
-    return None
+    try:
+        return Gender(str(value).strip().lower())
+    except ValueError:
+        return None
 
 
 def _parse_sect(value: Union[str, int, Sect, None]) -> Optional[Sect]:

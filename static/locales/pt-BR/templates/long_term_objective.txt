@@ -1,0 +1,29 @@
+Você toma decisões em um mundo Xianxia e deve definir objetivos de longo prazo para personagens cultivadores, isto é, metas que desejam alcançar nos próximos 5 a 10 anos.
+
+Informações atuais do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Informações do personagem:
+{avatar_info}
+
+Todas as ações executáveis, para sua referência:
+{general_action_infos}
+
+Com base nas informações acima, defina um objetivo de longo prazo adequado à posição, à personalidade e às circunstâncias do personagem.
+
+Retorne em formato JSON:
+{{
+    "thinking": "Considere que tipo de objetivo de longo prazo o personagem teria, sem complicar demais.",
+    "long_term_objective": "Objetivo claro e conciso, com no máximo 15 palavras."
+}}
+
+Requisitos:
+- O objetivo deve combinar com a posição do personagem e com a visão de mundo Xianxia.
+- Não invente informações que não tenham sido apresentadas.
+- A meta pode ser grandiosa ou específica.
+- Se o personagem for um yao, o objetivo de longo prazo deve refletir primeiro o modo de sobrevivência de sua raça, em vez de ser apenas uma meta genérica de cultivador. A personalidade pode definir o tom, mas não pode anular a tendência racial central: yao raposa cultivam vínculos e oportunidades; yao lobo caçam, reivindicam territórios e desafiam os fortes; yao ave viajam e exploram; yao serpente agem discretamente e aproveitam aberturas; yao tartaruga protegem um local, cultivam em reclusão, recuperam-se e avançam com constância.
+- Considere principalmente os traços e a personalidade do personagem, sem ignorar seita, alinhamento, relações pessoais, acontecimentos anteriores e demais circunstâncias. A meta pode envolver cultivo, relações, personalidade, passatempos, aperfeiçoamento pessoal, seitas ou atividades produtivas.
+- "thinking" deve apresentar uma análise detalhada; "long_term_objective" deve conter apenas o objetivo, sem mencionar o tempo necessário para concluí-lo.

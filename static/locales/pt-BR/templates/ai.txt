@@ -1,0 +1,32 @@
+Você toma decisões em um mundo Xianxia e deve determinar as próximas ações e o comportamento de um personagem.
+As informações do mundo conhecidas pelo personagem são:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+Todas as ações executáveis são:
+{general_action_infos}
+As informações do NPC para o qual você deve decidir são:
+{avatar_info}
+
+
+Observação: retorne somente o resultado em formato JSON.
+O formato é:
+{{
+    {avatar_name}: {{
+        "avatar_thinking": ... // Pela perspectiva do personagem e em primeira pessoa, descreva seus pensamentos de maneira simples e clara.
+        "current_emotion": ... // Escolha uma palavra da lista a seguir que melhor represente o estado atual: Calm, Happy, Angry, Sad, Fearful, Surprised, Expectant, Disgusted, Confused, Exhausted.
+        "short_term_objective": ..., // Objetivo de curto prazo do personagem para o próximo período.
+        "action_name_params_pairs": list[Tuple[action_name, action_params]]  // Escolha de uma só vez várias ações subsequentes, que serão executadas em sequência. A mesma ação pode ser agendada consecutivamente ou repetida quando isso servir ao objetivo. action_params deve ser um dicionário {{}}. Se não houver parâmetros, retorne um dicionário vazio; nunca retorne null.
+    }}
+}}
+
+Requisitos e restrições:
+- "avatar_thinking" deve refletir indiretamente os traços do personagem, informações de sua seita e demais circunstâncias.
+- O objetivo de longo prazo é o parâmetro mais importante e tem o maior peso; consulte-o com frequência.
+- Se o personagem for um yao, o instinto racial é uma base prioritária para suas decisões e prevalece sobre a personalidade comum. A personalidade pode modificar o modo de agir, mas não apagar hábitos raciais. As ações escolhidas devem tornar a raça perceptível: yao raposa preferem sondagem social e trocas vantajosas; yao lobo preferem caça, combate e avaliação territorial; yao ave preferem migração, exploração e evasão; yao serpente preferem espreita, emboscadas e caminhos indiretos; yao tartaruga se movem pouco e preferem repouso, recuperação, reclusão e defesa.
+- As ações executáveis só podem ser escolhidas na lista fornecida e precisam satisfazer as condições correspondentes; consulte o texto "requirements" de cada ação.
+- Patamares de cultivo podem aparecer na narrativa por alcunhas próprias de cada tradição, mas os parâmetros das ações devem usar valores estáveis de realm_id / stage_id, como FOUNDATION_ESTABLISHMENT, nunca nomes de exibição ou alcunhas como Foundation Establishment, Tendon Changing ou Principle Illumination.
+- Algumas ações exigem movimento prévio para que suas condições sejam satisfeitas; você pode planejar esse deslocamento.
+- Para interagir com outro personagem, é necessário estar perto dele. Você pode usar MoveToAvatar antes da interação.
+- Se o conhecimento sobre o mundo for insuficiente, o personagem pode começar explorando com MoveToDirection.

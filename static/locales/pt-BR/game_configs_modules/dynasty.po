@@ -1,0 +1,85 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-21 00:00+0000\n"
+"PO-Revision-Date: 2026-03-21 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "DYNASTY_QIN_NAME"
+msgstr "Qin"
+
+msgid "DYNASTY_QIN_DESC"
+msgstr "Exalta a lei e o poder militar; a corte segue uma ordem rigorosa e governa os mortais com mão de ferro."
+
+msgid "DYNASTY_JIN_NAME"
+msgstr "Jin"
+
+msgid "DYNASTY_JIN_DESC"
+msgstr "Grandes clãs se erguem em fileiras solenes; a nobreza aprecia debates elevados, enquanto a corte e o campo prezam os ritos e a reputação."
+
+msgid "DYNASTY_SONG_NAME"
+msgstr "Song"
+
+msgid "DYNASTY_SONG_DESC"
+msgstr "Valoriza mais as letras que as armas; suas instituições são numerosas e refinadas, e academias particulares florescem entre o povo."
+
+msgid "DYNASTY_LIANG_NAME"
+msgstr "Liang"
+
+msgid "DYNASTY_LIANG_DESC"
+msgstr "A corte é elegante e requintada, o ambiente erudito é sofisticado e seu governo, embora inclusivo, está repleto de manobras sutis."
+
+msgid "DYNASTY_CHU_NAME"
+msgstr "Chu"
+
+msgid "DYNASTY_CHU_DESC"
+msgstr "Suas terras são vastas e os costumes, variados; antigas tradições xamânicas ainda persistem, e poderosas famílias locais ascendem nas fronteiras."
+
+msgid "DYNASTY_QI_NAME"
+msgstr "Qi"
+
+msgid "DYNASTY_QI_DESC"
+msgstr "Próspera no comércio e no artesanato, abre-se para o mar e possui uma corte hábil em arrecadar receitas e direcionar recursos."
+
+msgid "DYNASTY_YAN_NAME"
+msgstr "Yan"
+
+msgid "DYNASTY_YAN_DESC"
+msgstr "As terras do norte enfrentam um frio implacável; a defesa militar é honrada, e a corte mantém um caráter firme e austero."
+
+msgid "DYNASTY_ZHAO_NAME"
+msgstr "Zhao"
+
+msgid "DYNASTY_ZHAO_DESC"
+msgstr "A equitação e o arco fazem parte dos costumes; os governos militar e civil caminham lado a lado, e o espírito das fronteiras permeia a sociedade."
+
+msgid "DYNASTY_WEI_NAME"
+msgstr "Wei"
+
+msgid "DYNASTY_WEI_DESC"
+msgstr "Suas leis são claras e exigentes, a autoridade soberana é forte e os diversos órgãos do governo funcionam com rara eficiência."
+
+msgid "DYNASTY_HAN_NAME"
+msgstr "Han"
+
+msgid "DYNASTY_HAN_DESC"
+msgstr "Sem demonstrar arrogância, a dinastia valoriza assuntos práticos e uma administração cuidadosa no âmbito local."
+
+msgid "DYNASTY_WU_NAME"
+msgstr "Wu"
+
+msgid "DYNASTY_WU_DESC"
+msgstr "Rios e canais cruzam o território, mercadores viajam com frequência e a corte sabe aproveitar as vantagens das embarcações e do transporte fluvial."
+
+msgid "DYNASTY_YUE_NAME"
+msgstr "Yue"
+
+msgid "DYNASTY_YUE_DESC"
+msgstr "Montanhas e pântanos dominam suas terras, o povo é tenaz e a corte se destaca por resistir com firmeza antes de atacar."

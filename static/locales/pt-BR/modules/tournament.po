@@ -1,0 +1,65 @@
+msgid "World Martial Arts Tournament is in progress..."
+msgstr "O Torneio Mundial de Artes Marciais está em andamento..."
+
+msgid "tournament_start_heaven"
+msgstr "O torneio da Lista Celestial começou! Participantes: {participants}."
+
+msgid "tournament_start_earth"
+msgstr "O torneio da Lista Terrena começou! Participantes: {participants}."
+
+msgid "tournament_start_human"
+msgstr "O torneio da Lista Humana começou! Participantes: {participants}."
+
+msgid "tournament_battle_result"
+msgstr "Na luta do torneio, {winner} derrotou {loser}."
+
+msgid "tournament_end_heaven"
+msgstr "O torneio da Lista Celestial terminou. O primeiro lugar ficou com {winner}."
+
+msgid "tournament_end_earth"
+msgstr "O torneio da Lista Terrena terminou. O primeiro lugar ficou com {winner}."
+
+msgid "tournament_end_human"
+msgstr "O torneio da Lista Humana terminou. O primeiro lugar ficou com {winner}."
+
+msgid "effect_tournament_heaven_first"
+msgstr "1º da Lista Celestial (Cultivo/Refinamento Corporal +50%, Iluminação +10%)"
+
+msgid "effect_tournament_earth_first"
+msgstr "1º da Lista Terrena (Cultivo/Refinamento Corporal +50%, Iluminação +10%)"
+
+msgid "effect_tournament_human_first"
+msgstr "1º da Lista Humana (Cultivo/Refinamento Corporal +50%, Iluminação +10%)"
+
+msgid "Event Type: World Martial Arts Tournament\nScene Setting: The tournament is held to determine the strongest cultivators of the realm."
+msgstr "Tipo de evento: Torneio Mundial de Artes Marciais\nCenário: o torneio é realizado para determinar os cultivadores mais fortes do reino."
+
+msgid "\n【Tournament Information】\n"
+msgstr "\n[Informações do torneio]\n"
+
+msgid "List: {list_name}\n"
+msgstr "Lista: {list_name}\n"
+
+msgid "Winner: {winner}\n"
+msgstr "Vencedor: {winner}\n"
+
+msgid "\n【Finalists Information】\n"
+msgstr "\n[Informações dos finalistas]\n"
+
+msgid "tournament_story_prompt"
+msgstr "Escreva uma história vívida, com cerca de 400 a 500 palavras, com base nos resultados do torneio acima. Descreva o intenso confronto de artes marciais entre os dois finalistas, os detalhes das colisões entre seus artefatos, a presença majestosa do vencedor e as reações da multidão. O tom deve combinar com um mundo de cultivo. Produza somente texto simples, sem sintaxe Markdown."
+
+msgid "Final Match: {winner} vs {loser}\n"
+msgstr "Partida final: {winner} contra {loser}\n"
+
+msgid "tournament_cancelled_due_to_insufficient_participants"
+msgstr "O Torneio Mundial de Artes Marciais foi cancelado por falta de participantes."
+
+msgid "tournament_heaven"
+msgstr "1º lugar da Lista Celestial"
+
+msgid "tournament_earth"
+msgstr "1º lugar da Lista Terrena"
+
+msgid "tournament_human"
+msgstr "1º lugar da Lista Humana"

@@ -8,11 +8,14 @@ services:
       dockerfile: deploy/Dockerfile.backend
     container_name: cultivation-backend
     ports:
-      - "8002:8002"
+      - "${CWS_BIND_IP:-127.0.0.1}:8002:8002"
     environment:
       - PYTHONUNBUFFERED=1
       - CWS_DATA_DIR=/data
       - CWS_DISABLE_AUTO_SHUTDOWN=1
+      - CWS_CODEX_BIN=/usr/lib/node_modules/@openai/codex/bin/codex.js
+      - CWS_CODEX_NODE=/usr/bin/node
+      - CWS_CODEX_HOME=/codex-home
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/api/v1/query/runtime/status"]
@@ -22,6 +25,9 @@ services:
       start_period: 30s
     volumes:
       - ./docker-data:/data
+      - /usr/bin/node:/usr/bin/node:ro
+      - /usr/lib/node_modules/@openai/codex:/usr/lib/node_modules/@openai/codex:ro
+      - /home/codex-agent/.codex:/codex-home
   # 前端服务
   frontend:
     build:
@@ -29,7 +35,7 @@ services:
       dockerfile: deploy/Dockerfile.frontend
     container_name: cultivation-frontend
     ports:
-      - "8123:80"
+      - "${CWS_BIND_IP:-127.0.0.1}:8123:80"
     depends_on:
       backend:
         condition: service_healthy
@@ -39,4 +45,3 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-

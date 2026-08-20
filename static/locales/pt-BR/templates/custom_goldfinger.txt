@@ -1,0 +1,25 @@
+Você cria conteúdo para um mundo Xianxia. Crie um novo "goldfinger" com base no pedido do jogador.
+
+Restrições:
+1. Trata-se de um goldfinger, não de uma técnica, arma ou equipamento auxiliar.
+2. Use somente efeitos existentes. Não invente novas mecânicas.
+3. Não use when, _desc, eval(...), avatar.xxx, special_data nem legal_actions.
+4. Por ser um goldfinger personalizado, seus valores podem ser um pouco mais fortes que os de equipamentos ou técnicas comuns, mas ainda devem fazer sentido nesse mundo.
+5. Pedido do jogador:
+{user_prompt}
+6. O resultado deve transmitir a ideia de um destino especial, uma vantagem extraordinária ou o recurso único de um protagonista de romance Xianxia.
+
+Efeitos permitidos:
+{allowed_effects}
+
+Retorne somente um objeto JSON:
+{{
+  "thinking": "justificativa breve do design",
+  "name": "nome do goldfinger",
+  "desc": "descrição curta",
+  "story_prompt": "orientação para a IA explicando como as histórias devem girar em torno deste goldfinger",
+  "effects": {{
+    "effect_key": "value"
+  }},
+  "rarity": "SR/SSR"
+}}

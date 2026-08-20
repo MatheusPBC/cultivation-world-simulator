@@ -3,13 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from src.classes.environment.map import Map
-from src.classes.environment.tile import TileType
-from src.run.load_map import build_map_from_rows, build_map_from_source
+from src.run.load_map import build_map_from_source
 from src.run.map_presets import DEFAULT_MAP_ID
 from src.run.map_source import MapLandmark, MapRegionOverride, MapSource
 
 
-MAP_SNAPSHOT_SCHEMA_VERSION = 2
+MAP_SNAPSHOT_SCHEMA_VERSION = 3
 
 
 def serialize_map_snapshot(game_map: Map) -> dict[str, Any]:
@@ -50,8 +49,6 @@ def _validate_matrix_shape(rows: Any, *, width: int, height: int, field_name: st
 
 def load_map_from_snapshot(snapshot: dict[str, Any]) -> Map:
     schema_version = int(snapshot.get("schema_version", 0) or 0)
-    if schema_version == 1:
-        return _load_v1_map_from_snapshot(snapshot)
     if schema_version != MAP_SNAPSHOT_SCHEMA_VERSION:
         raise ValueError(f"Unsupported map snapshot schema version: {schema_version}")
 
@@ -94,10 +91,10 @@ def load_map_from_snapshot(snapshot: dict[str, Any]) -> Map:
             if not isinstance(value, dict):
                 continue
             override: dict[str, Any] = {}
-            if value.get("name") is not None:
-                override["name"] = str(value.get("name") or "")
-            if value.get("desc") is not None:
-                override["desc"] = str(value.get("desc") or "")
+            if value.get("name_id") is not None:
+                override["name_id"] = str(value.get("name_id") or "")
+            if value.get("desc_id") is not None:
+                override["desc_id"] = str(value.get("desc_id") or "")
             if override:
                 region_overrides[int(raw_region_id)] = override
 
@@ -111,59 +108,14 @@ def load_map_from_snapshot(snapshot: dict[str, Any]) -> Map:
         landmarks=landmarks,
         region_overrides={
             rid: MapRegionOverride(
-                name=str(value.get("name")) if value.get("name") is not None else None,
-                desc=str(value.get("desc")) if value.get("desc") is not None else None,
+                name_id=str(value.get("name_id")) if value.get("name_id") is not None else None,
+                desc_id=str(value.get("desc_id")) if value.get("desc_id") is not None else None,
             )
             for rid, value in region_overrides.items()
         },
     )
     return build_map_from_source(
         source,
-        map_id=preset_id,
-        map_name=str(snapshot.get("map_name") or ""),
-        preset_version=int(snapshot.get("preset_version", 1) or 1),
-    )
-
-
-def _load_v1_map_from_snapshot(snapshot: dict[str, Any]) -> Map:
-    width = int(snapshot.get("width", 0) or 0)
-    height = int(snapshot.get("height", 0) or 0)
-    if width <= 0 or height <= 0:
-        raise ValueError("Invalid map snapshot size")
-
-    tile_rows = _validate_matrix_shape(
-        snapshot.get("tile_rows"),
-        width=width,
-        height=height,
-        field_name="tile_rows",
-    )
-    region_rows = _validate_matrix_shape(
-        snapshot.get("region_rows"),
-        width=width,
-        height=height,
-        field_name="region_rows",
-    )
-
-    normalized_tile_rows: list[list[str]] = []
-    normalized_region_rows: list[list[int]] = []
-    for tile_row, region_row in zip(tile_rows, region_rows):
-        normalized_tile_row: list[str] = []
-        normalized_region_row: list[int] = []
-        for tile_name, region_id in zip(tile_row, region_row):
-            tile_value = str(tile_name).lower()
-            try:
-                TileType(tile_value)
-            except ValueError as exc:
-                raise ValueError(f"Unknown tile type in map snapshot: {tile_name}") from exc
-            normalized_tile_row.append(tile_value)
-            normalized_region_row.append(int(region_id))
-        normalized_tile_rows.append(normalized_tile_row)
-        normalized_region_rows.append(normalized_region_row)
-
-    preset_id = str(snapshot.get("preset_id") or DEFAULT_MAP_ID)
-    return build_map_from_rows(
-        normalized_tile_rows,
-        normalized_region_rows,
         map_id=preset_id,
         map_name=str(snapshot.get("map_name") or ""),
         preset_version=int(snapshot.get("preset_version", 1) or 1),

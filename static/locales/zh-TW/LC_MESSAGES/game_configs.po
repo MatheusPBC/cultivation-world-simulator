@@ -2539,6 +2539,51 @@ msgstr "天生與萬蠱相親，舉念之間可令蟲豸奉命。"
 msgid "PERSONA_1018_NAME"
 msgstr "蠱仙"
 
+msgid "GOLDFINGER_1_NAME"
+msgstr "氣運之子"
+
+msgid "GOLDFINGER_1_DESC"
+msgstr "你彷彿生來便受天地眷顧，許多人求而不得的機緣總會主動靠近。"
+
+msgid "GOLDFINGER_1_STORY_PROMPT"
+msgstr "若角色擁有「氣運之子」外掛，請把天命偏愛、機緣主動靠近與順勢而為作為故事的重要線索。"
+
+msgid "GOLDFINGER_2_NAME"
+msgstr "福緣深厚"
+
+msgid "GOLDFINGER_2_DESC"
+msgstr "你福緣深厚，常能在險境中看見轉機，也能從尋常之處得到收穫。"
+
+msgid "GOLDFINGER_2_STORY_PROMPT"
+msgstr "請著重描寫逢凶化吉、細微福分與日常中的意外收穫。"
+
+msgid "GOLDFINGER_3_NAME"
+msgstr "穿越者"
+
+msgid "GOLDFINGER_3_DESC"
+msgstr "你來自另一個世界，現代記憶與思維仍影響著你理解修仙界的方式。"
+
+msgid "GOLDFINGER_3_STORY_PROMPT"
+msgstr "請著重描寫現代思維、異世界錯位感，以及嘗試以過往經驗處理修仙問題的視角。"
+
+msgid "GOLDFINGER_4_NAME"
+msgstr "重生者"
+
+msgid "GOLDFINGER_4_DESC"
+msgstr "你帶著前世的殘影歸來，對某些選擇與危險有難以言明的敏銳直覺。"
+
+msgid "GOLDFINGER_4_STORY_PROMPT"
+msgstr "請著重描寫前世殘留記憶、避開舊錯的衝動、昔日執念與對未來的誤判。"
+
+msgid "GOLDFINGER_5_NAME"
+msgstr "隨身老爺爺"
+
+msgid "GOLDFINGER_5_DESC"
+msgstr "一位看不見的前輩會在關鍵時刻指點、催促你，有時也會與你爭論。"
+
+msgid "GOLDFINGER_5_STORY_PROMPT"
+msgstr "請著重描寫隱秘前輩的指點、爭執、秘密與安排，讓這份陪伴始終存在於旅程中。"
+
 #. plant.csv: 頑強生長在戈壁巖縫中的奇異植物，葉片堅硬...
 msgid "PLANT_10_DESC"
 msgstr "頑強生長在戈壁巖縫中的奇異植物，葉片堅硬如劍，夜間能引動併吞噬星輝"
