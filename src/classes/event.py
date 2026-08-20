@@ -2,14 +2,24 @@
 event class
 """
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, List, Optional
 import uuid
 import time
 
+from src.classes.causal_link import CausalLink
 from src.systems.time import Month, Year, MonthStamp, get_date_str
 
 if TYPE_CHECKING:
     from src.classes.event_observation import EventObservation
+
+
+class FactKind(StrEnum):
+    OCCURRENCE = "occurrence"                # something happened (default)
+    STATE_TRANSITION = "state_transition"    # a domain-owned value changed
+    DERIVED_CONDITION = "derived_condition"  # a condition became true/false
+    DECISION = "decision"                    # an agent committed to an intent
+
 
 @dataclass
 class Event:
@@ -37,6 +47,12 @@ class Event:
     created_at: float = field(default_factory=time.time)
     # 运行时挂载的 observation，统一由 EventManager 持久化
     observations: List["EventObservation"] = field(default_factory=list, repr=False, compare=False)
+    # 事实类型：发生 / 状态转变 / 派生条件 / 决策；与 event_type 正交，互不覆盖
+    fact_kind: FactKind = FactKind.OCCURRENCE
+    # 因果证据载荷：deltas（StateDelta 列表）+ decision（AgentDecision，仅 DECISION 事件）
+    causal_payload: Optional[dict[str, Any]] = None
+    # 运行时挂载的因果边，统一由 EventStorage 持久化到 event_causal_links
+    causal_links: List["CausalLink"] = field(default_factory=list, repr=False, compare=False)
 
     def __str__(self) -> str:
         return f"{get_date_str(int(self.month_stamp))}: {self.content}"
@@ -55,9 +71,12 @@ class Event:
             "render_params": self.render_params,
             "subject_snapshots": self.subject_snapshots,
             "id": self.id,
-            "created_at": self.created_at
+            "created_at": self.created_at,
+            "fact_kind": str(self.fact_kind),
+            "causal_payload": self.causal_payload,
+            "causal_links": [link.to_dict() for link in self.causal_links],
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "Event":
         """从字典重建Event"""
@@ -73,7 +92,10 @@ class Event:
             render_params=data.get("render_params"),
             subject_snapshots=dict(data.get("subject_snapshots") or {}),
             id=data.get("id", str(uuid.uuid4())),
-            created_at=data.get("created_at", time.time())
+            created_at=data.get("created_at", time.time()),
+            fact_kind=FactKind(data.get("fact_kind", FactKind.OCCURRENCE.value)),
+            causal_payload=data.get("causal_payload"),
+            causal_links=[CausalLink.from_dict(item) for item in data.get("causal_links") or []],
         )
 
 class NullEvent:
@@ -97,6 +119,9 @@ class NullEvent:
             cls._instance.render_params = None
             cls._instance.id = "NULL_EVENT"
             cls._instance.observations = []
+            cls._instance.fact_kind = FactKind.OCCURRENCE
+            cls._instance.causal_payload = None
+            cls._instance.causal_links = []
         return cls._instance
     
     def __str__(self) -> str:

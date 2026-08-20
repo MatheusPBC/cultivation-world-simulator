@@ -1,8 +1,9 @@
 import pytest
 
-from src.classes.event import Event
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.event import Event, FactKind
 from src.sim.simulator_engine.phases import social
-from src.systems.time import Month
+from src.systems.time import Month, MonthStamp
 
 
 class TestEventLogic:
@@ -82,3 +83,77 @@ class TestEventLogic:
 
         assert avatar_a.get_friendliness(avatar_b) == 33
         assert avatar_b.get_friendliness(avatar_a) == 33
+
+
+class TestEventCausalMetadata:
+    """Task 2: Event gains fact_kind, causal_payload and a runtime causal_links mirror."""
+
+    def test_fact_kind_defaults_to_occurrence(self):
+        event = Event(month_stamp=MonthStamp(1), content="something happened")
+
+        assert event.fact_kind == FactKind.OCCURRENCE
+
+    def test_causal_payload_defaults_to_none(self):
+        event = Event(month_stamp=MonthStamp(1), content="something happened")
+
+        assert event.causal_payload is None
+
+    def test_causal_links_defaults_to_empty_list(self):
+        event = Event(month_stamp=MonthStamp(1), content="something happened")
+
+        assert event.causal_links == []
+
+    def test_to_dict_round_trips_fact_kind_and_causal_payload(self):
+        event = Event(
+            month_stamp=MonthStamp(1),
+            content="a region's population fell",
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"deltas": [{"aspect": "population"}], "decision": None},
+        )
+
+        data = event.to_dict()
+        restored = Event.from_dict(data)
+
+        assert data["fact_kind"] == "state_transition"
+        assert restored.fact_kind == FactKind.STATE_TRANSITION
+        assert restored.causal_payload == {"deltas": [{"aspect": "population"}], "decision": None}
+
+    def test_from_dict_defaults_fact_kind_and_causal_payload_when_absent(self):
+        event = Event(month_stamp=MonthStamp(1), content="legacy event")
+        data = event.to_dict()
+        del data["fact_kind"]
+        del data["causal_payload"]
+
+        restored = Event.from_dict(data)
+
+        assert restored.fact_kind == FactKind.OCCURRENCE
+        assert restored.causal_payload is None
+
+    def test_to_dict_round_trips_causal_links(self):
+        event = Event(month_stamp=MonthStamp(1), content="a breakthrough happened")
+        event.causal_links = [
+            CausalLink(
+                event_id=event.id,
+                cause_event_id="cause-1",
+                relation=CausalRelation.MOTIVATED_BY,
+                weight=0.5,
+            )
+        ]
+
+        data = event.to_dict()
+        restored = Event.from_dict(data)
+
+        assert data["causal_links"][0]["relation"] == "motivated_by"
+        assert len(restored.causal_links) == 1
+        assert restored.causal_links[0].cause_event_id == "cause-1"
+        assert restored.causal_links[0].relation == CausalRelation.MOTIVATED_BY
+        assert restored.causal_links[0].weight == 0.5
+
+    def test_from_dict_defaults_causal_links_when_absent(self):
+        event = Event(month_stamp=MonthStamp(1), content="legacy event")
+        data = event.to_dict()
+        del data["causal_links"]
+
+        restored = Event.from_dict(data)
+
+        assert restored.causal_links == []

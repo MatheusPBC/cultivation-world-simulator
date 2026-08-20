@@ -14,6 +14,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from src.run.log import get_logger
+from src.classes.causal_link import CausalLink, CausalRelation, MAX_CAUSAL_LINKS_PER_EVENT
 from src.classes.event_query import EventAudience, EventMemoryScope, EventPage, EventQuery
 
 
@@ -98,7 +99,9 @@ class EventStorage:
                         render_key TEXT,
                         render_params TEXT,
                         subject_snapshots TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        fact_kind TEXT,
+                        causal_payload TEXT
                     );
 
                     CREATE TABLE IF NOT EXISTS event_avatars (
@@ -147,6 +150,24 @@ class EventStorage:
                         ON event_observations(event_id);
                     CREATE INDEX IF NOT EXISTS idx_event_observations_subject_avatar_id
                         ON event_observations(subject_avatar_id);
+
+                    CREATE TABLE IF NOT EXISTS event_causal_links (
+                        id TEXT PRIMARY KEY,
+                        event_id TEXT NOT NULL,
+                        cause_event_id TEXT NOT NULL,
+                        relation TEXT NOT NULL,
+                        weight REAL DEFAULT 1.0,
+                        note_key TEXT,
+                        note_params TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(event_id, cause_event_id, relation),
+                        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_event_causal_links_event_id
+                        ON event_causal_links(event_id);
+                    CREATE INDEX IF NOT EXISTS idx_event_causal_links_cause_event_id
+                        ON event_causal_links(cause_event_id);
                 """)
                 columns = {
                     row["name"]
@@ -154,6 +175,10 @@ class EventStorage:
                 }
                 if "subject_snapshots" not in columns:
                     self._conn.execute("ALTER TABLE events ADD COLUMN subject_snapshots TEXT")
+                if "fact_kind" not in columns:
+                    self._conn.execute("ALTER TABLE events ADD COLUMN fact_kind TEXT")
+                if "causal_payload" not in columns:
+                    self._conn.execute("ALTER TABLE events ADD COLUMN causal_payload TEXT")
                 self._conn.commit()
             self._logger.info(f"EventStorage initialized: {self._db_path}")
         except Exception as e:
@@ -193,9 +218,9 @@ class EventStorage:
                 self._conn.execute(
                     """
                     INSERT OR IGNORE INTO events (
-                        id, month_stamp, content, is_major, is_story, event_type, render_key, render_params, subject_snapshots, created_at
+                        id, month_stamp, content, is_major, is_story, event_type, render_key, render_params, subject_snapshots, created_at, fact_kind, causal_payload
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         event.id,
@@ -208,6 +233,8 @@ class EventStorage:
                         json.dumps(event.render_params, ensure_ascii=False) if event.render_params is not None else None,
                         json.dumps(getattr(event, "subject_snapshots", {}), ensure_ascii=False),
                         _format_time(event.created_at),
+                        str(getattr(event, "fact_kind", None)) if getattr(event, "fact_kind", None) is not None else None,
+                        json.dumps(event.causal_payload, ensure_ascii=False) if getattr(event, "causal_payload", None) is not None else None,
                     )
                 )
 
@@ -250,6 +277,34 @@ class EventStorage:
                             str(observation.propagation_kind),
                             observation.relation_type,
                             _format_time(observation.created_at),
+                        )
+                    )
+
+                causal_links = getattr(event, "causal_links", None) or []
+                if len(causal_links) > MAX_CAUSAL_LINKS_PER_EVENT:
+                    self._logger.warning(
+                        f"Event {event.id} has {len(causal_links)} causal links; "
+                        f"truncating to {MAX_CAUSAL_LINKS_PER_EVENT}"
+                    )
+                    causal_links = causal_links[:MAX_CAUSAL_LINKS_PER_EVENT]
+
+                for link in causal_links:
+                    self._conn.execute(
+                        """
+                        INSERT OR IGNORE INTO event_causal_links (
+                            id, event_id, cause_event_id, relation, weight, note_key, note_params, created_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            link.id,
+                            event.id,
+                            link.cause_event_id,
+                            str(link.relation),
+                            link.weight,
+                            link.note_key,
+                            json.dumps(link.note_params, ensure_ascii=False) if link.note_params is not None else None,
+                            _format_time(link.created_at),
                         )
                     )
             return True
@@ -336,7 +391,7 @@ class EventStorage:
         avatar_map: Optional[dict[str, list[str]]] = None,
         sect_map: Optional[dict[str, list[int]]] = None,
     ) -> "Event":
-        from src.classes.event import Event
+        from src.classes.event import Event, FactKind
         from src.systems.time import MonthStamp
 
         if avatar_map is None:
@@ -360,6 +415,9 @@ class EventStorage:
             related_sects = sect_map.get(row["id"], [])
 
         snapshot_json = row["subject_snapshots"] if "subject_snapshots" in row.keys() else None
+        row_keys = row.keys()
+        fact_kind_value = row["fact_kind"] if "fact_kind" in row_keys else None
+        causal_payload_json = row["causal_payload"] if "causal_payload" in row_keys else None
         return Event(
             month_stamp=MonthStamp(row["month_stamp"]),
             content=row["content"],
@@ -373,6 +431,8 @@ class EventStorage:
             subject_snapshots=json.loads(snapshot_json) if snapshot_json else {},
             id=row["id"],
             created_at=_parse_time(row["created_at"]),
+            fact_kind=FactKind(fact_kind_value) if fact_kind_value else FactKind.OCCURRENCE,
+            causal_payload=json.loads(causal_payload_json) if causal_payload_json else None,
         )
 
     def _build_events_from_rows(self, rows) -> list["Event"]:
@@ -457,7 +517,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
                         FROM events e
                         JOIN event_avatars ea1 ON e.id = ea1.event_id AND ea1.avatar_id = ?
                         JOIN event_avatars ea2 ON e.id = ea2.event_id AND ea2.avatar_id = ?
@@ -468,7 +528,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
                         FROM events e
                         JOIN event_avatars ea ON e.id = ea.event_id AND ea.avatar_id = ?
                     """
@@ -478,7 +538,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
                         FROM events e
                         JOIN event_sects es ON e.id = es.event_id AND es.sect_id = ?
                     """
@@ -488,7 +548,7 @@ class EventStorage:
                     base_query = """
                         SELECT
                             rowid, id, month_stamp, content, is_major, is_story,
-                            event_type, render_key, render_params, e.subject_snapshots, e.created_at
+                            event_type, render_key, render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
                         FROM events e
                     """
 
@@ -586,7 +646,7 @@ class EventStorage:
             params.extend([cursor_month, cursor_month, cursor_rowid])
         sql = f"""
             SELECT DISTINCT e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at,
+                e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload,
                 eo.propagation_kind, eo.observer_avatar_id, eo.subject_avatar_id, eo.relation_type
             FROM events e JOIN event_observations eo
                 ON e.id = eo.event_id AND eo.observer_avatar_id = ?
@@ -729,6 +789,55 @@ class EventStorage:
         except Exception as e:
             self._logger.error(f"Failed to cleanup events: {e}")
             return 0
+
+    def get_causal_links_for_event(self, event_id: str) -> list["CausalLink"]:
+        """
+        返回以 event_id 为结果（效果）的所有因果边，即该事件的直接原因。
+
+        不会因为 cause_event_id 指向的原始事件已被 cleanup 清理而报错或漏读——
+        因果边本身没有对 cause_event_id 的外键约束，允许其指向一个已被裁剪的事件。
+        """
+        if self._conn is None:
+            return []
+        with self._db_lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, event_id, cause_event_id, relation, weight, note_key, note_params, created_at
+                FROM event_causal_links
+                WHERE event_id = ?
+                ORDER BY created_at ASC
+                """,
+                (event_id,),
+            ).fetchall()
+        return [self._row_to_causal_link(row) for row in rows]
+
+    def get_causal_links_caused_by(self, cause_event_id: str) -> list["CausalLink"]:
+        """返回以 cause_event_id 为原因的所有因果边，即该事件触发的下游效果。"""
+        if self._conn is None:
+            return []
+        with self._db_lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, event_id, cause_event_id, relation, weight, note_key, note_params, created_at
+                FROM event_causal_links
+                WHERE cause_event_id = ?
+                ORDER BY created_at ASC
+                """,
+                (cause_event_id,),
+            ).fetchall()
+        return [self._row_to_causal_link(row) for row in rows]
+
+    def _row_to_causal_link(self, row) -> "CausalLink":
+        return CausalLink(
+            id=row["id"],
+            event_id=row["event_id"],
+            cause_event_id=row["cause_event_id"],
+            relation=CausalRelation(row["relation"]),
+            weight=row["weight"],
+            note_key=row["note_key"],
+            note_params=json.loads(row["note_params"]) if row["note_params"] else None,
+            created_at=_parse_time(row["created_at"]),
+        )
 
     def count(self) -> int:
         """获取事件总数。"""

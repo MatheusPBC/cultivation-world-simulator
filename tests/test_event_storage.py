@@ -538,6 +538,207 @@ class TestEventStorageCleanup:
         assert events[0].content == "New"
 
 
+class TestEventStorageCausalMetadata:
+    """Task 2: fact_kind / causal_payload columns and the event_causal_links side table."""
+
+    def test_init_creates_causal_links_table(self, temp_db_path):
+        storage = EventStorage(temp_db_path)
+
+        cursor = storage._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name = 'event_causal_links'"
+        )
+        assert cursor.fetchone() is not None
+
+        columns = {row["name"] for row in storage._conn.execute("PRAGMA table_info(events)").fetchall()}
+        assert "fact_kind" in columns
+        assert "causal_payload" in columns
+
+        storage.close()
+
+    def test_upgrades_a_pre_existing_database_missing_the_new_columns(self, temp_db_path):
+        import sqlite3
+
+        legacy_conn = sqlite3.connect(str(temp_db_path))
+        legacy_conn.executescript(
+            """
+            CREATE TABLE events (
+                id TEXT PRIMARY KEY,
+                month_stamp INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                is_major BOOLEAN DEFAULT FALSE,
+                is_story BOOLEAN DEFAULT FALSE,
+                event_type TEXT DEFAULT '',
+                render_key TEXT,
+                render_params TEXT,
+                subject_snapshots TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+        legacy_conn.commit()
+        legacy_conn.close()
+
+        storage = EventStorage(temp_db_path)
+        columns = {row["name"] for row in storage._conn.execute("PRAGMA table_info(events)").fetchall()}
+        assert "fact_kind" in columns
+        assert "causal_payload" in columns
+
+        event = make_event(100, 5, "Upgraded db still writes fine")
+        assert storage.add_event(event) is True
+        storage.close()
+
+    def test_add_event_persists_fact_kind_and_causal_payload(self, event_storage):
+        from src.classes.event import FactKind
+
+        event = make_event(100, 5, "Population fell")
+        event.fact_kind = FactKind.STATE_TRANSITION
+        event.causal_payload = {"deltas": [{"aspect": "population"}], "decision": None}
+
+        event_storage.add_event(event)
+        events, _ = event_storage.get_events()
+
+        assert events[0].fact_kind == FactKind.STATE_TRANSITION
+        assert events[0].causal_payload == {"deltas": [{"aspect": "population"}], "decision": None}
+
+    def test_read_defaults_fact_kind_to_occurrence_when_null(self, event_storage):
+        from src.classes.event import FactKind
+
+        event = make_event(100, 5, "Plain event")
+        event_storage.add_event(event)
+        events, _ = event_storage.get_events()
+
+        assert events[0].fact_kind == FactKind.OCCURRENCE
+        assert events[0].causal_payload is None
+
+    def test_row_to_event_does_not_eagerly_load_causal_links(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 1, "cause")
+        effect = make_event(100, 2, "effect")
+        effect.causal_links = [
+            CausalLink(event_id=effect.id, cause_event_id=cause.id, relation=CausalRelation.TRIGGERED_BY)
+        ]
+        event_storage.add_event(cause)
+        event_storage.add_event(effect)
+
+        events, _ = event_storage.get_events()
+
+        assert all(event.causal_links == [] for event in events)
+
+
+class TestEventStorageCausalLinks:
+    """Write/read/cleanup behaviour for the event_causal_links side table."""
+
+    def test_links_write_and_read_back(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 1, "cause")
+        effect = make_event(100, 2, "effect")
+        effect.causal_links = [
+            CausalLink(
+                event_id=effect.id,
+                cause_event_id=cause.id,
+                relation=CausalRelation.TRIGGERED_BY,
+                weight=0.8,
+            )
+        ]
+        event_storage.add_event(cause)
+        event_storage.add_event(effect)
+
+        links = event_storage.get_causal_links_for_event(effect.id)
+
+        assert len(links) == 1
+        assert links[0].cause_event_id == cause.id
+        assert links[0].relation == CausalRelation.TRIGGERED_BY
+        assert links[0].weight == 0.8
+
+    def test_multifactor_links_on_one_effect(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause1 = make_event(100, 1, "cause1")
+        cause2 = make_event(100, 1, "cause2")
+        effect = make_event(100, 2, "effect")
+        effect.causal_links = [
+            CausalLink(event_id=effect.id, cause_event_id=cause1.id, relation=CausalRelation.TRIGGERED_BY, weight=0.6),
+            CausalLink(event_id=effect.id, cause_event_id=cause2.id, relation=CausalRelation.ENABLED_BY, weight=0.4),
+        ]
+        event_storage.add_event(cause1)
+        event_storage.add_event(cause2)
+        event_storage.add_event(effect)
+
+        links = event_storage.get_causal_links_for_event(effect.id)
+
+        assert {link.cause_event_id for link in links} == {cause1.id, cause2.id}
+
+    def test_unique_constraint_deduplicates_identical_links(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 1, "cause")
+        effect = make_event(100, 2, "effect")
+        link = CausalLink(event_id=effect.id, cause_event_id=cause.id, relation=CausalRelation.TRIGGERED_BY)
+        effect.causal_links = [link, link]
+        event_storage.add_event(cause)
+        event_storage.add_event(effect)
+
+        links = event_storage.get_causal_links_for_event(effect.id)
+
+        assert len(links) == 1
+
+    def test_links_are_capped_per_event(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation, MAX_CAUSAL_LINKS_PER_EVENT
+
+        effect = make_event(100, 2, "effect")
+        causes = [make_event(100, 1, f"cause{i}") for i in range(MAX_CAUSAL_LINKS_PER_EVENT + 5)]
+        for cause in causes:
+            event_storage.add_event(cause)
+        effect.causal_links = [
+            CausalLink(event_id=effect.id, cause_event_id=cause.id, relation=CausalRelation.TRIGGERED_BY)
+            for cause in causes
+        ]
+        event_storage.add_event(effect)
+
+        links = event_storage.get_causal_links_for_event(effect.id)
+
+        assert len(links) == MAX_CAUSAL_LINKS_PER_EVENT
+
+    def test_cleanup_cascades_links_of_the_deleted_event(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 1, "cause", is_major=True)
+        effect = make_event(100, 2, "effect", is_major=False)
+        effect.causal_links = [
+            CausalLink(event_id=effect.id, cause_event_id=cause.id, relation=CausalRelation.TRIGGERED_BY)
+        ]
+        event_storage.add_event(cause)
+        event_storage.add_event(effect)
+
+        event_storage.cleanup(keep_major=True)
+
+        assert event_storage.get_causal_links_for_event(effect.id) == []
+        row = event_storage._conn.execute("SELECT COUNT(*) FROM event_causal_links").fetchone()
+        assert row[0] == 0
+
+    def test_cleanup_leaves_a_dangling_cause_event_id_readable(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 1, "cause", is_major=False)
+        effect = make_event(100, 2, "effect", is_major=True)
+        effect.causal_links = [
+            CausalLink(event_id=effect.id, cause_event_id=cause.id, relation=CausalRelation.TRIGGERED_BY)
+        ]
+        event_storage.add_event(cause)
+        event_storage.add_event(effect)
+
+        deleted = event_storage.cleanup(keep_major=True)
+
+        assert deleted == 1
+        links = event_storage.get_causal_links_for_event(effect.id)
+        assert len(links) == 1
+        assert links[0].cause_event_id == cause.id
+        # The cause row itself is gone; the link is still readable as a pruned reference.
+        assert all(event.id != cause.id for event in event_storage.get_recent_events())
+
+
 class TestEventStorageCursorParsing:
     """Tests for cursor parsing edge cases."""
 
