@@ -137,7 +137,26 @@ class Breakthrough(TimedAction):
         content = t("{avatar} begins attempting breakthrough", avatar=self.avatar.name)
         event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=True)
         self._start_event_id = event.id
+        self._record_motivation(event)
         return event
+
+    def _record_motivation(self, start_event: Event) -> None:
+        # 被动记录：把本次动作链接到发起它的决策审计事件（若有）。
+        # 只在因果记录器存在、且 avatar 当前确实有一条在途决策时记录，
+        # 不创建新的执行路径，也不读取 AgentDecision 内容做任何判断。
+        from src.sim.simulator_engine.causal_recorder import get_causal_recorder
+
+        recorder = get_causal_recorder(self.world)
+        if recorder is None:
+            return
+        decision_event_id = getattr(self.avatar, "current_decision_event_id", "")
+        if not decision_event_id:
+            return
+        recorder.record_link(
+            start_event.id,
+            CausalLink(cause_event_id=decision_event_id, relation=CausalRelation.MOTIVATED_BY),
+            priority=5,
+        )
 
     # TimedAction 已统一 step 逻辑
 

@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from src.classes.event import Event, NULL_EVENT
+from src.classes.event_query import EventQuery
 from src.classes.event_storage import EventStorage, EventStorageError
 from src.sim.managers.event_manager import EventManager
 from src.systems.time import MonthStamp, Year, Month, create_month_stamp
@@ -737,6 +738,81 @@ class TestEventStorageCausalLinks:
         assert links[0].cause_event_id == cause.id
         # The cause row itself is gone; the link is still readable as a pruned reference.
         assert all(event.id != cause.id for event in event_storage.get_recent_events())
+
+
+class TestEventStorageUpdateCausalPayloadSqlite:
+    """Permanent SQLite-backed regression for EventStorage.update_causal_payload
+    (task-4-review.md finding: verified ad hoc, not previously checked in).
+
+    Exercises a real on-disk database across a close/reopen cycle -- an
+    in-memory EventManager or a single long-lived connection could not catch
+    a write that only looked persisted because the same process/connection
+    was still holding it in a cache.
+    """
+
+    def test_update_causal_payload_persists_across_close_and_reopen(self, temp_db_path):
+        from src.classes.event import FactKind
+
+        storage = EventStorage(temp_db_path)
+        decision_event = make_event(100, 1, "decision", ["a1"])
+        decision_event.fact_kind = FactKind.DECISION
+        decision_event.causal_payload = {
+            "deltas": [],
+            "decision": {"chosen_chain": [{"action_name": "Breakthrough", "params": {}}], "rejected": []},
+        }
+        storage.add_event(decision_event)
+        storage.close()
+
+        # Reopen a brand-new EventStorage instance on the same file -- this
+        # is the cross-month scenario: the decision event was flushed in an
+        # earlier process/step, and the rejection is captured later.
+        storage = EventStorage(temp_db_path)
+        updated_payload = {
+            "deltas": [],
+            "decision": {
+                "chosen_chain": [{"action_name": "Breakthrough", "params": {}}],
+                "rejected": [{"action_name": "Breakthrough", "params": {}, "reason": "Not at bottleneck"}],
+            },
+        }
+        result = storage.update_causal_payload(decision_event.id, updated_payload)
+        assert result is True
+        storage.close()
+
+        # Reopen again, with a fresh connection, and read it back through the
+        # normal query path with include_decisions=True (the opt-in causal
+        # query path), not a raw SELECT.
+        storage = EventStorage(temp_db_path)
+        page = storage.query_page(EventQuery(limit=100, include_decisions=True))
+        storage.close()
+
+        matching = [e for e in page.events if e.id == decision_event.id]
+        assert len(matching) == 1
+        assert matching[0].causal_payload["decision"]["rejected"] == [
+            {"action_name": "Breakthrough", "params": {}, "reason": "Not at bottleneck"}
+        ]
+
+    def test_update_causal_payload_to_none_persists_across_reopen(self, temp_db_path):
+        storage = EventStorage(temp_db_path)
+        event = make_event(100, 1, "occurrence", ["a1"])
+        event.causal_payload = {"deltas": [{"aspect": "population"}], "decision": None}
+        storage.add_event(event)
+        storage.close()
+
+        storage = EventStorage(temp_db_path)
+        assert storage.update_causal_payload(event.id, None) is True
+        storage.close()
+
+        storage = EventStorage(temp_db_path)
+        events, _ = storage.get_events()
+        storage.close()
+
+        assert events[0].causal_payload is None
+
+    def test_update_causal_payload_returns_false_when_storage_closed(self, temp_db_path):
+        storage = EventStorage(temp_db_path)
+        storage.close()
+
+        assert storage.update_causal_payload("does-not-matter", {"deltas": []}) is False
 
 
 class TestEventStorageCursorParsing:
