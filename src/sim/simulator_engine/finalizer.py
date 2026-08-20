@@ -55,7 +55,9 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
     log_events(final_events)
     ctx.world.month_stamp = ctx.world.month_stamp + 1
     ctx.events = final_events
-    # 清理桥接引用：因果记录器只在本轮 step 内有效，避免 step 之外的代码
-    # （如 HTTP 请求处理）误读到上一轮遗留的记录器。
+    # 清理桥接引用：因果记录器只在本轮 step 内有效。主要清理职责在
+    # SimulationPhaseRunner.run 的 finally 块（覆盖成功/abort/异常三种收尾），
+    # 这里的清理只是幂等的兜底，保留是为了 finalize_step 单独被调用
+    # （例如测试直接调用 finalize_step(ctx)）时行为依旧正确。
     ctx.world.step_causal_recorder = None
     return final_events

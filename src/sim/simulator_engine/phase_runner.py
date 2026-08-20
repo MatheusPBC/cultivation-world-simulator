@@ -41,3 +41,8 @@ class SimulationPhaseRunner:
             return []
         except SimulationStepAborted:
             return []
+        finally:
+            # 因果记录器只在本轮 step 内有效：无论成功收尾、reset 中止还是
+            # 任意异常向外传播，都要在这里统一清理，不依赖只在成功路径上
+            # 才会执行的 finalize_step。不吞异常——这里不 except，只清理。
+            self.world.step_causal_recorder = None
