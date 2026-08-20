@@ -56,3 +56,26 @@ def get_action_infos_str(avatar: "Avatar" | None = None) -> str:
     获取JSON格式的动作描述字符串
     """
     return json.dumps(get_action_infos(avatar), ensure_ascii=False, indent=2)
+
+
+def build_action_affordances(avatar: "Avatar") -> list[Dict[str, Any]]:
+    """
+    玩家/API 视角的动作可供性列表：列出全部实际动作，包含当前不可执行的，
+    并附上分类原因。
+
+    与 get_action_infos / get_action_infos_str 严格分离——后者是给 LLM
+    prompt 用的，为缩短 prompt 长度而故意过滤掉不可能的动作，不能加宽。
+
+    可执行性判定复用 `can_possibly_start()`；分类原因复用动作自身声明的
+    `get_requirements()` / `REQUIREMENTS_ID`，未声明时容忍为空字符串，
+    不臆造原因。
+    """
+    affordances: list[Dict[str, Any]] = []
+    for action_cls in ALL_ACTUAL_ACTION_CLASSES:
+        action_inst = action_cls(avatar, avatar.world)
+        available = action_inst.can_possibly_start()
+        info = _build_action_info(action_cls, avatar=avatar)
+        info["action_name"] = action_cls.__name__
+        info["available"] = available
+        affordances.append(info)
+    return affordances

@@ -29,6 +29,9 @@ class EventQuery:
     cursor: str | None = None
     limit: int = 100
     chronological: bool = False
+    # Decision-audit events (fact_kind=DECISION) are hidden from the default
+    # timeline/memory/journal views; causal queries opt in explicitly.
+    include_decisions: bool = False
 
 
 @dataclass(frozen=True, slots=True)

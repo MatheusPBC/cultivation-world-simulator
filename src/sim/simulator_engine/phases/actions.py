@@ -1,14 +1,62 @@
 from __future__ import annotations
 
+from src.classes.agent_decision import AgentDecision
+from src.classes.actions import get_action_infos
 from src.classes.ai import llm_ai
 from src.classes.core.avatar import Avatar
-from src.classes.event import Event, is_null_event
+from src.classes.event import Event, FactKind, is_null_event
 from src.config.providers import StaticConfigProvider
+from src.i18n import t
 from src.run.log import get_logger
 from src.sim.runtime_capabilities import get_decision_boundary_gateway
 
 
-async def phase_decide_actions(world, living_avatars: list[Avatar]) -> None:
+def _record_agent_decision(
+    world,
+    avatar: Avatar,
+    action_name_params_pairs,
+    avatar_thinking: str,
+    short_term_objective: str,
+) -> Event:
+    """
+    在决策边界把一次 LLM 决策记录为审计用的 fact_kind=DECISION 事件。
+
+    这是一条审计记录，不是并行的规划器：模拟器内没有任何地方会读取它来
+    做决策，`chosen_chain` 只是复制 `load_decide_result_chain` 已经入队
+    的计划。事件本身默认被 EventQuery.include_decisions 过滤，不出现在
+    时间线/记忆/世界志中，见 docs/specs/causal-world-kernel.md 5.4。
+    """
+    decision = AgentDecision(
+        month_stamp=int(world.month_stamp),
+        subject_kind="avatar",
+        subject_id=str(avatar.id),
+        source="llm",
+        considered_count=len(get_action_infos(avatar)),
+        chosen_chain=[
+            {"action_name": name, "params": params}
+            for name, params in action_name_params_pairs
+        ],
+        thinking=avatar_thinking,
+        short_term_objective=short_term_objective,
+    )
+    causal_payload = {"deltas": [], "decision": decision.to_dict()}
+    event = Event(
+        world.month_stamp,
+        t("{avatar} committed to an action chain", avatar=avatar.name),
+        related_avatars=[avatar.id],
+        is_major=False,
+        is_story=False,
+        fact_kind=FactKind.DECISION,
+        causal_payload=causal_payload,
+    )
+    # 运行时身份：一次决策可能跨月消费多个计划（见 commit_next_plan），
+    # 这两个字段不随存档保存，读档/重置后随 Avatar 重建自然清空。
+    avatar.current_decision_event_id = event.id
+    avatar._current_decision_payload = causal_payload
+    return event
+
+
+async def phase_decide_actions(world, living_avatars: list[Avatar]) -> list[Event]:
     gateway = get_decision_boundary_gateway(world)
     if gateway is not None:
         gateway.before_ai_decision(world)
@@ -23,9 +71,10 @@ async def phase_decide_actions(world, living_avatars: list[Avatar]) -> None:
         and str(getattr(avatar, "id", "")) != controlled_avatar_id
     ]
     if not avatars_to_decide:
-        return
+        return []
 
     decide_results = await llm_ai.decide(world, avatars_to_decide)
+    decision_events: list[Event] = []
     for avatar, result in decide_results.items():
         action_name_params_pairs, avatar_thinking, short_term_objective, _event = result
         avatar.load_decide_result_chain(
@@ -33,6 +82,12 @@ async def phase_decide_actions(world, living_avatars: list[Avatar]) -> None:
             avatar_thinking,
             short_term_objective,
         )
+        decision_events.append(
+            _record_agent_decision(
+                world, avatar, action_name_params_pairs, avatar_thinking, short_term_objective
+            )
+        )
+    return decision_events
 
 
 def phase_commit_next_plans(living_avatars: list[Avatar]) -> list[Event]:

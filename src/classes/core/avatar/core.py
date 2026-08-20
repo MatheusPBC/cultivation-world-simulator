@@ -94,6 +94,11 @@ class Avatar(
     planned_actions: List[ActionPlan] = field(default_factory=list)
     thinking: str = ""
     short_term_objective: str = ""
+    # 运行时字段：当前决策链对应的 fact_kind=DECISION 事件 id 及其可变 causal_payload
+    # 引用，用于把跨月消费计划时产生的 can_start 拒绝原因回填到同一条决策审计记录。
+    # 不随存档保存，读档/重置后随 Avatar 重建自然清空（AGENTS.md 规则34同类处理）。
+    current_decision_event_id: str = ""
+    _current_decision_payload: Optional[dict] = field(default=None, repr=False, compare=False)
     long_term_objective: Optional[LongTermObjective] = None
     magic_stone: MagicStone = field(default_factory=lambda: MagicStone(0))
     materials: dict[Material, int] = field(default_factory=dict)

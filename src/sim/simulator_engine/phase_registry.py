@@ -32,7 +32,7 @@ async def process_gatherings(simulator, ctx):
 
 
 async def decide_actions(simulator, ctx):
-    await actions.phase_decide_actions(simulator.world, ctx.living_avatars)
+    ctx.add_events(await actions.phase_decide_actions(simulator.world, ctx.living_avatars))
 
 
 def commit_next_plans(_simulator, ctx):

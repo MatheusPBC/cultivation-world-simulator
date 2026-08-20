@@ -141,12 +141,16 @@ class EventManager:
         rendered.content = render_observed_event(rendered, matched_observation)
         return rendered
 
-    def get_recent_events(self, limit: int = 100) -> List["Event"]:
+    def get_recent_events(self, limit: int = 100, include_decisions: bool = False) -> List["Event"]:
         """获取最近的事件（时间正序）。"""
         if self._storage:
-            return self._storage.get_recent_events(limit=limit)
-        else:
-            return self._memory_events[-limit:]
+            return self._storage.get_recent_events(limit=limit, include_decisions=include_decisions)
+
+        from src.classes.event import FactKind
+        events = self._memory_events
+        if not include_decisions:
+            events = [e for e in events if getattr(e, "fact_kind", FactKind.OCCURRENCE) != FactKind.DECISION]
+        return events[-limit:]
 
     def get_events_by_avatar(self, avatar_id: str, *, limit: int = 50) -> List["Event"]:
         """获取角色相关的事件（时间正序）。"""
@@ -188,6 +192,7 @@ class EventManager:
 
         if query.audience is EventAudience.OBSERVED and len(query.avatar_ids) != 1:
             raise ValueError("Observed event queries require exactly one avatar")
+        from src.classes.event import FactKind
         result: list["Event"] = []
         start_index = int(query.cursor or "0")
         matched_index = 0
@@ -198,6 +203,8 @@ class EventManager:
             else:
                 matched = all(avatar_id in related for avatar_id in query.avatar_ids)
             if not matched or not matches_memory_scope(event, query.memory_scope):
+                continue
+            if not query.include_decisions and getattr(event, "fact_kind", FactKind.OCCURRENCE) == FactKind.DECISION:
                 continue
             if query.sect_id is not None and query.sect_id not in (getattr(event, "related_sects", None) or []):
                 continue
@@ -250,6 +257,16 @@ class EventManager:
         return page.events, page.next_cursor, page.next_cursor is not None
 
     # --- 清理接口 ---
+
+    def update_decision_payload(self, event_id: str, causal_payload: Optional[dict]) -> None:
+        """Rewrite a decision event's causal_payload in place (see EventStorage.update_causal_payload)."""
+        if self._storage:
+            self._storage.update_causal_payload(event_id, causal_payload)
+            return
+        for event in self._memory_events:
+            if event.id == event_id:
+                event.causal_payload = causal_payload
+                break
 
     def cleanup(self, keep_major: bool = True, before_month_stamp: Optional[int] = None) -> int:
         """

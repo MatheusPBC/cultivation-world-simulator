@@ -489,6 +489,7 @@ class EventStorage:
         major_scope: Optional[str] = None,
         cursor: Optional[str] = None,
         limit: int = 100,
+        include_decisions: bool = False,
     ) -> EventPage["Event"]:
         """
         分页查询事件。
@@ -560,6 +561,9 @@ class EventStorage:
                 elif major_scope == "minor":
                     where_clauses.append("(e.is_major = FALSE OR e.is_story = TRUE)")
 
+                if not include_decisions:
+                    where_clauses.append("(e.fact_kind IS NULL OR e.fact_kind != 'decision')")
+
                 if cursor:
                     cursor_month, cursor_rowid = self._parse_cursor(cursor)
                     where_clauses.append(
@@ -626,6 +630,7 @@ class EventStorage:
                 major_scope=None if query.memory_scope is EventMemoryScope.ALL else query.memory_scope.value,
                 cursor=query.cursor,
                 limit=query.limit,
+                include_decisions=query.include_decisions,
             )
 
         if len(query.avatar_ids) != 1:
@@ -637,6 +642,8 @@ class EventStorage:
         }[query.memory_scope]
         params: list[object] = [query.avatar_ids[0]]
         where_clauses = [scope_sql]
+        if not query.include_decisions:
+            where_clauses.append("(e.fact_kind IS NULL OR e.fact_kind != 'decision')")
         if query.sect_id is not None:
             where_clauses.append("EXISTS (SELECT 1 FROM event_sects es WHERE es.event_id = e.id AND es.sect_id = ?)")
             params.append(query.sect_id)
@@ -740,9 +747,9 @@ class EventStorage:
         events = self.query_page(query).events
         return list(reversed(events)) if query.chronological else events
 
-    def get_recent_events(self, limit: int = 100) -> list["Event"]:
+    def get_recent_events(self, limit: int = 100, include_decisions: bool = False) -> list["Event"]:
         """获取最近的事件（供初始状态 API 使用）。"""
-        events = self.query_page(EventQuery(limit=limit)).events
+        events = self.query_page(EventQuery(limit=limit, include_decisions=include_decisions)).events
         return list(reversed(events))  # 时间正序。
 
     def cleanup(self, keep_major: bool = True, before_month_stamp: Optional[int] = None) -> int:
@@ -789,6 +796,32 @@ class EventStorage:
         except Exception as e:
             self._logger.error(f"Failed to cleanup events: {e}")
             return 0
+
+    def update_causal_payload(self, event_id: str, causal_payload: Optional[dict]) -> bool:
+        """
+        重写单个事件的 causal_payload（就地更新，不新增行）。
+
+        用于跨月消费的决策链：`AgentDecision.rejected` 可能在决策事件已经
+        持久化之后的月份才产生，需要通过 UPDATE 回填，而不是重新 INSERT
+        （`add_event` 使用 INSERT OR IGNORE，对已存在的行是无操作的）。
+        若事件尚未持久化（本月仍在 ctx.events 中），本次 UPDATE 影响 0 行，
+        属于正常情况——随后的 `add_event` 会写入包含最终 payload 的完整行。
+        """
+        if self._conn is None:
+            return False
+        try:
+            with self._transaction():
+                self._conn.execute(
+                    "UPDATE events SET causal_payload = ? WHERE id = ?",
+                    (
+                        json.dumps(causal_payload, ensure_ascii=False) if causal_payload is not None else None,
+                        event_id,
+                    ),
+                )
+            return True
+        except Exception as e:
+            self._logger.error(f"Failed to update causal payload for event {event_id}: {e}")
+            return False
 
     def get_causal_links_for_event(self, event_id: str) -> list["CausalLink"]:
         """

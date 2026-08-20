@@ -113,6 +113,7 @@ class ActionMixin:
                     "非法动作: Avatar(name=%s,id=%s) 的动作 %s 参数=%s 无法启动，原因=%s",
                     self.name, self.id, plan.action_name, plan.params, reason
                 )
+                self._record_plan_rejection(plan.action_name, plan.params, reason)
                 continue
             # 启动
             params_for_start = filter_kwargs_for_callable(action.start, plan.params)
@@ -122,6 +123,29 @@ class ActionMixin:
             self._new_action_set_this_step = True
             return start_event
         return None
+
+    def _record_plan_rejection(self: "Avatar", action_name: ACTION_NAME, params: dict, reason: str) -> None:
+        """
+        把 can_start(**params) 产生的具体拒绝原因，回填进当前决策链对应的
+        AgentDecision.rejected；这是唯一真正拥有该原因字符串的地方
+        （can_possibly_start 只有 bool，无法给出原因）。
+
+        决策事件可能已经在更早的月份持久化过（一次决策跨多月消费计划），
+        因此除了原地更新 self._current_decision_payload 引用的字典外，
+        还要显式回写存储层，见 EventStorage.update_causal_payload。
+        """
+        payload = self._current_decision_payload
+        if payload is None:
+            return
+        decision = payload.get("decision")
+        if decision is None:
+            return
+        decision.setdefault("rejected", []).append({
+            "action_name": action_name,
+            "params": params,
+            "reason": reason,
+        })
+        self.world.event_manager.update_decision_payload(self.current_decision_event_id, payload)
 
     async def tick_action(self: "Avatar") -> List[Event]:
         """
