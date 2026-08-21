@@ -13,7 +13,6 @@ class TestFrontendLocales:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         required_keys = {
             "title",
-            "coming_soon",
             "tabs.now",
             "tabs.focus",
             "tabs.stories",

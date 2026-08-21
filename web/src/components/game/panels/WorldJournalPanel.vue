@@ -172,6 +172,25 @@ onMounted(() => {
             </div>
           </article>
         </section>
+
+        <section class="journal-section">
+          <h3>{{ t('game.world_journal.ongoing') }}</h3>
+          <p v-if="journal.ongoing.length === 0" class="journal-empty">
+            {{ t('game.world_journal.ongoing_empty') }}
+          </p>
+          <button
+            v-for="item in journal.ongoing"
+            v-else
+            :key="item.avatar_id"
+            type="button"
+            class="ongoing-card"
+            @click="uiStore.select('avatar', item.avatar_id)"
+          >
+            <span class="ongoing-avatar">{{ item.avatar_name }}</span>
+            <span class="ongoing-action">{{ item.action }}</span>
+            <small>{{ t('game.world_journal.event_count', { count: item.event_count }) }}</small>
+          </button>
+        </section>
       </template>
     </div>
 
@@ -510,8 +529,21 @@ onMounted(() => {
   font-size: 10px;
 }
 
+.ongoing-card {
+  display: block;
+  width: 100%;
+  position: relative;
+  margin-top: 8px;
+  padding: 11px 78px 11px 12px;
+  border: 1px solid #303030;
+  border-radius: 10px;
+  background: #191919;
+  text-align: left;
+}
+
 .ongoing-avatar,
-.ongoing-action {
+.ongoing-action,
+.ongoing-card small {
   display: block;
 }
 
@@ -527,6 +559,16 @@ onMounted(() => {
   font-size: 12px;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.ongoing-card small {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  max-width: 65px;
+  color: #777;
+  font-size: 9px;
+  text-align: right;
 }
 
 .journal-empty,

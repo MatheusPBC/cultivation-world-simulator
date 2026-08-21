@@ -42,7 +42,6 @@ function createJournalI18n() {
               stories: 'Historias',
               timeline: 'Linha do tempo',
             },
-            coming_soon: 'Em breve',
             periods: { one: 'Este mes', three: '3 meses', twelve: '1 ano' },
             important_changes: 'Mudancas importantes',
             important_empty: 'Nenhuma mudanca importante neste periodo.',
@@ -173,16 +172,33 @@ describe('WorldJournalPanel', () => {
     vi.useFakeTimers()
   })
 
-  it('opens in Agora with factual highlights and world totals, all tabs enabled', async () => {
+  it('opens in Agora with factual highlights, ongoing activity and world totals', async () => {
     const wrapper = mountPanel()
     await settlePromises()
 
     expect(fetchWorldJournalMock).toHaveBeenCalledWith(1)
-    expect(wrapper.get('[data-testid="journal-now"]').isVisible()).toBe(true)
-    expect(wrapper.text()).toContain('Alice avancou de reino.')
-    expect(wrapper.text()).toContain('3')
+    const now = wrapper.get('[data-testid="journal-now"]')
+    expect(now.isVisible()).toBe(true)
+    expect(now.text()).toContain('Alice avancou de reino.')
+    expect(now.text()).toContain('Cultivando')
+    expect(now.text()).toContain('3')
     expect(wrapper.get('[data-testid="journal-tab-focus"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('[data-testid="journal-tab-stories"]').attributes('disabled')).toBeUndefined()
+  })
+
+  it('navigates to the avatar when an ongoing card in Agora is clicked', async () => {
+    const wrapper = mountPanel()
+    await settlePromises()
+
+    const ongoingCards = wrapper.get('[data-testid="journal-now"]').findAll('.ongoing-card')
+    expect(ongoingCards).toHaveLength(1)
+    expect(ongoingCards[0].text()).toContain('Alice')
+    expect(ongoingCards[0].text()).toContain('Cultivando')
+    expect(ongoingCards[0].text()).toContain('3')
+
+    await ongoingCards[0].trigger('click')
+    await settlePromises()
+    // Clicking through to the avatar detail (uiStore.select) must not throw.
   })
 
   it('changes the period and preserves the existing timeline as another mode', async () => {
