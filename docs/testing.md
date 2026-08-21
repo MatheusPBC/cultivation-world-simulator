@@ -118,6 +118,42 @@ async def test_action_with_llm(dummy_avatar, mock_llm_managers):
 2.  **Mock 时间**: 如果测试涉及时间流逝，可以直接修改 `dummy_avatar.world.month_stamp` 或相关的时间属性。
 3.  **检查日志**: 如果测试失败且原因不明，可以查看控制台输出的日志（已被重定向到 stderr）。
 
+### 3.5 测试必选决策失败暂停（`RequiredDecisionFailed`）
+
+`docs/specs/causal-world-kernel.md` §6 定义了必选 AI 决策（`action_decision`）
+失败时的暂停语义：Provider/解析失败在客户端自身重试耗尽后逃逸出
+`llm_ai.decide`，`phase_decide_actions`
+（`src/sim/simulator_engine/phases/actions.py`）把它包装为
+`RequiredDecisionFailed` 并向外抛出——它**不是** `SimulationStepAborted` 的子类，
+因此不会被 `SimulationPhaseRunner.run` 吞掉，会一路传播到
+`GameLoopRunner.run_once`，该处捕获后调用
+`runtime.set_failure_pause("required_decision_failed")`。
+
+编写相关测试时：
+
+*   要模拟"必选失败"，把 `mock_llm_managers["ai"].decide` 的
+    `side_effect` 设为 `LLMError(...)`（或其它逃逸出
+    `call_llm_with_task_name` 的异常），断言 `phase_decide_actions` /
+    `Simulator.step()` 抛出 `RequiredDecisionFailed`，且
+    `world.month_stamp` 未前进（因为 `finalize_step` 从未执行）。
+*   要模拟"合法的空决策"（不应暂停），把 `mock_llm_managers["ai"].decide`
+    设为返回 `{}`（或某个角色的 `action_name_params_pairs` 为空列表）——
+    这与规则测试模式（`resolve_test_mode_task` 对 `action_decision` 的
+    fallback）是同一类结果，两者都必须"跳过但不暂停"。
+*   `GameSessionRuntime.set_failure_pause` / `get_pause_reason` 的优先级
+    和清理规则（`set_paused(False)`、`reset_to_idle`、
+    `mark_pending_initialization` 都会清空 `pause_reason_override`，但
+    不会打断仍在等待的角色扮演 `pending_request`）见
+    `tests/test_game_session_runtime.py`；端到端的暂停/传播测试见
+    `tests/test_required_decision_failed.py`。
+*   涉及相位重排（`claim_ownerless_regions`、`process_gatherings` 现在都
+    排在 `decide_actions` 之后，见该 spec §6.4 与
+    `tests/test_phase_reordering.py`）时，优先直接调用相位函数两次来验证
+    "同月重跑" 场景的幂等性，而不是搭建完整的多月模拟。
+*   涉及跨月的稳定性或事件量级验证，参考
+    `tests/test_causal_kernel_smoke.py` 里的有界多月 smoke 测试写法：
+    固定角色数、固定月数、对事件总量设一个宽松上限，而不是断言精确数值。
+
 ## 4. 运行测试
 
 *   运行所有测试：

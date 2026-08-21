@@ -137,3 +137,76 @@ async def test_run_mutation_serializes_concurrent_operations():
         "second:start",
         "second:end",
     ]
+
+
+def test_failure_pause_outranks_roleplay_auto_pause_reason():
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_paused(False)
+    runtime.set_roleplay_auto_paused(True)
+    session = runtime.get_roleplay_session()
+    session["status"] = "awaiting_decision"
+
+    assert runtime.get_pause_reason() == "roleplay_waiting_decision"
+
+    runtime.set_failure_pause("required_decision_failed")
+
+    assert runtime.is_effectively_paused() is True
+    assert runtime.get_pause_reason() == "required_decision_failed"
+    # The roleplay auto-pause flag itself is untouched by the failure pause;
+    # only the reported reason is overridden.
+    assert runtime.get("roleplay_auto_paused") is True
+
+
+def test_resuming_from_failure_pause_falls_back_to_a_still_pending_roleplay_wait():
+    """A failure pause must not strand or clear a legitimate roleplay
+    `pending_request`: resuming (`set_paused(False)`) drops only the
+    `required_decision_failed` override, and if roleplay is still waiting on
+    a decision the runtime stays paused for that reason instead."""
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_roleplay_auto_paused(True)
+    session = runtime.get_roleplay_session()
+    session["status"] = "awaiting_decision"
+    session["pending_request"] = {"request_id": "roleplay-decision-1"}
+    runtime.set_failure_pause("required_decision_failed")
+
+    assert runtime.get_pause_reason() == "required_decision_failed"
+
+    runtime.set_paused(False)
+
+    assert runtime.is_effectively_paused() is True
+    assert runtime.get_pause_reason() == "roleplay_waiting_decision"
+    # The pending request itself was never touched by the failure pause.
+    assert runtime.get_roleplay_session()["pending_request"] == {"request_id": "roleplay-decision-1"}
+
+
+def test_set_paused_false_clears_failure_pause_reason():
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_failure_pause("required_decision_failed")
+
+    runtime.set_paused(False)
+
+    assert runtime.get_pause_reason() == ""
+    assert runtime.is_effectively_paused() is False
+
+
+def test_reset_to_idle_clears_failure_pause_reason():
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_failure_pause("required_decision_failed")
+
+    runtime.reset_to_idle()
+
+    # The runtime is still paused (idle is a paused state), but the specific
+    # `required_decision_failed` override must not survive the reset -- it
+    # falls back to the generic "paused" reason.
+    assert runtime.get("pause_reason_override") == ""
+    assert runtime.get_pause_reason() == "paused"
+
+
+def test_mark_pending_initialization_clears_failure_pause_reason():
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_failure_pause("required_decision_failed")
+
+    runtime.mark_pending_initialization(clear_world=True)
+
+    assert runtime.get("pause_reason_override") == ""
+    assert runtime.get_pause_reason() == "paused"

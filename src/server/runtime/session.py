@@ -28,6 +28,7 @@ DEFAULT_GAME_STATE: dict[str, Any] = {
     "llm_error_message": "",
     "llm_check_pending": False,
     "roleplay_session": create_roleplay_session_dict(),
+    "pause_reason_override": "",
 }
 
 
@@ -145,6 +146,7 @@ class GameSessionRuntime:
                 "llm_error_message": "",
                 "llm_check_pending": False,
                 "reset_requested": False,
+                "pause_reason_override": "",
             }
         )
         self.clear_roleplay_session()
@@ -175,6 +177,7 @@ class GameSessionRuntime:
         self._state["llm_error_message"] = ""
         self._state["llm_check_pending"] = False
         self._state["reset_requested"] = False
+        self._state["pause_reason_override"] = ""
         self.clear_roleplay_session()
 
     def begin_initialization(self) -> None:
@@ -194,14 +197,32 @@ class GameSessionRuntime:
 
     def set_paused(self, paused: bool) -> None:
         self._state["is_paused"] = bool(paused)
+        if not paused:
+            self._state["pause_reason_override"] = ""
 
     def set_roleplay_auto_paused(self, paused: bool) -> None:
         self._state["roleplay_auto_paused"] = bool(paused)
+
+    def set_failure_pause(self, reason: str) -> None:
+        """Pause the runtime for a reason that outranks roleplay auto-pause.
+
+        Used for `required_decision_failed` (see
+        `src.sim.simulator_engine.phases.actions.RequiredDecisionFailed`):
+        the world must stop advancing until a human resumes it, even if a
+        roleplay session also happens to be waiting on a decision boundary.
+        Cleared by `set_paused(False)`, `reset_to_idle`, and
+        `mark_pending_initialization`.
+        """
+        self._state["is_paused"] = True
+        self._state["pause_reason_override"] = str(reason)
 
     def is_effectively_paused(self) -> bool:
         return bool(self._state.get("is_paused", False) or self._state.get("roleplay_auto_paused", False))
 
     def get_pause_reason(self) -> str:
+        override = self._state.get("pause_reason_override", "")
+        if override:
+            return str(override)
         if self._state.get("roleplay_auto_paused", False):
             session = self.get_roleplay_session()
             status = str(session.get("status", "") or "")

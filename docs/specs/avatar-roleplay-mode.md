@@ -325,6 +325,14 @@
 - `roleplay_waiting_choice`
 - `roleplay_conversation`
 
+> 落地补充（causal world kernel Task 6）：实现中还新增了一个不属于角色扮演族的暂停原因
+> `required_decision_failed`（必选 `action_decision` 在 provider/解析重试耗尽后失败）。
+> `GameSessionRuntime.get_pause_reason()` 把它作为独立的 `pause_reason_override`
+> 优先于本节列出的所有角色扮演原因返回，但不会清空或打断仍在等待的
+> `roleplay_auto_paused` / `pending_request`——恢复（`set_paused(False)`）后，如果角色扮演
+> 仍在等待决策，暂停原因会正常回落到对应的 `roleplay_waiting_*`。详见
+> `docs/specs/causal-world-kernel.md` §6.2-6.4 与 `src/server/runtime/session.py`。
+
 聚合规则：
 
 - 只要存在任一阻塞型 pause reason，`is_paused = true`。

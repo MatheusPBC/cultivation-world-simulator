@@ -30,10 +30,54 @@ from src.classes.official_rank import (
 )
 
 
+def _observed_regions_this_tick(world, avatar: Avatar) -> set:
+    # 按观察半径重新计算“本 tick 可见”的区域集合。角色在同一月内的位置
+    # 不会在 phase 4（decide_actions）之前发生变化（移动发生在更晚的
+    # execute_actions），所以在感知 phase 和占地 phase 里各自独立调用本函数，
+    # 对同一位置总是得到相同结果——这正是让占地 phase 可以安全重跑的原因，
+    # 而不必依赖角色终身累积的 known_regions。
+    radius = get_avatar_observation_radius(avatar)
+
+    # 先按包围盒缩小搜索范围，再用曼哈顿距离判断真正可见区域。
+    start_x = max(0, avatar.pos_x - radius)
+    end_x = min(world.map.width - 1, avatar.pos_x + radius)
+    start_y = max(0, avatar.pos_y - radius)
+    end_y = min(world.map.height - 1, avatar.pos_y + radius)
+
+    observed_regions = set()
+    for x in range(start_x, end_x + 1):
+        for y in range(start_y, end_y + 1):
+            if abs(x - avatar.pos_x) + abs(y - avatar.pos_y) > radius:
+                continue
+
+            tile = world.map.get_tile(x, y)
+            if tile.region:
+                observed_regions.add(tile.region)
+
+    return observed_regions
+
+
 def phase_update_perception_and_knowledge(world, living_avatars: list[Avatar]) -> list[Event]:
-    # 这个 phase 同时承担两件事：
-    # 1. 根据观察半径刷新 known_regions
-    # 2. 让尚无洞府的角色在观察到无主修炼地时尝试占据
+    # 只做一件事：按观察半径刷新 known_regions。这是纯粹的集合并集操作，
+    # 天然幂等——重复执行不会产生任何可观察差异，因此可以安全地留在
+    # phase 4（decide_actions）之前。
+    #
+    # 占地（occupy_region）曾经也在这里，现在拆到 phase_claim_ownerless_regions，
+    # 并移到 phase 4 之后：一次 required-decision 失败会导致整月从 phase 1
+    # 重跑，而占地是一次性、不可逆的真实状态变更——见
+    # docs/specs/causal-world-kernel.md §6.4 残留问题 (a)。
+    for avatar in living_avatars:
+        for region in _observed_regions_this_tick(world, avatar):
+            avatar.known_regions.add(region.id)
+
+    return []
+
+
+def phase_claim_ownerless_regions(world, living_avatars: list[Avatar]) -> list[Event]:
+    # 占地逻辑：让尚无洞府的角色在“本 tick 观察到”的无主修炼地中尝试占据。
+    # 语义与拆分前完全一致（只看当前可见区域，不追溯历史 known_regions）；
+    # 唯一的区别是执行位置移到了 phase 4 之后，避免 required-decision 失败
+    # 导致整月重跑时把占地再执行一次。
     events: list[Event] = []
     avatars_with_home = set()
 
@@ -47,33 +91,13 @@ def phase_update_perception_and_knowledge(world, living_avatars: list[Avatar]) -
             avatars_with_home.add(region.host_avatar.id)
 
     for avatar in living_avatars:
-        radius = get_avatar_observation_radius(avatar)
+        if avatar.id in avatars_with_home:
+            continue
 
-        # 先按包围盒缩小搜索范围，再用曼哈顿距离判断真正可见区域。
-        start_x = max(0, avatar.pos_x - radius)
-        end_x = min(world.map.width - 1, avatar.pos_x + radius)
-        start_y = max(0, avatar.pos_y - radius)
-        end_y = min(world.map.height - 1, avatar.pos_y + radius)
-
-        observed_regions = set()
-        for x in range(start_x, end_x + 1):
-            for y in range(start_y, end_y + 1):
-                if abs(x - avatar.pos_x) + abs(y - avatar.pos_y) > radius:
-                    continue
-
-                tile = world.map.get_tile(x, y)
-                if tile.region:
-                    observed_regions.add(tile.region)
-
-        for region in observed_regions:
-            avatar.known_regions.add(region.id)
-
-            # 占地逻辑只允许“无主修炼区 + 角色尚无洞府”的组合进入。
+        for region in _observed_regions_this_tick(world, avatar):
             if not isinstance(region, CultivateRegion):
                 continue
             if region.host_avatar is not None:
-                continue
-            if avatar.id in avatars_with_home:
                 continue
 
             avatar.occupy_region(region)
@@ -89,6 +113,7 @@ def phase_update_perception_and_knowledge(world, living_avatars: list[Avatar]) -
                     related_avatars=[avatar.id],
                 )
             )
+            break
 
     return events
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from .tick_payload import TickPayloadBuilder
+from src.sim.simulator_engine.phases.actions import RequiredDecisionFailed
 from src.utils.llm.runtime_mode import is_world_test_mode, llm_test_mode_scope
 
 
@@ -67,6 +68,16 @@ class GameLoopRunner:
                 await asyncio.to_thread(self.trigger_auto_save, world, sim)
                 await self.manager.broadcast(self.build_auto_save_toast())
                 print("[Auto-Save] Auto save completed.")
+        except RequiredDecisionFailed as exc:
+            # A required `action_decision` LLM call failed after its own
+            # retries. `finalize_step` never ran for this tick, so no events
+            # were persisted and `world.month_stamp` was not advanced —
+            # abort-before-mutate already held. What was missing is this
+            # pause: without it the loop would silently retry the same month
+            # forever. Resuming re-runs the month from phase 1.
+            print(f"Game loop required decision failed: {exc}")
+            self.get_logger().logger.error(f"Game loop required decision failed: {exc}", exc_info=True)
+            self.runtime.set_failure_pause("required_decision_failed")
         except Exception as exc:
             print(f"Game loop error: {exc}")
             self.get_logger().logger.error(f"Game loop error: {exc}", exc_info=True)

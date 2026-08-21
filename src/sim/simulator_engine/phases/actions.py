@@ -11,6 +11,27 @@ from src.run.log import get_logger
 from src.sim.runtime_capabilities import get_decision_boundary_gateway
 
 
+class RequiredDecisionFailed(Exception):
+    """Raised when a required `action_decision` LLM call could not produce a
+    result after the LLM client's own retries (provider/transport failure, or
+    a parse failure that survived `CONFIG.ai.max_parse_retries`).
+
+    Deliberately NOT a subclass of `SimulationStepAborted`:
+    `SimulationPhaseRunner.run` only catches `SimulationStepAborted` (which
+    means "a lifecycle command superseded this step", a normal outcome), so
+    this exception propagates untouched through the phase runner,
+    `Simulator.step()`, and `GameSessionRuntime.run_mutation` into
+    `GameLoopRunner.run_once`, which pauses the runtime instead of silently
+    retrying forever. See docs/specs/causal-world-kernel.md §6.2-6.3.
+    """
+
+    def __init__(self, avatar_ids: list[str], message: str = ""):
+        self.avatar_ids = list(avatar_ids)
+        super().__init__(
+            message or f"required decision failed while deciding for avatars: {', '.join(self.avatar_ids)}"
+        )
+
+
 def _record_agent_decision(
     world,
     avatar: Avatar,
@@ -73,7 +94,19 @@ async def phase_decide_actions(world, living_avatars: list[Avatar]) -> list[Even
     if not avatars_to_decide:
         return []
 
-    decide_results = await llm_ai.decide(world, avatars_to_decide)
+    try:
+        decide_results = await llm_ai.decide(world, avatars_to_decide)
+    except Exception as exc:
+        # `llm_ai.decide` / `LLMAI._decide` only reach here via an exception
+        # for a real provider/parse failure (see src/classes/ai.py): a
+        # response that parses but is empty, and rule-based test mode, both
+        # return normally with an empty result instead of raising. So any
+        # exception escaping this call is, by construction, a required
+        # failure — never an indistinguishable "valid empty decision".
+        raise RequiredDecisionFailed(
+            [str(avatar.id) for avatar in avatars_to_decide], str(exc)
+        ) from exc
+
     decision_events: list[Event] = []
     for avatar, result in decide_results.items():
         action_name_params_pairs, avatar_thinking, short_term_objective, _event = result

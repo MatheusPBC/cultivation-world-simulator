@@ -1083,3 +1083,96 @@ What made this possible: typed edges instead of a scenario graph, `StateDelta` a
 evidence so each owner keeps writing its own state, `weight` for multifactor
 contribution, and `DERIVED_CONDITION` so "the lake is haunted" is a fact with
 causes rather than a class.
+
+---
+
+## 13. Task 6: what was actually delivered
+
+Section 6 above is the design; this records the as-built shape and the one
+finding that went beyond "confirm idempotency."
+
+1. **`RequiredDecisionFailed`** lives next to `phase_decide_actions`
+   (`src/sim/simulator_engine/phases/actions.py`), is not a
+   `SimulationStepAborted` subclass, and is raised by wrapping the single
+   `await llm_ai.decide(world, avatars_to_decide)` call in a `try`/`except
+   Exception`. Nothing else in that function path can legitimately raise:
+   a parsed-but-empty response and rule-based test mode both return
+   normally with an empty result (§6.3). No `return_exceptions=True` was
+   added to `LLMAI._decide`'s `asyncio.gather` — it still fails fast on the
+   first escaping exception, so `avatar.load_decide_result_chain` is never
+   called for a failed batch (abort-before-mutate holds unchanged).
+2. **`GameSessionRuntime.set_failure_pause(reason)`** sets `is_paused=True`
+   and a new `pause_reason_override` state key, read first by
+   `get_pause_reason()` ahead of the roleplay and plain-`paused` branches.
+   It is cleared by `set_paused(False)`, `reset_to_idle`, and
+   `mark_pending_initialization` — the same three call sites that already
+   clear roleplay runtime state. Clearing it does **not** touch
+   `roleplay_auto_paused` or the roleplay session: if roleplay was also
+   waiting on a decision boundary, resuming from a
+   `required_decision_failed` pause correctly falls back to
+   `roleplay_waiting_decision` instead of fully unpausing.
+   `GameLoopRunner.run_once` gets an `except RequiredDecisionFailed` clause
+   ahead of its existing `except Exception`, calling
+   `runtime.set_failure_pause("required_decision_failed")`.
+3. **Residue (a), region claiming.** `phase_update_perception_and_knowledge`
+   now only refreshes `known_regions` (a pure set union — idempotent).
+   Occupation moved to a new phase, `phase_claim_ownerless_regions`
+   (`src/sim/simulator_engine/phases/world.py`), registered as
+   `SIMULATION_PHASES` index 4, immediately after `decide_actions` (index
+   3) and before `commit_next_plans`. Both phases independently recompute
+   "regions observed this tick" from the avatar's current position and
+   observation radius (factored into `_observed_regions_this_tick`) rather
+   than reusing accumulated `known_regions` — avatar position cannot change
+   between phase 1 and phase 4 within one step (movement happens later, in
+   `execute_actions`), so this reproduces the original "passed by and
+   occupied" semantics exactly, while making a same-month retry safe: a
+   second call over an unchanged world state claims nothing new.
+4. **Residue (b), gatherings — upgraded from "confirm" to "move."** Reading
+   the three registered `Gathering` subclasses showed re-run is **not**
+   safe for two of them: `Tournament.is_start` re-fires unconditionally on
+   every January of a matching year with no state marking it as already
+   run, and `SectTeachingConference.is_start` re-picks a (possibly
+   different) sect each call with no such guard either — both would
+   literally re-run a full gathering (battles, teaching, relation deltas)
+   a second time on a same-month retry. `Auction` happens to self-limit
+   because `sold_item_count` is a derived property that `execute` drains,
+   but that is incidental, not a documented invariant. `HiddenDomain`
+   updates its own cooldown state inside `is_start` itself specifically to
+   guard repeated calls, which is the closest thing to a real precedent for
+   "idempotent by design" — and even that guard only prevents a *second*
+   opening, not the fact that the first opening's loot/events already ran
+   in-memory during the failed attempt. Given this, `process_gatherings`
+   was moved (not left in place with a "confirmed safe" note) to
+   `SIMULATION_PHASES` index 5, after `claim_ownerless_regions` and before
+   `commit_next_plans` — the same reasoning as region claiming.
+5. **Behavioral consequence of both moves, stated explicitly.** Avatars now
+   decide their month's actions *before* any gathering or region-claim
+   outcome from that same month is known to them, whereas previously
+   gatherings (and the region-claim side effect) ran first. This is a
+   deliberate trade-off: the alternative is an irreversible mutation sitting
+   before the point where a required-decision failure can abort the step,
+   which is exactly the hazard this task exists to remove. `is_in_major_action`
+   / `can_join_gathering` eligibility is unaffected either way, since it
+   reads `Avatar.current_action`, which `commit_next_plans` (still after
+   both moved phases) is what actually sets.
+6. **Residue (c), roleplay interaction — confirmed, not changed.**
+   `RuntimeDecisionBoundaryGateway.before_ai_decision` can set
+   `roleplay_auto_paused=True` and a `pending_request` before any LLM call
+   in the same `phase_decide_actions` invocation that later fails for a
+   *different* avatar. Because `set_failure_pause` never mutates
+   `roleplay_auto_paused` or the roleplay session, that pending request
+   survives a `required_decision_failed` pause untouched, and precedence
+   in `get_pause_reason()` resolves deterministically
+   (`pause_reason_override` first). See
+   `tests/test_game_session_runtime.py::test_resuming_from_failure_pause_falls_back_to_a_still_pending_roleplay_wait`.
+7. **No new phase-index churn beyond this.** `SIMULATION_PHASES` grew from
+   29 to 30 entries (one new phase, `claim_ownerless_regions`); every other
+   phase kept its relative order and shifted index by exactly the same
+   amount. `tests/test_backend_phase4_architecture.py`'s sequential-index
+   and first/last-name assertions are index-count-agnostic and still hold.
+8. **Measurements.** A 3-avatar, 6-month smoke run under the default
+   "valid empty decision" mock produced 3 events total (background world
+   phases only — no decisions, no gatherings, no region claims in that
+   fixture); a 60-hop linear causal chain (past the depth=5 clamp) resolved
+   through `get_event_causal_detail` in well under a millisecond. See
+   `tests/test_causal_kernel_smoke.py`.
