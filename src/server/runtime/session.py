@@ -216,7 +216,8 @@ class GameSessionRuntime:
         `src.sim.simulator_engine.phases.actions.RequiredDecisionFailed`):
         the world must stop advancing until a human resumes it, even if a
         roleplay session also happens to be waiting on a decision boundary.
-        Cleared by `set_paused(False)`, `reset_to_idle`, and
+        Cleared by `set_paused` in either direction (`True` or `False` —
+        it clears the override unconditionally), and by `reset_to_idle` and
         `mark_pending_initialization`.
         """
         self._state["is_paused"] = True

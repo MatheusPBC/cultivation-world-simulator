@@ -703,8 +703,8 @@ class TestConfigurationValidation:
         """A response that parses as JSON but carries no `type: text` content
         block is a genuine provider failure (Task 6 re-review F1), not a bare
         `Exception` -- it must be classified as `ProviderCallError` with
-        `INVALID_RESPONSE`, the same required-failure type `LLMAI._decide`
-        catches to raise `RequiredDecisionFailed`."""
+        `INVALID_RESPONSE`, the same required-failure type
+        `phase_decide_actions` catches to raise `RequiredDecisionFailed`."""
         config = LLMConfig(
             model_name="claude-sonnet-4-20250514",
             api_key="test-key",

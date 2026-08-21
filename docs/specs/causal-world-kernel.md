@@ -1114,9 +1114,13 @@ finding that went beyond "confirm idempotency."
 2. **`GameSessionRuntime.set_failure_pause(reason)`** sets `is_paused=True`
    and a new `pause_reason_override` state key, read first by
    `get_pause_reason()` ahead of the roleplay and plain-`paused` branches.
-   It is cleared by `set_paused(False)`, `reset_to_idle`, and
-   `mark_pending_initialization` — the same three call sites that already
-   clear roleplay runtime state. Clearing it does **not** touch
+   It is cleared by `set_paused` in **either** direction (`True` or
+   `False` — the override is dropped unconditionally, fixed in re-review
+   as F3: the save-load path pauses a freshly loaded world via
+   `set_paused(True)` directly, and a stale override from a previous world
+   must not leak into it), and also by `reset_to_idle` and
+   `mark_pending_initialization` — the same call sites that already clear
+   roleplay runtime state. Clearing it does **not** touch
    `roleplay_auto_paused` or the roleplay session: if roleplay was also
    waiting on a decision boundary, resuming from a
    `required_decision_failed` pause correctly falls back to
@@ -1154,6 +1158,43 @@ finding that went beyond "confirm idempotency."
    `claim_ownerless_regions`. See
    `tests/test_phase_reordering.py::test_required_decision_failure_leaves_long_term_objective_unset`,
    which fails if this phase is moved back ahead of `decide_actions`.
+3b. **New residue this move opens up, found in re-review (N1) and left as an
+   honest gap, not fixed here.** Moving `long_term_objective_thinking` (and
+   `claim_ownerless_regions` and `process_gatherings`) after `decide_actions`
+   removes the *pre*-decision residue, but it widens the window in which a
+   *post*-decision, non-required failure can abort a step that already
+   committed a decision. Concretely: `decide_actions` succeeds and
+   `phase_decide_actions` has already called
+   `Avatar.load_decide_result_chain` (queuing `planned_actions`) and
+   `_record_agent_decision` (setting `avatar.current_decision_event_id` and
+   `_current_decision_payload`) for a `fact_kind=DECISION` `Event` that is
+   still sitting unpersisted in `ctx.events` — then
+   `phase_long_term_objective_thinking` (or, by the same mechanism,
+   `process_gatherings`, or any later phase that can raise) throws. The step
+   aborts, `finalize_step` never runs, and the decision event is discarded
+   with everything else in the batch. On the retry, `decide_actions` skips
+   that avatar (`has_plans()` is now true from the queued chain), so the
+   decision is never re-emitted, and `avatar.current_decision_event_id`
+   permanently references an id that was never written to `EventStorage`.
+   Two concrete downstream readers of that dangling id:
+   `Breakthrough._record_motivation` (`src/classes/action/breakthrough.py`)
+   would record a `motivated_by` link to a non-existent cause, and
+   `_record_plan_rejection` (`src/classes/core/avatar/action_mixin.py`)
+   would call `EventStorage.update_causal_payload` against an id with no
+   matching row. Both fail closed at the causal-metadata layer (a dangling
+   `cause_event_id` is already a normal, tolerated shape per §5.6.3/§7.1 —
+   the `why` query renders it as `pruned: true` — and a no-op update against
+   a missing row is not a crash), so this is a **silent data-completeness
+   gap, not a correctness or crash risk**. It is also not new in kind: every
+   LLM-calling phase after `decide_actions` that predates this task
+   (`backstory_generation`, `nickname_generation`, `phase_sect_random_event`,
+   `phase_autonomous_custom_creation`, `phase_background_npc_events`) has the
+   same hazard, with a larger blast radius since they sit after
+   `execute_actions` too. This task does not fix it — the options (making
+   these optional phases fail-soft with `asyncio.gather(...,
+   return_exceptions=True)`, or giving the decision event its own persistence
+   point) are both a change in behavior beyond "harden failure semantics for
+   the required path," and are left as follow-up work, not implemented here.
 4. **Residue (b), gatherings — upgraded from "confirm" to "move."** Reading
    the three registered `Gathering` subclasses showed re-run is **not**
    safe for two of them: `Tournament.is_start` re-fires unconditionally on

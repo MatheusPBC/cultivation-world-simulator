@@ -146,10 +146,10 @@ async def test_action_with_llm(dummy_avatar, mock_llm_managers):
     不会打断仍在等待的角色扮演 `pending_request`）见
     `tests/test_game_session_runtime.py`；端到端的暂停/传播测试见
     `tests/test_required_decision_failed.py`。
-*   涉及相位重排（`claim_ownerless_regions`、`process_gatherings` 现在都
-    排在 `decide_actions` 之后，见该 spec §6.4 与
-    `tests/test_phase_reordering.py`）时，优先直接调用相位函数两次来验证
-    "同月重跑" 场景的幂等性，而不是搭建完整的多月模拟。
+*   涉及相位重排（`claim_ownerless_regions`、`process_gatherings`、
+    `long_term_objective_thinking` 现在都排在 `decide_actions` 之后，见该
+    spec §6.4/§13.3a 与 `tests/test_phase_reordering.py`）时，优先直接调用
+    相位函数两次来验证 "同月重跑" 场景的幂等性，而不是搭建完整的多月模拟。
 *   涉及跨月的稳定性或事件量级验证，参考
     `tests/test_causal_kernel_smoke.py` 里的有界多月 smoke 测试写法：
     固定角色数、固定月数、对事件总量设一个宽松上限，而不是断言精确数值。
