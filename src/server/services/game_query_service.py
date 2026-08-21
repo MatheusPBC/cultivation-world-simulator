@@ -24,6 +24,7 @@ class GameQueryDependencies:
     get_runtime_status: Any
     get_events_page: Any
     get_world_journal_query: Any
+    get_event_causal_detail_query: Any
     get_game_data_query: Any
     realm_order: Any
     alignment_enum: Any
@@ -77,6 +78,7 @@ class GameQueryService:
             build_public_current_run=self.get_current_run,
             build_public_events_page=self.get_events_page,
             build_public_world_journal=self.get_world_journal,
+            build_public_event_causal_detail=self.get_event_causal_detail,
             build_public_game_data=self.get_game_data,
             build_public_detail=self.get_detail,
             build_public_avatar_adjust_options=self.get_avatar_adjust_options,
@@ -160,6 +162,15 @@ class GameQueryService:
             self._deps.runtime,
             serialize_events_for_client=self._deps.serialize_events_for_client,
             period_months=period_months,
+        )
+
+    def get_event_causal_detail(self, *, event_id: str, depth: int, limit: int) -> dict:
+        return self._deps.get_event_causal_detail_query(
+            self._deps.runtime,
+            serialize_events_for_client=self._deps.serialize_events_for_client,
+            event_id=event_id,
+            depth=depth,
+            limit=limit,
         )
 
     def get_rankings(self) -> dict:

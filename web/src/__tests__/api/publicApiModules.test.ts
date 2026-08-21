@@ -66,6 +66,45 @@ describe('public api module migration', () => {
     expect(result).toEqual(journal)
   })
 
+  it('eventApi fetches the causal detail for one event with depth/limit params', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    const detail = {
+      event: {
+        id: 'e1',
+        text: 'e1',
+        content: 'e1',
+        year: 100,
+        month: 1,
+        month_stamp: 1200,
+        related_avatar_ids: [],
+        is_major: false,
+        is_story: false,
+        created_at: 0,
+      },
+      causes: [],
+      effects: [],
+      deltas: [],
+      decision: null,
+      truncated: false,
+    }
+    getMock.mockResolvedValue(detail)
+
+    const result = await eventApi.fetchEventCausalDetail('e1', { depth: 2, limit: 10 })
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/events/e1/causal?depth=2&limit=10')
+    expect(result).toEqual(detail)
+  })
+
+  it('eventApi normalizes a missing causal detail response to null', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    getMock.mockResolvedValue(null)
+
+    const result = await eventApi.fetchEventCausalDetail('e1')
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/events/e1/causal')
+    expect(result).toBeNull()
+  })
+
   it('eventApi cleans up events through /api/v1 command endpoint', async () => {
     const { eventApi } = await import('@/api/modules/event')
     deleteMock.mockResolvedValue({ deleted: 12 })

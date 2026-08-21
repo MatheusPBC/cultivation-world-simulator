@@ -1,4 +1,4 @@
-import type { EventDTO } from '@/types/api'
+import type { EventCausalDetailDTO, EventDTO } from '@/types/api'
 import type { EventSubject, GameEvent } from '@/types/core'
 import { avatarIdToColor } from '@/utils/eventHelper'
 
@@ -52,6 +52,20 @@ export function mapEventSubjects(subjects: EventDTO['subjects']): EventSubject[]
 export function mapEventDtosToTimeline(events: EventDTO[]): GameEvent[] {
   // API returns newest-first; timeline UI expects oldest-first.
   return events.map(mapEventDtoToGameEvent).reverse()
+}
+
+export function normalizeEventCausalDetail(
+  input: EventCausalDetailDTO | null | undefined,
+): EventCausalDetailDTO | null {
+  if (!input || !input.event) return null
+  return {
+    event: input.event,
+    causes: Array.isArray(input.causes) ? input.causes : [],
+    effects: Array.isArray(input.effects) ? input.effects : [],
+    deltas: Array.isArray(input.deltas) ? input.deltas : [],
+    decision: input.decision ?? null,
+    truncated: Boolean(input.truncated),
+  }
 }
 
 export function normalizeEventsResponse(

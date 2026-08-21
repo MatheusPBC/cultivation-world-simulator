@@ -1,11 +1,13 @@
 import { httpClient } from '../http';
-import type { 
+import type {
+  EventCausalDetailDTO,
   EventsResponseDTO,
+  FetchEventCausalDetailParams,
   FetchEventsParams,
   WorldJournalPeriodMonths,
   WorldJournalResponseDTO,
 } from '../../types/api';
-import { normalizeEventsResponse } from '../mappers/event';
+import { normalizeEventCausalDetail, normalizeEventsResponse } from '../mappers/event';
 
 export const eventApi = {
   async fetchEvents(params: FetchEventsParams = {}) {
@@ -26,6 +28,17 @@ export const eventApi = {
     return httpClient.get<WorldJournalResponseDTO>(
       `/api/v1/query/world/journal?period_months=${periodMonths}`,
     );
+  },
+
+  async fetchEventCausalDetail(eventId: string, params: FetchEventCausalDetailParams = {}) {
+    const query = new URLSearchParams();
+    if (params.depth != null) query.set('depth', String(params.depth));
+    if (params.limit != null) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    const data = await httpClient.get<EventCausalDetailDTO>(
+      `/api/v1/query/events/${encodeURIComponent(eventId)}/causal${qs ? '?' + qs : ''}`,
+    );
+    return normalizeEventCausalDetail(data);
   },
 
   cleanupEvents(keepMajor = true, beforeMonthStamp?: number) {

@@ -10,6 +10,7 @@ from typing import Callable, List, Optional, TYPE_CHECKING
 from src.classes.event_query import EventAudience, EventMemoryScope, EventPage, EventQuery, matches_memory_scope
 
 if TYPE_CHECKING:
+    from src.classes.causal_link import CausalLink
     from src.classes.event import Event
     from src.classes.event_storage import EventStorage
 
@@ -257,6 +258,33 @@ class EventManager:
         return page.events, page.next_cursor, page.next_cursor is not None
 
     # --- 清理接口 ---
+
+    def get_event_by_id(self, event_id: str) -> Optional["Event"]:
+        """按 id 直接读取单个事件，不受默认时间线的 decision 过滤限制。"""
+        if self._storage:
+            return self._storage.get_event_by_id(event_id)
+        for event in self._memory_events:
+            if event.id == event_id:
+                return event
+        return None
+
+    def get_causal_links_for_event(self, event_id: str) -> List["CausalLink"]:
+        """返回以 event_id 为结果（效果）的所有因果边，即该事件的直接原因。"""
+        if self._storage:
+            return self._storage.get_causal_links_for_event(event_id)
+        event = self.get_event_by_id(event_id)
+        return list(getattr(event, "causal_links", None) or []) if event is not None else []
+
+    def get_causal_links_caused_by(self, cause_event_id: str) -> List["CausalLink"]:
+        """返回以 cause_event_id 为原因的所有因果边，即该事件触发的下游效果。"""
+        if self._storage:
+            return self._storage.get_causal_links_caused_by(cause_event_id)
+        result: List["CausalLink"] = []
+        for event in self._memory_events:
+            for link in getattr(event, "causal_links", None) or []:
+                if link.cause_event_id == cause_event_id:
+                    result.append(link)
+        return result
 
     def update_decision_payload(self, event_id: str, causal_payload: Optional[dict]) -> None:
         """Rewrite a decision event's causal_payload in place (see EventStorage.update_causal_payload)."""

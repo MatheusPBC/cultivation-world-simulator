@@ -420,6 +420,8 @@ export type EventSubjectDTO =
       is_active?: boolean;
     }
 
+export type FactKindDTO = 'occurrence' | 'state_transition' | 'derived_condition' | 'decision';
+
 export interface EventDTO {
   id: string;
   text: string;
@@ -435,6 +437,7 @@ export interface EventDTO {
   render_key?: string;
   render_params?: Record<string, string | number | boolean | null>;
   created_at: number;
+  fact_kind?: FactKindDTO;
 }
 
 export interface EventsResponseDTO {
@@ -468,6 +471,8 @@ export interface WorldJournalOngoingDTO {
   avatar_name: string;
   action: string;
   event_count: number;
+  short_term_objective: string;
+  long_term_objective: string;
 }
 
 export interface WorldJournalResponseDTO {
@@ -478,7 +483,79 @@ export interface WorldJournalResponseDTO {
   };
   activity: WorldJournalActivityDTO;
   highlights: EventDTO[];
+  stories: EventDTO[];
+  stories_truncated: boolean;
   ongoing: WorldJournalOngoingDTO[];
+}
+
+// --- Causal "why" drill-down ---
+
+export type CausalRelationDTO =
+  | 'triggered_by'
+  | 'enabled_by'
+  | 'motivated_by'
+  | 'response_to'
+  | 'resolves'
+  | 'prevented_by'
+  | 'contributed_to';
+
+export interface CausalEdgeDTO {
+  relation: CausalRelationDTO;
+  weight: number;
+  note_key: string | null;
+  note_params: Record<string, string | number | boolean | null> | null;
+  depth: number;
+  event: EventDTO | null;
+  pruned: boolean;
+}
+
+export interface StateDeltaDTO {
+  id: string;
+  event_id: string;
+  owner_kind: string;
+  owner_id: string;
+  aspect: string;
+  before: string | null;
+  after: string | null;
+  magnitude: number | null;
+}
+
+export interface AgentDecisionRejectedDTO {
+  action_name: string;
+  params: Record<string, unknown>;
+  reason: string;
+}
+
+export interface AgentDecisionChosenDTO {
+  action_name: string;
+  params: Record<string, unknown>;
+}
+
+export interface AgentDecisionDTO {
+  id: string;
+  month_stamp: number;
+  subject_kind: string;
+  subject_id: string;
+  source: string;
+  considered_count: number;
+  chosen_chain: AgentDecisionChosenDTO[];
+  thinking: string;
+  short_term_objective: string;
+  rejected: AgentDecisionRejectedDTO[];
+}
+
+export interface EventCausalDetailDTO {
+  event: EventDTO;
+  causes: CausalEdgeDTO[];
+  effects: CausalEdgeDTO[];
+  deltas: StateDeltaDTO[];
+  decision: AgentDecisionDTO | null;
+  truncated: boolean;
+}
+
+export interface FetchEventCausalDetailParams {
+  depth?: number;
+  limit?: number;
 }
 
 // --- Status ---

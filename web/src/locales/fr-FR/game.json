@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "Journal du monde",
     "coming_soon": "Bientôt disponible",
-    "tabs": { "now": "Maintenant", "focus": "À suivre", "stories": "Histoires", "timeline": "Chronologie" },
-    "periods": { "one": "Ce mois-ci", "three": "3 mois", "twelve": "1 an" },
+    "tabs": {
+      "now": "Maintenant",
+      "focus": "À suivre",
+      "stories": "Histoires",
+      "timeline": "Chronologie"
+    },
+    "periods": {
+      "one": "Ce mois-ci",
+      "three": "3 mois",
+      "twelve": "1 an"
+    },
     "important_changes": "Changements importants",
     "important_empty": "Aucun changement important sur cette période.",
     "ongoing": "En cours",
@@ -16,7 +25,39 @@
     "active_avatars": "Personnages actifs",
     "event_count": "{count} événements",
     "loading": "Chargement du journal...",
-    "error": "Impossible de charger le journal."
+    "error": "Impossible de charger le journal.",
+    "focus_empty": "Aucune donnée de suivi pour cette période.",
+    "focus_short_term": "Objectif à court terme",
+    "focus_long_term": "Objectif à long terme",
+    "focus_no_objective": "Aucun objectif défini.",
+    "stories_empty": "Aucune histoire sur cette période.",
+    "stories_truncated": "Affichage des {count} histoires les plus récentes.",
+    "why_button": "Pourquoi ?",
+    "why_title": "Pourquoi cela s'est-il produit ?",
+    "why_loading": "Chargement de la chaîne causale...",
+    "why_error": "Impossible de charger la chaîne causale.",
+    "why_retry": "Réessayer",
+    "why_close": "Fermer",
+    "why_causes": "Causes",
+    "why_effects": "Effets",
+    "why_deltas": "Changements d'état",
+    "why_decision": "Décision à l'origine",
+    "why_no_causes": "Aucune cause enregistrée.",
+    "why_no_effects": "Aucun effet enregistré pour l'instant.",
+    "why_no_deltas": "Aucun changement d'état enregistré.",
+    "why_pruned": "(cet ancêtre a été supprimé de l'historique)",
+    "why_truncated": "Certaines causes ne sont pas affichées ; ouvrez un événement plus proche de la source pour en voir plus.",
+    "why_considered_count": "{count} options envisagées",
+    "why_rejected": "Options rejetées",
+    "why_relation": {
+      "triggered_by": "déclenché par",
+      "enabled_by": "rendu possible par",
+      "motivated_by": "motivé par",
+      "response_to": "en réponse à",
+      "resolves": "résout",
+      "prevented_by": "empêché par",
+      "contributed_to": "a contribué à"
+    }
   },
   "status_bar": {
     "phenomenon": "Phénomène du monde",
@@ -581,9 +622,9 @@
       "sections": {
         "grave": "Tombe",
         "deceased": "Défunt",
-          "goods": "Objets funéraires",
-          "treasure": "Trésor",
-          "treasure_info": "Détails du trésor"
+        "goods": "Objets funéraires",
+        "treasure": "Trésor",
+        "treasure_info": "Détails du trésor"
       },
       "location": "Lieu",
       "name": "Nom",
@@ -595,11 +636,11 @@
       "auxiliary": "Accessoire",
       "rogue": "Errant",
       "unknown": "Inconnu",
-        "empty_goods": "Aucun objet récupérable ne reste dans la tombe",
-        "source": "Origine",
-        "attempt_count": "Essais",
-        "expires_month": "Mois de dissipation",
-        "empty_treasure": "Le trésor a perdu son énergie spirituelle"
+      "empty_goods": "Aucun objet récupérable ne reste dans la tombe",
+      "source": "Origine",
+      "attempt_count": "Essais",
+      "expires_month": "Mois de dissipation",
+      "empty_treasure": "Le trésor a perdu son énergie spirituelle"
     }
   },
   "deceased": {

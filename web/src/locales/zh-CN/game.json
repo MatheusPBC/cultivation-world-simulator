@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "世界日志",
     "coming_soon": "即将推出",
-    "tabs": { "now": "当前", "focus": "关注", "stories": "故事", "timeline": "时间线" },
-    "periods": { "one": "本月", "three": "3个月", "twelve": "1年" },
+    "tabs": {
+      "now": "当前",
+      "focus": "关注",
+      "stories": "故事",
+      "timeline": "时间线"
+    },
+    "periods": {
+      "one": "本月",
+      "three": "3个月",
+      "twelve": "1年"
+    },
     "important_changes": "重要变更",
     "important_empty": "此期间没有重要变更。",
     "ongoing": "进行中",
@@ -16,7 +25,39 @@
     "active_avatars": "活跃角色",
     "event_count": "{count} 条事件",
     "loading": "正在加载日志...",
-    "error": "无法加载日志。"
+    "error": "无法加载日志。",
+    "focus_empty": "此期间没有关注数据。",
+    "focus_short_term": "短期目标",
+    "focus_long_term": "长期目标",
+    "focus_no_objective": "尚未设定目标。",
+    "stories_empty": "此期间没有故事。",
+    "stories_truncated": "仅显示最近 {count} 条故事。",
+    "why_button": "为什么？",
+    "why_title": "这是为什么发生的？",
+    "why_loading": "正在加载因果链...",
+    "why_error": "无法加载因果链。",
+    "why_retry": "重试",
+    "why_close": "关闭",
+    "why_causes": "起因",
+    "why_effects": "后续影响",
+    "why_deltas": "状态变化",
+    "why_decision": "背后的决策",
+    "why_no_causes": "没有记录到起因。",
+    "why_no_effects": "暂无记录的后续影响。",
+    "why_no_deltas": "没有记录到状态变化。",
+    "why_pruned": "（此环节已从历史中清理）",
+    "why_truncated": "部分起因未显示；打开更接近源头的事件可查看更多。",
+    "why_considered_count": "当时考虑了 {count} 个选项",
+    "why_rejected": "被放弃的选项",
+    "why_relation": {
+      "triggered_by": "触发于",
+      "enabled_by": "得益于",
+      "motivated_by": "出于决策",
+      "response_to": "回应于",
+      "resolves": "解决了",
+      "prevented_by": "被阻止于",
+      "contributed_to": "促成了"
+    }
   },
   "status_bar": {
     "phenomenon": "天地灵机",
@@ -597,12 +638,12 @@
       "runtime_effect_meta_permanent": "来源：{source} - 持续：长期"
     },
     "poi": {
-        "sections": {
-          "grave": "墓碑",
-          "deceased": "死者",
-          "goods": "墓中遗物",
-          "treasure": "宝物",
-          "treasure_info": "宝物信息"
+      "sections": {
+        "grave": "墓碑",
+        "deceased": "死者",
+        "goods": "墓中遗物",
+        "treasure": "宝物",
+        "treasure_info": "宝物信息"
       },
       "location": "位置",
       "name": "姓名",
@@ -614,11 +655,11 @@
       "auxiliary": "辅助装备",
       "rogue": "散修",
       "unknown": "未知",
-        "empty_goods": "墓中已无可取之物",
-        "source": "来源",
-        "attempt_count": "尝试次数",
-        "expires_month": "消散月份",
-        "empty_treasure": "宝物已经失去灵性"
+      "empty_goods": "墓中已无可取之物",
+      "source": "来源",
+      "attempt_count": "尝试次数",
+      "expires_month": "消散月份",
+      "empty_treasure": "宝物已经失去灵性"
     }
   },
   "deceased": {

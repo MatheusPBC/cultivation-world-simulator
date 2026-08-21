@@ -4,9 +4,20 @@ from typing import Any, Callable
 
 from fastapi import Query
 
+from src.classes.causal_link import CausalRelation
 from src.i18n import t
 from src.server.services.public_api_contract import raise_public_error
 from src.systems.cultivation_display import build_avatar_cultivation_display
+
+# Server-side clamps for the `why` causal traversal (docs/specs/causal-world-kernel.md §7.1).
+CAUSAL_QUERY_MAX_DEPTH = 5
+CAUSAL_QUERY_DEFAULT_DEPTH = 3
+CAUSAL_QUERY_MAX_NODE_LIMIT = 200
+CAUSAL_QUERY_DEFAULT_NODE_LIMIT = 40
+
+# Bounded list sizes for the World Journal's "stories" view; matches the
+# existing highlights/ongoing bound (§7.2) rather than paginating a new list.
+WORLD_JOURNAL_STORY_LIST_CAP = 20
 
 
 def get_runtime_status(runtime, version: str) -> dict[str, Any]:
@@ -575,17 +586,21 @@ def get_world_journal(
         for event in period_events
         if bool(event.is_major) and not bool(event.is_story)
     ][:5]
+    stories = [event for event in period_events if bool(event.is_story)]
     ongoing: list[dict[str, Any]] = []
     for avatar_id, event_count in avatar_event_counts.items():
         avatar = world.avatar_manager.get_avatar(avatar_id)
         if avatar is None or bool(getattr(avatar, "is_dead", False)):
             continue
+        long_term_objective = getattr(avatar, "long_term_objective", None)
         ongoing.append(
             {
                 "avatar_id": avatar_id,
                 "avatar_name": str(getattr(avatar, "name", avatar_id)),
                 "action": str(getattr(avatar, "current_action_name", "")),
                 "event_count": event_count,
+                "short_term_objective": str(getattr(avatar, "short_term_objective", "") or ""),
+                "long_term_objective": str(getattr(long_term_objective, "content", "") or "") if long_term_objective else "",
             }
         )
     ongoing.sort(key=lambda item: (-item["event_count"], item["avatar_name"], item["avatar_id"]))
@@ -604,7 +619,112 @@ def get_world_journal(
             "active_avatar_count": len(avatar_event_counts),
         },
         "highlights": serialize_events_for_client(highlights, world=world),
+        "stories": serialize_events_for_client(stories[:WORLD_JOURNAL_STORY_LIST_CAP], world=world),
+        "stories_truncated": len(stories) > WORLD_JOURNAL_STORY_LIST_CAP,
         "ongoing": ongoing[:5],
+    }
+
+
+def get_event_causal_detail(
+    runtime,
+    *,
+    serialize_events_for_client: Callable[[list[Any]], list[dict[str, Any]]],
+    event_id: str,
+    depth: int = CAUSAL_QUERY_DEFAULT_DEPTH,
+    limit: int = CAUSAL_QUERY_DEFAULT_NODE_LIMIT,
+) -> dict[str, Any]:
+    """Bounded read-only ancestor/effect traversal for one event ("why").
+
+    Read-only: this is a query, never a command (AGENTS.md rule 28). Direction
+    is always effect -> cause for `causes`; `effects` are the direct (one-hop)
+    downstream edges where this event is the cause. A missing/pruned ancestor
+    (removed by ``EventStorage.cleanup``) is represented as data
+    (``pruned: true, event: null``), never an error. Traversal is
+    breadth-first with a visited set, so a cycle cannot loop.
+    """
+    world = _require_world(runtime)
+    event_manager = getattr(world, "event_manager", None)
+    if event_manager is None:
+        raise_public_error(
+            status_code=503,
+            code="EVENTS_NOT_READY",
+            message="Event manager not initialized",
+        )
+
+    event = event_manager.get_event_by_id(event_id)
+    if event is None:
+        raise_public_error(
+            status_code=404,
+            code="EVENT_NOT_FOUND",
+            message="Event not found",
+        )
+
+    clamped_depth = max(1, min(int(depth), CAUSAL_QUERY_MAX_DEPTH))
+    clamped_limit = max(1, min(int(limit), CAUSAL_QUERY_MAX_NODE_LIMIT))
+
+    def edge_dto(link: Any, *, linked_event: Any | None, depth_value: int) -> dict[str, Any]:
+        return {
+            "relation": str(link.relation),
+            "weight": link.weight,
+            "note_key": link.note_key,
+            "note_params": link.note_params,
+            "depth": depth_value,
+            "event": serialize_events_for_client([linked_event], world=world)[0] if linked_event is not None else None,
+            "pruned": linked_event is None,
+        }
+
+    visited_ids: set[str] = {event.id}
+    causes: list[dict[str, Any]] = []
+    truncated = False
+
+    frontier = [event.id]
+    current_depth = 0
+    while frontier and current_depth < clamped_depth and not truncated:
+        current_depth += 1
+        next_frontier: list[str] = []
+        for source_id in frontier:
+            if truncated:
+                break
+            for link in event_manager.get_causal_links_for_event(source_id):
+                if len(causes) >= clamped_limit:
+                    truncated = True
+                    break
+                cause_event = event_manager.get_event_by_id(link.cause_event_id)
+                if cause_event is not None and link.cause_event_id not in visited_ids:
+                    visited_ids.add(link.cause_event_id)
+                    next_frontier.append(link.cause_event_id)
+                causes.append(edge_dto(link, linked_event=cause_event, depth_value=current_depth))
+        frontier = next_frontier
+
+    if not truncated and frontier:
+        # Depth cap reached with more ancestors left unexplored.
+        truncated = True
+
+    effect_links = event_manager.get_causal_links_caused_by(event.id)
+    effects = [
+        edge_dto(link, linked_event=event_manager.get_event_by_id(link.event_id), depth_value=1)
+        for link in effect_links[:clamped_limit]
+    ]
+    if len(effect_links) > clamped_limit:
+        truncated = True
+
+    decision_dto: dict[str, Any] | None = None
+    for link in event_manager.get_causal_links_for_event(event.id):
+        if link.relation == CausalRelation.MOTIVATED_BY:
+            decision_event = event_manager.get_event_by_id(link.cause_event_id)
+            if decision_event is not None and decision_event.causal_payload:
+                decision_dto = decision_event.causal_payload.get("decision")
+            break
+
+    deltas = list((event.causal_payload or {}).get("deltas") or [])
+
+    return {
+        "event": serialize_events_for_client([event], world=world)[0],
+        "causes": causes,
+        "effects": effects,
+        "deltas": deltas,
+        "decision": decision_dto,
+        "truncated": truncated,
     }
 
 

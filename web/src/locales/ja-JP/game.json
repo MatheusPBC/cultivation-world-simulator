@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "世界日誌",
     "coming_soon": "近日公開",
-    "tabs": { "now": "現在", "focus": "注目", "stories": "物語", "timeline": "タイムライン" },
-    "periods": { "one": "今月", "three": "3か月", "twelve": "1年" },
+    "tabs": {
+      "now": "現在",
+      "focus": "注目",
+      "stories": "物語",
+      "timeline": "タイムライン"
+    },
+    "periods": {
+      "one": "今月",
+      "three": "3か月",
+      "twelve": "1年"
+    },
     "important_changes": "重要な変化",
     "important_empty": "この期間に重要な変化はありません。",
     "ongoing": "進行中",
@@ -16,7 +25,39 @@
     "active_avatars": "活動中のキャラクター",
     "event_count": "{count}件の出来事",
     "loading": "日誌を読み込み中...",
-    "error": "日誌を読み込めませんでした。"
+    "error": "日誌を読み込めませんでした。",
+    "focus_empty": "この期間の注目データはありません。",
+    "focus_short_term": "短期目標",
+    "focus_long_term": "長期目標",
+    "focus_no_objective": "目標は設定されていません。",
+    "stories_empty": "この期間の物語はありません。",
+    "stories_truncated": "直近{count}件の物語を表示しています。",
+    "why_button": "なぜ？",
+    "why_title": "なぜこれが起きたのか？",
+    "why_loading": "因果関係を読み込み中...",
+    "why_error": "因果関係を読み込めませんでした。",
+    "why_retry": "再試行",
+    "why_close": "閉じる",
+    "why_causes": "原因",
+    "why_effects": "影響",
+    "why_deltas": "状態の変化",
+    "why_decision": "背後の決断",
+    "why_no_causes": "記録された原因はありません。",
+    "why_no_effects": "記録された影響はまだありません。",
+    "why_no_deltas": "記録された状態変化はありません。",
+    "why_pruned": "（この先祖は履歴から削除されました）",
+    "why_truncated": "一部の原因は表示されていません。より根源に近いイベントを開いてください。",
+    "why_considered_count": "{count}件の選択肢が検討されました",
+    "why_rejected": "却下された選択肢",
+    "why_relation": {
+      "triggered_by": "きっかけ",
+      "enabled_by": "後押し",
+      "motivated_by": "決断による",
+      "response_to": "応答",
+      "resolves": "解決",
+      "prevented_by": "阻止",
+      "contributed_to": "寄与"
+    }
   },
   "status_bar": {
     "phenomenon": "天地異象",
@@ -581,9 +622,9 @@
       "sections": {
         "grave": "墓",
         "deceased": "故人",
-          "goods": "副葬品",
-          "treasure": "宝物",
-          "treasure_info": "宝物情報"
+        "goods": "副葬品",
+        "treasure": "宝物",
+        "treasure_info": "宝物情報"
       },
       "location": "位置",
       "name": "名前",
@@ -595,11 +636,11 @@
       "auxiliary": "補助装備",
       "rogue": "野修",
       "unknown": "不明",
-        "empty_goods": "墓に回収できる品は残っていない",
-        "source": "由来",
-        "attempt_count": "試行回数",
-        "expires_month": "消滅月",
-        "empty_treasure": "宝物は霊力を失った"
+      "empty_goods": "墓に回収できる品は残っていない",
+      "source": "由来",
+      "attempt_count": "試行回数",
+      "expires_month": "消滅月",
+      "empty_treasure": "宝物は霊力を失った"
     }
   },
   "deceased": {

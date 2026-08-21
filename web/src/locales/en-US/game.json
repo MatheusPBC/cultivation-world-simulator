@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "World Journal",
     "coming_soon": "Coming soon",
-    "tabs": { "now": "Now", "focus": "Focus", "stories": "Stories", "timeline": "Timeline" },
-    "periods": { "one": "This month", "three": "3 months", "twelve": "1 year" },
+    "tabs": {
+      "now": "Now",
+      "focus": "Focus",
+      "stories": "Stories",
+      "timeline": "Timeline"
+    },
+    "periods": {
+      "one": "This month",
+      "three": "3 months",
+      "twelve": "1 year"
+    },
     "important_changes": "Important changes",
     "important_empty": "No important changes in this period.",
     "ongoing": "Ongoing",
@@ -16,7 +25,39 @@
     "active_avatars": "Active characters",
     "event_count": "{count} events",
     "loading": "Loading journal...",
-    "error": "Couldn't load journal."
+    "error": "Couldn't load journal.",
+    "focus_empty": "No focus data for this period.",
+    "focus_short_term": "Short-term goal",
+    "focus_long_term": "Long-term goal",
+    "focus_no_objective": "No objective set.",
+    "stories_empty": "No stories in this period.",
+    "stories_truncated": "Showing the most recent {count} stories.",
+    "why_button": "Why?",
+    "why_title": "Why did this happen?",
+    "why_loading": "Loading the causal chain...",
+    "why_error": "Couldn't load the causal chain.",
+    "why_retry": "Retry",
+    "why_close": "Close",
+    "why_causes": "Causes",
+    "why_effects": "Effects",
+    "why_deltas": "State changes",
+    "why_decision": "Decision behind this",
+    "why_no_causes": "No recorded causes.",
+    "why_no_effects": "No recorded effects yet.",
+    "why_no_deltas": "No state changes recorded.",
+    "why_pruned": "(this ancestor was pruned from history)",
+    "why_truncated": "Some causes were not shown; open the event closer to the source for more.",
+    "why_considered_count": "{count} options considered",
+    "why_rejected": "Rejected options",
+    "why_relation": {
+      "triggered_by": "triggered by",
+      "enabled_by": "enabled by",
+      "motivated_by": "motivated by",
+      "response_to": "response to",
+      "resolves": "resolves",
+      "prevented_by": "prevented by",
+      "contributed_to": "contributed to"
+    }
   },
   "status_bar": {
     "phenomenon": "World Phenomenon",
@@ -581,9 +622,9 @@
       "sections": {
         "grave": "Grave",
         "deceased": "Deceased",
-          "goods": "Grave Goods",
-          "treasure": "Treasure",
-          "treasure_info": "Treasure Details"
+        "goods": "Grave Goods",
+        "treasure": "Treasure",
+        "treasure_info": "Treasure Details"
       },
       "location": "Location",
       "name": "Name",
@@ -595,11 +636,11 @@
       "auxiliary": "Auxiliary",
       "rogue": "Rogue",
       "unknown": "Unknown",
-        "empty_goods": "No retrievable goods remain in the grave",
-        "source": "Source",
-        "attempt_count": "Attempts",
-        "expires_month": "Fades in month",
-        "empty_treasure": "The treasure has lost its spiritual power"
+      "empty_goods": "No retrievable goods remain in the grave",
+      "source": "Source",
+      "attempt_count": "Attempts",
+      "expires_month": "Fades in month",
+      "empty_treasure": "The treasure has lost its spiritual power"
     }
   },
   "deceased": {

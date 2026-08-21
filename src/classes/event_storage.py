@@ -823,6 +823,23 @@ class EventStorage:
             self._logger.error(f"Failed to update causal payload for event {event_id}: {e}")
             return False
 
+    def get_event_by_id(self, event_id: str) -> Optional["Event"]:
+        """按 id 直接读取单个事件，不受默认时间线的 decision 过滤限制。"""
+        if self._conn is None:
+            return None
+        with self._db_lock:
+            row = self._conn.execute(
+                """
+                SELECT id, month_stamp, content, is_major, is_story, event_type, render_key,
+                    render_params, subject_snapshots, created_at, fact_kind, causal_payload
+                FROM events WHERE id = ?
+                """,
+                (event_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_event(row)
+
     def get_causal_links_for_event(self, event_id: str) -> list["CausalLink"]:
         """
         返回以 event_id 为结果（效果）的所有因果边，即该事件的直接原因。

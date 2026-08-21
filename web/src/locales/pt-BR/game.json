@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "Diário do Mundo",
     "coming_soon": "Em breve",
-    "tabs": { "now": "Agora", "focus": "Em foco", "stories": "Histórias", "timeline": "Linha do tempo" },
-    "periods": { "one": "Este mês", "three": "3 meses", "twelve": "1 ano" },
+    "tabs": {
+      "now": "Agora",
+      "focus": "Em foco",
+      "stories": "Histórias",
+      "timeline": "Linha do tempo"
+    },
+    "periods": {
+      "one": "Este mês",
+      "three": "3 meses",
+      "twelve": "1 ano"
+    },
     "important_changes": "Mudanças importantes",
     "important_empty": "Nenhuma mudança importante neste período.",
     "ongoing": "Em andamento",
@@ -16,7 +25,39 @@
     "active_avatars": "Personagens ativos",
     "event_count": "{count} acontecimentos",
     "loading": "Carregando diário...",
-    "error": "Não foi possível carregar o diário."
+    "error": "Não foi possível carregar o diário.",
+    "focus_empty": "Nenhum dado em foco para este período.",
+    "focus_short_term": "Meta de curto prazo",
+    "focus_long_term": "Meta de longo prazo",
+    "focus_no_objective": "Nenhuma meta definida.",
+    "stories_empty": "Nenhuma história neste período.",
+    "stories_truncated": "Mostrando as {count} histórias mais recentes.",
+    "why_button": "Por quê?",
+    "why_title": "Por que isso aconteceu?",
+    "why_loading": "Carregando a cadeia causal...",
+    "why_error": "Não foi possível carregar a cadeia causal.",
+    "why_retry": "Tentar novamente",
+    "why_close": "Fechar",
+    "why_causes": "Causas",
+    "why_effects": "Efeitos",
+    "why_deltas": "Mudanças de estado",
+    "why_decision": "Decisão por trás disso",
+    "why_no_causes": "Nenhuma causa registrada.",
+    "why_no_effects": "Nenhum efeito registrado ainda.",
+    "why_no_deltas": "Nenhuma mudança de estado registrada.",
+    "why_pruned": "(este antecedente foi removido do histórico)",
+    "why_truncated": "Algumas causas não foram exibidas; abra o evento mais próximo da origem para ver mais.",
+    "why_considered_count": "{count} opções consideradas",
+    "why_rejected": "Opções rejeitadas",
+    "why_relation": {
+      "triggered_by": "desencadeado por",
+      "enabled_by": "possibilitado por",
+      "motivated_by": "motivado pela decisão",
+      "response_to": "em resposta a",
+      "resolves": "resolve",
+      "prevented_by": "impedido por",
+      "contributed_to": "contribuiu para"
+    }
   },
   "status_bar": {
     "phenomenon": "Fenômeno Mundial",

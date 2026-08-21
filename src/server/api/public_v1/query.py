@@ -103,6 +103,16 @@ def create_public_query_router(
     def get_world_journal_v1(period_months: Literal["1", "3", "12"] = "1"):
         return ok_response(query_service.get_world_journal(period_months=int(period_months)))
 
+    @router.get("/api/v1/query/events/{event_id}/causal")
+    def get_event_causal_detail_v1(
+        event_id: str,
+        depth: int = 3,
+        limit: int = 40,
+    ):
+        return ok_response(
+            query_service.get_event_causal_detail(event_id=event_id, depth=depth, limit=limit)
+        )
+
     @router.get("/api/v1/query/rankings")
     def get_rankings_v1():
         if query_service is not None:

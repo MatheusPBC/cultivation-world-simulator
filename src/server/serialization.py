@@ -208,6 +208,7 @@ def serialize_events_for_client(events: list[Any], *, world: Any | None = None) 
                 "render_key": getattr(event, "render_key", None),
                 "render_params": getattr(event, "render_params", None),
                 "created_at": getattr(event, "created_at", 0.0),
+                "fact_kind": str(getattr(event, "fact_kind", "occurrence")),
             }
         )
 

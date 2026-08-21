@@ -3,8 +3,17 @@
   "world_journal": {
     "title": "Nhật ký Thế giới",
     "coming_soon": "Sắp ra mắt",
-    "tabs": { "now": "Hiện tại", "focus": "Trọng tâm", "stories": "Câu chuyện", "timeline": "Dòng thời gian" },
-    "periods": { "one": "Tháng này", "three": "3 tháng", "twelve": "1 năm" },
+    "tabs": {
+      "now": "Hiện tại",
+      "focus": "Trọng tâm",
+      "stories": "Câu chuyện",
+      "timeline": "Dòng thời gian"
+    },
+    "periods": {
+      "one": "Tháng này",
+      "three": "3 tháng",
+      "twelve": "1 năm"
+    },
     "important_changes": "Thay đổi quan trọng",
     "important_empty": "Không có thay đổi quan trọng trong giai đoạn này.",
     "ongoing": "Đang diễn ra",
@@ -16,7 +25,39 @@
     "active_avatars": "Nhân vật hoạt động",
     "event_count": "{count} sự kiện",
     "loading": "Đang tải nhật ký...",
-    "error": "Không thể tải nhật ký."
+    "error": "Không thể tải nhật ký.",
+    "focus_empty": "Không có dữ liệu trọng tâm cho giai đoạn này.",
+    "focus_short_term": "Mục tiêu ngắn hạn",
+    "focus_long_term": "Mục tiêu dài hạn",
+    "focus_no_objective": "Chưa đặt mục tiêu.",
+    "stories_empty": "Không có câu chuyện nào trong giai đoạn này.",
+    "stories_truncated": "Đang hiển thị {count} câu chuyện gần đây nhất.",
+    "why_button": "Tại sao?",
+    "why_title": "Tại sao điều này xảy ra?",
+    "why_loading": "Đang tải chuỗi nhân quả...",
+    "why_error": "Không thể tải chuỗi nhân quả.",
+    "why_retry": "Thử lại",
+    "why_close": "Đóng",
+    "why_causes": "Nguyên nhân",
+    "why_effects": "Hệ quả",
+    "why_deltas": "Thay đổi trạng thái",
+    "why_decision": "Quyết định đằng sau",
+    "why_no_causes": "Không có nguyên nhân được ghi nhận.",
+    "why_no_effects": "Chưa có hệ quả nào được ghi nhận.",
+    "why_no_deltas": "Không có thay đổi trạng thái nào được ghi nhận.",
+    "why_pruned": "(tổ tiên này đã bị dọn khỏi lịch sử)",
+    "why_truncated": "Một số nguyên nhân chưa được hiển thị; hãy mở sự kiện gần nguồn hơn để xem thêm.",
+    "why_considered_count": "Đã cân nhắc {count} lựa chọn",
+    "why_rejected": "Các lựa chọn bị từ chối",
+    "why_relation": {
+      "triggered_by": "được kích hoạt bởi",
+      "enabled_by": "được cho phép bởi",
+      "motivated_by": "do quyết định",
+      "response_to": "phản hồi cho",
+      "resolves": "giải quyết",
+      "prevented_by": "bị ngăn cản bởi",
+      "contributed_to": "góp phần vào"
+    }
   },
   "status_bar": {
     "phenomenon": "Thiên Tượng Thế Giới",
@@ -581,9 +622,9 @@
       "sections": {
         "grave": "Mộ",
         "deceased": "Người đã mất",
-          "goods": "Di vật trong mộ",
-          "treasure": "Báu vật",
-          "treasure_info": "Thông tin báu vật"
+        "goods": "Di vật trong mộ",
+        "treasure": "Báu vật",
+        "treasure_info": "Thông tin báu vật"
       },
       "location": "Vị trí",
       "name": "Tên",
@@ -595,11 +636,11 @@
       "auxiliary": "Pháp bảo phụ trợ",
       "rogue": "Tán tu",
       "unknown": "Không rõ",
-        "empty_goods": "Trong mộ không còn vật gì có thể lấy",
-        "source": "Nguồn gốc",
-        "attempt_count": "Lần thử",
-        "expires_month": "Tháng tiêu tán",
-        "empty_treasure": "Báu vật đã mất linh lực"
+      "empty_goods": "Trong mộ không còn vật gì có thể lấy",
+      "source": "Nguồn gốc",
+      "attempt_count": "Lần thử",
+      "expires_month": "Tháng tiêu tán",
+      "empty_treasure": "Báu vật đã mất linh lực"
     }
   },
   "deceased": {
