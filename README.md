@@ -47,6 +47,37 @@
 - 🌏 **规则作为基石**：世界基于灵根、境界、功法、性格、宗门、丹药、兵器、武道会、拍卖会、寿元等元素共同组成的严谨体系运行。AI 的想象力被限制在合理又足够丰富的修仙逻辑框架内，确保世界真实可信。
 - 🦋 **涌现式剧情**：开发者也不知道下一秒会发生什么。没有预设剧本，只有无数因果交织出的世界演变。宗门大战、正魔之争、天骄陨落，皆由世界逻辑自主推演。
 
+## 🧭 Sobre esta variante: PT-BR, mobile e mundo causal
+
+Esta variante é mantida em [`MatheusPBC/cultivation-world-simulator`](https://github.com/MatheusPBC/cultivation-world-simulator) e continua baseada no projeto original [`4thfever/cultivation-world-simulator`](https://github.com/4thfever/cultivation-world-simulator).
+
+Além da localização da interface e dos textos gerados por IA para português brasileiro, esta versão inclui:
+
+- provider `codex_cli`, que reutiliza uma sessão OAuth do Codex sem copiar tokens para o código;
+- interface responsiva para celular, com navegação dedicada para mundo, avatares e roleplay;
+- Diário do Mundo/Crônica com as visões **Agora**, **Foco**, **Histórias** e a linha do tempo completa;
+- fatos causais registrados como eventos, com `CausalLink`, `StateDelta` e `AgentDecision`;
+- `CausalRecorder` passivo, ligado aos sistemas existentes sem controlar sua execução;
+- consulta causal limitada e segura em `GET /api/v1/query/events/{event_id}/causal`;
+- ação **Por quê?** na Crônica para reconstruir causas, efeitos, decisões e mudanças de estado;
+- pausa `required_decision_failed` quando uma decisão mensal obrigatória da IA falha de verdade, sem confundir uma resposta válida vazia com erro do provider.
+
+### Princípio arquitetural
+
+O kernel causal é uma camada de observação e ligação entre sistemas existentes, não um segundo motor de simulação. Personagens, regiões, seitas, itens e demais modelos continuam sendo os donos do estado real; os registros causais são evidências semânticas das mudanças que esses sistemas produziram.
+
+### Escopo atual
+
+Esta entrega constrói a fundação para mundos mais emergentes, mas ainda não implementa todos os sistemas imaginados para as próximas etapas. Fisiologia detalhada, crises de recursos, ecologia espiritual, rumores, economia reativa e causalidade intergeracional continuam sendo evolução futura. Em outras palavras: os trilhos causais estão prontos, mas as novas leis locais ainda serão adicionadas gradualmente.
+
+Para experimentar todo o kernel, recomenda-se criar um mundo novo. Saves e textos livres antigos não são traduzidos ou reconstruídos retroativamente.
+
+Documentação:
+
+- [Customizações PT-BR, Codex e mobile](docs/customizations/README.md)
+- [Especificação do Causal World Kernel](docs/specs/causal-world-kernel.md)
+- [Estratégia e comandos de testes](docs/testing.md)
+
 <table border="0">
   <tr>
     <td width="33%" valign="top">
@@ -148,7 +179,7 @@ docker-compose up -d --build
 <details>
 <summary><b>局域网/手机访问配置 (点击展开)</b></summary>
 
-> ⚠️ 移动端 UI 暂未完全适配，仅供尝鲜。
+> ✅ Esta variante inclui uma interface responsiva dedicada para celular. Para uma experiência estável, use o frontend servido pelo mesmo ambiente do backend e mantenha a página atualizada após novos deployments.
 
 1. **后端配置**：推荐通过环境变量启动后端，例如 PowerShell 中执行 `$env:SERVER_HOST='0.0.0.0'; python src/server/main.py --dev`。如需改默认值，可编辑只读配置 `static/config.yml` 中的 `system.host`。
 2. **前端配置**：修改 `web/vite.config.ts`，在 server 块中添加 `host: '0.0.0.0'`。
