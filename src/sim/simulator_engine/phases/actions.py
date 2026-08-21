@@ -9,6 +9,7 @@ from src.config.providers import StaticConfigProvider
 from src.i18n import t
 from src.run.log import get_logger
 from src.sim.runtime_capabilities import get_decision_boundary_gateway
+from src.utils.llm.exceptions import LLMError, ProviderCallError
 
 
 class RequiredDecisionFailed(Exception):
@@ -96,13 +97,17 @@ async def phase_decide_actions(world, living_avatars: list[Avatar]) -> list[Even
 
     try:
         decide_results = await llm_ai.decide(world, avatars_to_decide)
-    except Exception as exc:
-        # `llm_ai.decide` / `LLMAI._decide` only reach here via an exception
-        # for a real provider/parse failure (see src/classes/ai.py): a
-        # response that parses but is empty, and rule-based test mode, both
-        # return normally with an empty result instead of raising. So any
-        # exception escaping this call is, by construction, a required
-        # failure — never an indistinguishable "valid empty decision".
+    except (LLMError, ProviderCallError) as exc:
+        # Strictly the required-failure set from docs/specs/causal-world-kernel.md
+        # §6.3: a provider/transport failure (`ProviderCallError`) or a parse
+        # failure that survived `CONFIG.ai.max_parse_retries` (`LLMError`,
+        # which `ParseError` subclasses). `LLMAI._decide` also runs a fair
+        # amount of non-LLM code around the provider call (prompt assembly,
+        # `world.get_info`, `EmotionType(...)`, the pairs normalisation, the
+        # 3-tuple unpack in `AI.decide`) — a bug in any of that must NOT be
+        # relabelled as a required-decision failure; it must fall through to
+        # `GameLoopRunner.run_once`'s generic `except Exception` instead, so
+        # it is visible as what it actually is.
         raise RequiredDecisionFailed(
             [str(avatar.id) for avatar in avatars_to_decide], str(exc)
         ) from exc

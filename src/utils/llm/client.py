@@ -386,7 +386,11 @@ def _call_anthropic(config: LLMConfig, prompt: str) -> str:
         for block in result.get("content", []):
             if block.get("type") == "text":
                 return block["text"]
-        raise Exception("UNKNOWN_ERROR::Anthropic 响应中未找到 text 内容")
+        raise ProviderCallError(
+            ProviderFailureKind.INVALID_RESPONSE,
+            "Anthropic 响应中未找到 text 内容",
+            response_body=json.dumps(result),
+        )
     except urllib.error.HTTPError as e:
         error_body = e.read().decode("utf-8")
         raise ProviderCallError(

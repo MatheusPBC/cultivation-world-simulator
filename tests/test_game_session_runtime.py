@@ -189,6 +189,23 @@ def test_set_paused_false_clears_failure_pause_reason():
     assert runtime.is_effectively_paused() is False
 
 
+def test_set_paused_true_also_clears_a_stale_failure_pause_reason():
+    """The save-load path pauses a freshly loaded world via
+    `set_paused(True)` (not `reset_to_idle`/`mark_pending_initialization`),
+    so a `required_decision_failed` override left over from a previous world
+    must not leak into it -- an external agent reading
+    `/api/v1/query/runtime/status` for the new world must not see a failure
+    reason for a decision that never happened in it."""
+    runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+    runtime.set_failure_pause("required_decision_failed")
+
+    runtime.set_paused(True)
+
+    assert runtime.get("pause_reason_override") == ""
+    assert runtime.get_pause_reason() == "paused"
+    assert runtime.is_effectively_paused() is True
+
+
 def test_reset_to_idle_clears_failure_pause_reason():
     runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
     runtime.set_failure_pause("required_decision_failed")

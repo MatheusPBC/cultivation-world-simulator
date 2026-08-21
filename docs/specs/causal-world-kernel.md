@@ -733,7 +733,7 @@ survive in the live `World` even though no event was persisted. Their side effec
 |---|---|---|---|
 | 1 | `phase_update_perception_and_knowledge` | `avatar.known_regions.add(...)` | Yes — set union, idempotent |
 | 1 | same handler | `avatar.occupy_region(region)` | **No** — a real state change whose describing `Event` would be discarded |
-| 2 | `phase_long_term_objective_thinking` | sets the avatar's long-term objective | Yes — overwritten on re-run |
+| 2 | `phase_long_term_objective_thinking` | sets the avatar's long-term objective | ~~Yes — overwritten on re-run~~ **Corrected in Task 6 re-review — this was wrong.** `can_generate_long_term_objective` gates regeneration on *years since it was last set*, so a value written during a failed, discarded batch is **not** regenerated on the immediate retry. Same class of residue as row above. Moved after `decide_actions`; see §13.3a. |
 | 3 | `phase_process_gatherings` | gathering state in `GatheringManager` | Not verified for idempotency |
 | 4 | `phase_decide_actions` → `gateway.before_ai_decision` | may set `roleplay_auto_paused=True` and a `pending_request` before any LLM call | Needs confirmation — see below |
 
@@ -1094,13 +1094,23 @@ finding that went beyond "confirm idempotency."
 1. **`RequiredDecisionFailed`** lives next to `phase_decide_actions`
    (`src/sim/simulator_engine/phases/actions.py`), is not a
    `SimulationStepAborted` subclass, and is raised by wrapping the single
-   `await llm_ai.decide(world, avatars_to_decide)` call in a `try`/`except
-   Exception`. Nothing else in that function path can legitimately raise:
-   a parsed-but-empty response and rule-based test mode both return
-   normally with an empty result (§6.3). No `return_exceptions=True` was
-   added to `LLMAI._decide`'s `asyncio.gather` — it still fails fast on the
-   first escaping exception, so `avatar.load_decide_result_chain` is never
-   called for a failed batch (abort-before-mutate holds unchanged).
+   `await llm_ai.decide(world, avatars_to_decide)` call in
+   `try`/`except (LLMError, ProviderCallError)` — the exact required-failure
+   set from §6.3, **not** a bare `except Exception`. `LLMAI._decide` runs a
+   fair amount of non-LLM code around the provider call (prompt assembly via
+   `get_action_infos_str`/`world.get_info`/`get_avatar_ai_context`, the pairs
+   normalisation, `EmotionType(...)`), and `AI.decide` does a 3-tuple unpack
+   afterward; a bug in any of that must surface as itself through
+   `GameLoopRunner.run_once`'s generic `except Exception`, not get
+   relabelled as a required-decision failure — an earlier draft of this task
+   caught `Exception` here and was corrected in review (see
+   `tests/test_required_decision_failed.py::test_phase_decide_actions_does_not_convert_a_non_llm_exception`).
+   A parsed-but-empty response and rule-based test mode both return
+   normally with an empty result (§6.3), so they never reach this `except`
+   at all. No `return_exceptions=True` was added to `LLMAI._decide`'s
+   `asyncio.gather` — it still fails fast on the first escaping exception,
+   so `avatar.load_decide_result_chain` is never called for a failed batch
+   (abort-before-mutate holds unchanged).
 2. **`GameSessionRuntime.set_failure_pause(reason)`** sets `is_paused=True`
    and a new `pause_reason_override` state key, read first by
    `get_pause_reason()` ahead of the roleplay and plain-`paused` branches.
@@ -1115,18 +1125,35 @@ finding that went beyond "confirm idempotency."
    ahead of its existing `except Exception`, calling
    `runtime.set_failure_pause("required_decision_failed")`.
 3. **Residue (a), region claiming.** `phase_update_perception_and_knowledge`
-   now only refreshes `known_regions` (a pure set union — idempotent).
-   Occupation moved to a new phase, `phase_claim_ownerless_regions`
-   (`src/sim/simulator_engine/phases/world.py`), registered as
-   `SIMULATION_PHASES` index 4, immediately after `decide_actions` (index
-   3) and before `commit_next_plans`. Both phases independently recompute
-   "regions observed this tick" from the avatar's current position and
-   observation radius (factored into `_observed_regions_this_tick`) rather
-   than reusing accumulated `known_regions` — avatar position cannot change
-   between phase 1 and phase 4 within one step (movement happens later, in
+   now only refreshes `known_regions` (a pure set union — idempotent) and
+   stays at `SIMULATION_PHASES` index 1. Occupation moved to a new phase,
+   `phase_claim_ownerless_regions`
+   (`src/sim/simulator_engine/phases/world.py`), registered at index 4,
+   after `decide_actions` (index 2) and before `commit_next_plans`. Both
+   phases independently recompute "regions observed this tick" from the
+   avatar's current position and observation radius (factored into
+   `_observed_regions_this_tick`) rather than reusing accumulated
+   `known_regions` — avatar position cannot change between phase 1 and
+   `decide_actions` within one step (movement happens later, in
    `execute_actions`), so this reproduces the original "passed by and
    occupied" semantics exactly, while making a same-month retry safe: a
    second call over an unchanged world state claims nothing new.
+3a. **Residue found during re-review, same class as (a): `long_term_objective_thinking`.**
+   Spec §6.4's residue table originally marked this row *"Yes — overwritten
+   on re-run"* without checking it; that was wrong, and is corrected here.
+   `process_avatar_long_term_objective` writes a real
+   `avatar.long_term_objective` (replacing any existing one, not merging
+   it), and its own guard, `can_generate_long_term_objective`, keys off
+   *years since it was last set* — so an objective written during a failed,
+   discarded batch is not regenerated on the immediate retry
+   (`years_passed < 5`), even though the `Event` describing it was thrown
+   away with the rest of that batch. This is the same silent-residue shape
+   as region claiming, just easier to miss because nothing about it looked
+   like a mutation at a glance. Fixed the same way: moved to
+   `SIMULATION_PHASES` index 3, after `decide_actions` and before
+   `claim_ownerless_regions`. See
+   `tests/test_phase_reordering.py::test_required_decision_failure_leaves_long_term_objective_unset`,
+   which fails if this phase is moved back ahead of `decide_actions`.
 4. **Residue (b), gatherings — upgraded from "confirm" to "move."** Reading
    the three registered `Gathering` subclasses showed re-run is **not**
    safe for two of them: `Tournament.is_start` re-fires unconditionally on
@@ -1145,16 +1172,16 @@ finding that went beyond "confirm idempotency."
    was moved (not left in place with a "confirmed safe" note) to
    `SIMULATION_PHASES` index 5, after `claim_ownerless_regions` and before
    `commit_next_plans` — the same reasoning as region claiming.
-5. **Behavioral consequence of both moves, stated explicitly.** Avatars now
-   decide their month's actions *before* any gathering or region-claim
-   outcome from that same month is known to them, whereas previously
-   gatherings (and the region-claim side effect) ran first. This is a
-   deliberate trade-off: the alternative is an irreversible mutation sitting
-   before the point where a required-decision failure can abort the step,
-   which is exactly the hazard this task exists to remove. `is_in_major_action`
-   / `can_join_gathering` eligibility is unaffected either way, since it
-   reads `Avatar.current_action`, which `commit_next_plans` (still after
-   both moved phases) is what actually sets.
+5. **Behavioral consequence of all three moves, stated explicitly.** Avatars
+   now decide their month's actions *before* any gathering, region-claim, or
+   long-term-objective outcome from that same month is known to them,
+   whereas previously all three ran first. This is a deliberate trade-off:
+   the alternative is an irreversible mutation sitting before the point
+   where a required-decision failure can abort the step, which is exactly
+   the hazard this task exists to remove. `is_in_major_action` /
+   `can_join_gathering` eligibility is unaffected either way, since it reads
+   `Avatar.current_action`, which `commit_next_plans` (still after all three
+   moved phases) is what actually sets.
 6. **Residue (c), roleplay interaction — confirmed, not changed.**
    `RuntimeDecisionBoundaryGateway.before_ai_decision` can set
    `roleplay_auto_paused=True` and a `pending_request` before any LLM call
@@ -1170,9 +1197,15 @@ finding that went beyond "confirm idempotency."
    phase kept its relative order and shifted index by exactly the same
    amount. `tests/test_backend_phase4_architecture.py`'s sequential-index
    and first/last-name assertions are index-count-agnostic and still hold.
-8. **Measurements.** A 3-avatar, 6-month smoke run under the default
-   "valid empty decision" mock produced 3 events total (background world
-   phases only — no decisions, no gatherings, no region claims in that
-   fixture); a 60-hop linear causal chain (past the depth=5 clamp) resolved
-   through `get_event_causal_detail` in well under a millisecond. See
-   `tests/test_causal_kernel_smoke.py`.
+8. **Measurements.** A first pass measured event volume under the default
+   "valid empty decision" mock (all avatars decide nothing) and produced 3
+   events over 6 months — a measurement of a world where nothing happens,
+   which was rightly flagged in re-review as not saying anything about the
+   causal kernel's actual event volume. Corrected: a 3-avatar, 6-month run
+   where every avatar decides a real, non-empty action (`MoveToDirection`)
+   the one month it is idle produced 11 total events across the run,
+   including exactly 3 `FactKind.DECISION` events (one per avatar's single
+   decision) — consistent with §10 point 6's estimate of *(living avatars) /
+   (average chain length)* decision events per month. A 60-hop linear causal
+   chain (past the depth=5 clamp) resolved through `get_event_causal_detail`
+   in well under a millisecond. See `tests/test_causal_kernel_smoke.py`.

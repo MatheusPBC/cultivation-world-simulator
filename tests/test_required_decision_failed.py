@@ -25,12 +25,12 @@ from src.server.loop.runner import GameLoopRunner
 from src.server.loop.tick_payload import TickPayloadBuilder
 from src.server.runtime import DEFAULT_GAME_STATE, GameSessionRuntime
 from src.sim.simulator import Simulator
-from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner, SimulationStepAborted
+from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.sim.simulator_engine.phases.actions import (
     RequiredDecisionFailed,
     phase_decide_actions,
 )
-from src.utils.llm.exceptions import LLMError
+from src.utils.llm.exceptions import LLMError, ProviderCallError, ProviderFailureKind
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
@@ -45,6 +45,44 @@ async def test_phase_decide_actions_raises_required_decision_failed_on_llm_error
         await phase_decide_actions(base_world, [dummy_avatar])
 
     assert str(dummy_avatar.id) in exc_info.value.avatar_ids
+
+
+@pytest.mark.asyncio
+async def test_phase_decide_actions_raises_required_decision_failed_on_provider_call_error(
+    base_world, dummy_avatar, mock_llm_managers
+):
+    """`ProviderCallError` is not an `LLMError` subclass (see
+    src/utils/llm/exceptions.py), so it must be caught explicitly -- this is
+    the transport-failure half of the required-failure set from §6.3."""
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+    mock_llm_managers["ai"].decide = AsyncMock(
+        side_effect=ProviderCallError(ProviderFailureKind.NETWORK, "connection refused")
+    )
+
+    with pytest.raises(RequiredDecisionFailed) as exc_info:
+        await phase_decide_actions(base_world, [dummy_avatar])
+
+    assert str(dummy_avatar.id) in exc_info.value.avatar_ids
+
+
+@pytest.mark.asyncio
+async def test_phase_decide_actions_does_not_convert_a_non_llm_exception(
+    base_world, dummy_avatar, mock_llm_managers
+):
+    """The classification must be strict: a bug inside `llm_ai.decide` (a
+    programming error, not a provider/parse failure) must propagate as
+    itself, so it is visible through `GameLoopRunner.run_once`'s generic
+    `except Exception` instead of being misfiled as
+    `required_decision_failed`. This is the actual boundary the diff
+    creates -- raising something other than `LLMError`/`ProviderCallError`
+    from *inside* the wrapped call must NOT be caught here."""
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+    mock_llm_managers["ai"].decide = AsyncMock(
+        side_effect=AttributeError("'Avatar' object has no attribute 'foo'")
+    )
+
+    with pytest.raises(AttributeError):
+        await phase_decide_actions(base_world, [dummy_avatar])
 
 
 @pytest.mark.asyncio

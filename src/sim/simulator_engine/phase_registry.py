@@ -23,12 +23,23 @@ def update_perception_and_knowledge(simulator, ctx):
     ctx.add_events(world_phases.phase_update_perception_and_knowledge(simulator.world, ctx.living_avatars))
 
 
-async def long_term_objective_thinking(_simulator, ctx):
-    ctx.add_events(await lifecycle.phase_long_term_objective_thinking(ctx.living_avatars))
-
-
 async def decide_actions(simulator, ctx):
     ctx.add_events(await actions.phase_decide_actions(simulator.world, ctx.living_avatars))
+
+
+async def long_term_objective_thinking(_simulator, ctx):
+    # 移到 decide_actions 之后：`process_avatar_long_term_objective` 会真实
+    # 写入 avatar.long_term_objective（且不是 union 式合并，可能替换旧目标），
+    # 一旦在 decide_actions 之前写入而随后触发 RequiredDecisionFailed，
+    # 整月从 phase 1 重跑时 `can_generate_long_term_objective` 会因为
+    # “距离上次设定 <5 年”而判定不需要重新生成——目标已经在活的 World 里
+    # 生效，但描述它的 Event 已随失败批次一起丢弃，永远补不回来。这与占地
+    # （残留问题 a）同一类残留，此前 spec §6.4 第 3 行错误地把它标注为
+    # “Yes——overwritten on re-run”，见 docs/specs/causal-world-kernel.md §13.3a。
+    # 代价与占地/聚会一致：决策提示（`avatar.get_expanded_info` 里的
+    # long_term_objective 字段）会晚一个月看到新目标，这是本任务已经接受的
+    # 同类信息滞后，不是新增的行为退化。
+    ctx.add_events(await lifecycle.phase_long_term_objective_thinking(ctx.living_avatars))
 
 
 def claim_ownerless_regions(simulator, ctx):
@@ -145,8 +156,8 @@ def finalize_step_phase(_simulator, ctx):
 
 SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_perception_and_knowledge", 1, "update_perception_and_knowledge", update_perception_and_knowledge),
-    SimulationPhase("long_term_objective_thinking", 2, "long_term_objective_thinking", long_term_objective_thinking),
-    SimulationPhase("decide_actions", 3, "decide_actions", decide_actions),
+    SimulationPhase("decide_actions", 2, "decide_actions", decide_actions),
+    SimulationPhase("long_term_objective_thinking", 3, "long_term_objective_thinking", long_term_objective_thinking),
     SimulationPhase("claim_ownerless_regions", 4, "claim_ownerless_regions", claim_ownerless_regions),
     SimulationPhase("process_gatherings", 5, "process_gatherings", process_gatherings),
     SimulationPhase("commit_next_plans", 6, "commit_next_plans", commit_next_plans),

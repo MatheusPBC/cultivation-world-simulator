@@ -37,7 +37,7 @@ from src.utils.llm.client import (
 )
 from src.utils.llm.config import LLMConfig
 from src.utils.llm.parser import parse_json
-from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.exceptions import LLMError, ParseError, ProviderCallError, ProviderFailureKind
 
 
 def make_http_error(url: str, code: int, msg: str, body: bytes) -> urllib.error.HTTPError:
@@ -698,6 +698,30 @@ class TestConfigurationValidation:
         assert headers["X-api-key"] == "test-key"
         assert headers["Anthropic-version"] == "2023-06-01"
         assert "Authorization" not in headers
+
+    def test_anthropic_response_without_text_block_raises_provider_call_error(self):
+        """A response that parses as JSON but carries no `type: text` content
+        block is a genuine provider failure (Task 6 re-review F1), not a bare
+        `Exception` -- it must be classified as `ProviderCallError` with
+        `INVALID_RESPONSE`, the same required-failure type `LLMAI._decide`
+        catches to raise `RequiredDecisionFailed`."""
+        config = LLMConfig(
+            model_name="claude-sonnet-4-20250514",
+            api_key="test-key",
+            base_url="https://api.anthropic.com",
+            api_format="anthropic",
+        )
+
+        mock_response_content = json.dumps({"content": [{"type": "image", "source": {}}]}).encode("utf-8")
+        mock_response = MagicMock()
+        mock_response.read.return_value = mock_response_content
+        mock_response.__enter__.return_value = mock_response
+
+        with patch("urllib.request.urlopen", return_value=mock_response):
+            with pytest.raises(ProviderCallError) as exc_info:
+                _call_with_requests(config, "test")
+
+        assert exc_info.value.kind == ProviderFailureKind.INVALID_RESPONSE
 
 
 class TestConfigFallback:

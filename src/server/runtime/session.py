@@ -196,9 +196,15 @@ class GameSessionRuntime:
         self._state["init_error"] = str(error)
 
     def set_paused(self, paused: bool) -> None:
+        # Cleared unconditionally, in both directions: a load/reinit path
+        # calls `set_paused(True)` (not `reset_to_idle`/
+        # `mark_pending_initialization`) to pause the freshly loaded world,
+        # and a stale `pause_reason_override` from a previous session must
+        # not survive into it — see docs/specs/causal-world-kernel.md §6.2.
+        # `set_failure_pause` writes `is_paused` directly (not through this
+        # method) and then the override, so it is unaffected by this clear.
         self._state["is_paused"] = bool(paused)
-        if not paused:
-            self._state["pause_reason_override"] = ""
+        self._state["pause_reason_override"] = ""
 
     def set_roleplay_auto_paused(self, paused: bool) -> None:
         self._state["roleplay_auto_paused"] = bool(paused)

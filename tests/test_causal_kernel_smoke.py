@@ -12,11 +12,12 @@ deep causal chain stays cheap to traverse.
 from __future__ import annotations
 
 import time
+from unittest.mock import AsyncMock
 
 import pytest
 
 from src.classes.causal_link import CausalLink, CausalRelation
-from src.classes.event import Event
+from src.classes.event import NULL_EVENT, Event, FactKind
 from src.server.runtime import DEFAULT_GAME_STATE, GameSessionRuntime
 from src.server.services.game_queries import get_event_causal_detail
 from src.server.serialization import serialize_events_for_client
@@ -25,25 +26,50 @@ from src.systems.time import Month, Year, create_month_stamp
 
 
 @pytest.mark.asyncio
-async def test_bounded_multi_month_smoke(base_world, mock_llm_managers):
-    """Run a handful of months back-to-back with a small population and no
-    decisions (the default `mock_llm_managers["ai"].decide` returns `{}`,
-    the "valid empty decision" case from section 6.3) and assert the world
-    keeps advancing without raising and without an unbounded event count."""
-    for i in range(3):
-        avatar = _make_avatar(base_world, f"smoke-{i}", pos_x=i, pos_y=i)
+async def test_bounded_multi_month_smoke_with_real_decisions(base_world, mock_llm_managers):
+    """Run a handful of months back-to-back with a small population where
+    every avatar actually decides a (non-empty) action each month it is
+    idle, so `FactKind.DECISION` events and their downstream action events
+    are genuinely produced -- an earlier version of this test used the
+    default mocked "empty decision" and measured a world where nothing
+    happens, which proved nothing about causal-kernel event volume."""
+    avatars = [_make_avatar(base_world, f"smoke-{i}", pos_x=i, pos_y=i) for i in range(3)]
+    for avatar in avatars:
         base_world.avatar_manager.register_avatar(avatar)
+
+    async def _decide(_world, avatars_to_decide):
+        return {
+            avatar: (
+                [("MoveToDirection", {"direction": "East"})],
+                "heading east",
+                "explore the world",
+                NULL_EVENT,
+            )
+            for avatar in avatars_to_decide
+        }
+
+    mock_llm_managers["ai"].decide = AsyncMock(side_effect=_decide)
 
     sim = Simulator(base_world)
     months_to_run = 6
     start_month = int(base_world.month_stamp)
     total_events = 0
+    decision_events = 0
 
     for _ in range(months_to_run):
         events = await sim.step()
         total_events += len(events)
+        decision_events += sum(1 for e in events if e.fact_kind == FactKind.DECISION)
 
     assert int(base_world.month_stamp) == start_month + months_to_run
+    # Every avatar starts idle and `MoveToDirection` takes 6 months, so each
+    # of the 3 avatars decides exactly once across this run -- the decision
+    # event count must reflect that real activity, not be zero.
+    assert decision_events == len(avatars), (
+        f"expected exactly {len(avatars)} decision events (one per avatar "
+        f"deciding once), got {decision_events}"
+    )
+    assert total_events > 0
     # No hard ceiling is prescribed by the spec; this only guards against a
     # gross blow-up (e.g. an accidental per-tile or per-pair event emission).
     assert total_events < 500, f"unexpectedly high event volume for {months_to_run} months: {total_events}"
