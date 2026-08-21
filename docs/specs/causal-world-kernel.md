@@ -1185,13 +1185,27 @@ finding that went beyond "confirm idempotency."
    `cause_event_id` is already a normal, tolerated shape per §5.6.3/§7.1 —
    the `why` query renders it as `pruned: true` — and a no-op update against
    a missing row is not a crash), so this is a **silent data-completeness
-   gap, not a correctness or crash risk**. It is also not new in kind: every
-   LLM-calling phase after `decide_actions` that predates this task
-   (`backstory_generation`, `nickname_generation`, `phase_sect_random_event`,
-   `phase_autonomous_custom_creation`, `phase_background_npc_events`) has the
-   same hazard, with a larger blast radius since they sit after
-   `execute_actions` too. This task does not fix it — the options (making
-   these optional phases fail-soft with `asyncio.gather(...,
+   gap, not a correctness or crash risk**. The two phases that can actually
+   abort a step this way are `long_term_objective_thinking` and
+   `process_gatherings`, both of which **this task moved after
+   `decide_actions`** — so the exposure is, in the concrete case verified
+   here, created by this task's own reordering, not inherited from before
+   it. `long_term_objective_thinking` is a bare `asyncio.gather` over
+   `process_avatar_long_term_objective` with no `except`, and
+   `process_gatherings` can reach `StoryTeller.tell_story`, which
+   deliberately has no `try`/`except` around its LLM call ("移除了
+   try-except 块，允许异常向上冒泡，以便 Fail Fast",
+   `src/classes/story_teller.py`) for gathering stories, which are fixed at
+   100% probability. The other post-decision LLM phases do **not** share
+   this hazard: `backstory_generation`, `nickname_generation`,
+   `phase_sect_random_event`, and `phase_autonomous_custom_creation` each
+   wrap their own LLM call in `try`/`except Exception` and return `None`
+   on failure rather than letting it escape, and `phase_background_npc_events`
+   makes no LLM call at all. A post-decision *programming bug* (as opposed
+   to an LLM failure) in any phase, including those four, has the same
+   effect regardless. This task does not fix the hazard in
+   `long_term_objective_thinking` / `process_gatherings` — the options
+   (making them fail-soft with `asyncio.gather(...,
    return_exceptions=True)`, or giving the decision event its own persistence
    point) are both a change in behavior beyond "harden failure semantics for
    the required path," and are left as follow-up work, not implemented here.
