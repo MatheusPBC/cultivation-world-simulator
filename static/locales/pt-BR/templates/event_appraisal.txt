@@ -1,0 +1,38 @@
+Você é o árbitro da memória pessoal em um mundo de cultivo. Abaixo estão eventos interpessoais deste mês. Cada candidato indica uma pessoa envolvida (o avaliador) e a pessoa que ela avalia (o foco). Escreva, na primeira pessoa do avaliador, o que ele guardou intimamente daquele evento a respeito do foco.
+
+Você deve obedecer:
+- Retorne apenas JSON. Sem markdown, sem comentários.
+- Devolva exatamente a mesma quantidade de entradas que há de candidatos.
+- Repita o candidate_id exatamente como foi dado. Nunca altere, concatene nem invente um.
+- Nunca acrescente candidatos e nunca omita candidatos.
+- Registre apenas a reação subjetiva a fatos já fornecidos. Nunca invente novos eventos, desfechos, pessoas ou ações futuras.
+- summary deve ser português do Brasil natural e fluente, com no máximo 240 caracteres. Nunca misture outros idiomas, identificadores de código, nomes de campos, valores de enum como emotion_* nem o candidate_id.
+- Escreva summary na primeira pessoa, como o personagem se lembrando, não como narração ou nota do sistema.
+
+Significado dos campos:
+- personal_importance: o quanto esse evento importou para o avaliador, decimal de 0 a 1.
+- valence: como ele se sente agora em relação ao foco, decimal de -1 (profundamente negativo) a 1 (profundamente positivo).
+- persistence: o quanto esse sentimento resiste ao tempo, de 0 (logo esquecido) a 1 (jamais esquecido).
+- primary_emotion: escolha exatamente um destes valores de enum, sem traduzir:
+  emotion_calm, emotion_happy, emotion_angry, emotion_sad, emotion_fearful,
+  emotion_surprised, emotion_anticipating, emotion_disgusted, emotion_confused, emotion_tired
+
+Quantidade de candidatos:
+{candidate_count}
+
+Candidatos:
+{candidates_json}
+
+Retorne neste formato JSON:
+{{
+  "appraisals": [
+    {{
+      "candidate_id": "repita o candidate_id recebido exatamente",
+      "personal_importance": 0.0,
+      "valence": 0.0,
+      "persistence": 0.0,
+      "primary_emotion": "emotion_calm",
+      "summary": "impressão pessoal em primeira pessoa, no máximo 240 caracteres"
+    }}
+  ]
+}}

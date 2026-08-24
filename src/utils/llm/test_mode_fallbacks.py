@@ -59,6 +59,10 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         return {"choice": "", "thinking": ""}
     if task_name == "sect_thinker":
         return {"sect_thinking": ""}
+    if task_name == "event_appraisal":
+        # No AI appraisals: every candidate falls back to its deterministic
+        # per-candidate rule profile in event_appraisal_service.
+        return {"appraisals": []}
     if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:
         return {}
     if task_name.startswith("world_lore_"):
@@ -72,6 +76,6 @@ def registered_test_mode_tasks() -> frozenset[str]:
     return frozenset({
         "action_decision", "backstory", "long_term_objective", "nickname", "story_teller",
         "relation_resolver", "relation_delta", "single_choice", "sect_thinker", "sect_decider",
-        "interaction_feedback", "fate_revelation", "random_minor_event",
+        "interaction_feedback", "fate_revelation", "random_minor_event", "event_appraisal",
         "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary",
     })

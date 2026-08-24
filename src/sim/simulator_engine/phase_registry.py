@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from .finalizer import finalize_step
-from .phases import actions, annual, lifecycle, poi, sect_war, social, world as world_phases
+from .phases import actions, annual, appraisal, lifecycle, poi, sect_war, social, world as world_phases
 
 
 PhaseHandler = Callable[[Any, Any], Any]
@@ -150,6 +150,13 @@ async def annual_maintenance(simulator, ctx):
     await annual.run_annual_maintenance(simulator, ctx)
 
 
+async def generate_event_appraisals(_simulator, ctx):
+    # 紧挨 finalizer 之前：此时本月所有事件都已经产生并进入 ctx.events，
+    # 但还没有落库，所以解读可以直接挂到事件上，由 finalize_step 与事件
+    # 主体在同一个事务里一起写入。
+    await appraisal.phase_generate_event_appraisals(ctx.world, ctx.events)
+
+
 def finalize_step_phase(_simulator, ctx):
     return finalize_step(ctx)
 
@@ -184,7 +191,8 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("handle_interactions_second", 27, "handle_interactions", handle_interactions),
     SimulationPhase("update_calculated_relations", 28, "update_calculated_relations", update_calculated_relations),
     SimulationPhase("annual_maintenance", 29, "annual_maintenance", annual_maintenance),
-    SimulationPhase("finalize_step", 30, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("generate_event_appraisals", 30, "generate_event_appraisals", generate_event_appraisals),
+    SimulationPhase("finalize_step", 31, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

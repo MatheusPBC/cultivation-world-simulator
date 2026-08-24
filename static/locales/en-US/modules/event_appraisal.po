@@ -1,0 +1,44 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: en-US\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# EventAppraisal deterministic rule-fallback summary text.
+msgid "I prevailed over {focus_name} in that fight."
+msgstr "I prevailed over {focus_name} in that fight."
+
+msgid "{focus_name} defeated me in that fight."
+msgstr "{focus_name} defeated me in that fight."
+
+msgid "I took {focus_name}'s life."
+msgstr "I took {focus_name}'s life."
+
+msgid "{focus_name} and I became lovers."
+msgstr "{focus_name} and I became lovers."
+
+msgid "{focus_name} refused my confession."
+msgstr "{focus_name} refused my confession."
+
+msgid "I turned {focus_name} down."
+msgstr "I turned {focus_name} down."
+
+msgid "{focus_name} and I became sworn siblings."
+msgstr "{focus_name} and I became sworn siblings."
+
+msgid "{focus_name} refused to become my sworn sibling."
+msgstr "{focus_name} refused to become my sworn sibling."
+
+msgid "{focus_name} and I are bound as master and disciple."
+msgstr "{focus_name} and I are bound as master and disciple."
+
+msgid "What happened between {focus_name} and me stayed with me."
+msgstr "What happened between {focus_name} and me stayed with me."

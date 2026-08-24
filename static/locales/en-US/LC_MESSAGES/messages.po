@@ -2236,6 +2236,37 @@ msgstr "Water"
 msgid "wood_essence"
 msgstr "Wood"
 
+# EventAppraisal deterministic rule-fallback summary text.
+msgid "I prevailed over {focus_name} in that fight."
+msgstr "I prevailed over {focus_name} in that fight."
+
+msgid "{focus_name} defeated me in that fight."
+msgstr "{focus_name} defeated me in that fight."
+
+msgid "I took {focus_name}'s life."
+msgstr "I took {focus_name}'s life."
+
+msgid "{focus_name} and I became lovers."
+msgstr "{focus_name} and I became lovers."
+
+msgid "{focus_name} refused my confession."
+msgstr "{focus_name} refused my confession."
+
+msgid "I turned {focus_name} down."
+msgstr "I turned {focus_name} down."
+
+msgid "{focus_name} and I became sworn siblings."
+msgstr "{focus_name} and I became sworn siblings."
+
+msgid "{focus_name} refused to become my sworn sibling."
+msgstr "{focus_name} refused to become my sworn sibling."
+
+msgid "{focus_name} and I are bound as master and disciple."
+msgstr "{focus_name} and I are bound as master and disciple."
+
+msgid "What happened between {focus_name} and me stayed with me."
+msgstr "What happened between {focus_name} and me stayed with me."
+
 # Event Content
 msgid ""
 "In the auction for {item_name}, {winner_name} outbid {runner_up_name} with "

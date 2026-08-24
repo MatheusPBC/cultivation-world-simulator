@@ -24,6 +24,7 @@ llm:
     sect_random_event_reason: "fast"
     sect_decider: "normal"
     sect_thinker: "fast"
+    event_appraisal: "fast"
     world_lore_style_guide: "normal"
     world_lore_region_rewrite: "normal"
     world_lore_sect_group_rewrite: "normal"

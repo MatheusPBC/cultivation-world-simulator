@@ -2196,6 +2196,37 @@ msgstr "水"
 msgid "wood_essence"
 msgstr "木"
 
+# 个人解读（EventAppraisal）确定性规则兜底的 summary 文案。
+msgid "I prevailed over {focus_name} in that fight."
+msgstr "我在那场战斗中战胜了{focus_name}。"
+
+msgid "{focus_name} defeated me in that fight."
+msgstr "{focus_name}在那场战斗中打败了我。"
+
+msgid "I took {focus_name}'s life."
+msgstr "我夺走了{focus_name}的性命。"
+
+msgid "{focus_name} and I became lovers."
+msgstr "我和{focus_name}结为道侣。"
+
+msgid "{focus_name} refused my confession."
+msgstr "{focus_name}拒绝了我的表白。"
+
+msgid "I turned {focus_name} down."
+msgstr "我拒绝了{focus_name}。"
+
+msgid "{focus_name} and I became sworn siblings."
+msgstr "我和{focus_name}结为义结金兰。"
+
+msgid "{focus_name} refused to become my sworn sibling."
+msgstr "{focus_name}拒绝了与我结拜。"
+
+msgid "{focus_name} and I are bound as master and disciple."
+msgstr "我和{focus_name}结为师徒。"
+
+msgid "What happened between {focus_name} and me stayed with me."
+msgstr "我和{focus_name}之间发生的事，一直留在我心里。"
+
 # 事件内容
 msgid ""
 "In the auction for {item_name}, {winner_name} outbid {runner_up_name} with "

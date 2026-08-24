@@ -666,6 +666,25 @@ class TestConfess:
             assert events[1].is_story is True
             assert "A romantic confession story." in events[1].content
 
+    @pytest.mark.asyncio
+    async def test_confess_finish_rejection_includes_structured_participant_ids(self, dummy_avatar, target_avatar):
+        """A rejected confession is still a real interpersonal result: the event
+        appraisal generator (src.systems.event_appraisal_service) reads
+        avatar_a_id/avatar_b_id from render_params, never from prose, so a
+        rejection must carry them just like an accepted confession does."""
+        action = Confess(dummy_avatar, dummy_avatar.world)
+        action._confess_success = False
+
+        with patch("src.classes.story_event_service.StoryEventService.should_trigger", return_value=False):
+            events = await action.finish(target_avatar=target_avatar)
+
+        assert len(events) == 1
+        result_event = events[0]
+        assert result_event.event_type == "bond_lovers_rejected"
+        params = result_event.render_params or {}
+        assert params.get("avatar_a_id") == str(dummy_avatar.id)
+        assert params.get("avatar_b_id") == str(target_avatar.id)
+
 
 class TestSwearBrotherhood:
     """Tests for SwearBrotherhood mutual action."""
@@ -780,6 +799,25 @@ class TestSwearBrotherhood:
             assert events[0].is_major is True
             assert events[1].is_story is True
             assert "A legendary brotherhood story." in events[1].content
+
+    @pytest.mark.asyncio
+    async def test_swear_finish_rejection_includes_structured_participant_ids(self, dummy_avatar, target_avatar):
+        """A rejected swear-brotherhood proposal is still a real interpersonal
+        result: the event appraisal generator (src.systems.event_appraisal_service)
+        reads avatar_a_id/avatar_b_id from render_params, never from prose, so a
+        rejection must carry them just like a successful swear does."""
+        action = SwearBrotherhood(dummy_avatar, dummy_avatar.world)
+        action._swear_success = False
+
+        with patch("src.classes.story_event_service.StoryEventService.should_trigger", return_value=False):
+            events = await action.finish(target_avatar=target_avatar)
+
+        assert len(events) == 1
+        result_event = events[0]
+        assert result_event.event_type == "bond_sworn_sibling_rejected"
+        params = result_event.render_params or {}
+        assert params.get("avatar_a_id") == str(dummy_avatar.id)
+        assert params.get("avatar_b_id") == str(target_avatar.id)
 
 
 class TestMutualActionBase:

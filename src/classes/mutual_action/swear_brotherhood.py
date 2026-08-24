@@ -10,6 +10,7 @@ from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.classes.close_relation_event_service import (
     apply_positive_bond_warmth,
     configure_positive_bond_event,
+    set_bond_participant_params,
 )
 from src.classes.relation.relation_delta_service import RelationDeltaService
 from src.classes.relation.relation import Relation
@@ -106,6 +107,9 @@ class SwearBrotherhood(InvitationAction):
             configure_positive_bond_event(result_event, avatar_a=self.avatar, avatar_b=target)
             apply_positive_bond_warmth(subject=self.avatar, other_party=target, event_type=event_type)
             apply_positive_bond_warmth(subject=target, other_party=self.avatar, event_type=event_type)
+        else:
+            # 被拒同样是一次真实的人际结果，需要结构化参与者 ID 才能生成个人解读。
+            set_bond_participant_params(result_event, avatar_a=self.avatar, avatar_b=target)
         
         events.append(result_event)
 

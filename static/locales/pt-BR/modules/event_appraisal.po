@@ -1,0 +1,44 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Texto de resumo do fallback determinístico de EventAppraisal.
+msgid "I prevailed over {focus_name} in that fight."
+msgstr "Eu venci {focus_name} naquela luta."
+
+msgid "{focus_name} defeated me in that fight."
+msgstr "{focus_name} me derrotou naquela luta."
+
+msgid "I took {focus_name}'s life."
+msgstr "Eu tirei a vida de {focus_name}."
+
+msgid "{focus_name} and I became lovers."
+msgstr "{focus_name} e eu nos tornamos amantes."
+
+msgid "{focus_name} refused my confession."
+msgstr "{focus_name} rejeitou minha declaração."
+
+msgid "I turned {focus_name} down."
+msgstr "Eu recusei {focus_name}."
+
+msgid "{focus_name} and I became sworn siblings."
+msgstr "{focus_name} e eu nos tornamos irmãos de juramento."
+
+msgid "{focus_name} refused to become my sworn sibling."
+msgstr "{focus_name} recusou se tornar meu irmão de juramento."
+
+msgid "{focus_name} and I are bound as master and disciple."
+msgstr "{focus_name} e eu estamos ligados como mestre e discípulo."
+
+msgid "What happened between {focus_name} and me stayed with me."
+msgstr "O que aconteceu entre {focus_name} e eu ficou comigo."

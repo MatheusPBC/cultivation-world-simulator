@@ -120,6 +120,26 @@ def apply_positive_bond_warmth(
         add_friendliness(link.observer, other_party, delta, current_month=current_month)
 
 
+def set_bond_participant_params(
+    event: "Event",
+    *,
+    avatar_a: "Avatar",
+    avatar_b: "Avatar",
+) -> None:
+    """写入羁绊类事件的结构化参与者 ID。
+
+    `avatar_a_id` / `avatar_b_id` 是羁绊类事件（成立与被拒都算）唯一的
+    结构化参与者契约，个人解读生成只认这两个键，绝不从正文推断 ID。
+    见 `src/systems/event_appraisal_service.py` 的 `_PARTICIPANT_KEYS`。
+    """
+    params = dict(event.render_params or {})
+    params.setdefault("avatar_a_id", str(avatar_a.id))
+    params.setdefault("avatar_a_name", avatar_a.name)
+    params.setdefault("avatar_b_id", str(avatar_b.id))
+    params.setdefault("avatar_b_name", avatar_b.name)
+    event.render_params = params
+
+
 def configure_positive_bond_event(
     event: "Event",
     *,
@@ -136,10 +156,7 @@ def configure_positive_bond_event(
         subject=avatar_b,
         propagation_kind="close_relation_positive_bond",
     )
+    set_bond_participant_params(event, avatar_a=avatar_a, avatar_b=avatar_b)
     params = dict(event.render_params or {})
-    params.setdefault("avatar_a_id", str(avatar_a.id))
-    params.setdefault("avatar_a_name", avatar_a.name)
-    params.setdefault("avatar_b_id", str(avatar_b.id))
-    params.setdefault("avatar_b_name", avatar_b.name)
     params.setdefault("bond_label_id", _POSITIVE_BOND_LABEL_IDS.get(event.event_type, "bond_label_major_relationship"))
     event.render_params = params

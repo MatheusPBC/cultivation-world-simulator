@@ -2267,6 +2267,37 @@ msgstr "Água"
 msgid "wood_essence"
 msgstr "Madeira"
 
+# Texto de resumo do fallback determinístico de EventAppraisal.
+msgid "I prevailed over {focus_name} in that fight."
+msgstr "Eu venci {focus_name} naquela luta."
+
+msgid "{focus_name} defeated me in that fight."
+msgstr "{focus_name} me derrotou naquela luta."
+
+msgid "I took {focus_name}'s life."
+msgstr "Eu tirei a vida de {focus_name}."
+
+msgid "{focus_name} and I became lovers."
+msgstr "{focus_name} e eu nos tornamos amantes."
+
+msgid "{focus_name} refused my confession."
+msgstr "{focus_name} rejeitou minha declaração."
+
+msgid "I turned {focus_name} down."
+msgstr "Eu recusei {focus_name}."
+
+msgid "{focus_name} and I became sworn siblings."
+msgstr "{focus_name} e eu nos tornamos irmãos de juramento."
+
+msgid "{focus_name} refused to become my sworn sibling."
+msgstr "{focus_name} recusou se tornar meu irmão de juramento."
+
+msgid "{focus_name} and I are bound as master and disciple."
+msgstr "{focus_name} e eu estamos ligados como mestre e discípulo."
+
+msgid "What happened between {focus_name} and me stayed with me."
+msgstr "O que aconteceu entre {focus_name} e eu ficou comigo."
+
 # Event Content
 msgid ""
 "In the auction for {item_name}, {winner_name} outbid {runner_up_name} with "
