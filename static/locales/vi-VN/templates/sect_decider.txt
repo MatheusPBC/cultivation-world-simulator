@@ -16,8 +16,8 @@ Ngữ cảnh quyết sách lượt này:
 
 Ràng buộc quy tắc:
 1. Quyết sách ngoại giao: other_sect_id chỉ được chọn từ diplomacy_targets.
-2. Nếu hiện tại chưa ở trạng thái chiến tranh với một tông môn, mới được đặt tông môn đó vào declare_war_target_ids.
-3. Nếu hiện tại đã ở trạng thái chiến tranh với một tông môn, mới được đặt tông môn đó vào seek_peace_target_ids.
+2. Nếu hiện tại chưa ở trạng thái chiến tranh với một tông môn, mới được dùng declare_war với tông môn đó.
+3. Nếu hiện tại đã ở trạng thái chiến tranh với một tông môn, mới được dùng seek_peace với tông môn đó.
 4. Chiêu mộ tán tu: avatar_id chỉ được chọn từ recruitment_candidates.
 5. Trục xuất, ban công pháp, chu cấp linh thạch: avatar_id chỉ được chọn từ member_candidates.
 6. Mỗi lần chiêu mộ thành công một người cần tiêu hao {recruit_cost} linh thạch; chỉ chọn khi ngươi cho là đáng giá.
@@ -33,14 +33,19 @@ Ràng buộc quy tắc:
 16. Nếu trường kỳ thù địch với tông môn khác, quan hệ ác liệt, biên giới lâu dài tiếp giáp và chịu áp lực, đồng thời chiến lực bản tông không rõ ràng yếu hơn, thì dùng chiến tranh để giải quyết ân oán, áp lực biên giới và tranh đoạt tài nguyên là lựa chọn hợp lý.
 17. Nếu diplomacy_targets cho thấy relation_value của đối phương rất thấp, border_contact_edges rõ ràng, power_ratio không bất lợi, không được một mực quan vọng; tuyên chiến, uy hiếp, tiên phát chế nhân đều có thể phù hợp lợi ích tông môn.
 18. Nếu thân phận tông môn vốn cứng rắn, bành trướng hoặc thiên về cướp đoạt, thì trong cùng điều kiện nên tích cực cân nhắc chiến tranh hơn, không mặc định bảo thủ.
-19. Nếu đã ở trạng thái chiến tranh, trừ khi cục diện rõ ràng bất lợi, không nên dễ dàng lấy seek_peace_target_ids làm đáp án mặc định.
+19. Nếu đã ở trạng thái chiến tranh, trừ khi cục diện rõ ràng bất lợi, không nên dễ dàng lấy seek_peace làm đáp án mặc định.
+21. personal_appraisals trong diplomacy_targets là ký ức cá nhân của chưởng môn đương nhiệm bên ta về chưởng môn đương nhiệm của tông môn kia. Đó chỉ là bằng chứng để tham khảo, không phải mệnh lệnh: chiến lược, đạo thống, chiến lực, lãnh thổ, tài chính và mức chán chiến vẫn mang tính quyết định, và bạn hoàn toàn có thể bỏ qua một ký ức tiêu cực.
+22. Nếu một hành động ngoại giao thực sự chịu ảnh hưởng từ ký ức đó, hãy đưa appraisal_id tương ứng vào appraisal_ids của hành động ấy; nếu không, trả về mảng rỗng.
+23. appraisal_ids chỉ được trích dẫn appraisal_id đã có sẵn trong personal_appraisals của chính mục tiêu đó. Không được bịa ra, không được lặp lại, không được trích dẫn ký ức của mục tiêu khác. Trích dẫn không hợp lệ chỉ làm vô hiệu riêng hành động ngoại giao đó.
 20. Nếu war_weariness cao, điều đó cho thấy nội bộ tông môn càng mỏi mệt với chiến tranh kéo dài; lúc này nên nghiêng về hòa bình, chỉ chiến và tránh chủ động mở rộng chiến sự.
 
 Hãy trả về JSON nghiêm ngặt, không xuất bất kỳ giải thích bổ sung nào. Định dạng:
 {{
   "thinking": "Dùng một câu khái quát mạch quyết sách lượt này của bản tông",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["appraisal_id trong personal_appraisals của mục tiêu đó"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["tan_tu_avatar_id_1", "tan_tu_avatar_id_2"],
   "expel_avatar_ids": ["de_tu_avatar_id_1"],
   "reward_avatar_ids": ["de_tu_avatar_id_2"],

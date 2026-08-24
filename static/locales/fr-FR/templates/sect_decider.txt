@@ -16,8 +16,8 @@ Contexte décisionnel :
 
 Contraintes :
 1. Actions diplomatiques : vous ne pouvez choisir les valeurs `other_sect_id` que parmi `diplomacy_targets`.
-2. Vous ne pouvez placer une Secte dans `declare_war_target_ids` que si elle n'est pas actuellement en guerre avec vous.
-3. Vous ne pouvez placer une Secte dans `seek_peace_target_ids` que si elle est actuellement en guerre avec vous.
+2. Vous ne pouvez utiliser `declare_war` contre une Secte que si elle n'est pas actuellement en guerre avec vous.
+3. Vous ne pouvez utiliser `seek_peace` envers une Secte que si elle est actuellement en guerre avec vous.
 4. Recrutement : vous ne pouvez choisir les valeurs avatar_id que parmi `recruitment_candidates`.
 5. Expulsion, récompenses de techniques et soutien en pierres spirituelles : vous ne pouvez choisir les valeurs avatar_id que parmi `member_candidates`.
 6. Chaque recrutement réussi coûte {recruit_cost} pierres spirituelles, ne choisissez donc que des recrues valant ce coût.
@@ -33,14 +33,19 @@ Contraintes :
 16. Si une autre Secte a été hostile longtemps, les relations sont mauvaises, le chevauchement de territoire est évident, et votre Secte n'est pas à un désavantage de pouvoir clair, résoudre la haine, la pression frontalière et les conflits de ressources par la guerre est une option raisonnable et viable.
 17. Si une cible de diplomatie montre une très faible `relation_value`, des `territory_overlap_tiles` notables et une `power_ratio` non inférieure, ne vous contentiez pas d'une observation passive ; déclarer la guerre, exercer une pression coercitive et frapper en premier peuvent tous être des moyens valides de protéger les intérêts de la Secte.
 18. Si l'identité propre de la Secte est brutale, expansionniste ou prédatrice, elle devrait être plus disposée à envisager la guerre dans les mêmes conditions plutôt que de se contenter de la prudence par défaut.
-19. Si la Secte est déjà en guerre, ne traitez pas `seek_peace_target_ids` comme la réponse par défaut à moins que la situation soit clairement défavorable.
+19. Si la Secte est déjà en guerre, ne traitez pas `seek_peace` comme la réponse par défaut à moins que la situation soit clairement défavorable.
+21. `personal_appraisals` dans `diplomacy_targets` est la mémoire personnelle que le patriarche actuel de votre Secte garde du patriarche actuel de l'autre Secte. C'est une preuve à considérer, jamais un ordre : la stratégie, la doctrine, la puissance militaire, le territoire, les finances et la lassitude de guerre restent décisifs, et vous pouvez ignorer entièrement un souvenir négatif.
+22. Si une action diplomatique a réellement été influencée par un tel souvenir, placez les `appraisal_id` correspondants dans les `appraisal_ids` de cette action. Sinon, retournez un tableau vide.
+23. `appraisal_ids` ne peut citer que des `appraisal_id` déjà fournis dans les `personal_appraisals` de cette même cible. N'en inventez jamais, n'en répétez jamais et ne citez jamais la mémoire d'une autre cible. Une citation invalide n'annule que cette action diplomatique.
 20. Si `war_weariness` est élevé, cela signifie que la Secte s'est fatiguée d'une guerre prolongée, elle devrait donc être plus disposée à préserver la paix, à cesser de combattre et à éviter d'élargir les guerres de sa propre initiative.
 
 Retournez du JSON strict uniquement, sans texte supplémentaire, dans exactement ce format :
 {{
   "thinking": "Une courte phrase résumant la logique de décision de la Secte pour ce cycle",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["un appraisal_id des personal_appraisals de cette cible"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["rogue_avatar_id_1", "rogue_avatar_id_2"],
   "expel_avatar_ids": ["member_avatar_id_1"],
   "reward_avatar_ids": ["member_avatar_id_2"],

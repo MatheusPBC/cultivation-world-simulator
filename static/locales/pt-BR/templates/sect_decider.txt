@@ -16,8 +16,8 @@ Contexto da decisão:
 
 Restrições:
 1. Ações diplomáticas: escolha apenas valores de `other_sect_id` presentes em `diplomacy_targets`.
-2. Inclua uma seita em `declare_war_target_ids` somente se ela ainda não estiver em guerra com sua seita.
-3. Inclua uma seita em `seek_peace_target_ids` somente se ela já estiver em guerra com sua seita.
+2. Use `declare_war` contra uma seita somente se ela ainda não estiver em guerra com sua seita.
+3. Use `seek_peace` com uma seita somente se ela já estiver em guerra com sua seita.
 4. Recrutamento: escolha apenas valores de avatar_id presentes em `recruitment_candidates`.
 5. Expulsão, concessão de técnicas e auxílio em pedras espirituais: escolha apenas valores de avatar_id presentes em `member_candidates`.
 6. Cada recrutamento bem-sucedido custa {recruit_cost} pedras espirituais; recrute somente candidatos que justifiquem esse custo.
@@ -33,14 +33,19 @@ Restrições:
 16. Se outra seita mantém hostilidade há muito tempo, as relações são ruins, a sobreposição territorial é evidente e sua seita não está em clara desvantagem de poder, resolver o ódio, a pressão de fronteira e as disputas por recursos pela guerra é uma opção razoável e viável.
 17. Se um alvo diplomático tiver `relation_value` muito baixo, `territory_overlap_tiles` relevante e `power_ratio` que não indique inferioridade, não escolha observação passiva por padrão; declarar guerra, exercer pressão coercitiva ou atacar primeiro podem ser meios válidos de proteger os interesses da seita.
 18. Se a identidade da seita for severa, expansionista ou predatória, ela deve considerar a guerra com maior disposição nas mesmas condições, em vez de sempre optar pela cautela.
-19. Se a seita já estiver em guerra, não trate `seek_peace_target_ids` como resposta padrão, a menos que a situação seja claramente desfavorável.
+19. Se a seita já estiver em guerra, não trate `seek_peace` como resposta padrão, a menos que a situação seja claramente desfavorável.
 20. Se `war_weariness` estiver alto, a seita está mais cansada de uma guerra prolongada e, portanto, deve estar mais disposta a preservar a paz, interromper os combates e evitar iniciar novas guerras.
+21. O campo `personal_appraisals` dentro de `diplomacy_targets` é a memória pessoal que o patriarca atual da sua seita guarda sobre o patriarca atual da outra seita. É apenas evidência que você pode considerar, nunca uma ordem: estratégia, doutrina, poder militar, território, finanças e cansaço de guerra continuam decisivos, e você pode ignorar completamente uma memória negativa.
+22. Se uma ação diplomática realmente foi influenciada por essa memória, coloque os `appraisal_id` correspondentes em `appraisal_ids` daquela ação. Caso contrário, retorne um array vazio.
+23. `appraisal_ids` só pode citar valores de `appraisal_id` já fornecidos em `personal_appraisals` daquele mesmo alvo. Nunca invente um, nunca repita um e nunca cite a memória de outro alvo. Uma citação inválida descarta apenas aquela ação diplomática.
 
 Retorne somente JSON estrito, sem texto adicional, exatamente neste formato:
 {{
   "thinking": "Uma frase curta resumindo a lógica das decisões da seita nesta rodada",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["um appraisal_id de personal_appraisals daquele alvo"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["rogue_avatar_id_1", "rogue_avatar_id_2"],
   "expel_avatar_ids": ["member_avatar_id_1"],
   "reward_avatar_ids": ["member_avatar_id_2"],
@@ -48,8 +53,8 @@ Retorne somente JSON estrito, sem texto adicional, exatamente neste formato:
 }}
 
 Requisitos adicionais:
-1. Se não houver decisão em uma categoria, retorne um array vazio nesse campo.
-2. Não repita o mesmo avatar_id nem other_sect_id.
+1. Se não houver decisão em uma categoria, retorne um array vazio nesse campo. Se não houver nenhuma ação diplomática nesta rodada, retorne `diplomacy_actions` como array vazio.
+2. Não repita o mesmo avatar_id nem other_sect_id. No máximo uma ação diplomática por `other_sect_id` a cada rodada.
 3. Mantenha `thinking` conciso, com cerca de 20 a 60 palavras.
 4. `thinking` deve refletir diretamente tanto a identidade da seita quanto sua postura financeira. Se a rodada incluir diplomacia severa ou a possibilidade de guerra, isso também deve surgir naturalmente. Exemplo: "Nossa seita deve preservar a herança ortodoxa, controlar os gastos e responder à pressão hostil com força decisiva."
 5. O campo `thinking` deve ser escrito inteiramente em português brasileiro natural. Não escreva em chinês, japonês nem misture idiomas, mesmo que nomes ou dados de origem contenham chinês.

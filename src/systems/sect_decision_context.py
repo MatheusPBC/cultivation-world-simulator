@@ -6,12 +6,80 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from src.sim.managers.sect_manager import SectManager
 from src.i18n import t
 from src.systems.sect_relations import compute_sect_relations
+from src.systems.time import get_date_str
 from src.utils.config import CONFIG
 
 if TYPE_CHECKING:
     from src.classes.core.sect import Sect
     from src.classes.core.world import World
     from src.classes.event_storage import EventStorage
+
+
+# 个人解读进入外交上下文的门槛与条数上限。
+# 见 docs/specs/personal-appraisal-politics.md（“Sect decision context”）。
+MIN_APPRAISAL_EFFECTIVE_WEIGHT = 0.15
+MAX_APPRAISALS_PER_TARGET = 5
+
+
+def find_living_patriarch(sect: "Sect") -> Optional[Any]:
+    """返回该宗门当前在世的掌门；没有则返回 None。
+
+    掌门是“个人记忆influence”的唯一入口：宗门本身没有记忆，只有当前
+    在任且在世的掌门才会把私人恩怨带进外交决策上下文。
+    """
+    if sect is None:
+        return None
+    for avatar in (getattr(sect, "members", {}) or {}).values():
+        if getattr(avatar, "is_dead", False):
+            continue
+        if str(getattr(getattr(avatar, "sect_rank", None), "value", "")) == "patriarch":
+            return avatar
+    return None
+
+
+def build_patriarch_appraisal_evidence(
+    *,
+    event_storage: "EventStorage",
+    local_patriarch: Optional[Any],
+    other_patriarch: Optional[Any],
+    current_month: int,
+    min_effective_weight: float,
+    limit: int,
+) -> List[Dict[str, Any]]:
+    """本方现任掌门对对方现任掌门的个人解读证据（只读上下文，不是数值修正）。
+
+    任一方缺少在世掌门时，个人影响为空——宗门层面不继承前任掌门的私怨。
+    """
+    if local_patriarch is None or other_patriarch is None:
+        return []
+
+    try:
+        scored_items = event_storage.get_scored_event_appraisals(
+            str(getattr(local_patriarch, "id", "")),
+            int(current_month),
+            focus_avatar_id=str(getattr(other_patriarch, "id", "")),
+            min_effective_weight=min_effective_weight,
+            limit=limit,
+        )
+    except Exception:
+        return []
+
+    evidence: List[Dict[str, Any]] = []
+    for scored in scored_items:
+        appraisal = scored.appraisal
+        evidence.append(
+            {
+                "appraisal_id": appraisal.id,
+                "source_event_id": appraisal.event_id,
+                "source_event_month_stamp": int(scored.source_event_month_stamp),
+                "source_event_date": get_date_str(int(scored.source_event_month_stamp)),
+                "primary_emotion": appraisal.primary_emotion.value,
+                "summary": appraisal.summary,
+                "valence": float(appraisal.valence),
+                "effective_weight": float(scored.effective_weight),
+            }
+        )
+    return evidence
 
 
 @dataclass
@@ -168,14 +236,7 @@ def build_sect_decision_context(
         key=lambda avatar: int(getattr(getattr(avatar, "cultivation_progress", None), "level", 0) or 0),
         default=None,
     )
-    patriarch = next(
-        (
-            avatar
-            for avatar in living_members
-            if getattr(getattr(avatar, "sect_rank", None), "value", "") == "patriarch"
-        ),
-        None,
-    )
+    patriarch = find_living_patriarch(sect)
     self_assessment = {
         "member_count": len(getattr(sect, "members", {})),
         "alive_member_count": len(living_members),
@@ -344,9 +405,22 @@ def build_sect_decision_context(
             }
         )
         diplomacy_state = world.get_sect_diplomacy_state(sect.id, other_id, current_month=current_month)
+        other_patriarch = find_living_patriarch(other_sect_by_id.get(other_id))
         diplomacy_target = {
             "other_sect_id": other_id,
             "other_sect_name": other_name,
+            # 个人记忆影响：只有双方都有在世掌门时才存在，且始终是“证据”，
+            # 不参与 relation_value 的任何数值计算。
+            "local_patriarch_id": str(getattr(patriarch, "id", "")) if patriarch is not None else None,
+            "other_patriarch_id": str(getattr(other_patriarch, "id", "")) if other_patriarch is not None else None,
+            "personal_appraisals": build_patriarch_appraisal_evidence(
+                event_storage=event_storage,
+                local_patriarch=patriarch,
+                other_patriarch=other_patriarch,
+                current_month=current_month,
+                min_effective_weight=MIN_APPRAISAL_EFFECTIVE_WEIGHT,
+                limit=MAX_APPRAISALS_PER_TARGET,
+            ),
             "status": str(diplomacy_state.get("status", "peace") or "peace"),
             "war_months": int(diplomacy_state.get("war_months", 0) or 0),
             "peace_months": int(diplomacy_state.get("peace_months", 0) or 0),

@@ -16,8 +16,8 @@
 
 制約:
 1. 外交行動では、`other_sect_id` として選べるのは `diplomacy_targets` に含まれる値のみです。
-2. `declare_war_target_ids` に入れられるのは、現在あなたの宗門と交戦していない宗門だけです。
-3. `seek_peace_target_ids` に入れられるのは、現在あなたの宗門と交戦中の宗門だけです。
+2. `declare_war` を使えるのは、現在あなたの宗門と交戦していない宗門に対してだけです。
+3. `seek_peace` を使えるのは、現在あなたの宗門と交戦中の宗門に対してだけです。
 4. 勧誘では、`recruitment_candidates` にある avatar_id のみ選べます。
 5. 追放、功法褒賞、霊石支援では、`member_candidates` にある avatar_id のみ選べます。
 6. 勧誘に成功するたびに {recruit_cost} 霊石を消費します。費用に見合う対象だけを選んでください。
@@ -33,14 +33,19 @@
 16. 他宗門が長期にわたり敵対し、関係値が低く、領土重複が明白で、かつ自宗が明確な戦力劣位にないなら、怨恨・国境圧力・資源争いを戦争で解決することは合理的かつ現実的な選択です。
 17. 外交対象の `relation_value` が極端に低く、`territory_overlap_tiles` が目立ち、`power_ratio` でも不利でないなら、受動的観望を既定にしてはいけません。宣戦、威圧、先制行動はいずれも宗門利益を守る有効な手段になり得ます。
 18. 宗門のアイデンティティが苛烈・拡張志向・略奪的である場合、同条件下では慎重一辺倒ではなく、より戦争を検討しやすくあるべきです。
-19. すでに戦争中である場合、情勢が明らかに不利でない限り、`seek_peace_target_ids` を既定解として扱ってはいけません。
+19. すでに戦争中である場合、情勢が明らかに不利でない限り、`seek_peace` を既定解として扱ってはいけません。
+21. `diplomacy_targets` 内の `personal_appraisals` は、自宗の現掌門が相手宗門の現掌門に対して抱く私的な記憶です。これは参考にできる証拠であって命令ではありません。戦略、道統、戦力、領土、財政、厭戦度が依然として決定的であり、負の記憶を完全に無視しても構いません。
+22. ある外交行動が実際にその記憶に影響された場合は、対応する `appraisal_id` をその行動の `appraisal_ids` に入れてください。そうでなければ空配列を返します。
+23. `appraisal_ids` には、その対象の `personal_appraisals` に既に提示された `appraisal_id` のみを引用できます。捏造・重複・他の対象の記憶の引用は禁止です。不正な引用はその外交行動のみを無効にします。
 20. `war_weariness` が高い場合、それは宗門が長期戦に疲弊していることを意味します。平和維持、停戦、自発的な戦線拡大の回避をより重視してください。
 
 返答は厳格な JSON のみとし、余計な文を付けず、次の形式に正確に従ってください:
 {{
   "thinking": "今期の宗門判断ロジックを一文で要約",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["その対象の personal_appraisals にある appraisal_id"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["rogue_avatar_id_1", "rogue_avatar_id_2"],
   "expel_avatar_ids": ["member_avatar_id_1"],
   "reward_avatar_ids": ["member_avatar_id_2"],

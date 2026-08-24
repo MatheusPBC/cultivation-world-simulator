@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.event import Event
 from src.classes.sect_decider import SectDecider
 from src.classes.sect_thinker import SectThinker
@@ -104,14 +105,23 @@ async def phase_sect_periodic_decision(simulator) -> list[Event]:
             result = await SectDecider.decide(sect, ctx, world)
             sect.last_decision_summary = result.summary_text
             events.extend(result.events)
-            events.append(
-                Event(
-                    world.month_stamp,
-                    result.summary_text,
-                    related_sects=[int(sect.id)],
-                    is_major=False,
-                )
+            summary_event = Event(
+                world.month_stamp,
+                result.summary_text,
+                related_sects=[int(sect.id)],
+                is_major=False,
             )
+            if result.decision_event is not None:
+                # 摘要事件是本轮决策的产物，指回同一轮的审计事件，
+                # 让 Why 视图能从摘要追溯到具体决策与被引用的记忆。
+                summary_event.causal_links.append(
+                    CausalLink(
+                        event_id=summary_event.id,
+                        cause_event_id=result.decision_event.id,
+                        relation=CausalRelation.TRIGGERED_BY,
+                    )
+                )
+            events.append(summary_event)
         except Exception as exc:
             get_logger().logger.error(
                 "Sect periodic decision failed for %s(%s): %s",

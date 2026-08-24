@@ -365,8 +365,9 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
     )
     payload = {
         "thinking": "先压边界。",
-        "declare_war_target_ids": [2],
-        "seek_peace_target_ids": [],
+        "diplomacy_actions": [
+            {"action": "declare_war", "other_sect_id": 2, "appraisal_ids": []},
+        ],
         "recruit_avatar_ids": [],
         "expel_avatar_ids": [],
         "reward_avatar_ids": [],

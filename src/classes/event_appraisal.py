@@ -30,6 +30,21 @@ class AppraisalSource(Enum):
 
 
 @dataclass(frozen=True)
+class ScoredEventAppraisal:
+    """An appraisal together with the read-time facts needed to display it.
+
+    `effective_weight` and the source event's date are *derived* at query
+    time from the source `Event`'s `month_stamp`; neither is stored on the
+    appraisal row, so this view exists to avoid every caller re-deriving
+    (and re-deciding) them. `EventStorage` stays the sole owner.
+    """
+
+    appraisal: "EventAppraisal"
+    source_event_month_stamp: int
+    effective_weight: float
+
+
+@dataclass(frozen=True)
 class EventAppraisal:
     event_id: str
     appraiser_avatar_id: str

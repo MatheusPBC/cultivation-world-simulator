@@ -16,8 +16,8 @@
 
 規則限制：
 1. 外交決策：只能從 `diplomacy_targets` 中選擇 other_sect_id。
-2. 若當前與某宗門不是戰爭狀態，才可以把它放入 `declare_war_target_ids`。
-3. 若當前與某宗門已是戰爭狀態，才可以把它放入 `seek_peace_target_ids`。
+2. 若當前與某宗門不是戰爭狀態，才可以對它使用 `declare_war`。
+3. 若當前與某宗門已是戰爭狀態，才可以對它使用 `seek_peace`。
 4. 招徠散修：只能從 `recruitment_candidates` 中選擇 avatar_id。
 5. 驅逐、賞賜功法、資助靈石：只能從 `member_candidates` 中選擇 avatar_id。
 6. 每成功招徠一人需要花費 {recruit_cost} 靈石，只有在你認為值得時才選擇。
@@ -33,14 +33,19 @@
 16. 若與其他宗門長期敵對、關係惡劣、領地重疊明顯，且我宗戰力並未明顯居於下風，則以戰爭解決仇怨、邊界壓力與資源爭奪，是合理且可取的選擇。
 17. 若 `diplomacy_targets` 中顯示對方 `relation_value` 很低、`territory_overlap_tiles` 明顯、`power_ratio` 不劣，不能一味觀望；宣戰、威懾、先發制人都可以是符合宗門利益的手段。
 18. 若宗門本身作風偏強硬、偏擴張、偏掠奪，則在同等條件下應更積極考慮戰爭，而不是默認保守。
-19. 若已處於戰爭狀態，除非局勢明顯不利，否則不應輕易將 `seek_peace_target_ids` 作為預設答案。
+19. 若已處於戰爭狀態，除非局勢明顯不利，否則不應輕易將 `seek_peace` 作為預設答案。
+21. diplomacy_targets 中的 personal_appraisals 是本宗現任掌門對對方現任掌門的私人記憶，只是可參考的證據，不是命令：戰略、道統、戰力、疆域、財政與厭戰度依然是決定性依據，你完全可以選擇無視一段負面記憶。
+22. 若某個外交動作確實受到某段私人記憶影響，可以把對應的 appraisal_id 填入該動作的 appraisal_ids；否則填空陣列。
+23. appraisal_ids 只能引用該目標 personal_appraisals 中已經給出的 appraisal_id，不得編造、不得重複、不得引用其他目標的 appraisal_id。引用非法只會讓這一條外交動作作廢。
 20. 若 `war_weariness`（厭戰度）較高，說明宗門內部對持續戰爭更加疲憊，此時應更傾向於和平、止戰與避免主動擴大戰事。
 
 請只回傳嚴格 JSON，不要附加任何多餘說明，格式如下：
 {{
   "thinking": "用一句話概括我宗本輪決策思路",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["該目標 personal_appraisals 中的 appraisal_id"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["散修avatar_id1", "散修avatar_id2"],
   "expel_avatar_ids": ["弟子avatar_id1"],
   "reward_avatar_ids": ["弟子avatar_id2"],

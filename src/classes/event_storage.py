@@ -27,7 +27,7 @@ class EventStorageError(RuntimeError):
 
 if TYPE_CHECKING:
     from src.classes.event import Event
-    from src.classes.event_appraisal import EventAppraisal
+    from src.classes.event_appraisal import EventAppraisal, ScoredEventAppraisal
     from src.classes.event_observation import EventObservation
 
 def _format_time(ts: float) -> str:
@@ -909,14 +909,37 @@ class EventStorage:
         min_effective_weight: float = 0.0,
         limit: int = 100,
     ) -> list["EventAppraisal"]:
+        """查询某个 appraiser 对（可选）某个 focus 的个人解读，按当前有效权重降序排列。"""
+        return [
+            scored.appraisal
+            for scored in self.get_scored_event_appraisals(
+                appraiser_avatar_id,
+                current_month_stamp,
+                focus_avatar_id=focus_avatar_id,
+                min_effective_weight=min_effective_weight,
+                limit=limit,
+            )
+        ]
+
+    def get_scored_event_appraisals(
+        self,
+        appraiser_avatar_id: str,
+        current_month_stamp: int,
+        focus_avatar_id: Optional[str] = None,
+        min_effective_weight: float = 0.0,
+        limit: int = 100,
+    ) -> list["ScoredEventAppraisal"]:
         """
-        查询某个 appraiser 对（可选）某个 focus 的个人解读，按当前有效权重降序排列。
+        与 `get_event_appraisals` 相同的查询，但额外带回读取时派生的
+        来源事件 month_stamp 与当前有效权重。
 
         有效权重依赖来源事件的 month_stamp 与 current_month_stamp 计算的
         年龄（月），不持久化在 event_appraisals 表中；`current_month_stamp`
         为必填参数，调用方必须显式给出评估所用的当前时间，避免默认值
         悄悄产生错误的年龄（进而错误地绕过 min_effective_weight 过滤）。
         """
+        from src.classes.event_appraisal import ScoredEventAppraisal
+
         if self._conn is None:
             return []
 
@@ -944,13 +967,21 @@ class EventStorage:
         scored: list[tuple[float, int, int, "EventAppraisal"]] = []
         for row in rows:
             appraisal = self._row_to_event_appraisal(row)
-            age_months = int(current_month_stamp) - int(row["event_month_stamp"])
+            event_month_stamp = int(row["event_month_stamp"])
+            age_months = int(current_month_stamp) - event_month_stamp
             weight = appraisal.effective_weight(age_months)
             if weight >= min_effective_weight:
-                scored.append((weight, int(row["event_month_stamp"]), int(row["appraisal_rowid"]), appraisal))
+                scored.append((weight, event_month_stamp, int(row["appraisal_rowid"]), appraisal))
 
         scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
-        return [appraisal for _, _, _, appraisal in scored[:limit]]
+        return [
+            ScoredEventAppraisal(
+                appraisal=appraisal,
+                source_event_month_stamp=event_month_stamp,
+                effective_weight=weight,
+            )
+            for weight, event_month_stamp, _, appraisal in scored[:limit]
+        ]
 
     def _row_to_event_appraisal(self, row) -> "EventAppraisal":
         from src.classes.event_appraisal import AppraisalSource, EventAppraisal

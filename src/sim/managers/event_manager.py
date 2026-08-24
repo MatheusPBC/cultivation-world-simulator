@@ -12,7 +12,7 @@ from src.classes.event_query import EventAudience, EventMemoryScope, EventPage, 
 if TYPE_CHECKING:
     from src.classes.causal_link import CausalLink
     from src.classes.event import Event
-    from src.classes.event_appraisal import EventAppraisal
+    from src.classes.event_appraisal import EventAppraisal, ScoredEventAppraisal
     from src.classes.event_storage import EventStorage
 
 
@@ -298,6 +298,25 @@ class EventManager:
         """返回某个 appraiser 对（可选）某个 focus 的个人解读；内存模式下返回空列表。"""
         if self._storage:
             return self._storage.get_event_appraisals(
+                appraiser_avatar_id,
+                current_month_stamp,
+                focus_avatar_id=focus_avatar_id,
+                min_effective_weight=min_effective_weight,
+                limit=limit,
+            )
+        return []
+
+    def get_scored_event_appraisals(
+        self,
+        appraiser_avatar_id: str,
+        current_month_stamp: int,
+        focus_avatar_id: Optional[str] = None,
+        min_effective_weight: float = 0.0,
+        limit: int = 100,
+    ) -> List["ScoredEventAppraisal"]:
+        """同 get_event_appraisals，但带回来源事件 month_stamp 与当前有效权重；内存模式下返回空列表。"""
+        if self._storage:
+            return self._storage.get_scored_event_appraisals(
                 appraiser_avatar_id,
                 current_month_stamp,
                 focus_avatar_id=focus_avatar_id,

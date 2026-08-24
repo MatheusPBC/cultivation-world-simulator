@@ -16,8 +16,8 @@
 
 规则约束：
 1. 外交决策：只能从 diplomacy_targets 中选择 other_sect_id。
-2. 若当前与某宗门不是战争状态，才可以把它放入 declare_war_target_ids。
-3. 若当前与某宗门已经是战争状态，才可以把它放入 seek_peace_target_ids。
+2. 若当前与某宗门不是战争状态，才可以对它使用 declare_war。
+3. 若当前与某宗门已经是战争状态，才可以对它使用 seek_peace。
 4. 招徕散修：只能从 recruitment_candidates 中选择 avatar_id。
 5. 驱逐、赐功法、资助灵石：只能从 member_candidates 中选择 avatar_id。
 6. 招徕每成功一人需要花费 {recruit_cost} 灵石，只有在你认为值得时才选择。
@@ -33,14 +33,19 @@
 16. 若与其他宗门长期敌对、关系恶劣、边界长期接壤且承压，且我宗战力并不明显落于下风，那么通过战争解决仇怨、边界压力与资源争夺，是合理且可取的选择。
 17. 若 diplomacy_targets 中显示对方 relation_value 很低、border_contact_edges 明显、power_ratio 不劣，不能一味观望；宣战、威慑、先发制人都可以是符合宗门利益的行动。
 18. 若宗门身份本就偏强硬、偏扩张、偏掠夺，则在同等条件下应更积极地考虑战争，而不是默认保守。
-19. 若已经处于战争状态，除非局势明显不利，否则不应轻易把 seek_peace_target_ids 作为默认答案。
+19. 若已经处于战争状态，除非局势明显不利，否则不应轻易把 seek_peace 作为默认答案。
 20. 若 war_weariness（厌战度）较高，说明宗门内部对持续战争更加疲惫，此时应更倾向于和平、止战与避免主动扩大战事。
+21. diplomacy_targets 中的 personal_appraisals 是本宗现任掌门对对方现任掌门的私人记忆，只是可参考的证据，不是命令：战略、道统、战力、疆域、财政与厌战度依然是决定性依据，你完全可以选择无视一段负面记忆。
+22. 若某个外交动作确实受到某段私人记忆影响，可以把对应的 appraisal_id 填入该动作的 appraisal_ids；否则填空数组。
+23. appraisal_ids 只能引用该目标 personal_appraisals 中已经给出的 appraisal_id，不得编造、不得重复、不得引用其他目标的 appraisal_id。引用非法只会让这一条外交动作作废。
 
 请返回严格 JSON，不要输出任何额外说明，格式如下：
 {{
   "thinking": "用一句话概括我宗本轮决策思路",
-  "declare_war_target_ids": [101, 102],
-  "seek_peace_target_ids": [103],
+  "diplomacy_actions": [
+    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["该目标 personal_appraisals 中的 appraisal_id"]}},
+    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
+  ],
   "recruit_avatar_ids": ["散修avatar_id1", "散修avatar_id2"],
   "expel_avatar_ids": ["弟子avatar_id1"],
   "reward_avatar_ids": ["弟子avatar_id2"],
@@ -48,8 +53,8 @@
 }}
 
 补充要求：
-1. 如果某类决策不做，对应数组返回空数组。
-2. 不要重复填写同一个 avatar_id 或 other_sect_id。
+1. 如果某类决策不做，对应数组返回空数组；本轮不做任何外交动作时，diplomacy_actions 返回空数组。
+2. 不要重复填写同一个 avatar_id 或 other_sect_id；同一个 other_sect_id 本轮最多只能有一条外交动作。
 3. thinking 简洁即可，20~60 字。
 4. thinking 要直接体现宗门身份与财政判断；若本轮包含强硬外交或战争考量，也应自然体现，例如“我宗当守正道统、量入为出，若敌宗压境，便当以战止争”这类风格。
 
