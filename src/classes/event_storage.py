@@ -27,6 +27,7 @@ class EventStorageError(RuntimeError):
 
 if TYPE_CHECKING:
     from src.classes.event import Event
+    from src.classes.event_appraisal import EventAppraisal
     from src.classes.event_observation import EventObservation
 
 def _format_time(ts: float) -> str:
@@ -168,6 +169,27 @@ class EventStorage:
                         ON event_causal_links(event_id);
                     CREATE INDEX IF NOT EXISTS idx_event_causal_links_cause_event_id
                         ON event_causal_links(cause_event_id);
+
+                    CREATE TABLE IF NOT EXISTS event_appraisals (
+                        id TEXT PRIMARY KEY,
+                        event_id TEXT NOT NULL,
+                        appraiser_avatar_id TEXT NOT NULL,
+                        focus_avatar_id TEXT NOT NULL,
+                        personal_importance REAL NOT NULL,
+                        valence REAL NOT NULL,
+                        persistence REAL NOT NULL,
+                        primary_emotion TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(event_id, appraiser_avatar_id, focus_avatar_id),
+                        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_event_appraisals_appraiser_avatar_id
+                        ON event_appraisals(appraiser_avatar_id);
+                    CREATE INDEX IF NOT EXISTS idx_event_appraisals_focus_avatar_id
+                        ON event_appraisals(focus_avatar_id);
                 """)
                 columns = {
                     row["name"]
@@ -307,6 +329,10 @@ class EventStorage:
                             _format_time(link.created_at),
                         )
                     )
+
+                # 插入运行时挂载的 appraisal，与事件主表同一事务，失败时整体回滚。
+                for appraisal in getattr(event, "appraisals", None) or []:
+                    self._insert_event_appraisal_row(appraisal)
             return True
         except Exception as e:
             self._logger.error(f"Failed to write event {event.id}: {e}")
@@ -822,6 +848,127 @@ class EventStorage:
         except Exception as e:
             self._logger.error(f"Failed to update causal payload for event {event_id}: {e}")
             return False
+
+    def _insert_event_appraisal_row(self, appraisal: "EventAppraisal") -> None:
+        """执行单条 event_appraisals INSERT；不管理事务，供 add_event 与
+        add_event_appraisal 在各自的事务边界内复用。"""
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO event_appraisals (
+                id, event_id, appraiser_avatar_id, focus_avatar_id,
+                personal_importance, valence, persistence,
+                primary_emotion, summary, source, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                appraisal.id,
+                appraisal.event_id,
+                str(appraisal.appraiser_avatar_id),
+                str(appraisal.focus_avatar_id),
+                appraisal.personal_importance,
+                appraisal.valence,
+                appraisal.persistence,
+                appraisal.primary_emotion.value,
+                appraisal.summary,
+                appraisal.source.value,
+                _format_time(appraisal.created_at),
+            ),
+        )
+
+    def add_event_appraisal(self, appraisal: "EventAppraisal") -> bool:
+        """
+        写入单条 EventAppraisal。
+
+        appraisal 是不可变的历史个人解读；重复的
+        (event_id, appraiser_avatar_id, focus_avatar_id) 组合会被静默忽略，
+        而不是覆盖已有记录。失败时记录日志并返回 False，不抛异常。
+        """
+        if self._conn is None:
+            self._logger.error("EventStorage not initialized")
+            return False
+        try:
+            with self._transaction():
+                self._insert_event_appraisal_row(appraisal)
+            return True
+        except sqlite3.IntegrityError as e:
+            self._logger.error(
+                f"Event appraisal {appraisal.id} references a missing or invalid "
+                f"event {appraisal.event_id!r}: {e}"
+            )
+            return False
+        except Exception as e:
+            self._logger.error(f"Failed to write event appraisal {appraisal.id}: {e}")
+            return False
+
+    def get_event_appraisals(
+        self,
+        appraiser_avatar_id: str,
+        current_month_stamp: int,
+        focus_avatar_id: Optional[str] = None,
+        min_effective_weight: float = 0.0,
+        limit: int = 100,
+    ) -> list["EventAppraisal"]:
+        """
+        查询某个 appraiser 对（可选）某个 focus 的个人解读，按当前有效权重降序排列。
+
+        有效权重依赖来源事件的 month_stamp 与 current_month_stamp 计算的
+        年龄（月），不持久化在 event_appraisals 表中；`current_month_stamp`
+        为必填参数，调用方必须显式给出评估所用的当前时间，避免默认值
+        悄悄产生错误的年龄（进而错误地绕过 min_effective_weight 过滤）。
+        """
+        if self._conn is None:
+            return []
+
+        sql = """
+            SELECT ea.id, ea.event_id, ea.appraiser_avatar_id, ea.focus_avatar_id,
+                ea.personal_importance, ea.valence, ea.persistence,
+                ea.primary_emotion, ea.summary, ea.source, ea.created_at,
+                ea.rowid AS appraisal_rowid, e.month_stamp AS event_month_stamp
+            FROM event_appraisals ea
+            JOIN events e ON e.id = ea.event_id
+            WHERE ea.appraiser_avatar_id = ?
+        """
+        params: list = [str(appraiser_avatar_id)]
+        if focus_avatar_id is not None:
+            sql += " AND ea.focus_avatar_id = ?"
+            params.append(str(focus_avatar_id))
+
+        try:
+            with self._db_lock:
+                rows = self._conn.execute(sql, params).fetchall()
+        except Exception as e:
+            self._logger.exception(f"Failed to query event appraisals: {e}")
+            raise EventStorageError("Failed to query event appraisals") from e
+
+        scored: list[tuple[float, int, int, "EventAppraisal"]] = []
+        for row in rows:
+            appraisal = self._row_to_event_appraisal(row)
+            age_months = int(current_month_stamp) - int(row["event_month_stamp"])
+            weight = appraisal.effective_weight(age_months)
+            if weight >= min_effective_weight:
+                scored.append((weight, int(row["event_month_stamp"]), int(row["appraisal_rowid"]), appraisal))
+
+        scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+        return [appraisal for _, _, _, appraisal in scored[:limit]]
+
+    def _row_to_event_appraisal(self, row) -> "EventAppraisal":
+        from src.classes.event_appraisal import AppraisalSource, EventAppraisal
+        from src.classes.emotions import EmotionType
+
+        return EventAppraisal(
+            id=row["id"],
+            event_id=row["event_id"],
+            appraiser_avatar_id=row["appraiser_avatar_id"],
+            focus_avatar_id=row["focus_avatar_id"],
+            personal_importance=row["personal_importance"],
+            valence=row["valence"],
+            persistence=row["persistence"],
+            primary_emotion=EmotionType(row["primary_emotion"]),
+            summary=row["summary"],
+            source=AppraisalSource(row["source"]),
+            created_at=_parse_time(row["created_at"]),
+        )
 
     def get_event_by_id(self, event_id: str) -> Optional["Event"]:
         """按 id 直接读取单个事件，不受默认时间线的 decision 过滤限制。"""

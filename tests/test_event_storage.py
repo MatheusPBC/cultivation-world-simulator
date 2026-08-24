@@ -14,7 +14,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from src.classes.emotions import EmotionType
 from src.classes.event import Event, NULL_EVENT
+from src.classes.event_appraisal import AppraisalSource, EventAppraisal
 from src.classes.event_query import EventQuery
 from src.classes.event_storage import EventStorage, EventStorageError
 from src.sim.managers.event_manager import EventManager
@@ -939,6 +941,33 @@ class TestEventManagerWithStorage:
         assert len(events) == 1
         assert events[0].content == "Minor pair"
 
+    def test_get_event_appraisals_delegates_to_storage(self, event_manager):
+        """Test that EventManager.get_event_appraisals delegates to EventStorage."""
+        from src.classes.emotions import EmotionType
+        from src.classes.event_appraisal import AppraisalSource, EventAppraisal
+
+        event = make_event(100, 5, "An ambush occurred", ["avatar_1", "avatar_2"])
+        event_manager.add_event(event)
+        appraisal = EventAppraisal(
+            event_id=event.id,
+            appraiser_avatar_id="avatar_1",
+            focus_avatar_id="avatar_2",
+            personal_importance=0.8,
+            valence=-0.5,
+            persistence=0.4,
+            primary_emotion=EmotionType.ANGRY,
+            summary="Betrayed during the ambush.",
+            source=AppraisalSource.LLM,
+        )
+        event_manager._storage.add_event_appraisal(appraisal)
+
+        loaded = event_manager.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(event.month_stamp),
+        )
+
+        assert [a.id for a in loaded] == [appraisal.id]
+
 
 class TestEventManagerPagination:
     """EventManager pagination tests."""
@@ -1031,6 +1060,17 @@ class TestEventManagerMemoryMode:
 
         assert len(events) == 1
         assert events[0].content == "Major"
+
+    def test_get_event_appraisals_returns_empty_in_memory_mode(self, memory_event_manager):
+        """Memory mode has no event_appraisals table; it must return [] rather than error."""
+        memory_event_manager.add_event(make_event(100, 1, "An ambush occurred", ["a1", "a2"]))
+
+        loaded = memory_event_manager.get_event_appraisals(
+            appraiser_avatar_id="a1",
+            current_month_stamp=100,
+        )
+
+        assert loaded == []
 
     def test_get_minor_events_memory(self, memory_event_manager):
         """Test minor event filtering in memory mode."""
@@ -1234,3 +1274,301 @@ class TestEventStorageThreadSafety:
 
         final_events, _ = event_storage.get_events(limit=expected_total + 5)
         assert len(final_events) == expected_total
+
+
+# --- EventAppraisal persistence tests ---
+
+def make_appraisal(event_id: str, **overrides) -> EventAppraisal:
+    defaults = dict(
+        event_id=event_id,
+        appraiser_avatar_id="avatar_1",
+        focus_avatar_id="avatar_2",
+        personal_importance=0.8,
+        valence=-0.5,
+        persistence=0.4,
+        primary_emotion=EmotionType.ANGRY,
+        summary="Betrayed during the ambush.",
+        source=AppraisalSource.LLM,
+    )
+    defaults.update(overrides)
+    return EventAppraisal(**defaults)
+
+
+class TestEventAppraisalPersistence:
+    """Tests for EventStorage's event_appraisals table."""
+
+    def test_init_creates_event_appraisals_table_and_indexes(self, temp_db_path):
+        storage = EventStorage(temp_db_path)
+
+        tables = [
+            row[0]
+            for row in storage._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='event_appraisals'"
+            ).fetchall()
+        ]
+        assert "event_appraisals" in tables
+
+        indexes = {
+            row[0]
+            for row in storage._conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='event_appraisals'"
+            ).fetchall()
+        }
+        assert any("appraiser" in name for name in indexes)
+        assert any("focus" in name for name in indexes)
+
+        storage.close()
+
+    def test_add_event_appraisal_round_trips(self, event_storage):
+        event = make_event(100, 5, "An ambush occurred", ["avatar_1", "avatar_2"])
+        event_storage.add_event(event)
+        appraisal = make_appraisal(event.id)
+
+        result = event_storage.add_event_appraisal(appraisal)
+        assert result is True
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(event.month_stamp),
+        )
+
+        assert len(loaded) == 1
+        restored = loaded[0]
+        assert restored.id == appraisal.id
+        assert restored.event_id == event.id
+        assert restored.appraiser_avatar_id == "avatar_1"
+        assert restored.focus_avatar_id == "avatar_2"
+        assert restored.personal_importance == pytest.approx(0.8)
+        assert restored.valence == pytest.approx(-0.5)
+        assert restored.persistence == pytest.approx(0.4)
+        assert restored.primary_emotion is EmotionType.ANGRY
+        assert restored.summary == "Betrayed during the ambush."
+        assert restored.source is AppraisalSource.LLM
+
+    def test_add_event_appraisal_enforces_uniqueness(self, event_storage):
+        event = make_event(100, 5, "An ambush occurred", ["avatar_1", "avatar_2"])
+        event_storage.add_event(event)
+        first = make_appraisal(event.id, summary="First take.")
+        second = make_appraisal(event.id, summary="Second take.")
+
+        event_storage.add_event_appraisal(first)
+        event_storage.add_event_appraisal(second)
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(event.month_stamp),
+        )
+        assert len(loaded) == 1
+        assert loaded[0].summary == "First take."
+
+    def test_event_appraisal_cascades_on_event_delete(self, event_storage):
+        event = make_event(100, 5, "An ambush occurred", ["avatar_1", "avatar_2"], event_id="doomed-event")
+        event_storage.add_event(event)
+        event_storage.add_event_appraisal(make_appraisal(event.id))
+
+        with event_storage._transaction() as conn:
+            conn.execute("DELETE FROM events WHERE id = ?", (event.id,))
+
+        remaining = event_storage._conn.execute(
+            "SELECT COUNT(*) FROM event_appraisals WHERE event_id = ?", (event.id,)
+        ).fetchone()[0]
+        assert remaining == 0
+
+    def test_get_event_appraisals_filters_by_focus_avatar(self, event_storage):
+        event = make_event(100, 5, "Two encounters", ["avatar_1", "avatar_2", "avatar_3"])
+        event_storage.add_event(event)
+        event_storage.add_event_appraisal(
+            make_appraisal(event.id, focus_avatar_id="avatar_2")
+        )
+        event_storage.add_event_appraisal(
+            make_appraisal(event.id, focus_avatar_id="avatar_3")
+        )
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            focus_avatar_id="avatar_2",
+            current_month_stamp=int(event.month_stamp),
+        )
+
+        assert len(loaded) == 1
+        assert loaded[0].focus_avatar_id == "avatar_2"
+
+    def test_get_event_appraisals_filters_by_minimum_effective_weight(self, event_storage):
+        old_event = make_event(0, 1, "Long ago", ["avatar_1", "avatar_2"], event_id="old-event")
+        recent_event = make_event(100, 1, "Recently", ["avatar_1", "avatar_2"], event_id="recent-event")
+        event_storage.add_event(old_event)
+        event_storage.add_event(recent_event)
+
+        # Fully decayed (persistence=0, ~100 years old) -> low effective weight.
+        event_storage.add_event_appraisal(
+            make_appraisal(
+                old_event.id,
+                personal_importance=0.9,
+                persistence=0.0,
+            )
+        )
+        # Fresh appraisal -> high effective weight.
+        event_storage.add_event_appraisal(
+            make_appraisal(
+                recent_event.id,
+                personal_importance=0.9,
+                persistence=0.0,
+            )
+        )
+
+        current_month_stamp = int(recent_event.month_stamp)
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=current_month_stamp,
+            min_effective_weight=0.5,
+        )
+
+        assert len(loaded) == 1
+        assert loaded[0].event_id == recent_event.id
+
+    def test_get_event_appraisals_sorts_by_effective_weight_descending(self, event_storage):
+        weak_event = make_event(0, 1, "Weak memory", ["avatar_1", "avatar_2"], event_id="weak-event")
+        strong_event = make_event(100, 1, "Strong memory", ["avatar_1", "avatar_2"], event_id="strong-event")
+        event_storage.add_event(weak_event)
+        event_storage.add_event(strong_event)
+
+        event_storage.add_event_appraisal(
+            make_appraisal(weak_event.id, personal_importance=0.9, persistence=0.0)
+        )
+        event_storage.add_event_appraisal(
+            make_appraisal(strong_event.id, personal_importance=0.9, persistence=0.0)
+        )
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(strong_event.month_stamp),
+        )
+
+        assert [a.event_id for a in loaded] == [strong_event.id, weak_event.id]
+
+    def test_get_event_appraisals_respects_limit_with_deterministic_tie_order(self, event_storage):
+        event = make_event(100, 1, "Many focuses", ["avatar_1"])
+        event_storage.add_event(event)
+        for i in range(5):
+            event_storage.add_event_appraisal(
+                make_appraisal(event.id, focus_avatar_id=f"avatar_focus_{i}")
+            )
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(event.month_stamp),
+            limit=2,
+        )
+
+        # All five appraisals share the same event and the same weight, so the
+        # tie must break deterministically (most-recently-inserted first)
+        # rather than depend on unspecified SQLite row order.
+        assert [a.focus_avatar_id for a in loaded] == ["avatar_focus_4", "avatar_focus_3"]
+
+    def test_get_event_appraisals_returns_empty_for_unknown_appraiser(self, event_storage):
+        event = make_event(100, 1, "Something happened", ["avatar_1", "avatar_2"])
+        event_storage.add_event(event)
+        event_storage.add_event_appraisal(make_appraisal(event.id))
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="unknown-avatar",
+            current_month_stamp=int(event.month_stamp),
+        )
+
+        assert loaded == []
+
+    def test_get_event_appraisals_preserves_positive_and_negative_across_events(self, event_storage):
+        good_event = make_event(100, 1, "A reconciliation", ["avatar_1", "avatar_2"], event_id="good-event")
+        bad_event = make_event(100, 2, "A betrayal", ["avatar_1", "avatar_2"], event_id="bad-event")
+        event_storage.add_event(good_event)
+        event_storage.add_event(bad_event)
+
+        event_storage.add_event_appraisal(
+            make_appraisal(good_event.id, valence=0.9, summary="Reconciled.")
+        )
+        event_storage.add_event_appraisal(
+            make_appraisal(bad_event.id, valence=-0.9, summary="Betrayed.")
+        )
+
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1",
+            current_month_stamp=int(bad_event.month_stamp),
+        )
+
+        valence_by_event = {a.event_id: a.valence for a in loaded}
+        assert len(loaded) == 2
+        assert valence_by_event[good_event.id] == pytest.approx(0.9)
+        assert valence_by_event[bad_event.id] == pytest.approx(-0.9)
+
+    def test_add_event_appraisal_rejects_orphan_event_id(self, event_storage):
+        orphan = make_appraisal("does-not-exist")
+
+        result = event_storage.add_event_appraisal(orphan)
+
+        assert result is False
+        count = event_storage._conn.execute(
+            "SELECT COUNT(*) FROM event_appraisals"
+        ).fetchone()[0]
+        assert count == 0
+
+    def test_add_event_persists_runtime_appraisals_atomically(self, event_storage):
+        event = make_event(100, 5, "Something happened", ["avatar_1", "avatar_2"], event_id="atomic-event")
+        appraisal = make_appraisal(event.id)
+        event.appraisals.append(appraisal)
+
+        result = event_storage.add_event(event)
+
+        assert result is True
+        loaded = event_storage.get_event_appraisals(
+            appraiser_avatar_id=appraisal.appraiser_avatar_id,
+            current_month_stamp=int(event.month_stamp),
+        )
+        assert [a.id for a in loaded] == [appraisal.id]
+
+    def test_add_event_rolls_back_entirely_when_runtime_appraisal_is_invalid(self, event_storage):
+        event = make_event(100, 5, "Something happened", ["avatar_1", "avatar_2"], event_id="broken-event")
+        bad_appraisal = make_appraisal("some-other-nonexistent-event-id")
+        event.appraisals.append(bad_appraisal)
+
+        result = event_storage.add_event(event)
+
+        assert result is False
+        assert event_storage.count() == 0
+        assert event_storage.get_event_by_id(event.id) is None
+
+    def test_old_database_gets_empty_event_appraisals_table_without_backfill(self, temp_db_path):
+        import sqlite3
+
+        legacy_conn = sqlite3.connect(str(temp_db_path))
+        legacy_conn.executescript(
+            """
+            CREATE TABLE events (
+                id TEXT PRIMARY KEY,
+                month_stamp INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                is_major BOOLEAN DEFAULT FALSE,
+                is_story BOOLEAN DEFAULT FALSE,
+                event_type TEXT DEFAULT '',
+                render_key TEXT,
+                render_params TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+        legacy_conn.execute(
+            "INSERT INTO events (id, month_stamp, content) VALUES ('legacy-1', 5, 'Old content')"
+        )
+        legacy_conn.commit()
+        legacy_conn.close()
+
+        storage = EventStorage(temp_db_path)
+
+        loaded = storage.get_event_appraisals(
+            appraiser_avatar_id="avatar_1", current_month_stamp=5
+        )
+        assert loaded == []
+
+        count = storage._conn.execute("SELECT COUNT(*) FROM event_appraisals").fetchone()[0]
+        assert count == 0
+
+        storage.close()

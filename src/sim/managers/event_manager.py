@@ -12,6 +12,7 @@ from src.classes.event_query import EventAudience, EventMemoryScope, EventPage, 
 if TYPE_CHECKING:
     from src.classes.causal_link import CausalLink
     from src.classes.event import Event
+    from src.classes.event_appraisal import EventAppraisal
     from src.classes.event_storage import EventStorage
 
 
@@ -285,6 +286,25 @@ class EventManager:
                 if link.cause_event_id == cause_event_id:
                     result.append(link)
         return result
+
+    def get_event_appraisals(
+        self,
+        appraiser_avatar_id: str,
+        current_month_stamp: int,
+        focus_avatar_id: Optional[str] = None,
+        min_effective_weight: float = 0.0,
+        limit: int = 100,
+    ) -> List["EventAppraisal"]:
+        """返回某个 appraiser 对（可选）某个 focus 的个人解读；内存模式下返回空列表。"""
+        if self._storage:
+            return self._storage.get_event_appraisals(
+                appraiser_avatar_id,
+                current_month_stamp,
+                focus_avatar_id=focus_avatar_id,
+                min_effective_weight=min_effective_weight,
+                limit=limit,
+            )
+        return []
 
     def update_decision_payload(self, event_id: str, causal_payload: Optional[dict]) -> None:
         """Rewrite a decision event's causal_payload in place (see EventStorage.update_causal_payload)."""

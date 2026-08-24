@@ -11,6 +11,7 @@ from src.classes.causal_link import CausalLink
 from src.systems.time import Month, Year, MonthStamp, get_date_str
 
 if TYPE_CHECKING:
+    from src.classes.event_appraisal import EventAppraisal
     from src.classes.event_observation import EventObservation
 
 
@@ -47,6 +48,8 @@ class Event:
     created_at: float = field(default_factory=time.time)
     # 运行时挂载的 observation，统一由 EventManager 持久化
     observations: List["EventObservation"] = field(default_factory=list, repr=False, compare=False)
+    # 运行时挂载的 appraisal（直接参与者的个人解读），统一由 EventStorage 持久化到 event_appraisals
+    appraisals: List["EventAppraisal"] = field(default_factory=list, repr=False, compare=False)
     # 事实类型：发生 / 状态转变 / 派生条件 / 决策；与 event_type 正交，互不覆盖
     fact_kind: FactKind = FactKind.OCCURRENCE
     # 因果证据载荷：deltas（StateDelta 列表）+ decision（AgentDecision，仅 DECISION 事件）
@@ -119,6 +122,7 @@ class NullEvent:
             cls._instance.render_params = None
             cls._instance.id = "NULL_EVENT"
             cls._instance.observations = []
+            cls._instance.appraisals = []
             cls._instance.fact_kind = FactKind.OCCURRENCE
             cls._instance.causal_payload = None
             cls._instance.causal_links = []
