@@ -1,0 +1,56 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Gathering System - Auction
+# Status Text
+msgid "Auction is in progress..."
+msgstr "O leilão está em andamento..."
+
+msgid "epiphany_event_desc"
+msgstr ""
+"Evento especial: os discípulos {names} tiveram uma epifania durante a "
+"palestra e aprenderam diretamente {tech_name}!\n"
+
+msgid "female"
+msgstr "Feminino"
+
+msgid "sect_teaching_context_prompt"
+msgstr ""
+"Seita: {sect_name}\n"
+"Estilo: {style}\n"
+"Mestre: {teacher_name} ({teacher_realm})\n"
+"{epiphany_text}\n"
+"Com base nas características da seita e dos personagens, descreva a compreensão do mestre sobre o Céu, a Terra, o Mundo e o Dao, além das diferentes reações dos discípulos."
+
+msgid "sect_teaching_event_desc"
+msgstr "{teacher_name} sobe ao púlpito para pregar."
+
+msgid "sect_teaching_exp_gain"
+msgstr "{student_name} ganhou {exp} de experiência."
+
+msgid "sect_teaching_gathering_info"
+msgstr "Conferência de ensinamentos da seita {sect_name}"
+
+# Gathering System - Sect Teaching
+msgid "sect_teaching_story_prompt"
+msgstr ""
+"Descreva uma conferência de ensinamentos de uma seita. Destaque a "
+"atmosfera, a profunda ressonância do Dao nas palavras do mestre e as "
+"diversas reações dos discípulos. Não mencione valores específicos de "
+"pontos de experiência."
+
+msgid "sect_teaching_summary"
+msgstr ""
+"A seita {sect_name} realizou uma conferência de ensinamentos conduzida por "
+"{teacher_name}. Participantes: {student_names}."

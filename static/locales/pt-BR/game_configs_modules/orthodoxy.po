@@ -1,0 +1,60 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "ORTHODOXY_BUDDHISM_DESC"
+msgstr ""
+"Salve todos os seres sencientes e eleve seu reino de cultivo por meio da "
+"meditação e da iluminação súbita."
+
+# Buddhism
+msgid "ORTHODOXY_BUDDHISM_NAME"
+msgstr "Budismo"
+
+msgid "ORTHODOXY_CONFUCIANISM_DESC"
+msgstr ""
+"Eduque o povo, cultive o Espírito Nobre (Haoran Qi) e seu reino se elevará "
+"de acordo."
+
+# Confucianism
+msgid "ORTHODOXY_CONFUCIANISM_NAME"
+msgstr "Confucionismo"
+
+msgid "ORTHODOXY_DAO_DESC"
+msgstr ""
+"Siga o Dao Celestial, absorva energia espiritual (qi) e eleve seu reino de "
+"cultivo por meio da prática."
+
+# Dao (Daoism)
+msgid "ORTHODOXY_DAO_NAME"
+msgstr "Dao"
+
+msgid "ORTHODOXY_SANXIU_DESC"
+msgstr "Tome o Céu e a Terra como mestres e siga o Caminho da Natureza."
+
+# Nature (Sanxiu)
+msgid "ORTHODOXY_SANXIU_NAME"
+msgstr "Natureza"
+
+msgid "ORTHODOXY_WU_DESC"
+msgstr ""
+"Adentre o Dao pelas artes marciais e pelo Refinamento Corporal. Embora o "
+"progresso seja lento, a base é sólida, e superar gargalos se torna tão "
+"natural quanto comer e beber."
+
+# Martial (Wu)
+msgid "ORTHODOXY_WU_NAME"
+msgstr "Marcial"
+
+msgid "Orthodoxy [{name}]"
+msgstr "Ortodoxia [{name}]"

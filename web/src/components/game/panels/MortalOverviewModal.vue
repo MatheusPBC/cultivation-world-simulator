@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useMortalOverviewModal } from '@/composables/useMortalOverviewModal'
 import buildingIcon from '@/assets/icons/ui/lucide/building-2.svg'
 import usersIcon from '@/assets/icons/ui/lucide/users.svg'
+import { formatGenderLabel } from '@/utils/cultivationText'
 
 const props = defineProps<{
   show: boolean;
@@ -111,7 +112,7 @@ function handleShowChange(value: boolean) {
             <tbody>
               <tr v-for="mortal in trackedMortals" :key="mortal.id">
                 <td>{{ mortal.name }}</td>
-                <td>{{ mortal.gender }}</td>
+                <td>{{ formatGenderLabel(mortal.gender, t) }}</td>
                 <td>{{ mortal.age }}</td>
                 <td>{{ resolveBirthRegion(mortal.born_region_name) }}</td>
               </tr>

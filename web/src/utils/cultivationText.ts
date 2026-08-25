@@ -81,6 +81,26 @@ function getStageKeyFromLevel(level: number): 'early' | 'middle' | 'late' {
   return 'late';
 }
 
+export function humanizeIdentifier(raw: string | number | null | undefined): string {
+  if (raw === null || raw === undefined) return '';
+  const text = String(raw).trim();
+  if (!text) return '';
+  if (!/[_-]/.test(text) && !/[\p{Ll}\d]\p{Lu}/u.test(text)) return text;
+  return text
+    .replace(/^(?:content|item_label|item_verb)_/i, '')
+    .replace(/([\p{Ll}\d])(\p{Lu})/gu, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/(^|\s)(\p{L})/gu, (_match, prefix: string, letter: string) => `${prefix}${letter.toLocaleUpperCase('pt-BR')}`);
+}
+
+export function formatGenderLabel(raw: string | null | undefined, translate: Translate): string {
+  const value = String(raw ?? '').trim().toLowerCase();
+  if (value === 'male' || value === '男') return translate('ui.create_avatar.gender_labels.male');
+  if (value === 'female' || value === '女') return translate('ui.create_avatar.gender_labels.female');
+  return humanizeIdentifier(raw);
+}
+
 export function formatRealmLabel(raw: string | number | null | undefined, translate: Translate): string {
   return translateByAlias(raw, REALM_ALIAS_TO_KEY, translate, 'realms');
 }
@@ -109,6 +129,13 @@ export function formatCultivationText(raw: string | number | null | undefined, t
   const text = String(raw).trim();
   if (!text) return '';
 
+  const concatenated = text.match(
+    /^(qi_refinement|foundation_establishment|core_formation|nascent_soul)_?(early_stage|middle_stage|late_stage)$/i,
+  );
+  if (concatenated) {
+    return formatRealmStage(concatenated[1], concatenated[2], translate);
+  }
+
   const parts = text.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {
     const stageText = formatStageLabel(parts[parts.length - 1], translate);
@@ -118,7 +145,11 @@ export function formatCultivationText(raw: string | number | null | undefined, t
     }
   }
 
-  return formatRealmLabel(text, translate) || formatStageLabel(text, translate) || text;
+  const realm = REALM_ALIAS_TO_KEY[text] ?? REALM_ALIAS_TO_KEY[text.toUpperCase()] ?? REALM_ALIAS_TO_KEY[text.toLowerCase()];
+  if (realm) return translate(`realms.${realm}`);
+  const stage = STAGE_ALIAS_TO_KEY[text] ?? STAGE_ALIAS_TO_KEY[text.toUpperCase()] ?? STAGE_ALIAS_TO_KEY[text.toLowerCase()];
+  if (stage) return translate(`game.ranking.stages.${stage}`);
+  return humanizeIdentifier(text);
 }
 
 export function formatEntityGrade(raw: string | number | null | undefined, translate: Translate): string {

@@ -1,0 +1,61 @@
+Você simula um mundo Xianxia livre. Gere para um personagem uma revelação de "Destino" que acontece apenas uma vez na vida.
+
+O Destino não é uma recompensa e não deve conceder itens, cultivo, atributos, mudanças de relação nem efeitos.
+Ele é um presságio misterioso: primeiro surge um acontecimento concreto; depois, manifesta-se um verso oracular enigmático.
+
+Informações do personagem:
+{avatar_info}
+
+Local atual:
+{location}
+
+Ação atual:
+{current_action}
+
+Informações do mundo:
+{world_info}
+
+Fenômeno atual:
+{current_phenomenon}
+
+Retorne três campos:
+
+1. trigger_text
+- Um momento místico concreto, de preferência com 20 a 45 palavras em português brasileiro.
+- Deve conter um lugar, uma ação e uma imagem marcante.
+- Não explique o significado.
+- Não conceda nenhuma recompensa prática.
+
+2. oracle_text
+- Este é o campo mais importante.
+- Escreva um oráculo enigmático em português brasileiro, normalmente com 5 a 18 palavras e nunca mais de 25.
+- Pode ser conciso, poético, semelhante a uma gatha budista, profecia, inscrição ou fragmento de sonho.
+- Não force uma estrutura rígida ou simétrica.
+- Use imagens concretas como maré, neve, lamparina, sino, lua, ponte, poço, portão, estela, espada, barco, cervo, flor, cinza, espelho, nuvem, fogo, chuva, sombra, pedra, vento, mar ou montanha.
+- Prefira movimento e tensão: cair, voltar, abrir, brilhar, atravessar, esconder, afundar, soar, quebrar, virar, crescer, minguar, surgir ou desaparecer.
+- Preserve o mistério. Não explique o que o presságio prevê.
+- Não afirme resultados futuros definitivos, como morte, ascensão, realeza, casamento, vingança, obtenção de artefato ou avanço de reino.
+- Evite linguagem moderna ou termos de sistema, atributos, probabilidade e recompensa.
+
+Referências de estilo; não copie:
+- "Quando a maré se fecha, a mensagem silencia"
+- "A flor que cai não encerra a primavera; o sino que soa não anuncia retorno"
+- "A neve de mil montanhas desce ao mar, enquanto o primeiro sol retorna sobre a maré"
+- "Uma lamparina solitária ilumina a neve antiga; ossos novos repousam na maré da primavera"
+- "Onde a raiz das nuvens se parte, o velho portão volta a abrir"
+- "Diante da ponte, não pergunte pela travessia; ao ver o cervo, volte o corpo"
+
+3. event_text
+- De preferência, 45 a 90 palavras em português brasileiro.
+- Combine trigger_text e oracle_text naturalmente.
+- Termine exibindo oracle_text entre 『』.
+- Não explique o oráculo.
+
+Retorne somente JSON estrito:
+```json
+{{
+  "trigger_text": "...",
+  "oracle_text": "...",
+  "event_text": "..."
+}}
+```

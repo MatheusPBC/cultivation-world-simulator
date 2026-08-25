@@ -1,0 +1,130 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "cultivation_alias.profile.dao"
+msgstr "Daoísta"
+
+msgid "cultivation_alias.profile.sanxiu"
+msgstr "Cultivador Independente"
+
+msgid "cultivation_alias.profile.wu"
+msgstr "Caminho Marcial"
+
+msgid "cultivation_alias.profile.confucianism"
+msgstr "Caminho Confucionista"
+
+msgid "cultivation_alias.profile.buddhism"
+msgstr "Caminho Budista"
+
+msgid "cultivation_alias.profile.yao"
+msgstr "Yao"
+
+msgid "cultivation_alias.dao.realm.qi_refinement"
+msgstr "Refinamento de Qi"
+
+msgid "cultivation_alias.dao.realm.foundation_establishment"
+msgstr "Estabelecimento da Fundação"
+
+msgid "cultivation_alias.dao.realm.core_formation"
+msgstr "Formação do Núcleo"
+
+msgid "cultivation_alias.dao.realm.nascent_soul"
+msgstr "Alma Nascente"
+
+msgid "cultivation_alias.dao.stage.early"
+msgstr "Estágio Inicial"
+
+msgid "cultivation_alias.dao.stage.middle"
+msgstr "Estágio Intermediário"
+
+msgid "cultivation_alias.dao.stage.late"
+msgstr "Estágio Avançado"
+
+msgid "cultivation_alias.wu.realm.qi_refinement"
+msgstr "Têmpera Corporal"
+
+msgid "cultivation_alias.wu.realm.foundation_establishment"
+msgstr "Têmpera dos Tendões"
+
+msgid "cultivation_alias.wu.realm.core_formation"
+msgstr "Mestre Marcial"
+
+msgid "cultivation_alias.wu.realm.nascent_soul"
+msgstr "Santo Marcial"
+
+msgid "cultivation_alias.wu.stage.early"
+msgstr "Domínio Inicial"
+
+msgid "cultivation_alias.wu.stage.middle"
+msgstr "Domínio Intermediário"
+
+msgid "cultivation_alias.wu.stage.late"
+msgstr "Domínio Pleno"
+
+msgid "cultivation_alias.confucianism.realm.qi_refinement"
+msgstr "Cultivo do Qi Vital"
+
+msgid "cultivation_alias.confucianism.realm.foundation_establishment"
+msgstr "Iluminação dos Princípios"
+
+msgid "cultivation_alias.confucianism.realm.core_formation"
+msgstr "Estabelecimento do Mandato"
+
+msgid "cultivation_alias.confucianism.realm.nascent_soul"
+msgstr "Grande Erudito"
+
+msgid "cultivation_alias.confucianism.stage.early"
+msgstr "Reino Inicial"
+
+msgid "cultivation_alias.confucianism.stage.middle"
+msgstr "Reino Intermediário"
+
+msgid "cultivation_alias.confucianism.stage.late"
+msgstr "Conclusão"
+
+msgid "cultivation_alias.buddhism.realm.qi_refinement"
+msgstr "Monge Noviço"
+
+msgid "cultivation_alias.buddhism.realm.foundation_establishment"
+msgstr "Monge"
+
+msgid "cultivation_alias.buddhism.realm.core_formation"
+msgstr "Arhat"
+
+msgid "cultivation_alias.buddhism.realm.nascent_soul"
+msgstr "Bodisatva"
+
+msgid "cultivation_alias.buddhism.stage.early"
+msgstr "Reino Inicial"
+
+msgid "cultivation_alias.buddhism.stage.middle"
+msgstr "Reino Intermediário"
+
+msgid "cultivation_alias.buddhism.stage.late"
+msgstr "Conclusão"
+
+msgid "cultivation_alias.yao.realm.qi_refinement"
+msgstr "Despertar Espiritual"
+
+msgid "cultivation_alias.yao.realm.foundation_establishment"
+msgstr "Transformação da Forma"
+
+msgid "cultivation_alias.yao.realm.core_formation"
+msgstr "Núcleo Demoníaco"
+
+msgid "cultivation_alias.yao.realm.nascent_soul"
+msgstr "Rei Demoníaco"
+
+msgid "cultivation_alias.yao.stage.early"
+msgstr "Estágio Inicial"
+
+msgid "cultivation_alias.yao.stage.middle"
+msgstr "Estágio Intermediário"
+
+msgid "cultivation_alias.yao.stage.late"
+msgstr "Estágio Avançado"

@@ -1,0 +1,178 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "bought"
+msgstr "comprou"
+
+msgid "bought and consumed"
+msgstr "comprou e consumiu"
+
+msgid "bought and equipped"
+msgstr "comprou e equipou"
+
+# Action: Buy
+msgid "buy_action_name"
+msgstr "Comprar"
+
+msgid "buy_description"
+msgstr "Compre itens, equipamentos e elixires na cidade"
+
+msgid "buy_requirements"
+msgstr "Estar na cidade e ter dinheiro suficiente"
+
+# Action: HelpPeople
+msgid "help_people_action_name"
+msgstr "Ajudar as pessoas"
+
+msgid "help_people_description"
+msgstr "Ajude as pessoas na cidade, consumindo uma pequena quantia de Pedras Espirituais"
+
+msgid "help_people_requirements"
+msgstr "Apenas em áreas urbanas e com Pedras Espirituais suficientes"
+
+# Action: Mine
+msgid "mine_action_name"
+msgstr "Minerar"
+
+msgid "mine_description"
+msgstr "Explore os veios de minério da área atual para obter materiais minerais"
+
+msgid "mine_requirements"
+msgstr ""
+"Exige uma área comum com veios de minério, e o reino do personagem deve ser "
+"igual ou superior ao do veio"
+
+# Action: Move (Base)
+msgid "move_action_name"
+msgstr "Mover"
+
+# Action: MoveAwayFromAvatar
+msgid "move_away_from_avatar_action_name"
+msgstr "Afastar-se do personagem"
+
+msgid "move_away_from_avatar_description"
+msgstr "Afaste-se continuamente do personagem especificado"
+
+msgid "move_away_from_avatar_requirements"
+msgstr "Sem restrições"
+
+# Action: MoveAwayFromRegion
+msgid "move_away_from_region_action_name"
+msgstr "Sair da região"
+
+msgid "move_away_from_region_description"
+msgstr "Saia da região especificada"
+
+msgid "move_away_from_region_requirements"
+msgstr "Sem restrições"
+
+msgid "move_description"
+msgstr "Mova-se para uma posição relativa"
+
+# Action: MoveToAvatar
+msgid "move_to_avatar_action_name"
+msgstr "Ir até o personagem"
+
+msgid "move_to_avatar_description"
+msgstr "Mova-se até a localização de um personagem específico"
+
+msgid "move_to_avatar_requirements"
+msgstr "Sem restrições"
+
+# Action: MoveToDirection
+msgid "move_to_direction_action_name"
+msgstr "Mover e explorar"
+
+msgid "move_to_direction_description"
+msgstr "Explore áreas desconhecidas em uma direção"
+
+msgid "move_to_direction_requirements"
+msgstr "Sem restrições"
+
+# Action: MoveToRegion
+msgid "move_to_region_action_name"
+msgstr "Ir para a região"
+
+msgid "move_to_region_description"
+msgstr "Mova-se até uma região específica"
+
+msgid "move_to_region_requirements"
+msgstr "Sem restrições"
+
+# Action: Sell
+msgid "sell_action_name"
+msgstr "Vender"
+
+msgid "sell_description"
+msgstr ""
+"Venda na cidade todos os itens de determinado tipo que possui ou o "
+"equipamento atual"
+
+msgid "sell_requirements"
+msgstr "Estar na cidade e possuir itens ou equipamentos que possam ser vendidos"
+
+msgid "wilderness"
+msgstr "ermo"
+
+msgid "{avatar} attempted to move but target is invalid"
+msgstr "{avatar} tentou se mover, mas o destino é inválido"
+
+msgid "{avatar} begins helping people in town"
+msgstr "{avatar} começou a ajudar as pessoas na cidade"
+
+msgid "{avatar} sold {item} in town"
+msgstr "{avatar} vendeu {item} na cidade"
+
+msgid "plant_action_name"
+msgstr "Plantar"
+
+msgid "plant_description"
+msgstr ""
+"Plante cultivos espirituais para ganhar uma pequena quantia de Pedras "
+"Espirituais. Dura 6 meses."
+
+msgid "plant_requirements"
+msgstr "Requer uma região comum"
+
+msgid "{avatar} begins planting at {location}"
+msgstr "{avatar} começou a plantar em {location}"
+
+msgid "{avatar} finished planting, earned {stones} Spirit Stones"
+msgstr "{avatar} terminou o plantio e ganhou {stones} Pedras Espirituais"
+
+# POI actions
+
+msgid "move_to_poi_action_name"
+msgstr "Ir para o local"
+
+msgid "move_to_poi_description"
+msgstr "Mova-se até um ponto de interesse conhecido"
+
+msgid "move_to_poi_requirements"
+msgstr "Requer conhecimento desse local"
+
+msgid "{avatar} begins moving toward {poi}"
+msgstr "{avatar} começou a se mover em direção a {poi}"
+
+msgid "Cannot resolve point of interest: {poi}"
+msgstr "Não foi possível localizar o ponto de interesse: {poi}"
+
+msgid "Point of interest has expired"
+msgstr "O ponto de interesse expirou"
+
+msgid "Point of interest is unknown"
+msgstr "O ponto de interesse é desconhecido"
+
+msgid "Point of interest is out of bounds"
+msgstr "O ponto de interesse está fora dos limites"

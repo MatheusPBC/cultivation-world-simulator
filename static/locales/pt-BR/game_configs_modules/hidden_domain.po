@@ -1,0 +1,31 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_FIRE_DESC"
+msgstr "Local onde um poderoso cultivador humano pereceu junto com o Imperador Demônio das Chamas há dez mil anos. Até hoje, as veias da terra expelem um Fogo Nefasto Terreno que jamais se apaga e tinge o céu de vermelho-sangue. Sob o solo calcinado jazem incontáveis espadas e alabardas partidas; à meia-noite, almas guerreiras rugem e revivem o massacre trágico do passado. Treinar aqui exige suportar a dor constante do veneno de fogo corroendo o coração, mas proporciona condições excepcionais para compreender a antiga intenção de batalha. Aqueles abençoados pelo destino podem até encontrar, nas profundezas do magma, fragmentos de artefatos deixados por cultivadores ancestrais ou vislumbrar um traço do Grande Dao."
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_FIRE_NAME"
+msgstr "Vale dos Imortais Caídos"
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_PALACE_DESC"
+msgstr "Um magnífico complexo de palácios suspenso acima da Camada dos Ventos dos Nove Céus. Somente aqueles de perseverança extraordinária conseguem atravessar as fendas espaciais que dilaceram a carne ao redor do domínio. O interior está repleto de restrições antigas e formações ilusórias sobrepostas; um único passo em falso destrói corpo e alma, condenando-os para sempre ao vazio. Embora o Pavilhão das Escrituras tenha desabado com o tempo, cada página dos livros dourados e pergaminhos de jade dispersos na turbulência do vazio registra poderes sobrenaturais supremos, capazes de provocar um banho de sangue no mundo do cultivo. Apenas cultivadores no auge da Formação do Núcleo conseguem suportar minimamente a pressão da antiguidade e entrever uma oportunidade imortal."
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_PALACE_NAME"
+msgstr "Palácio do Vazio dos Nove Céus"
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_WOOD_DESC"
+msgstr "Um fragmento do antigo Jardim do Imperador Azure, despedaçado eras atrás e hoje eternamente coberto por uma névoa tóxica e multicolorida. As leis rompidas do local fazem as plantas espirituais crescerem de modo desenfreado, enquanto vinhas demoníacas metamórficas e flores carnívoras espreitam nas sombras. Dizem que quem atravessar a Floresta do Silêncio Mortal, na periferia, e encontrar a Fonte Espiritual da Madeira Azure, no centro, poderá transformar até a mais comum das ervas em medicina imortal. Contudo, é preciso cuidado com as feras guardiãs, deformadas por milênios consumindo resíduos medicinais e sedentas por sangue fresco."
+
+msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_WOOD_NAME"
+msgstr "Remanescente das Miríades de Árvores"

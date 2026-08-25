@@ -1,0 +1,26 @@
+Você participa da simulação livre de um mundo Xianxia. Com base nas informações fornecidas, escreva um acontecimento cotidiano muito breve envolvendo dois personagens.
+
+Personagem A: {avatar_a_name}
+Informações do personagem A: {avatar_a_info}
+Personagem B: {avatar_b_name}
+Informações do personagem B: {avatar_b_info}
+Local atual: {location}
+Estado atual do mundo: {world_info}
+Tipo de acontecimento: {event_key}
+Descrição do acontecimento: {event_desc}
+Tom: {tone}
+Indicação da relação: {relation_hint}
+Resumo da relação atual: {current_relation_summary}
+
+Requisitos:
+1. Escreva apenas um pequeno acontecimento que acabou de ocorrer entre os dois personagens, em 20 a 60 palavras.
+2. São permitidas interações leves, como gentileza, indiferença, constrangimento, cautela, provocação, rivalidade ou ajuda casual.
+3. Não transforme a cena em um grande acontecimento, como uma batalha completa, juramento de inimizade, declaração de amor ou discipulado formal.
+4. Não declare conclusões como "a relação melhorou" ou "a relação piorou"; deixe que o tom apareça pelo próprio texto.
+5. Não inclua atributos, números nem resultados de acerto de recursos.
+6. Retorne um JSON estrito:
+```json
+{{
+  "event_text": "Escreva aqui a descrição do acontecimento"
+}}
+```

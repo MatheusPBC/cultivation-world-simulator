@@ -60,7 +60,11 @@ def _join_realm_stage(realm_name: str, stage_name: str) -> str:
         return stage_name
     if not stage_name:
         return realm_name
-    return f"{realm_name}{stage_name}"
+    from src.classes.language import language_manager
+    from src.i18n.locale_registry import uses_space_separated_names
+
+    separator = " " if uses_space_separated_names(str(language_manager)) else ""
+    return f"{realm_name}{separator}{stage_name}"
 
 
 def resolve_cultivation_alias_profile(avatar: Any) -> str:

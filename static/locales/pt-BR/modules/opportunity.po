@@ -1,0 +1,136 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-07-03 00:00+0000\n"
+"PO-Revision-Date: 2026-07-03 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "nearby"
+msgstr "nas proximidades"
+
+msgid "northeast"
+msgstr "nordeste"
+
+msgid "northwest"
+msgstr "noroeste"
+
+msgid "southeast"
+msgstr "sudeste"
+
+msgid "southwest"
+msgstr "sudoeste"
+
+msgid "old city"
+msgstr "cidade antiga"
+
+msgid "sect territory"
+msgstr "território da seita"
+
+msgid "cave dwelling"
+msgstr "morada em caverna"
+
+msgid "wilderness place"
+msgstr "local ermo"
+
+msgid "unknown place"
+msgstr "local desconhecido"
+
+msgid "unknown realm"
+msgstr "reino desconhecido"
+
+msgid "{realm} cultivator"
+msgstr "cultivador do reino {realm}"
+
+msgid "{realm} {weapon_type} cultivator"
+msgstr "cultivador do reino {realm} que usa {weapon_type}"
+
+msgid "{realm} sect cultivator"
+msgstr "cultivador de seita do reino {realm}"
+
+msgid ""
+"{avatar_name} felt a stir of fate, sensing a thread of opportunity tied to a "
+"{region_hint} in the {direction}."
+msgstr ""
+"{avatar_name} sentiu o destino se agitar e percebeu um fio de oportunidade "
+"ligado a {region_hint}, na direção {direction}."
+
+msgid ""
+"{avatar_name} felt a stir of fate, sensing a thread of opportunity tied to a "
+"{target_hint} in the {direction}."
+msgstr ""
+"{avatar_name} sentiu o destino se agitar e percebeu um fio de oportunidade "
+"ligado a {target_hint}, na direção {direction}."
+
+msgid "{avatar_name}'s opportunity sense gradually faded away."
+msgstr "A percepção de oportunidade de {avatar_name} se dissipou aos poucos."
+
+msgid "{avatar_name}'s opportunity sense suddenly broke, leaving nowhere to seek."
+msgstr "A percepção de oportunidade de {avatar_name} se rompeu de repente, sem deixar pistas."
+
+msgid ""
+"{avatar_name} followed the opportunity and found an ancient treasure: "
+"{item_name}."
+msgstr ""
+"{avatar_name} seguiu a oportunidade e encontrou um tesouro ancestral: "
+"{item_name}."
+
+msgid ""
+"{avatar_name} followed the opportunity and obtained {item_name}. "
+"{exchange_text}"
+msgstr ""
+"{avatar_name} seguiu a oportunidade e obteve {item_name}. "
+"{exchange_text}"
+
+msgid "{avatar_name} followed the opportunity and gained a boon: {boon_title}."
+msgstr "{avatar_name} seguiu a oportunidade e recebeu uma bênção: {boon_title}."
+
+msgid "{avatar_name} followed the opportunity, but the spiritual trace faded away."
+msgstr "{avatar_name} seguiu a oportunidade, mas o rastro espiritual se dissipou."
+
+msgid ""
+"{avatar_name} followed the feeling, but only found the spiritual trace "
+"already gone."
+msgstr ""
+"{avatar_name} seguiu o pressentimento, mas descobriu que o rastro espiritual "
+"já havia desaparecido."
+
+msgid ""
+"{avatar_name} followed the opportunity, but suffered backlash and was injured "
+"for {damage} HP."
+msgstr ""
+"{avatar_name} seguiu a oportunidade, mas sofreu uma reação adversa e perdeu "
+"{damage} de PV."
+
+msgid "{avatar_name} followed the opportunity, but suffered backlash and perished."
+msgstr "{avatar_name} seguiu a oportunidade, mas sofreu uma reação adversa e morreu."
+
+msgid "opportunity_boon"
+msgstr "Bênção da oportunidade"
+
+msgid "opportunity_story_prompt"
+msgstr "Escreva uma breve história xianxia sobre o desfecho desta oportunidade, enfatizando a orientação celestial, a situação atual do personagem e o próprio resultado. Não reescreva os fatos estabelecidos."
+
+msgid "{years} years and {months} months"
+msgstr "{years} anos e {months} meses"
+
+msgid "{years} years"
+msgstr "{years} anos"
+
+msgid "{months} months"
+msgstr "{months} meses"
+
+msgid "Opportunity sense: {hint} This sense may last about {remaining}."
+msgstr "Percepção de oportunidade: {hint} Essa percepção pode durar cerca de {remaining}."
+
+msgid "effect_extra_opportunity_probability"
+msgstr "Chance de oportunidade +{value}"
+
+msgid "effect_source_opportunity"
+msgstr "Oportunidade"

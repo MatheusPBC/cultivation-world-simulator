@@ -1,5 +1,23 @@
 {
   "population": "Population",
+  "world_journal": {
+    "title": "World Journal",
+    "coming_soon": "Coming soon",
+    "tabs": { "now": "Now", "focus": "Focus", "stories": "Stories", "timeline": "Timeline" },
+    "periods": { "one": "This month", "three": "3 months", "twelve": "1 year" },
+    "important_changes": "Important changes",
+    "important_empty": "No important changes in this period.",
+    "ongoing": "Ongoing",
+    "ongoing_empty": "No activity tracked in this period.",
+    "activity": "World activity",
+    "total_events": "Events",
+    "major_events": "Important",
+    "story_events": "Stories",
+    "active_avatars": "Active characters",
+    "event_count": "{count} events",
+    "loading": "Loading journal...",
+    "error": "Couldn't load journal."
+  },
   "status_bar": {
     "phenomenon": "World Phenomenon",
     "effect": "Effect: ",
@@ -600,7 +618,9 @@
     "no_events": "No related events",
     "back_to_list": "Back to List",
     "death_year": "Year {year}, Month {month}",
-    "rogue": "Rogue"
+    "rogue": "Rogue",
+    "status_alive": "Alive",
+    "status_dead": "Deceased"
   },
   "world_secret": {
     "title": "World Secret",

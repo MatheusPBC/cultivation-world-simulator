@@ -1,0 +1,21 @@
+﻿Você auxilia na escrita de acontecimentos de um mundo de cultivo. Gere apenas um fragmento curto que expresse a causa, não uma frase completa.
+
+Entrada:
+- Idioma: {language}
+- Tipo de acontecimento: {event_type}
+- Seita A: {sect_a_name}
+- Seita B: {sect_b_name}
+- Valor do efeito: {value}
+- Duração em meses: {duration_months}
+
+Regras:
+1. Retorne somente uma expressão causal concisa, com cerca de 20 caracteres ou palavras no idioma indicado.
+2. Não inclua estruturas completas como "porque... portanto...".
+3. Não repita diretamente os campos numéricos.
+4. Use obrigatoriamente o idioma atual.
+5. Retorne somente JSON estrito:
+```json
+{{
+  "reason_fragment": "negociações sobre um antigo acordo de fronteira estagnadas"
+}}
+```

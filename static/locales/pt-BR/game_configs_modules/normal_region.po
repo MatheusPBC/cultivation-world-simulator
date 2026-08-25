@@ -1,0 +1,215 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. normal_region.csv: NORMAL_REGION_101_DESC
+msgid "NORMAL_REGION_101_DESC"
+msgstr ""
+"Localizada no centro do continente, possui terreno plano e qi espiritual "
+"sereno. É um lugar ideal para iniciantes estabelecerem seus alicerces e "
+"fundarem seitas."
+
+#. normal_region.csv: NORMAL_REGION_101_NAME
+msgid "NORMAL_REGION_101_NAME"
+msgstr "Região das Planícies"
+
+#. normal_region.csv: NORMAL_REGION_102_DESC
+msgid "NORMAL_REGION_102_DESC"
+msgstr ""
+"Localizada no extremo oeste do continente, é um vasto deserto onde a areia "
+"amarela cobre o céu. O clima é seco e a temperatura varia muito entre o dia "
+"e a noite; trata-se de uma rota obrigatória para as caravanas do deserto."
+
+#. normal_region.csv: NORMAL_REGION_102_NAME
+msgid "NORMAL_REGION_102_NAME"
+msgstr "Areias Movediças do Oeste"
+
+#. normal_region.csv: NORMAL_REGION_103_DESC
+msgid "NORMAL_REGION_103_DESC"
+msgstr ""
+"Localizada no sudoeste do continente, tem árvores ancestrais que alcançam o "
+"céu e vinhas entrelaçadas. A floresta densa abriga muitas feras selvagens, "
+"tornando esta uma região perigosa para coletar ervas medicinais e caçar."
+
+#. normal_region.csv: NORMAL_REGION_103_NAME
+msgid "NORMAL_REGION_103_NAME"
+msgstr "Ermos do Sul"
+
+#. normal_region.csv: NORMAL_REGION_104_DESC
+msgid "NORMAL_REGION_104_DESC"
+msgstr ""
+"Localizada no extremo norte do continente, permanece congelada por milhares "
+"de quilômetros e há eras não descongela. O frio cortante, o vento e a neve "
+"só permitem a sobrevivência dos aventureiros mais resistentes."
+
+#. normal_region.csv: NORMAL_REGION_104_NAME
+msgid "NORMAL_REGION_104_NAME"
+msgstr "Campo de Gelo do Extremo Norte"
+
+#. normal_region.csv: NORMAL_REGION_105_DESC
+msgid "NORMAL_REGION_105_DESC"
+msgstr ""
+"Localizado no extremo leste do continente, é vasto e ilimitado, com ondas "
+"impetuosas. Ventos traiçoeiros e recifes ocultos fazem deste mar um desafio "
+"para mercadores marítimos e pescadores."
+
+#. normal_region.csv: NORMAL_REGION_105_NAME
+msgid "NORMAL_REGION_105_NAME"
+msgstr "Mar Azul Sem Fim"
+
+#. normal_region.csv: NORMAL_REGION_106_DESC
+msgid "NORMAL_REGION_106_DESC"
+msgstr ""
+"Atravessa o continente de oeste a leste, levando suas águas sempre para o Mar "
+"Oriental. Seu curso veloz corta todo o território e serve como uma importante "
+"rota de transporte."
+
+#. normal_region.csv: NORMAL_REGION_106_NAME
+msgid "NORMAL_REGION_106_NAME"
+msgstr "Correnteza do Rio Tianhe"
+
+#. normal_region.csv: NORMAL_REGION_107_DESC
+msgid "NORMAL_REGION_107_DESC"
+msgstr ""
+"Localizadas no leste do continente, suas elevações ondulantes perfuram as "
+"nuvens. As montanhas íngremes escondem pedras peculiares e muitas cavernas, "
+"atraindo aventureiros em busca de tesouros."
+
+#. normal_region.csv: NORMAL_REGION_107_NAME
+msgid "NORMAL_REGION_107_NAME"
+msgstr "Montanhas Qingfeng"
+
+#. normal_region.csv: NORMAL_REGION_108_DESC
+msgid "NORMAL_REGION_108_DESC"
+msgstr ""
+"Localizado no noroeste do continente, tem picos nevados e ventos de frio "
+"cortante. Coberto de neve o ano inteiro e cruzado por trilhas acidentadas, é "
+"o desafio definitivo para alpinistas."
+
+#. normal_region.csv: NORMAL_REGION_108_NAME
+msgid "NORMAL_REGION_108_NAME"
+msgstr "Pico Nevado dos Dez Mil Zhang"
+
+#. normal_region.csv: NORMAL_REGION_109_DESC
+msgid "NORMAL_REGION_109_DESC"
+msgstr ""
+"Localizada no oeste do continente, é coberta por campos verdejantes até onde "
+"a vista alcança. Água e pastagens abundantes sustentam rebanhos de bois e "
+"ovelhas, formando um pasto natural para povos nômades."
+
+#. normal_region.csv: NORMAL_REGION_109_NAME
+msgid "NORMAL_REGION_109_NAME"
+msgstr "Campos Verdes Sem Fim"
+
+#. normal_region.csv: NORMAL_REGION_110_DESC
+msgid "NORMAL_REGION_110_DESC"
+msgstr ""
+"Localizada no centro do continente, possui árvores ancestrais que alcançam o "
+"céu e uma vegetação exuberante. A vasta floresta é rica em recursos e serve "
+"como principal área de atividade para lenhadores e caçadores."
+
+#. normal_region.csv: NORMAL_REGION_110_NAME
+msgid "NORMAL_REGION_110_NAME"
+msgstr "Mar Florestal Qingyun"
+
+#. normal_region.csv: NORMAL_REGION_111_DESC
+msgid "NORMAL_REGION_111_DESC"
+msgstr ""
+"Localizado no nordeste do continente, lança chamas aos céus e rios de magma "
+"por suas encostas. O vulcão ativo oferece energia geotérmica abundante e é "
+"ideal para o trabalho dos ferreiros, embora seja extremamente perigoso."
+
+#. normal_region.csv: NORMAL_REGION_111_NAME
+msgid "NORMAL_REGION_111_NAME"
+msgstr "Vulcão de Lava"
+
+#. normal_region.csv: NORMAL_REGION_112_DESC
+msgid "NORMAL_REGION_112_DESC"
+msgstr ""
+"Localizada no leste do continente, possui terras férteis e colheitas fartas. "
+"O solo profundo e as chuvas abundantes fazem desta uma região preciosa para "
+"os agricultores."
+
+#. normal_region.csv: NORMAL_REGION_112_NAME
+msgid "NORMAL_REGION_112_NAME"
+msgstr "Terras Agrícolas Férteis"
+
+#. normal_region.csv: NORMAL_REGION_113_DESC
+msgid "NORMAL_REGION_113_DESC"
+msgstr ""
+"Localizado no sul do continente, permanece o ano inteiro coberto por um "
+"miasma de cinco cores e infestado de insetos venenosos. Mortais que entram "
+"ali são reduzidos a ossos; somente praticantes de técnicas venenosas o veem "
+"como uma gruta celestial suprema."
+
+#. normal_region.csv: NORMAL_REGION_113_NAME
+msgid "NORMAL_REGION_113_NAME"
+msgstr "Pântano Venenoso do Submundo"
+
+#. normal_region.csv: NORMAL_REGION_114_DESC
+msgid "NORMAL_REGION_114_DESC"
+msgstr ""
+"Localizadas no sul do continente, estas vastas montanhas se estendem sem fim "
+"e formam a terra ancestral do povo Yao. Os picos são íngremes e os caminhos, "
+"difíceis de atravessar."
+
+#. normal_region.csv: NORMAL_REGION_114_NAME
+msgid "NORMAL_REGION_114_NAME"
+msgstr "Cem Mil Montanhas"
+
+#. normal_region.csv: NORMAL_REGION_115_DESC
+msgid "NORMAL_REGION_115_DESC"
+msgstr ""
+"Localizado no centro-norte do continente, possui florestas de bambu roxo e "
+"qi espiritual límpido. O vento entre os bambus soa como música imortal; o "
+"cultivo sereno neste lugar purifica os demônios interiores e favorece a "
+"compreensão do Dao do céu e da terra."
+
+#. normal_region.csv: NORMAL_REGION_115_NAME
+msgid "NORMAL_REGION_115_NAME"
+msgstr "Retiro dos Bambus Roxos"
+
+#. normal_region.csv: NORMAL_REGION_116_DESC
+msgid "NORMAL_REGION_116_DESC"
+msgstr ""
+"Localizado no nordeste do continente, não deixa crescer uma única erva e tem "
+"o solo congelado a centenas de metros de profundidade. A vida se extingue "
+"aqui, mas o lugar concentra o qi espiritual do frio extremo e, por vezes, "
+"revela gelo profundo de dez mil anos."
+
+#. normal_region.csv: NORMAL_REGION_116_NAME
+msgid "NORMAL_REGION_116_NAME"
+msgstr "Ermo da Geada Cortante"
+
+#. normal_region.csv: NORMAL_REGION_117_DESC
+msgid "NORMAL_REGION_117_DESC"
+msgstr ""
+"Localizado no sudoeste do continente, é açoitado por areia, pedras e ventos "
+"afiados como lâminas. Diz a lenda que estrelas caíram aqui, deixando para trás "
+"uma violenta força estelar e ferro meteórico de origem extraterrestre."
+
+#. normal_region.csv: NORMAL_REGION_117_NAME
+msgid "NORMAL_REGION_117_NAME"
+msgstr "Deserto Rochoso das Estrelas Partidas"
+
+#. normal_region.csv: NORMAL_REGION_118_DESC
+msgid "NORMAL_REGION_118_DESC"
+msgstr ""
+"Localizada além dos mares do extremo leste, esta ilha solitária vive envolta "
+"em nuvens e névoa. Fontes espirituais brotam por toda parte entre flores e "
+"ervas exóticas, e a densidade do qi espiritual supera em muito a do continente. "
+"É o destino almejado pelos cultivadores errantes de além-mar."
+
+#. normal_region.csv: NORMAL_REGION_118_NAME
+msgid "NORMAL_REGION_118_NAME"
+msgstr "Ilha Perdida de Penglai"

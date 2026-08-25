@@ -1,0 +1,590 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "PERSONA_1001_DESC"
+msgstr "Entrega-se aos divertimentos sem pensar em progredir."
+
+msgid "PERSONA_1001_NAME"
+msgstr "Brincalhão"
+
+msgid "PERSONA_1002_DESC"
+msgstr "Não consegue viver sem livros."
+
+msgid "PERSONA_1002_NAME"
+msgstr "Devorador de Livros"
+
+msgid "PERSONA_1003_DESC"
+msgstr "Não passa um dia sem tomar chá."
+
+msgid "PERSONA_1003_NAME"
+msgstr "Amante de Chá"
+
+msgid "PERSONA_1004_DESC"
+msgstr "Tem talento para tocar cítara."
+
+msgid "PERSONA_1004_NAME"
+msgstr "Músico"
+
+msgid "PERSONA_1005_DESC"
+msgstr "Viajar milhares de quilômetros ensina mais do que ler milhares de livros."
+
+msgid "PERSONA_1005_NAME"
+msgstr "Viajante"
+
+msgid "PERSONA_1006_DESC"
+msgstr "Bons enxadristas vivem muito."
+
+msgid "PERSONA_1006_NAME"
+msgstr "Enxadrista"
+
+msgid "PERSONA_10_DESC"
+msgstr "Você valoriza a própria vida e não se arrisca sem necessidade."
+
+msgid "PERSONA_10_NAME"
+msgstr "Apegado à Vida"
+
+msgid "PERSONA_11_DESC"
+msgstr "Você valoriza os companheiros e a harmonia, e gosta de ajudar."
+
+msgid "PERSONA_11_NAME"
+msgstr "Amigável"
+
+msgid "PERSONA_12_DESC"
+msgstr "Você não esquece uma ofensa facilmente e aceita pagar o preço e dedicar o tempo necessário para se vingar."
+
+msgid "PERSONA_12_NAME"
+msgstr "Vingativo"
+
+msgid "PERSONA_13_DESC"
+msgstr "Você prefere ficar só e evita criar laços profundos com os outros."
+
+msgid "PERSONA_13_NAME"
+msgstr "Antissocial"
+
+msgid "PERSONA_14_DESC"
+msgstr "Você contém as emoções e mantém uma postura fria e distante diante do mundo."
+
+msgid "PERSONA_14_NAME"
+msgstr "Indiferente"
+
+msgid "PERSONA_15_DESC"
+msgstr "Você enfrenta os conflitos de frente e prefere resolver os problemas pela força e pelo confronto."
+
+msgid "PERSONA_15_NAME"
+msgstr "Combativo"
+
+msgid "PERSONA_16_DESC"
+msgstr "Você age por impulso, sem pensar muito nas consequências."
+
+msgid "PERSONA_16_NAME"
+msgstr "Impulsivo"
+
+msgid "PERSONA_17_DESC"
+msgstr "Você é extremamente cauteloso e se assusta facilmente com os riscos."
+
+msgid "PERSONA_17_NAME"
+msgstr "Tímido"
+
+msgid "PERSONA_18_DESC"
+msgstr "Você age de forma autoritária e irracional, sempre colocando os próprios interesses em primeiro lugar."
+
+msgid "PERSONA_18_NAME"
+msgstr "Autoritário"
+
+msgid "PERSONA_19_DESC"
+msgstr "Você dedica quase todo o seu tempo ao cultivo e despreza os prazeres mundanos."
+
+msgid "PERSONA_19_NAME"
+msgstr "Obcecado por Cultivo"
+
+msgid "PERSONA_1_DESC"
+msgstr "Você sempre analisa os problemas com lógica e só age depois de planejar."
+
+msgid "PERSONA_1_NAME"
+msgstr "Racional"
+
+msgid "PERSONA_20_DESC"
+msgstr "Você aprecia mais a solidão e a reflexão."
+
+msgid "PERSONA_20_NAME"
+msgstr "Introvertido"
+
+msgid "PERSONA_21_DESC"
+msgstr "Você gosta de conversar e toma a iniciativa para fazer amigos."
+
+msgid "PERSONA_21_NAME"
+msgstr "Extrovertido"
+
+msgid "PERSONA_22_DESC"
+msgstr "Ao conversar, você costuma se expressar com ironia, zombaria e sarcasmo."
+
+msgid "PERSONA_22_NAME"
+msgstr "Maldoso"
+
+msgid "PERSONA_23_DESC"
+msgstr "Você trata os outros com simpatia e responde de forma positiva."
+
+msgid "PERSONA_23_NAME"
+msgstr "Entusiasmado"
+
+msgid "PERSONA_24_DESC"
+msgstr "Você nutre um ódio profundo pelo mal."
+
+msgid "PERSONA_24_NAME"
+msgstr "Extremamente Justo"
+
+msgid "PERSONA_25_DESC"
+msgstr "Você exalta o poder e o medo, e faz qualquer coisa para alcançar seus objetivos."
+
+msgid "PERSONA_25_NAME"
+msgstr "Extremamente Maligno"
+
+msgid "PERSONA_26_DESC"
+msgstr "Você encara com naturalidade a ideia de formar um casal daoísta ou praticar cultivo duplo com outras pessoas."
+
+msgid "PERSONA_26_NAME"
+msgstr "Desinibido"
+
+msgid "PERSONA_27_DESC"
+msgstr "Você é cauteloso ao formar um casal daoísta ou praticar cultivo duplo com outras pessoas."
+
+msgid "PERSONA_27_NAME"
+msgstr "Acanhado"
+
+msgid "PERSONA_28_DESC"
+msgstr "Você é especialmente gentil com pessoas atraentes do sexo oposto."
+
+msgid "PERSONA_28_NAME"
+msgstr "Bajulador"
+
+msgid "PERSONA_29_DESC"
+msgstr "Você facilmente se torna hostil com quem está muito acima de você."
+
+msgid "PERSONA_29_NAME"
+msgstr "Invejoso"
+
+msgid "PERSONA_2_DESC"
+msgstr "Seus objetivos mudam constantemente, e você não se dedica a nenhum deles por muito tempo."
+
+msgid "PERSONA_2_NAME"
+msgstr "Inconstante"
+
+msgid "PERSONA_30_DESC"
+msgstr "Você veio da sociedade moderna e sente saudade de tudo que deixou para trás."
+
+msgid "PERSONA_30_NAME"
+msgstr "Transmigrado"
+
+msgid "PERSONA_31_DESC"
+msgstr "A fortuna o acompanha desde o nascimento, tornando encontros auspiciosos mais prováveis."
+
+msgid "PERSONA_31_NAME"
+msgstr "Filho da Fortuna"
+
+msgid "PERSONA_32_DESC"
+msgstr "Você ingressou no Dao pela espada, e a espada é a sua vida."
+
+msgid "PERSONA_32_NAME"
+msgstr "Fanático por Espadas"
+
+msgid "PERSONA_33_DESC"
+msgstr "Você esconde sua verdadeira capacidade, age com cautela e sabe manipular as situações."
+
+msgid "PERSONA_33_NAME"
+msgstr "Maquiavélico"
+
+msgid "PERSONA_34_DESC"
+msgstr "Você honra suas promessas e jamais trai quem conquistou sua lealdade."
+
+msgid "PERSONA_34_NAME"
+msgstr "Leal"
+
+msgid "PERSONA_35_DESC"
+msgstr "Você age com decisão e crueldade, eliminando qualquer ameaça futura."
+
+msgid "PERSONA_35_NAME"
+msgstr "Implacável"
+
+msgid "PERSONA_36_DESC"
+msgstr "Por já ter vivido uma vida anterior, você possui vagas premonições sobre o futuro."
+
+msgid "PERSONA_36_NAME"
+msgstr "Reencarnado"
+
+msgid "PERSONA_37_DESC"
+msgstr "Você desconfia de todos e não entrega sua confiança facilmente."
+
+msgid "PERSONA_37_NAME"
+msgstr "Desconfiado"
+
+msgid "PERSONA_38_DESC"
+msgstr "Você se concentra no refinamento corporal, possui um físico robusto e é imbatível no combate corpo a corpo."
+
+msgid "PERSONA_38_NAME"
+msgstr "Cultivador Corporal"
+
+msgid "PERSONA_39_DESC"
+msgstr "Você domina o Dao da Alquimia e é sensível às ervas espirituais."
+
+msgid "PERSONA_39_NAME"
+msgstr "Alquimista"
+
+msgid "PERSONA_3_DESC"
+msgstr "Você sempre deixa tudo para depois, não gosta de se esforçar e prefere aproveitar a vida."
+
+msgid "PERSONA_3_NAME"
+msgstr "Preguiçoso"
+
+msgid "PERSONA_40_DESC"
+msgstr "Você nasceu com muita sorte e transforma desgraças em bênçãos."
+
+msgid "PERSONA_40_NAME"
+msgstr "Abençoado pela Fortuna"
+
+msgid "PERSONA_41_DESC"
+msgstr "Você tem profundo interesse e um talento único para o Dao da Espada."
+
+msgid "PERSONA_41_NAME"
+msgstr "Cultivador da Espada"
+
+msgid "PERSONA_42_DESC"
+msgstr "Você se especializou em técnicas de sabre e possui uma compreensão singular do Dao do Sabre."
+
+msgid "PERSONA_42_NAME"
+msgstr "Cultivador do Sabre"
+
+msgid "PERSONA_43_DESC"
+msgstr "Você domina as técnicas de lança e empunha a rainha de todas as armas."
+
+msgid "PERSONA_43_NAME"
+msgstr "Cultivador da Lança"
+
+msgid "PERSONA_44_DESC"
+msgstr "Com um bastão nas mãos, o mundo é seu."
+
+msgid "PERSONA_44_NAME"
+msgstr "Cultivador do Bastão"
+
+msgid "PERSONA_45_DESC"
+msgstr "Você domina o Dao da Música e sabe atacar ou se defender com uma cítara ou flauta."
+
+msgid "PERSONA_45_NAME"
+msgstr "Mestre da Música"
+
+msgid "PERSONA_46_DESC"
+msgstr "Você é hábil com armas ocultas e ataca de maneira misteriosa e imprevisível."
+
+msgid "PERSONA_46_NAME"
+msgstr "Especialista em Armas Ocultas"
+
+msgid "PERSONA_47_DESC"
+msgstr "Você domina as técnicas de leque e demonstra elegância em cada movimento."
+
+msgid "PERSONA_47_NAME"
+msgstr "Cultivador do Leque"
+
+msgid "PERSONA_48_DESC"
+msgstr "Você domina as técnicas de chicote e combina força e flexibilidade com essa arma."
+
+msgid "PERSONA_48_NAME"
+msgstr "Cultivador do Chicote"
+
+msgid "PERSONA_49_DESC"
+msgstr "Você ingressou no Dao pelo sabre, e o sabre é a sua vida."
+
+msgid "PERSONA_49_NAME"
+msgstr "Fanático por Sabres"
+
+msgid "PERSONA_4_DESC"
+msgstr "Você sempre se arrisca, adora emoção e não perde a chance de apostar tudo."
+
+msgid "PERSONA_4_NAME"
+msgstr "Aventureiro"
+
+msgid "PERSONA_50_DESC"
+msgstr "Você ingressou no Dao pela lança, e a lança é a sua vida."
+
+msgid "PERSONA_50_NAME"
+msgstr "Fanático por Lanças"
+
+msgid "PERSONA_51_DESC"
+msgstr "Você ingressou no Dao pelo bastão, e o bastão é a sua vida."
+
+msgid "PERSONA_51_NAME"
+msgstr "Santo do Bastão"
+
+msgid "PERSONA_52_DESC"
+msgstr "Você ingressou no Dao pelo leque, e o leque é a sua vida."
+
+msgid "PERSONA_52_NAME"
+msgstr "Fanático por Leques"
+
+msgid "PERSONA_53_DESC"
+msgstr "Você ingressou no Dao pelo chicote, e o chicote é a sua vida."
+
+msgid "PERSONA_53_NAME"
+msgstr "Fanático por Chicotes"
+
+msgid "PERSONA_54_DESC"
+msgstr "Seu domínio do Dao das Armas Ocultas chegou ao auge, permitindo matar sem ser percebido."
+
+msgid "PERSONA_54_NAME"
+msgstr "Mestre Assassino"
+
+msgid "PERSONA_55_DESC"
+msgstr "Você sente um desejo intenso por pessoas bonitas."
+
+msgid "PERSONA_55_NAME"
+msgstr "Libidinoso"
+
+msgid "PERSONA_56_DESC"
+msgstr "Você tem o coração sereno e nenhum interesse por relações amorosas ou sexuais."
+
+msgid "PERSONA_56_NAME"
+msgstr "Sem Desejos"
+
+msgid "PERSONA_57_DESC"
+msgstr "Você sente uma curiosidade inesgotável pelo mundo desconhecido."
+
+msgid "PERSONA_57_NAME"
+msgstr "Explorador"
+
+msgid "PERSONA_58_DESC"
+msgstr "Você detesta percorrer longas distâncias e prefere permanecer em lugares conhecidos."
+
+msgid "PERSONA_58_NAME"
+msgstr "Caseiro"
+
+msgid "PERSONA_59_DESC"
+msgstr "Você nasceu marcado pelo azar, e tudo costuma dar errado."
+
+msgid "PERSONA_59_NAME"
+msgstr "Pé-Frio"
+
+msgid "PERSONA_5_DESC"
+msgstr "Você sempre se adapta às circunstâncias, segue o próprio humor e não se prende a regras."
+
+msgid "PERSONA_5_NAME"
+msgstr "Despreocupado"
+
+msgid "PERSONA_60_DESC"
+msgstr "Os primeiros anos do seu cultivo são repletos de infortúnios."
+
+msgid "PERSONA_60_NAME"
+msgstr "Talento Tardio"
+
+msgid "PERSONA_61_DESC"
+msgstr "Você domina o Dao do Refinamento de Artefatos."
+
+msgid "PERSONA_61_NAME"
+msgstr "Refinador de Artefatos"
+
+msgid "PERSONA_62_DESC"
+msgstr "Suas emoções oscilam intensamente."
+
+msgid "PERSONA_62_NAME"
+msgstr "Emotivo"
+
+msgid "PERSONA_63_DESC"
+msgstr "Você é hábil em prospecção e escavação, com uma intuição singular para encontrar veios minerais."
+
+msgid "PERSONA_63_NAME"
+msgstr "Minerador"
+
+msgid "PERSONA_64_DESC"
+msgstr "Você evita riscos e não gosta de chamar atenção."
+
+msgid "PERSONA_64_NAME"
+msgstr "Prudente"
+
+msgid "PERSONA_65_DESC"
+msgstr "Você é mesquinho e não suporta ver alguém em situação melhor que a sua."
+
+msgid "PERSONA_65_NAME"
+msgstr "Ciumento"
+
+msgid "PERSONA_66_DESC"
+msgstr "Você valoriza a família e os laços de sangue, colocando os interesses do clã em primeiro lugar."
+
+msgid "PERSONA_66_NAME"
+msgstr "Apegado à Família"
+
+msgid "PERSONA_67_DESC"
+msgstr "Você valoriza a amizade e a lealdade, e faria qualquer sacrifício pelos amigos."
+
+msgid "PERSONA_67_NAME"
+msgstr "Leal aos Amigos"
+
+msgid "PERSONA_68_DESC"
+msgstr "Você está acostumado a viver por conta própria e raramente cria vínculos profundos."
+
+msgid "PERSONA_68_NAME"
+msgstr "Solitário"
+
+msgid "PERSONA_69_DESC"
+msgstr "Você é fiel no amor e não muda de sentimento depois de se comprometer."
+
+msgid "PERSONA_69_NAME"
+msgstr "Devotado"
+
+msgid "PERSONA_6_DESC"
+msgstr "Você deseja intensamente pedras espirituais e riquezas."
+
+msgid "PERSONA_6_NAME"
+msgstr "Ganancioso"
+
+msgid "PERSONA_70_DESC"
+msgstr "Você se apaixona facilmente e sonha com um grande amor."
+
+msgid "PERSONA_70_NAME"
+msgstr "Romântico"
+
+msgid "PERSONA_71_DESC"
+msgstr "Você é indiferente ao amor e dificilmente se deixa envolver."
+
+msgid "PERSONA_71_NAME"
+msgstr "Insensível"
+
+msgid "PERSONA_7_DESC"
+msgstr "Você gosta de procurar flores raras, ervas e remédios espirituais nas montanhas e florestas."
+
+msgid "PERSONA_7_NAME"
+msgstr "Coletor"
+
+msgid "PERSONA_8_DESC"
+msgstr "Você aprecia a emoção de rastrear presas na natureza e conhece bem os hábitos dos animais."
+
+msgid "PERSONA_8_NAME"
+msgstr "Caçador"
+
+msgid "PERSONA_9_DESC"
+msgstr "Você sempre reflete profundamente e aborda os problemas de maneira filosófica."
+
+msgid "PERSONA_9_NAME"
+msgstr "Pensativo"
+
+msgid "PERSONA_1007_DESC"
+msgstr "Vindo das camadas mais humildes da sociedade, você leva jeito para cultivar plantas espirituais e consegue obter mais pedras espirituais com a agricultura."
+
+msgid "PERSONA_1007_NAME"
+msgstr "Agricultor"
+
+msgid "PERSONA_1008_DESC"
+msgstr "Você se mantém distante dos assuntos mundanos e detesta ser arrastado para disputas de poder e questões da corte."
+
+msgid "PERSONA_1008_NAME"
+msgstr "Desapegado"
+
+msgid "PERSONA_1009_DESC"
+msgstr "Você está acostumado a cultivar sozinho entre montanhas e pântanos, e nada o incomoda mais do que lidar com a corte."
+
+msgid "PERSONA_1009_NAME"
+msgstr "Cultivador Recluso"
+
+msgid "PERSONA_1010_DESC"
+msgstr "Você está disposto a entrar no mundo mortal e aprimorar a si mesmo e sua reputação por meio dos assuntos mundanos."
+
+msgid "PERSONA_1010_NAME"
+msgstr "Mundano"
+
+msgid "PERSONA_1011_DESC"
+msgstr "Você reverencia a ordem ortodoxa e se dispõe a usar o conhecimento e o serviço público para trazer ordem ao mundo."
+
+msgid "PERSONA_1011_NAME"
+msgstr "Cavalheiro Ortodoxo"
+
+msgid "PERSONA_1012_DESC"
+msgstr "Você se importa muito com a aparência e se dedica aos cuidados pessoais para estar sempre bem-apresentado."
+
+msgid "PERSONA_1012_NAME"
+msgstr "Vaidoso"
+
+msgid "PERSONA_1013_DESC"
+msgstr "Você se preocupa intensamente com a aparência e quase transforma o desejo de ficar mais bonito em uma obsessão."
+
+msgid "PERSONA_1013_NAME"
+msgstr "Narcisista"
+
+msgid "PERSONA_1014_DESC"
+msgstr "Você costuma esconder suas qualidades e fingir fraqueza, levando os outros a subestimar sua força e o perigo que representa. Alguns chegam a intimidá-lo ou humilhá-lo, apenas para serem colocados em seu devido lugar de forma espetacular."
+
+msgid "PERSONA_1014_NAME"
+msgstr "Finge Fraqueza"
+
+msgid "PERSONA_1015_DESC"
+msgstr "Você sente curiosidade e afinidade naturais por cultivadores de outras raças e está disposto a criar vínculos apesar das diferenças de origem."
+
+msgid "PERSONA_1015_NAME"
+msgstr "Amigo dos Forasteiros"
+
+msgid "PERSONA_1016_DESC"
+msgstr "Você rejeita instintivamente cultivadores de raças diferentes da sua e tem dificuldade para confiar de verdade em forasteiros."
+
+msgid "PERSONA_1016_NAME"
+msgstr "Aversão a Forasteiros"
+
+msgid "PERSONA_1019_DESC"
+msgstr "Você compreende as estruturas das formações e consegue usar discos de formação para orientar os mecanismos espirituais de uma região."
+
+msgid "PERSONA_1019_NAME"
+msgstr "Mestre de Formações"
+
+msgid "PERSONA_1020_DESC"
+msgstr "Você nasceu dominando as artes de formação e consegue canalizar linhas ley e mecanismos espirituais com mais eficiência ao criar formações."
+
+msgid "PERSONA_1020_NAME"
+msgstr "Imortal das Formações"
+
+msgid "PERSONA_1017_DESC"
+msgstr "Você domina insetos e artes venenosas, além de ser hábil no cultivo por meio de Gu."
+
+msgid "PERSONA_1017_NAME"
+msgstr "Mestre de Gu"
+
+msgid "PERSONA_1018_DESC"
+msgstr "Você possui uma afinidade natural com incontáveis Gu e consegue comandar insetos com um pensamento."
+
+msgid "PERSONA_1018_NAME"
+msgstr "Imortal de Gu"
+
+msgid "GOLDFINGER_1_NAME"
+msgstr "Filho da Fortuna"
+msgid "GOLDFINGER_1_DESC"
+msgstr "Você parece ter nascido sob o favor do Céu e da Terra; oportunidades que muitos jamais alcançam surgem naturalmente em seu caminho."
+msgid "GOLDFINGER_1_STORY_PROMPT"
+msgstr "Quando o personagem for um Filho da Fortuna, trate o favor do destino, as oportunidades que se aproximam e a capacidade de aproveitar o momento como elementos centrais da história."
+msgid "GOLDFINGER_2_NAME"
+msgstr "Abençoado pela Boa Fortuna"
+msgid "GOLDFINGER_2_DESC"
+msgstr "Sua sorte é profunda: mesmo em situações perigosas, você costuma encontrar uma saída e descobrir ganhos onde outros nada perceberiam."
+msgid "GOLDFINGER_2_STORY_PROMPT"
+msgstr "Quando o personagem for Abençoado pela Boa Fortuna, destaque reviravoltas favoráveis, pequenas bênçãos e descobertas inesperadas no cotidiano."
+msgid "GOLDFINGER_3_NAME"
+msgstr "Transmigrado"
+msgid "GOLDFINGER_3_DESC"
+msgstr "Você veio de outro mundo, e suas memórias e sua forma moderna de pensar ainda influenciam a maneira como enxerga o mundo do cultivo."
+msgid "GOLDFINGER_3_STORY_PROMPT"
+msgstr "Quando o personagem for um Transmigrado, destaque o pensamento moderno, o estranhamento diante deste mundo e suas tentativas de aplicar experiências da vida anterior aos problemas do cultivo."
+msgid "GOLDFINGER_4_NAME"
+msgstr "Reencarnado"
+msgid "GOLDFINGER_4_DESC"
+msgstr "Você parece ter retornado com fragmentos de uma vida anterior e possui uma intuição inexplicável diante de certas escolhas e perigos."
+msgid "GOLDFINGER_4_STORY_PROMPT"
+msgstr "Quando o personagem for Reencarnado, destaque memórias residuais da vida anterior, o impulso de evitar velhos erros, obsessões antigas e possíveis equívocos sobre o futuro."
+msgid "GOLDFINGER_5_NAME"
+msgstr "Ancião Acompanhante"
+msgid "GOLDFINGER_5_DESC"
+msgstr "Seu destino parece ocultar um mentor invisível, que oferece orientação nos momentos decisivos, cobra seu progresso e às vezes discute com você."
+msgid "GOLDFINGER_5_STORY_PROMPT"
+msgstr "Quando o personagem possuir um Ancião Acompanhante, destaque os conselhos, conflitos, segredos e planos desse mentor oculto, deixando clara sua presença constante na jornada."

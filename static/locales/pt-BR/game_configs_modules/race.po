@@ -1,0 +1,58 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt-BR\n"
+
+msgid "RACE_HUMAN_NAME"
+msgstr "Humano"
+
+msgid "RACE_HUMAN_DESC"
+msgstr "Você é um humano comum."
+
+msgid "RACE_HUMAN_BEHAVIOR_DESC"
+msgstr "Humanos não são limitados pelos instintos dos yao; suas ações são guiadas principalmente pela personalidade, pelos objetivos, pela seita, pelo alinhamento e pelas circunstâncias do momento."
+
+msgid "RACE_FOX_NAME"
+msgstr "Yao Raposa"
+
+msgid "RACE_FOX_DESC"
+msgstr "Os yao raposa são naturalmente astutos e hábeis em interpretar expressões e emoções. Costumam ter uma aparência marcante e são conhecidos por sua afinidade inata com oportunidades e vínculos sociais."
+
+msgid "RACE_FOX_BEHAVIOR_DESC"
+msgstr "As ações dos yao raposa devem priorizar a leitura das emoções, a sondagem social, as trocas vantajosas e o faro para oportunidades. A personalidade individual pode moldar o método, mas não deve transformá-los em cultivadores obtusos que desprezam os relacionamentos."
+
+msgid "RACE_WOLF_NAME"
+msgstr "Yao Lobo"
+
+msgid "RACE_WOLF_DESC"
+msgstr "Os yao lobo possuem linhagens poderosas, valorizam a sobrevivência, a caça e a batalha, têm instintos aguçados e movimentos velozes e costumam aprimorar seu cultivo por meio do combate."
+
+msgid "RACE_WOLF_BEHAVIOR_DESC"
+msgstr "As ações dos yao lobo devem priorizar a sobrevivência, a caça, o combate, o território e a avaliação da força. A personalidade individual pode mudar apenas a forma como atacam, mas não deve fazê-los passar muito tempo em conversas ociosas nem evitar todo conflito."
+
+msgid "RACE_BIRD_NAME"
+msgstr "Yao Ave"
+
+msgid "RACE_BIRD_DESC"
+msgstr "Os yao ave possuem percepção abrangente e movimentos ágeis, nascem com o anseio por lugares distantes e se destacam no reconhecimento, na fuga e na exploração do desconhecido."
+
+msgid "RACE_BIRD_BEHAVIOR_DESC"
+msgstr "As ações dos yao ave devem priorizar a migração, o reconhecimento, as viagens, a observação e a evasão. A personalidade individual pode afetar apenas a rota e o ritmo, mas não deve mantê-los presos a um lugar sem motivo nem levá-los a abandonar a busca por horizontes mais amplos."
+
+msgid "RACE_SNAKE_NAME"
+msgstr "Yao Serpente"
+
+msgid "RACE_SNAKE_DESC"
+msgstr "Os yao serpente possuem auras sutis e modos pacientes, destacam-se na ocultação e nas emboscadas, costumam ser temidos pelos cultivadores humanos e se adaptam bem a lugares sombrios e perigosos."
+
+msgid "RACE_SNAKE_BEHAVIOR_DESC"
+msgstr "As ações dos yao serpente devem priorizar a espreita, a paciência, a sondagem, as rotas indiretas e as emboscadas repentinas. A personalidade individual pode mudar apenas o grau de crueldade, mas não deve transformá-los em cultivadores espalhafatosos, frontais e abertamente agitados."
+
+msgid "RACE_TURTLE_NAME"
+msgstr "Yao Tartaruga"
+
+msgid "RACE_TURTLE_DESC"
+msgstr "Os yao tartaruga têm vida longa e corpos robustos, agem com lentidão e cautela e são especialmente hábeis na defesa, na recuperação e em longos períodos de cultivo isolado."
+
+msgid "RACE_TURTLE_BEHAVIOR_DESC"
+msgstr "As ações dos yao tartaruga devem priorizar a lentidão, a defesa, a recuperação, o repouso e o isolamento. Salvo para evitar perigos, avançar de estágio, cumprir deveres da seita, perseguir um alvo claro ou suprir a necessidade de recursos, eles não devem se deslocar com frequência nem iniciar conflitos; a personalidade individual não pode se sobrepor a esse instinto de proteção."

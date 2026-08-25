@@ -1,0 +1,55 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+# Story Styles
+msgid "story_style.plain_narration"
+msgstr "Narração simples: use linguagem contida e poucos adornos, como se registrasse os acontecimentos à distância."
+
+msgid "story_style.emotion_in_scenery"
+msgstr "Emoção na paisagem: deixe o cenário transmitir o sentimento, integrando a emoção interior ao ambiente."
+
+msgid "story_style.freehand_ancient"
+msgstr "Estilo clássico livre: priorize imagens e metáforas; seja conciso e evite linguagem arcaica obscura."
+
+msgid "story_style.marketplace_life"
+msgstr "Vida cotidiana: mantenha a prosa pé no chão, coloquial, simples e natural, sem afetação."
+
+msgid "story_style.poetic_lyricism"
+msgstr "Lirismo poético: use frases curtas e construções paralelas ocasionais; faça alusões com moderação e evite excessos rebuscados."
+
+msgid "story_style.philosophical_fable"
+msgstr "Fábula filosófica: deixe os acontecimentos levantarem uma questão ou revelarem uma ou duas reflexões marcantes, sem pregar."
+
+msgid "story_style.chronicle"
+msgstr "Estilo de crônica: narre os acontecimentos em ordem clara, como um historiador, usando poucos adjetivos."
+
+msgid "story_style.personified_scenery"
+msgstr "Paisagem personificada: dê ao cenário um leve toque humano e coloque aspirações na paisagem, sem exagerar."
+
+msgid "story_style.taoist_nature"
+msgstr "Natureza taoista: dê à prosa um tom de vocabulário taoista acessível e conduza o texto de volta a uma ideia central."
+
+msgid "story_style.buddhist_emptiness"
+msgstr "Vazio budista: entrelace impermanência e vazio de forma leve, sem tornar a prosa enigmática."
+
+msgid "story_style.folk_storytelling"
+msgstr "Narrativa popular: use a voz escrita de um contador de histórias animado, com ritmo ágil e detalhes vívidos."
+
+msgid "story_style.elegant_scholarly"
+msgstr "Estilo erudito e elegante: mantenha uma atmosfera culta com leves referências, sem ostentação."
+
+msgid "story_style.bold_and_open"
+msgstr "Ousado e aberto: use palavras grandiosas e ritmo majestoso; expresse os sentimentos de forma direta e sem restrições."
+
+msgid "story_style.gorgeous_and_bizarre"
+msgstr "Suntuoso e insólito: explore detalhes sensoriais, linguagem ornamentada e sedutora, além de luzes e cores estranhas."
+
+msgid "story_style.cold_and_concise"
+msgstr "Frio e conciso: prefira frases curtas; faça cada palavra ter peso, como metal contra pedra, sem sentimentalismo excessivo."
+
+msgid "story_style.fine_line_drawing"
+msgstr "Traço delicado: não acrescente adornos; capte movimentos e expressões sutis para revelar a essência por meio de detalhes precisos."

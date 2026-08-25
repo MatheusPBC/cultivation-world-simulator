@@ -1,0 +1,40 @@
+Você cria um mundo Xianxia. Receberá o contexto original do mundo e um trecho de sua história.
+Com base nesse contexto e nessa história, modifique as informações das regiões existentes no mundo, incluindo cidades, regiões comuns e regiões de cultivo.
+
+Contexto do mundo:
+{world_info}
+
+Texto histórico:
+{world_lore}
+
+Informações das cidades:
+{city_regions}
+
+Informações das regiões comuns:
+{normal_regions}
+
+Informações das regiões de cultivo:
+{cultivate_regions}
+
+Com base nas informações acima, analise e retorne sugestões de modificação.
+
+Retorne em formato JSON:
+{{
+    "thinking": "Analise quais modificações devem ser feitas",
+    "city_regions_change":
+        {{
+            "id": {{ // id original
+                "name": str // novo nome
+                "desc": desc // nova descrição
+            }}
+        }},
+    "normal_regions_change": {{}}, // dict com a mesma estrutura acima
+    "cultivate_regions_change": {{}} // dict com a mesma estrutura acima
+}}
+
+Requisitos:
+1. "thinking" contém sua análise; apresente uma justificativa detalhada.
+2. As modificações devem se basear no conteúdo da história e ser coerentes.
+3. Se uma região não precisar de modificação, retorne um dicionário vazio {{}}.
+4. Para regiões modificadas, retorne somente "name" e "desc", sem nenhuma outra chave.
+5. Escreva todo o conteúdo textual retornado em português brasileiro claro e natural. Nomes próprios podem permanecer na forma original quando isso for adequado à ambientação.

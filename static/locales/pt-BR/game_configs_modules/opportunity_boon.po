@@ -1,0 +1,32 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "OPPORTUNITY_BOON_LUCK_TITLE"
+msgstr "Favor Celestial"
+
+msgid "OPPORTUNITY_BOON_LUCK_DESC"
+msgstr "Um fio dos mistérios celestiais refina o destino, aumentando ligeiramente a sorte."
+
+msgid "OPPORTUNITY_BOON_LIFESPAN_TITLE"
+msgstr "Compreensão da Longevidade"
+
+msgid "OPPORTUNITY_BOON_LIFESPAN_DESC"
+msgstr "Uma revelação espiritual penetra o corpo, aumentando ligeiramente a longevidade."
+
+msgid "OPPORTUNITY_BOON_CULTIVATION_TITLE"
+msgstr "Resplendor do Dao"
+
+msgid "OPPORTUNITY_BOON_CULTIVATION_DESC"
+msgstr "A mente se torna límpida, facilitando o cultivo por vários anos."
+
+msgid "OPPORTUNITY_BOON_BODY_TITLE"
+msgstr "Refinamento Espiritual"
+
+msgid "OPPORTUNITY_BOON_BODY_DESC"
+msgstr "A força espiritual refina o corpo, aumentando o poder de combate por vários anos."

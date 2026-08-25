@@ -1,0 +1,234 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. sect_region.csv: SECT_REGION_401_DESC
+msgid "SECT_REGION_401_DESC"
+msgstr ""
+"Os Picos Jueyun atravessam o mar de nuvens, unidos por correntes de ferro e "
+"pontes suspensas sobre trilhas montanhosas traiçoeiras. Somente quem domina "
+"de fato sua intenção da espada consegue alcançar as alturas. No meio da subida "
+"há plataformas de teste, tanques para lavar espadas e penhascos cobertos por "
+"incontáveis marcas de lâmina; mais acima, o vento se torna cortante e relâmpagos "
+"às vezes riscam os precipícios. Todo o portal da seita lembra uma espada ancestral "
+"desembainhada e jamais guardada: austera, imponente e tomada por uma ameaça gélida."
+
+#. sect_region.csv: SECT_REGION_401_NAME
+msgid "SECT_REGION_401_NAME"
+msgstr "Pico Jueyun"
+
+#. sect_region.csv: SECT_REGION_402_DESC
+msgid "SECT_REGION_402_DESC"
+msgstr ""
+"A Caverna das Dez Mil Feras se oculta nas profundezas das cordilheiras. Suas "
+"camadas externas são seladas por miasma e vinhas emaranhadas que formam uma "
+"barreira natural. Só ao avançar se alcançam os domínios das feras que descem "
+"para o interior. Pontes de pedra, portões de ferro e plataformas de doma dividem "
+"os níveis, enquanto rugidos baixos e correntes em choque ecoam sem cessar no ar "
+"carregado de qi demoníaco. Ossos e marcas de garras cobrem o chão. Mais que um "
+"portal de seita comum, este é um ninho-cidade vivo de feras colossais, e cada "
+"nível inferior parece mais opressivo que o anterior."
+
+#. sect_region.csv: SECT_REGION_402_NAME
+msgid "SECT_REGION_402_NAME"
+msgstr "Caverna das Dez Mil Feras"
+
+#. sect_region.csv: SECT_REGION_403_DESC
+msgid "SECT_REGION_403_DESC"
+msgstr ""
+"Jinghaiya paira sobre um penhasco à beira-mar, onde salões, corredores e "
+"terraços de observação das marés feitos de jade espiritual gélido permanecem "
+"meio ocultos pela névoa oceânica. De longe, todo o portal da seita parece flutuar "
+"entre o luar e as ondas. Junto ao precipício, a muralha de jade reflete o mar e "
+"as estrelas; conforme as marés sobem e descem, reflexos aquáticos ondulam por "
+"paredes e pisos, fazendo os caminhos parecerem metade reais, metade ilusórios. "
+"O silêncio é tamanho que apenas as ondas, o vento e o ocasional sino tocando um "
+"beiral lembram aos visitantes que ainda não deixaram o mundo mortal."
+
+#. sect_region.csv: SECT_REGION_403_NAME
+msgid "SECT_REGION_403_NAME"
+msgstr "Penhasco do Mar Silencioso"
+
+#. sect_region.csv: SECT_REGION_404_DESC
+msgid "SECT_REGION_404_DESC"
+msgstr ""
+"O Mar Morto é formado por ilhas negras e baías sombrias ligadas por passarelas "
+"estreitas, marcos de balsas em ruínas e faróis de fogo-fátuo. Visto de longe, "
+"parece uma cidade de espectros à deriva sobre águas escuras como tinta. O mar "
+"se agita sem vento, e cada onda que se ergue traz um lamento semelhante a um "
+"choro distante. A névoa úmida tinge os salões e degraus das ilhas de branco "
+"acinzentado e verde doentio. À noite, o luar importa menos que as lanternas de "
+"alma tremeluzindo na bruma, transformando toda a região em um submundo visto em sonho."
+
+#. sect_region.csv: SECT_REGION_404_NAME
+msgid "SECT_REGION_404_NAME"
+msgstr "Mar do Silêncio Mortal"
+
+#. sect_region.csv: SECT_REGION_405_DESC
+msgid "SECT_REGION_405_DESC"
+msgstr ""
+"À primeira vista, o Vale Qianji parece um vale montanhoso comum, com caminhos "
+"de pedra azul, beirais elegantes, pátios e flores cuidadosamente dispostos. Só "
+"ao se aproximar é possível perceber que as pontes giram, as paredes se abrem e "
+"se fecham e até a altura dos degraus oculta mecanismos de disparo. Torres de "
+"vigia e pontes suspensas se erguem acima, enquanto túneis secretos, oficinas e "
+"câmaras seladas se escondem abaixo. De vez em quando, ouvem-se dentes de engrenagem "
+"se encaixando, o leve zumbido do metal ou passos de marionetes vindos do nada. "
+"O mais aterrorizante não é uma armadilha isolada, mas o fato de o próprio vale "
+"ser uma máquina gigantesca."
+
+#. sect_region.csv: SECT_REGION_405_NAME
+msgid "SECT_REGION_405_NAME"
+msgstr "Vale dos Mil Mecanismos"
+
+#. sect_region.csv: SECT_REGION_406_DESC
+msgid "SECT_REGION_406_DESC"
+msgstr ""
+"A Gruta Dourada ocupa um paraíso particular oculto atrás de uma próspera cidade "
+"mercantil. Na entrada há mares de lanternas, incenso flutuante, pontes curvas e "
+"pavilhões sobrepostos sobre a água. Quanto mais se avança, mais o tumulto se "
+"dissipa e mais persistentes ficam os sons da água e da música. Os terraços "
+"externos reluzem com ouro e jade e transbordam de visitantes; nas profundezas, "
+"salas tranquilas, fontes termais e lagos de sonhos se escondem atrás de véus, "
+"paredes floridas e névoa. Tudo é belo e luxuoso, mas é impossível saber se alguém "
+"veio festejar, sonhar ou ingressar em uma forma mais sutil de cultivo."
+
+#. sect_region.csv: SECT_REGION_406_NAME
+msgid "SECT_REGION_406_NAME"
+msgstr "Gruta Dourada"
+
+#. sect_region.csv: SECT_REGION_407_DESC
+msgid "SECT_REGION_407_DESC"
+msgstr ""
+"A Ilha Pudu paira solitária no centro do Mar das Tempestades. Além de suas "
+"margens, ondas colossais se erguem e relâmpagos se revolvem; no interior, porém, "
+"os sinos e a luz budista mantêm a ilha em uma calma quase imóvel. O Pagode Vajra "
+"domina o centro, cercado por templos, escadarias, plataformas de ascese nos "
+"penhascos e um porto voltado para o mar. Os sinos dourados no alto ressoam com "
+"o vento marítimo e parecem apaziguar a tempestade pouco a pouco. Quando a névoa "
+"matinal se ergue, a luz dourada cai sobre recifes negros e salões pálidos, e a "
+"ilha parece um selo sagrado retirado de um mar enfurecido."
+
+#. sect_region.csv: SECT_REGION_407_NAME
+msgid "SECT_REGION_407_NAME"
+msgstr "Ilha Pudu"
+
+#. sect_region.csv: SECT_REGION_408_DESC
+msgid "SECT_REGION_408_DESC"
+msgstr ""
+"O Pântano das Sombras jamais vê a verdadeira luz do dia. Névoa venenosa, água "
+"imunda e árvores ancestrais emaranhadas isolam toda a região, e invasores costumam "
+"ser observados por olhos invisíveis antes mesmo de avistarem o portal da seita. "
+"A verdadeira fortaleza não se concentra na superfície: torres ocultas e pontes "
+"de corda ficam entre as copas, enquanto túneis, celas e entradas cobertas de miasma "
+"se espalham sob o brejo. Quase não há linha de visão desimpedida, apenas lâmpadas "
+"frias tremeluzindo na névoa e águas negras prontas para engolir o som de passos."
+
+#. sect_region.csv: SECT_REGION_408_NAME
+msgid "SECT_REGION_408_NAME"
+msgstr "Pântano das Sombras"
+
+#. sect_region.csv: SECT_REGION_409_DESC
+msgid "SECT_REGION_409_DESC"
+msgstr ""
+"As Ilhas Flutuantes Duobao não formam uma única ilha, mas uma cadeia de ilhas "
+"celestes de vários tamanhos, ligadas por correntes gigantescas, pontes de nuvens "
+"e rotas de navios voadores em uma cidade imortal suspensa nos céus. O anel externo "
+"é tomado por docas e pátios de carga movimentados; os níveis intermediários, por "
+"ruas comerciais, casas de leilão e mercados; e as alturas, por torres de forja que "
+"expelem fogo dia e noite. Depois de escurecer, lanternas percorrem correntes e rotas "
+"celestes até as nuvens, fazendo toda a região parecer uma teia mercantil dourada "
+"estendida pelo céu, sempre ruidosa e sempre em movimento."
+
+#. sect_region.csv: SECT_REGION_409_NAME
+msgid "SECT_REGION_409_NAME"
+msgstr "Ilhas Flutuantes dos Inúmeros Tesouros"
+
+#. sect_region.csv: SECT_REGION_410_DESC
+msgid "SECT_REGION_410_DESC"
+msgstr ""
+"O Vale dos Ecos se estreita entre penhascos imponentes, formando naturalmente "
+"inúmeras cavidades ressonantes e fendas sonoras. Até uma única nota dedilhada "
+"pode rodopiar pelo vale por muito tempo sem desaparecer. Pavilhões, terraços à "
+"beira d'água, torres de qin e corredores acompanham os contornos das montanhas, "
+"enquanto riachos atravessam as construções. À primeira vista, é tão gracioso quanto "
+"um retiro imortal, mas um ouvido atento percebe que o vento nos beirais e as gotas "
+"na água parecem rearranjados por uma mão invisível. O vale costuma ser mais perigoso "
+"não quando a música o preenche, mas quando tudo cai repentinamente em silêncio."
+
+#. sect_region.csv: SECT_REGION_410_NAME
+msgid "SECT_REGION_410_NAME"
+msgstr "Vale dos Ecos"
+
+#. sect_region.csv: SECT_REGION_411_DESC
+msgid "SECT_REGION_411_DESC"
+msgstr ""
+"Mizhongtian parece ser apenas um pico solitário, mas, depois de atravessar o "
+"portal, descobre-se que terraços, degraus, pontes e caminhos estão incrustados "
+"em camadas de espaço dobrado. A mesma estrada pode parecer completamente diferente "
+"vista antes ou depois. Nas encostas há praças gravadas com padrões de formação, "
+"corredores suspensos no ar e salões que surgem e desaparecem, enquanto linhas de "
+"luz às vezes percorrem o chão como se a própria montanha pensasse lentamente. "
+"Não existe aqui qualquer senso estável de direção; cada passo parece levar a outro mundo."
+
+#. sect_region.csv: SECT_REGION_411_NAME
+msgid "SECT_REGION_411_NAME"
+msgstr "Céu Labiríntico"
+
+#. sect_region.csv: SECT_REGION_412_DESC
+msgid "SECT_REGION_412_DESC"
+msgstr ""
+"O Reino Celestial da Aurora fica nas profundezas da noite eterna do extremo "
+"norte. Além dele se estendem planícies de gelo silenciosas, mas somente esta "
+"cidade-palácio é banhada o ano todo por uma aurora móvel, clara como o dia. "
+"Altas muralhas de gelo, portões de ferro negro, pontes congeladas e campos de "
+"treinamento reluzem sob a luz cambiante; nas profundezas da cidade, o altar da "
+"chama sagrada lança um brilho rubro e constante através do frio. Sua beleza não "
+"está apenas na imponência, mas na convivência ordenada entre gelo e fogo, quietude "
+"e esplendor, como se toda a cidade fosse uma chama persistindo no inverno mais profundo."
+
+#. sect_region.csv: SECT_REGION_412_NAME
+msgid "SECT_REGION_412_NAME"
+msgstr "Reino Celestial da Aurora"
+
+#. sect_region.csv: SECT_REGION_413_DESC
+msgid "SECT_REGION_413_DESC"
+msgstr ""
+"A Floresta dos Sábios fica onde convergem as veias espirituais centrais, entre "
+"árvores ancestrais imponentes e estelas de pedra dispersas. Salas de aula, "
+"bibliotecas e pátios à beira d'água se escondem sob a sombra, e quem caminha por "
+"ali costuma percorrer trilhas cobertas de folhas e corredores gravados com textos "
+"clássicos. Durante o dia, o som das leituras viaja longe com o vento da floresta; "
+"à noite, as estelas emitem um brilho suave sob a lua, envolvendo árvores e beirais "
+"em serena dignidade. O lugar parece menos uma seita fechada e mais uma academia "
+"viva que continua a crescer com o tempo."
+
+#. sect_region.csv: SECT_REGION_413_NAME
+msgid "SECT_REGION_413_NAME"
+msgstr "Floresta dos Sábios"
+
+#. sect_region.csv: SECT_REGION_414_DESC
+msgid "SECT_REGION_414_DESC"
+msgstr ""
+"A montanha acima do Lago de Sangue Asura é inteiramente vermelho-escura, e de "
+"suas fendas sobem sem cessar névoa cor de sangue e calor. Nas profundezas da "
+"montanha, imensos lagos subterrâneos de sangue e salões sacrificiais em camadas "
+"foram escavados na terra. Pontes de correntes de ferro cruzam rios de sangue, e "
+"escadarias de pedra descem até arenas, cavernas de ossos e altares iluminados por "
+"luz escarlate. Quanto mais fundo se vai, mais intenso fica o cheiro de ferrugem, "
+"remédios e sangue úmido. Toda a fortaleza parece uma fera monstruosa respirando "
+"lentamente sob o solo."
+
+#. sect_region.csv: SECT_REGION_414_NAME
+msgid "SECT_REGION_414_NAME"
+msgstr "Lago de Sangue Asura"

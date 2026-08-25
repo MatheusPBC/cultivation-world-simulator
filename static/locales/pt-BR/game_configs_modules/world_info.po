@@ -1,0 +1,229 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "WORLD_INFO_ACTION_DESC"
+msgstr "Você dispõe de uma série de ações executáveis. Preste atenção aos efeitos, às restrições, às regiões e à duração de cada ação."
+
+msgid "WORLD_INFO_ACTION_NAME"
+msgstr "Ações"
+
+msgid "WORLD_INFO_ACTION_TITLE"
+msgstr "Ações"
+
+msgid "WORLD_INFO_AUCTION_DESC"
+msgstr "Em intervalos imprevisíveis, uma figura misteriosa organiza um leilão no qual podem surgir artigos valiosos."
+
+msgid "WORLD_INFO_AUCTION_NAME"
+msgstr "Leilão"
+
+msgid "WORLD_INFO_AUCTION_TITLE"
+msgstr "Leilão"
+
+msgid "WORLD_INFO_BATTLE_DESC"
+msgstr "Só os mais aptos sobrevivem. A diferença entre reinos pesa muito, e cultivadores de reinos elevados têm vantagem absoluta sobre os mais fracos. Se um oponente morrer, o vencedor poderá saquear seus pertences."
+
+msgid "WORLD_INFO_BATTLE_NAME"
+msgstr "Batalha"
+
+msgid "WORLD_INFO_BATTLE_TITLE"
+msgstr "Batalha"
+
+msgid "WORLD_INFO_CULTIVATION_DESC"
+msgstr "O cultivo acumula poder até que o estágio atual alcance seu gargalo. Uma tentativa de avanço pode ter sucesso ou fracassar: o sucesso leva o personagem ao estágio seguinte, enquanto o fracasso pode cobrar um preço."
+
+msgid "WORLD_INFO_CULTIVATION_NAME"
+msgstr "Cultivo"
+
+msgid "WORLD_INFO_CULTIVATION_TITLE"
+msgstr "Cultivo"
+
+msgid "WORLD_INFO_DEATH_DESC"
+msgstr "Um personagem também morre quando seu HP cai abaixo de 0."
+
+msgid "WORLD_INFO_DEATH_NAME"
+msgstr "Morte"
+
+msgid "WORLD_INFO_DEATH_TITLE"
+msgstr "Morte"
+
+msgid "WORLD_INFO_EQUIPMENT_AND_ELIXIR_DESC"
+msgstr "Armas, equipamentos auxiliares e elixires concedem bônus adicionais. Equipamentos de alto grau e elixires adequados podem aumentar muito a capacidade de sobrevivência e o poder de combate de um cultivador."
+
+msgid "WORLD_INFO_EQUIPMENT_AND_ELIXIR_NAME"
+msgstr "Equipamentos e Elixires"
+
+msgid "WORLD_INFO_EQUIPMENT_AND_ELIXIR_TITLE"
+msgstr "Equipamentos e Elixires"
+
+msgid "WORLD_INFO_INTRO_DESC"
+msgstr "Este é um mundo de cultivo onde inúmeros cultivadores competem entre si e conflitos irrompem por toda parte."
+
+msgid "WORLD_INFO_INTRO_NAME"
+msgstr "Introdução"
+
+msgid "WORLD_INFO_INTRO_TITLE"
+msgstr "Introdução"
+
+msgid "WORLD_INFO_LIFESPAN_DESC"
+msgstr "Todo personagem possui um limite de longevidade. Quando ela se esgota, a morte é inevitável. Avançar de reino costuma prolongá-la, enquanto uma tentativa fracassada pode reduzi-la."
+
+msgid "WORLD_INFO_LIFESPAN_NAME"
+msgstr "Longevidade"
+
+msgid "WORLD_INFO_LIFESPAN_TITLE"
+msgstr "Longevidade"
+
+msgid "WORLD_INFO_ORTHODOXY_DESC"
+msgstr "Cada tradição segue um método de cultivo próprio. Daoistas praticam exercícios respiratórios, artistas marciais refinam o corpo, budistas meditam e confucianos educam o povo."
+
+msgid "WORLD_INFO_ORTHODOXY_NAME"
+msgstr "Ortodoxia"
+
+msgid "WORLD_INFO_ORTHODOXY_TITLE"
+msgstr "Ortodoxia"
+
+msgid "WORLD_INFO_REALM_DESC"
+msgstr "Os reinos fundamentais do mundo, do mais fraco ao mais forte, são Refinamento de Qi, Estabelecimento da Fundação, Formação do Núcleo e Alma Nascente. Cada reino possui os estágios Inicial, Intermediário e Avançado. Tradições diferentes podem adotar outros nomes, mas as regras sempre usam essa sequência como referência."
+
+msgid "WORLD_INFO_REALM_NAME"
+msgstr "Reino"
+
+msgid "WORLD_INFO_REALM_TITLE"
+msgstr "Reino"
+
+msgid "WORLD_INFO_REGION_DESC"
+msgstr "Cada região produz efeitos distintos. Realizar a atividade certa no lugar adequado rende o dobro do resultado com metade do esforço."
+
+msgid "WORLD_INFO_REGION_NAME"
+msgstr "Região"
+
+msgid "WORLD_INFO_REGION_TITLE"
+msgstr "Região"
+
+msgid "WORLD_INFO_ROOT_DESC"
+msgstr "As raízes espirituais são formadas pelos cinco elementos: Metal, Madeira, Água, Fogo e Terra. Elas se dividem em Raízes Simples, Duplas e Celestiais. Na interação dos cinco elementos, Metal domina Madeira, Madeira domina Terra, Terra domina Água, Água domina Fogo e Fogo domina Metal. A Raiz Espiritual Celestial reúne os cinco elementos e concede um bônus adicional durante avanços. A eficiência do cultivo é maior em regiões que correspondem ao atributo da própria raiz espiritual."
+
+msgid "WORLD_INFO_ROOT_NAME"
+msgstr "Raiz Espiritual"
+
+msgid "WORLD_INFO_ROOT_TITLE"
+msgstr "Raiz Espiritual"
+
+msgid "WORLD_INFO_SECRET_REALM_DESC"
+msgstr "Reinos secretos se abrem a cada poucos anos. Entrar em um deles pode levar a grandes perigos, mas também a artefatos e técnicas de alto nível."
+
+msgid "WORLD_INFO_SECRET_REALM_NAME"
+msgstr "Reino Secreto"
+
+msgid "WORLD_INFO_SECRET_REALM_TITLE"
+msgstr "Reino Secreto"
+
+msgid "WORLD_INFO_SECT_DESC"
+msgstr "As seitas oferecem abrigo aos cultivadores. Ingressar em uma permite aprender técnicas exclusivas e receber a proteção dos demais discípulos; cultivadores independentes têm liberdade, mas carecem de recursos."
+
+msgid "WORLD_INFO_SECT_NAME"
+msgstr "Seita"
+
+msgid "WORLD_INFO_SECT_TITLE"
+msgstr "Seita"
+
+msgid "WORLD_INFO_SHOPPING_DESC"
+msgstr "Nas cidades, é possível comprar elixires e armas do grau Refinamento de Qi. Elixires adquiridos são consumidos imediatamente para fortalecer o personagem; novas armas permitem trocar para um tipo mais adequado."
+
+msgid "WORLD_INFO_SHOPPING_NAME"
+msgstr "Compras"
+
+msgid "WORLD_INFO_SHOPPING_TITLE"
+msgstr "Compras"
+
+msgid "WORLD_INFO_SPIRIT_STONE_DESC"
+msgstr "A moeda corrente do mundo do cultivo. Pedras espirituais servem para comprar artefatos e elixires e podem ser obtidas por coleta, comércio ou saque."
+
+msgid "WORLD_INFO_SPIRIT_STONE_NAME"
+msgstr "Pedra Espiritual"
+
+msgid "WORLD_INFO_SPIRIT_STONE_TITLE"
+msgstr "Pedra Espiritual"
+
+msgid "WORLD_INFO_WORLD_QI_DESC"
+msgstr "A cada poucos anos, o mundo passa por transformações celestiais, como Marés de Qi, que afetam as capacidades dos personagens."
+
+msgid "WORLD_INFO_WORLD_QI_NAME"
+msgstr "Qi do Mundo"
+
+msgid "WORLD_INFO_WORLD_QI_TITLE"
+msgstr "Qi do Mundo"
+
+msgid "WORLD_INFO_RANKING_DESC"
+msgstr "O mundo do cultivo possui os Rankings Celestial, Terreno e Humano, além do Ranking das Seitas. Os três rankings individuais são organizados pelo reino padrão equivalente: o Celestial registra especialistas do nível Alma Nascente; o Terreno, especialistas do nível Formação do Núcleo; e o Humano, especialistas do nível Estabelecimento da Fundação. O Ranking das Seitas as classifica pelo poder total."
+
+msgid "WORLD_INFO_RANKING_NAME"
+msgstr "Rankings"
+
+msgid "WORLD_INFO_RANKING_TITLE"
+msgstr "Rankings"
+
+msgid "WORLD_INFO_DYNASTY_DESC"
+msgstr "Dinastias mortais governam o território, preservando a ordem mundana e as fronteiras. Imperadores não vivem mais que outros mortais e, quando um deles morre, um novo soberano assume o trono."
+
+msgid "WORLD_INFO_DYNASTY_NAME"
+msgstr "Dinastia"
+
+msgid "WORLD_INFO_DYNASTY_TITLE"
+msgstr "Dinastia"
+
+msgid "WORLD_INFO_OFFICIAL_DESC"
+msgstr "Cultivadores podem servir à corte imperial, administrando o território para conquistar reputação e receber salário. Reputação suficiente garante promoções; quanto mais alto o cargo, maiores o salário e a sorte. Se negligenciarem o governo por muito tempo, sua reputação diminuirá gradualmente."
+
+msgid "WORLD_INFO_OFFICIAL_NAME"
+msgstr "Cargo Oficial"
+
+msgid "WORLD_INFO_OFFICIAL_TITLE"
+msgstr "Cargo Oficial"
+
+msgid "WORLD_INFO_CULTIVATION_ALIAS_DESC"
+msgstr "Os mesmos reinos de cultivo recebem nomes diferentes em cada tradição. Daoistas e cultivadores independentes usam Refinamento de Qi, Estabelecimento da Fundação, Formação do Núcleo e Alma Nascente; cultivadores marciais usam Têmpera Corporal, Têmpera dos Tendões, Mestre Marcial e Santo Marcial; confucianos usam Cultivo do Qi Vital, Iluminação dos Princípios, Estabelecimento do Mandato e Grande Erudito; budistas usam Monge Noviço, Monge, Arhat e Bodisatva; cultivadores yao usam Despertar Espiritual, Transformação da Forma, Núcleo Demoníaco e Rei Demoníaco. Esses nomes correspondem à mesma sequência fundamental de reinos. Eles alteram a narrativa e os termos da interface, mas não mudam avanços, poder, longevidade, grau de itens ou outras regras."
+
+msgid "WORLD_INFO_CULTIVATION_ALIAS_NAME"
+msgstr "Nomes dos Reinos"
+
+msgid "WORLD_INFO_CULTIVATION_ALIAS_TITLE"
+msgstr "Nomes dos Reinos"
+
+msgid "WORLD_INFO_GU_DESC"
+msgstr "As artes Gu exigem que o cultivador carregue um instrumento Gu e possua a capacidade de infligir Gu antes de aplicá-lo a um alvo observável. Cada Gu age de maneira diferente: o Gu do Afundamento Mental altera relações de modo sutil; o Gu Devorador de Sangue causa dano periódico à vida; e os Gu da Erosão da Essência e da Desordem do Coração perturbam o cultivo. A chance de sucesso depende do instrumento, dos bônus do usuário e da resistência Gu do alvo. Uma falha pode ser percebida e prejudicar a relação."
+
+msgid "WORLD_INFO_GU_NAME"
+msgstr "Gu"
+
+msgid "WORLD_INFO_GU_TITLE"
+msgstr "Gu"
+
+msgid "WORLD_INFO_FORMATION_DESC"
+msgstr "Para instalar um efeito regional temporário no local atual, o cultivador precisa carregar um disco de formação e saber montar formações. Cada formação é adequada a certas regiões: áreas de cultivo e seitas podem receber formações de concentração espiritual, proteção das montanhas, clareza e semelhantes; cidades podem receber formações de cura; e minas, campos de ervas e domínios de feras podem receber formações de busca de veios, crescimento da madeira e condução de feras. Formações consomem pedras espirituais e desaparecem ao fim de sua duração."
+
+msgid "WORLD_INFO_FORMATION_NAME"
+msgstr "Formações"
+
+msgid "WORLD_INFO_FORMATION_TITLE"
+msgstr "Formações"
+
+msgid "WORLD_INFO_OPPORTUNITY_DESC"
+msgstr "Cultivadores podem sentir ocasionalmente uma súbita manifestação do destino, percebendo que uma pessoa ou um lugar está ligado à sua própria oportunidade. Ao seguir essa sensação, talvez encontrem um tesouro ou uma bênção, voltem de mãos vazias ou enfrentem perigo. Se demorarem demais, a oportunidade desaparecerá."
+
+msgid "WORLD_INFO_OPPORTUNITY_NAME"
+msgstr "Oportunidade"
+
+msgid "WORLD_INFO_OPPORTUNITY_TITLE"
+msgstr "Oportunidade"

@@ -1,0 +1,161 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Avatar System
+# Field Labels (info_dict keys)
+msgid "Origin"
+msgstr "Origem"
+
+msgid "Origin: {origin}"
+msgstr "Origem: {origin}"
+
+msgid "Orthodoxy"
+msgstr "Ortodoxia"
+
+msgid "Ranking"
+msgstr "Classificação"
+
+msgid "Realm"
+msgstr "Reino"
+
+msgid "Recent Events"
+msgstr "Eventos recentes"
+
+msgid "Region"
+msgstr "Região"
+
+msgid "Relations"
+msgstr "Relações"
+
+msgid "Sect"
+msgstr "Seita"
+
+msgid "Short-term Goal"
+msgstr "Objetivo de curto prazo"
+
+msgid "Spirit Animal"
+msgstr "Animal espiritual"
+
+msgid "Spirit Stones"
+msgstr "Pedras espirituais"
+
+msgid "Technique"
+msgstr "Técnica"
+
+msgid "Traits"
+msgstr "Traços"
+
+msgid "Weapon"
+msgstr "Arma"
+
+msgid "appearance_10_desc_female"
+msgstr "Sua beleza é tão deslumbrante que basta um olhar para que ninguém a esqueça."
+
+msgid "appearance_10_desc_male"
+msgstr "Você é tão belo que parece pertencer a outro mundo."
+
+msgid "appearance_10_name"
+msgstr "Deslumbrante"
+
+msgid "appearance_1_desc_female"
+msgstr "Você é muito feia, com traços desarmônicos que fazem as pessoas evitarem você."
+
+msgid "appearance_1_desc_male"
+msgstr "Você é muito feio, com traços desarmônicos que costumam atrair olhares."
+
+# Automatically added missing keys
+msgid "appearance_1_name"
+msgstr "Horrendo"
+
+msgid "appearance_2_desc_female"
+msgstr "Sua aparência é grosseira, com alguns traços bastante marcantes."
+
+msgid "appearance_2_desc_male"
+msgstr "Sua aparência é grosseira, com alguns traços bastante marcantes."
+
+msgid "appearance_2_name"
+msgstr "Feio"
+
+msgid "appearance_3_desc_female"
+msgstr "Sua aparência é mediana e não muito agradável aos olhos."
+
+msgid "appearance_3_desc_male"
+msgstr "Sua aparência é mediana e não muito agradável aos olhos."
+
+msgid "appearance_3_name"
+msgstr "Rústico"
+
+msgid "appearance_4_desc_female"
+msgstr "Você tem uma aparência muito comum e se perde facilmente na multidão."
+
+msgid "appearance_4_desc_male"
+msgstr "Você tem uma aparência muito comum e se perde facilmente na multidão."
+
+msgid "appearance_4_name"
+msgstr "Comum"
+
+msgid "appearance_5_desc_female"
+msgstr "Você tem traços delicados e uma aparência bastante agradável."
+
+msgid "appearance_5_desc_male"
+msgstr "Você tem traços delicados e uma aparência bastante agradável."
+
+msgid "appearance_5_name"
+msgstr "Delicado"
+
+msgid "appearance_6_desc_female"
+msgstr "Você tem traços harmoniosos e parece cheia de energia."
+
+msgid "appearance_6_desc_male"
+msgstr "Você tem traços harmoniosos e parece cheio de energia."
+
+msgid "appearance_6_name"
+msgstr "Elegante"
+
+msgid "appearance_7_desc_female"
+msgstr "Você é muito bonita e chama a atenção."
+
+msgid "appearance_7_desc_male"
+msgstr "Você é muito bonito e faz muitas pessoas virarem a cabeça."
+
+msgid "appearance_7_name"
+msgstr "Bonito"
+
+msgid "appearance_8_desc_female"
+msgstr "Você é tão bonita que chega a impressionar."
+
+msgid "appearance_8_desc_male"
+msgstr "Sua aparência é excepcional e chama a atenção por onde você passa."
+
+msgid "appearance_8_name"
+msgstr "Impressionante"
+
+msgid "appearance_9_desc_female"
+msgstr "Sua beleza é arrebatadora, quase inesquecível à primeira vista."
+
+msgid "appearance_9_desc_male"
+msgstr "Sua aparência e sua presença são excepcionais e costumam atrair olhares discretos."
+
+msgid "appearance_9_name"
+msgstr "Primoroso"
+
+msgid "daughter"
+msgstr "filha"
+
+msgid ""
+"{name} has awakened their spiritual roots and embarked on the path of "
+"cultivation."
+msgstr ""
+"{name} despertou suas raízes espirituais e ingressou no caminho do "
+"cultivo."

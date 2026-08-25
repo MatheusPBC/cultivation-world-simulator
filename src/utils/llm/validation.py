@@ -13,6 +13,8 @@ def is_local_llm_endpoint(base_url: str) -> bool:
 
 
 def llm_requires_api_key(*, base_url: str, api_format: str = "openai") -> bool:
+    if (api_format or "openai").lower() == "codex_cli":
+        return False
     if (api_format or "openai").lower() == "anthropic":
         return True
     return not is_local_llm_endpoint(base_url)

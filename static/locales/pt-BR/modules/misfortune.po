@@ -1,0 +1,92 @@
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid ", defended {region}"
+msgstr ", defendeu {region}"
+
+msgid ", successfully seized {region}"
+msgstr ", tomou {region} com sucesso"
+
+msgid "Already the owner of this cave dwelling"
+msgstr "Já é proprietário desta morada de cultivo"
+
+msgid "Cannot drive away in wilderness"
+msgstr "Não é possível expulsar alguém em uma área selvagem"
+
+msgid "Cannot find region: {region}"
+msgstr "Região não encontrada: {region}"
+
+msgid "Cannot initiate interaction with self"
+msgstr "Não é possível iniciar uma interação consigo mesmo"
+
+msgid "Elixirs cannot be gifted"
+msgstr "Elixires não podem ser dados de presente"
+
+msgid "Gift you {item}"
+msgstr "Dar {item} a você"
+
+msgid "Insufficient item: {name}"
+msgstr "Item insuficiente: {name}"
+
+msgid "Insufficient spirit stones (current: {current}, need: {need})"
+msgstr "Pedras espirituais insuficientes (atual: {current}, necessário: {need})"
+
+msgid "Item not equipped: {name}"
+msgstr "Item não equipado: {name}"
+
+msgid "Item not found: {name}"
+msgstr "Item não encontrado: {name}"
+
+msgid ""
+"Level difference insufficient, need 20 levels (current gap: {diff} levels)"
+msgstr ""
+"Diferença de nível insuficiente; são necessários 20 níveis (diferença "
+"atual: {diff} níveis)"
+
+msgid "Target is not your apprentice"
+msgstr "O alvo não é seu aprendiz"
+
+msgid ""
+"Target is not your disciple, martial grandchild, martial sibling, child, "
+"grandchild, or friend"
+msgstr ""
+"O alvo não é seu discípulo, discípulo de segunda geração, irmão marcial, "
+"filho, neto ou amigo"
+
+msgid "Target not within interaction range"
+msgstr "O alvo está fora do alcance de interação"
+
+msgid "misfortune_event_base"
+msgstr "Sofreu um infortúnio ({title}): {result}"
+
+msgid "misfortune_result_backlash"
+msgstr "{name} perdeu {amount} pontos de cultivo."
+
+msgid "misfortune_result_injury"
+msgstr "{name} sofreu {damage} de dano e ficou com {current}/{max} de vida."
+
+msgid "misfortune_result_loss_spirit_stone"
+msgstr "{name} perdeu {amount} pedras espirituais."
+
+msgid "misfortune_title_backlash"
+msgstr "Reação do cultivo"
+
+msgid "misfortune_title_injury"
+msgstr "Ferimento acidental"
+
+msgid "misfortune_title_loss_spirit_stone"
+msgstr "Perda financeira"
+
+msgid "misfortune_title_mystery"
+msgstr "Azar misterioso"
+
+msgid "{name} cultivation regressed by {amount} points"
+msgstr "O cultivo de {name} regrediu {amount} pontos"
+
+msgid "{name} lost {amount} spirit stones"
+msgstr "{name} perdeu {amount} pedras espirituais"
+
+msgid "{name} took {damage} damage, HP remaining {current}/{max}"
+msgstr "{name} sofreu {damage} de dano e ficou com {current}/{max} de vida"

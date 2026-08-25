@@ -1,0 +1,189 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "BACKGROUND_NPC_ROLE_HERB_VENDOR"
+msgstr "vendedor de ervas"
+
+msgid "BACKGROUND_NPC_ROLE_STORYTELLER"
+msgstr "contador de histórias da casa de chá"
+
+msgid "BACKGROUND_NPC_ROLE_PATROL_RUNNER"
+msgstr "mensageiro da patrulha urbana"
+
+msgid "BACKGROUND_NPC_ROLE_TIDE_GUIDE"
+msgstr "guia das marés"
+
+msgid "BACKGROUND_NPC_ROLE_DOCK_LABORER"
+msgstr "trabalhador das docas"
+
+msgid "BACKGROUND_NPC_ROLE_MOUNTAIN_GUARD"
+msgstr "guarda do desfiladeiro"
+
+msgid "BACKGROUND_NPC_ROLE_MINE_SURVIVOR"
+msgstr "sobrevivente da mina"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_GATE_CHILD"
+msgstr "jovem porteiro da seita"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_ERRAND_SERVANT"
+msgstr "servente da seita externa"
+
+msgid "BACKGROUND_NPC_ROLE_YAMEN_CLERK"
+msgstr "escrivão do yamen"
+
+msgid "BACKGROUND_NPC_ROLE_GRAIN_KEEPER"
+msgstr "encarregado do celeiro"
+
+msgid "BACKGROUND_NPC_ROLE_BLACK_MARKET_BROKER"
+msgstr "intermediário do mercado clandestino"
+
+msgid "BACKGROUND_NPC_ROLE_APPRAISER"
+msgstr "avaliador de mercadorias"
+
+msgid "BACKGROUND_NPC_ROLE_MEDICINE_ASSISTANT"
+msgstr "assistente da botica"
+
+msgid "BACKGROUND_NPC_ROLE_TEA_SHED_ELDER"
+msgstr "ancião da barraca de chá"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_FIELD_FARMER"
+msgstr "agricultor dos campos da seita"
+
+msgid "BACKGROUND_NPC_ROLE_ALCHEMY_FIREWORKER"
+msgstr "foguista da alquimia"
+
+msgid "BACKGROUND_NPC_ROLE_SCRIPTURE_COPYIST"
+msgstr "copista de escrituras"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_TENANT"
+msgstr "arrendatário da seita"
+
+msgid "BACKGROUND_NPC_ROLE_IMMORTAL_SEEKING_PARENT"
+msgstr "genitor em busca da imortalidade"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_BUYER"
+msgstr "comprador da seita"
+
+msgid "BACKGROUND_NPC_ROLE_HUNTER"
+msgstr "caçador"
+
+msgid "BACKGROUND_NPC_ROLE_HERB_GATHERER"
+msgstr "coletor de ervas"
+
+msgid "BACKGROUND_NPC_ROLE_FERRYMAN"
+msgstr "barqueiro"
+
+msgid "BACKGROUND_NPC_ROLE_CARAVAN_MERCHANT"
+msgstr "mercador itinerante"
+
+msgid "BACKGROUND_NPC_ROLE_POSTAL_COURIER"
+msgstr "mensageiro"
+
+msgid "BACKGROUND_NPC_ROLE_INNKEEPER"
+msgstr "estalajadeiro"
+
+msgid "BACKGROUND_NPC_ROLE_BLACKSMITH"
+msgstr "ferreiro"
+
+msgid "BACKGROUND_NPC_ROLE_ARTIFACT_SHOPKEEPER"
+msgstr "lojista de artefatos"
+
+msgid "BACKGROUND_NPC_ROLE_WEAPON_SHOPKEEPER"
+msgstr "lojista de armas"
+
+msgid "BACKGROUND_NPC_ROLE_PAWNSHOP_CLERK"
+msgstr "avaliador da casa de penhores"
+
+msgid "BACKGROUND_NPC_ROLE_TAX_COLLECTOR"
+msgstr "coletor de impostos"
+
+msgid "BACKGROUND_NPC_ROLE_CONSTABLE"
+msgstr "oficial de justiça"
+
+msgid "BACKGROUND_NPC_ROLE_NIGHT_WATCHMAN"
+msgstr "vigia noturno"
+
+msgid "BACKGROUND_NPC_ROLE_HOUSEHOLD_CLERK"
+msgstr "escrivão do registro civil"
+
+msgid "BACKGROUND_NPC_ROLE_NOTICE_CRIER"
+msgstr "arauto de editais"
+
+msgid "BACKGROUND_NPC_ROLE_RELIEF_OFFICER"
+msgstr "oficial de assistência"
+
+msgid "BACKGROUND_NPC_ROLE_GOVERNMENT_GATEKEEPER"
+msgstr "porteiro do yamen"
+
+msgid "BACKGROUND_NPC_ROLE_IMPERIAL_COURIER"
+msgstr "mensageiro imperial"
+
+msgid "BACKGROUND_NPC_ROLE_PALACE_ATTENDANT"
+msgstr "servidor do palácio"
+
+msgid "BACKGROUND_NPC_ROLE_CENSOR_RETAINER"
+msgstr "servidor do censor"
+
+msgid "BACKGROUND_NPC_ROLE_SHIPWRIGHT"
+msgstr "construtor naval"
+
+msgid "BACKGROUND_NPC_ROLE_SALT_STEWARD"
+msgstr "administrador do armazém de sal"
+
+msgid "BACKGROUND_NPC_ROLE_FISHERMAN"
+msgstr "pescador"
+
+msgid "BACKGROUND_NPC_ROLE_PEARL_DIVER"
+msgstr "mergulhador de pérolas"
+
+msgid "BACKGROUND_NPC_ROLE_CHART_PEDDLER"
+msgstr "vendedor de cartas náuticas"
+
+msgid "BACKGROUND_NPC_ROLE_PORT_TAX_COLLECTOR"
+msgstr "coletor de impostos portuários"
+
+msgid "BACKGROUND_NPC_ROLE_SHIP_CAPTAIN"
+msgstr "capitão de navio"
+
+msgid "BACKGROUND_NPC_ROLE_POST_STATION_MASTER"
+msgstr "chefe da estação de correio"
+
+msgid "BACKGROUND_NPC_ROLE_MINE_FOREMAN"
+msgstr "capataz da mina"
+
+msgid "BACKGROUND_NPC_ROLE_MINER"
+msgstr "mineiro"
+
+msgid "BACKGROUND_NPC_ROLE_ORE_APPRAISER"
+msgstr "avaliador de minérios"
+
+msgid "BACKGROUND_NPC_ROLE_MOUNTAIN_PEDDLER"
+msgstr "mascate das montanhas"
+
+msgid "BACKGROUND_NPC_ROLE_GINSENG_GATHERER"
+msgstr "coletor de ginseng"
+
+msgid "BACKGROUND_NPC_ROLE_LUMBERJACK"
+msgstr "lenhador"
+
+msgid "BACKGROUND_NPC_ROLE_BEAST_KEEPER"
+msgstr "tratador de feras espirituais"
+
+msgid "BACKGROUND_NPC_ROLE_FORGE_ARTISAN"
+msgstr "artesão da forja"
+
+msgid "BACKGROUND_NPC_ROLE_SECT_COOK"
+msgstr "cozinheiro da seita"
+
+msgid "BACKGROUND_NPC_ROLE_SWEEPER_CHILD"
+msgstr "jovem varredor"
+
+msgid "BACKGROUND_NPC_ROLE_VASSAL_STEWARD"
+msgstr "administrador vassalo"
+
+msgid "BACKGROUND_NPC_ROLE_LETTER_SERVANT"
+msgstr "criado mensageiro"

@@ -1,7 +1,9 @@
 import { httpClient } from '../http';
 import type { 
   EventsResponseDTO,
-  FetchEventsParams
+  FetchEventsParams,
+  WorldJournalPeriodMonths,
+  WorldJournalResponseDTO,
 } from '../../types/api';
 import { normalizeEventsResponse } from '../mappers/event';
 
@@ -18,6 +20,12 @@ export const eventApi = {
     const qs = query.toString();
     const data = await httpClient.get<EventsResponseDTO>(`/api/v1/query/events${qs ? '?' + qs : ''}`);
     return normalizeEventsResponse(data);
+  },
+
+  fetchWorldJournal(periodMonths: WorldJournalPeriodMonths) {
+    return httpClient.get<WorldJournalResponseDTO>(
+      `/api/v1/query/world/journal?period_months=${periodMonths}`,
+    );
   },
 
   cleanupEvents(keepMajor = true, beforeMonthStamp?: number) {

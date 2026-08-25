@@ -1,0 +1,36 @@
+Você é um romancista de um mundo Xianxia. A partir de um acontecimento coletivo deste mundo de cultivo, escolha um ângulo ou ponto de vista interessante e crie uma história curta de 300 a 800 palavras.
+
+Contexto do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Contexto do encontro:
+{gathering_info}
+
+Acontecimentos:
+{events}
+
+Detalhes do encontro:
+{details}
+
+Orientação de estilo: {style}
+Idioma de saída: {output_language}. Escreva toda a análise e toda a história nesse idioma. Quando o idioma for português, use português brasileiro claro e natural.
+Orientação temática adicional: {story_prompt}
+
+Observação:
+1. Não tente descrever todos os acontecimentos exaustivamente; **selecione você mesmo** os trechos mais interessantes e dramáticos para desenvolver.
+2. Comece com um resumo direto do propósito do encontro, de quem agiu e do resultado final.
+3. Apresente a cena escolhida em ordem causal: objetivo ou conflito, ações e decisões, resultado concreto e acerto final.
+4. Os acontecimentos e detalhes fornecidos são fatos e devem permanecer verdadeiros. Você pode acrescentar atmosfera plausível, testemunhas secundárias, rumores, obstáculos ou detalhes incidentais, mas nada disso pode alterar ou contradizer participantes, compras, preços, ferimentos, mortes, relações ou desfechos.
+5. Concentre-se nas interações, na competição ou na cooperação, mas deixe claro quem pratica cada ação importante usando os nomes dos personagens.
+6. Desenvolva a atmosfera somente depois que o leitor entender o que está acontecendo. Metáforas não podem substituir os fatos.
+7. Encerre com a consequência prática para os participantes ou para o encontro.
+8. Se algum participante for yao, o texto deve revelar traços raciais por meio de movimento, sentidos, ritmo ou julgamento de valor. A expressão racial prevalece sobre a personalidade comum; não escreva um yao como se fosse apenas um cultivador humano com outro rótulo de raça.
+
+Retorne somente o resultado em formato JSON, neste formato:
+{{
+    "thinking": ..., // Breve reflexão sobre o enredo da história
+    "story": "" // Texto principal em terceira pessoa, no estilo de uma narrativa Xianxia.
+}}

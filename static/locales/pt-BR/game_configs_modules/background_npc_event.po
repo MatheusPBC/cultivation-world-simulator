@@ -1,0 +1,300 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "BACKGROUND_NPC_EVENT_ALCHEMY_FIREWORKER_ASHES"
+msgstr "Atrás da sala de alquimia de {sect_name}, um foguista peneirava repetidas vezes as cinzas claras da fornalha, temendo deixar passar qualquer pó que ainda pudesse voltar ao fogo."
+
+msgid "BACKGROUND_NPC_EVENT_APPRAISER_AVATAR_SELL_ECHO"
+msgstr "Depois que {avatar_name} deixou a casa de consignação de {region_name}, o avaliador examinou o item sob a lamparina mais três vezes antes de permitir que o escrivão o registrasse."
+
+msgid "BACKGROUND_NPC_EVENT_BLACK_MARKET_BROKER_HIDDEN_MAP"
+msgstr "Em um beco de {region_name}, um intermediário do mercado clandestino escondia sob a manga uma carta náutica rasgada e dizia que a sombra do recife marcada nela só aparecia uma vez a cada trinta anos."
+
+msgid "BACKGROUND_NPC_EVENT_DOCK_LABORER_NIGHT_CARGO"
+msgstr "Quando a maré noturna subiu em {region_name}, vários trabalhadores das docas arrastaram peles encharcadas de feras marinhas para o armazém de sal."
+
+msgid "BACKGROUND_NPC_EVENT_FERRYMAN_MOVE_REGION_ECHO"
+msgstr "Na balsa de {region_name}, o guia das marés estudou as águas e avisou {avatar_name} que, ultimamente, cada vez menos viajantes ousavam fazer a travessia à noite."
+
+msgid "BACKGROUND_NPC_EVENT_GRAIN_KEEPER_GOVERN_ECHO"
+msgstr "Depois que {avatar_name} terminou de cuidar dos assuntos da cidade em {region_name}, o encarregado do celeiro acrescentou uma linha às contas, e as vozes do lado de fora do portão se acalmaram."
+
+msgid "BACKGROUND_NPC_EVENT_HEALER_HELP_PEOPLE_ECHO"
+msgstr "Depois que {avatar_name} deixou {region_name}, o médico da clínica enviou o restante do pó cicatrizante para o abrigo de distribuição de mingau, onde vários desalojados agradeceram em voz baixa."
+
+msgid "BACKGROUND_NPC_EVENT_HERB_VENDOR_AVATAR_BUY_ECHO"
+msgstr "Enquanto {avatar_name} escolhia materiais espirituais em {region_name}, o assistente da botica limpava o balcão sem parar, sem jamais ousar apressar a escolha."
+
+msgid "BACKGROUND_NPC_EVENT_HERB_VENDOR_MARKET_ARGUMENT"
+msgstr "Em {region_name}, um vendedor e um coletor de ervas discutiram por meio dia sobre a idade de um feixe, até que um assistente chamou o responsável pela loja para examiná-lo."
+
+msgid "BACKGROUND_NPC_EVENT_IMMORTAL_PARENT_WAITS"
+msgstr "Diante do portão de {sect_name}, pais em busca da imortalidade esperaram com a criança até o sol pender para o oeste; o jovem porteiro trouxe água, mas não prometeu transmitir recado algum."
+
+msgid "BACKGROUND_NPC_EVENT_MARKET_REACTS_TO_YAO"
+msgstr "Quando {avatar_name} atravessou o mercado de {region_name}, vários feirantes baixaram a voz, e uma mulher puxou o filho para trás de si."
+
+msgid "BACKGROUND_NPC_EVENT_MEDICINE_ASSISTANT_AVATAR_INQUIRY"
+msgstr "Quando {avatar_name} perguntou os preços em uma botica de {region_name}, o assistente afastou depressa várias ervas mortais e expôs apenas produtos que ainda conservavam energia espiritual."
+
+msgid "BACKGROUND_NPC_EVENT_MINE_SURVIVOR_WHISPERS"
+msgstr "Ao lado de uma barraca de chá em {region_name}, um sobrevivente da mina sussurrou que, à noite, vinham sons de batidas das profundezas; ninguém entre os ouvintes respondeu."
+
+msgid "BACKGROUND_NPC_EVENT_MOUNTAIN_GUARD_AVATAR_WARNING"
+msgstr "Quando {avatar_name} passou pelo portão montanhoso de {region_name}, um guarda reuniu coragem para avisar que ventos estranhos costumavam soprar mais adiante à noite, depois baixou a cabeça e recuou."
+
+msgid "BACKGROUND_NPC_EVENT_MOUNTAIN_GUARD_WATCHES_CLOUD"
+msgstr "Um guarda do desfiladeiro de {region_name} encontrou uma nova marca de queimadura na muralha e olhou para as alturas cobertas de névoa, mas não registrou o fato no livro da vigília noturna."
+
+msgid "BACKGROUND_NPC_EVENT_PATROL_FEARS_EVIL_AVATAR"
+msgstr "Depois que {avatar_name} deixou os becos de {region_name}, um mensageiro da patrulha urbana permaneceu junto ao poço por um longo tempo e então simplesmente fechou aquela página do livro de ocorrências."
+
+msgid "BACKGROUND_NPC_EVENT_PATROL_PLUNDER_ECHO"
+msgstr "Depois que {avatar_name} deixou {region_name}, nenhuma lamparina foi acesa no beco oeste durante toda a noite, e até o mensageiro da patrulha urbana passou por ali com passos mais leves."
+
+msgid "BACKGROUND_NPC_EVENT_PATROL_RUNNER_CITY_ORDER"
+msgstr "Na entrada de um beco em {region_name}, um mensageiro da patrulha urbana esperou dois cultivadores se afastarem antes de mandar a multidão de curiosos dispersar."
+
+msgid "BACKGROUND_NPC_EVENT_SCRIPTURE_COPYIST_AVATAR_SILENCE"
+msgstr "Quando {avatar_name} passou por uma sala lateral da biblioteca de escrituras de {sect_name}, o copista imediatamente imobilizou o pincel e só voltou a escrever depois que o farfalhar das vestes desapareceu."
+
+msgid "BACKGROUND_NPC_EVENT_SCRIPTURE_COPYIST_WET_PAGES"
+msgstr "Em uma sala lateral da biblioteca de escrituras de {sect_name}, um copista estendeu páginas úmidas sobre telas de bambu e alertou uma criança para não deixar que os discípulos internos as vissem."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_BUYER_MARKET_LIST"
+msgstr "Nas barracas abaixo de {sect_name}, um comprador da seita conferiu novamente a lista de provisões, separando grãos, carvão e tigelas de remédios enquanto franzia a testa diante do preço dos materiais espirituais."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_ERRAND_MISSION_ECHO"
+msgstr "Depois que {avatar_name} entregou a tarefa da seita, um servente da seita externa dobrou novamente a lista de provisões e soltou um suspiro discreto."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_FIELD_FARMER_AVATAR_PATH"
+msgstr "Quando {avatar_name} passou pelo caminho dos campos de {sect_name}, um agricultor interrompeu o trabalho com a enxada e deu passagem sobre o dique, só voltando às ervas daninhas quando os passos sumiram."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_FIELD_FARMER_LEAF_SPOTS"
+msgstr "Ao lado dos campos espirituais de {sect_name}, um agricultor encontrou pontas enegrecidas em uma fileira de ervas, largou o balde d'água e correu para procurar um administrador."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_GATE_CHILD_AVATAR_QUESTION"
+msgstr "Quando {avatar_name} passou pelo portão de {sect_name}, o jovem porteiro perguntou baixinho se deveria enviar um recado ao pátio externo e imediatamente tornou a baixar os olhos para os degraus."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_GATE_CHILD_WAITING"
+msgstr "Diante do portão de {sect_name}, um jovem porteiro apoiou a vassoura nos degraus de pedra e observou várias famílias em busca da imortalidade desaparecerem lentamente na névoa da manhã."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_SERVANT_REACTS_TO_DISCIPLE"
+msgstr "Quando {avatar_name} desceu a montanha para comprar provisões, um servente da seita externa abriu passagem junto à escadaria de pedra e esperou antes de voltar a erguer os sacos de arroz."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_TENANT_GRAIN_CART"
+msgstr "Ao pé de {sect_name}, arrendatários pararam a carroça de grãos diante da escadaria de pedra e contaram em silêncio os grãos devidos naquele ano enquanto aguardavam o administrador."
+
+msgid "BACKGROUND_NPC_EVENT_STORE_REACTS_TO_HIGH_REALM"
+msgstr "Quando {avatar_name} parou diante da botica de {region_name}, o responsável ordenou imediatamente que os assistentes guardassem as ervas mortais e expusessem caixas de jade com materiais espirituais."
+
+msgid "BACKGROUND_NPC_EVENT_STORYTELLER_RUMOR_TEAHOUSE"
+msgstr "Em uma casa de chá de {region_name}, um contador de histórias afirmou que uma propriedade imortal havia emergido no mar oriental; os ouvintes vibraram, enquanto o escrivão apenas anotou a venda de mais três bules de chá."
+
+msgid "BACKGROUND_NPC_EVENT_TEA_SHED_ELDER_AVATAR_PAUSE"
+msgstr "Quando {avatar_name} parou diante de uma barraca de chá em {region_name}, o ancião interrompeu a história sobre uma seita imortal que vinha contando e perguntou apenas se serviria mais chá."
+
+msgid "BACKGROUND_NPC_EVENT_TIDE_GUIDE_WARNS_TIDE"
+msgstr "A maré de {region_name} ficou repentinamente revolta, e um guia das marés aconselhou vários barcos pequenos a adiar a partida enquanto os capitães estudavam as nuvens."
+
+msgid "BACKGROUND_NPC_EVENT_YAMEN_CLERK_LATE_RECORDS"
+msgstr "Um escrivão do yamen de {region_name} passou a noite recopiando os processos, resumindo discretamente os depoimentos que envolviam cultivadores e acrescentando apenas uma pequena nota no canto."
+
+msgid "BACKGROUND_NPC_EVENT_YAMEN_REACTS_TO_OFFICIAL"
+msgstr "Depois que {avatar_name} entrou em {region_name}, as patrulhas urbanas saudaram de longe, e o escrivão do yamen passou a noite recopiando a pilha de processos."
+
+msgid "BACKGROUND_NPC_EVENT_HUNTER_FOREST_SNARE"
+msgstr "Na orla da floresta de {region_name}, um caçador recolheu um laço molhado de orvalho e descobriu que as pegadas de cascos terminavam diante de uma pedra azul."
+
+msgid "BACKGROUND_NPC_EVENT_HERB_GATHERER_MIST_BASKET"
+msgstr "Antes que a névoa se dissipasse em {region_name}, um coletor de ervas descartou metade de um cesto de plantas comuns e conservou apenas algumas folhas iluminadas por energia espiritual."
+
+msgid "BACKGROUND_NPC_EVENT_FERRYMAN_RIVER_ROPE"
+msgstr "Na balsa de {region_name}, o rio de repente se aquietou; o barqueiro tornou a amarrar a corda e disse aos viajantes que não perguntassem sobre a viagem de volta."
+
+msgid "BACKGROUND_NPC_EVENT_CARAVAN_MERCHANT_ROADSIDE_ACCOUNT"
+msgstr "À beira da estrada em {region_name}, mercadores itinerantes registraram ossos de feras, sacos de sal e fragmentos de materiais espirituais em contas separadas."
+
+msgid "BACKGROUND_NPC_EVENT_POSTAL_COURIER_LATE_SEAL"
+msgstr "As lamparinas da estação de correio de {region_name} continuaram acesas enquanto um mensageiro escondia na manga uma carta urgente com o lacre de cera rachado."
+
+msgid "BACKGROUND_NPC_EVENT_INNKEEPER_ROOM_SCREEN"
+msgstr "Em uma estalagem de {region_name}, o estalajadeiro mandou limpar o biombo do cômodo mais reservado, dizendo que cultivadores não gostavam de muita poeira mortal."
+
+msgid "BACKGROUND_NPC_EVENT_BLACKSMITH_SPARK_TALISMAN"
+msgstr "Faíscas branco-azuladas saltaram da forja em {region_name}; o ferreiro observou por um instante e então prendeu um velho talismã sob a bigorna."
+
+msgid "BACKGROUND_NPC_EVENT_ARTIFACT_SHOPKEEPER_SEALED_SHELF"
+msgstr "O lojista de artefatos de {region_name} tornou a selar a prateleira mais alta e advertiu o assistente para não deixar clientes mortais tocarem nela."
+
+msgid "BACKGROUND_NPC_EVENT_PAWNSHOP_CLERK_OLD_TOKEN"
+msgstr "Em {region_name}, um avaliador da casa de penhores encontrou metade de uma ficha de jade em uma caixa antiga e fechou o livro-caixa ao ver o padrão quebrado."
+
+msgid "BACKGROUND_NPC_EVENT_TAX_COLLECTOR_DAWN_SCALES"
+msgstr "Ao primeiro toque do tambor da alvorada em {region_name}, um coletor de impostos pesou sacos de arroz junto ao portão e depois, discretamente, um pacote de areia espiritual."
+
+msgid "BACKGROUND_NPC_EVENT_CONSTABLE_CASE_THREAD"
+msgstr "Diante da mesa de investigações de {region_name}, um oficial de justiça moveu vários fios vermelhos para que evitassem todas as placas de madeira com nomes de cultivadores."
+
+msgid "BACKGROUND_NPC_EVENT_NIGHT_WATCHMAN_THIRD_WATCH"
+msgstr "Depois do toque da terceira vigília em {region_name}, o vigia noturno ouviu vestes roçando sobre as telhas e não ousou olhar para cima."
+
+msgid "BACKGROUND_NPC_EVENT_HOUSEHOLD_CLERK_RED_INK"
+msgstr "Em {region_name}, um escrivão do registro civil circulou com tinta vermelha várias famílias que haviam se mudado e escreveu: \"possivelmente seguiram um portal imortal\"."
+
+msgid "BACKGROUND_NPC_EVENT_NOTICE_CRIER_NEW_EDICT"
+msgstr "Um arauto de editais de {region_name} afixou uma nova proclamação da corte e baixou a voz ao ler \"oferendas aos portais imortais\"."
+
+msgid "BACKGROUND_NPC_EVENT_IMPERIAL_COURIER_DUSTY_CASE"
+msgstr "Em {region_name}, um mensageiro imperial entregou ao yamen apenas a carta mais urgente e partiu com as demais ainda presas atrás da sela."
+
+msgid "BACKGROUND_NPC_EVENT_PALACE_ATTENDANT_OUTER_RUMOR"
+msgstr "Nos assentos dos fundos de uma casa de chá em {region_name}, um servidor do palácio mencionou mudanças nas mesas de incenso da capital, e os ouvintes ficaram em silêncio."
+
+msgid "BACKGROUND_NPC_EVENT_CENSOR_RETAINER_QUIET_INQUIRY"
+msgstr "No fim de um beco de {region_name}, um servidor do censor perguntou sobre os cultivadores que haviam passado recentemente e deixou apenas uma fria moeda de cobre."
+
+msgid "BACKGROUND_NPC_EVENT_SHIPWRIGHT_KEEL_MARK"
+msgstr "No estaleiro de {region_name}, um construtor naval encontrou um tênue desenho de água na quilha nova e mandou o aprendiz interromper a colocação dos pregos."
+
+msgid "BACKGROUND_NPC_EVENT_SALT_STEWARD_WET_LEDGER"
+msgstr "O administrador do armazém de sal de {region_name} abriu um livro-caixa úmido e registrou várias perdas de sal como \"danos causados pela maré\"."
+
+msgid "BACKGROUND_NPC_EVENT_FISHERMAN_RED_TIDE_NET"
+msgstr "Fora do porto de {region_name}, um pescador puxou uma rede manchada de vermelho e não ousou levar para casa a escama brilhante presa no fundo."
+
+msgid "BACKGROUND_NPC_EVENT_PEARL_DIVER_SHELL_WHISPER"
+msgstr "Um mergulhador de pérolas de {region_name} encostou uma concha vazia ao ouvido, escutou algo entoando cânticos através da água e empalideceu."
+
+msgid "BACKGROUND_NPC_EVENT_CHART_PEDDLER_HIDDEN_REEF"
+msgstr "Um vendedor de cartas náuticas de {region_name} escureceu a marca de um recife oculto e disse ao comprador que seria melhor esquecer aquela rota."
+
+msgid "BACKGROUND_NPC_EVENT_PORT_TAX_COLLECTOR_CARGO_MARK"
+msgstr "Em {region_name}, o coletor de impostos portuários carimbou uma caixa de carga, viu luz espiritual escapar pela fresta e acrescentou outro selo."
+
+msgid "BACKGROUND_NPC_EVENT_SHIP_CAPTAIN_STORM_OATH"
+msgstr "Em {region_name}, o capitão de navio derramou vinho no mar e jurou que naquela noite não perseguiria a maré contrária; nenhum marinheiro contestou."
+
+msgid "BACKGROUND_NPC_EVENT_POST_STATION_MASTER_TIRED_HORSE"
+msgstr "Em {region_name}, o chefe da estação de correio tocou um cavalo de revezamento suado e virou a tabuleta da próxima rota, indicando uma espera mais longa."
+
+msgid "BACKGROUND_NPC_EVENT_MINE_FOREMAN_CRACKED_BEAM"
+msgstr "Em {region_name}, um capataz da mina encontrou uma rachadura recente em uma viga de sustentação, ordenou que os trabalhadores recuassem e então cobriu a fenda com lama."
+
+msgid "BACKGROUND_NPC_EVENT_MINER_LAMP_CIRCLE"
+msgstr "Na entrada de uma mina em {region_name}, vários mineiros se sentaram ao redor de uma lamparina quase apagada; nenhum deles queria ser o primeiro a dizer o que ouvira lá embaixo."
+
+msgid "BACKGROUND_NPC_EVENT_ORE_APPRAISER_BLUE_VEIN"
+msgstr "Um avaliador de minérios de {region_name} abriu uma pedra de veios verdes, viu um clarão azul e imediatamente reduziu o preço oferecido."
+
+msgid "BACKGROUND_NPC_EVENT_MOUNTAIN_PEDDLER_PASS_PRICE"
+msgstr "Um mascate das montanhas de {region_name} expôs cogumelos secos e tendões de fera, mas aumentou os preços ao saber que cultivadores lutavam mais adiante."
+
+msgid "BACKGROUND_NPC_EVENT_GINSENG_GATHERER_OLD_ROOT"
+msgstr "Em {region_name}, um coletor de ginseng desenterrou uma raiz antiga, viu suas ramificações se curvarem como mãos minúsculas e tornou a enterrá-la às pressas."
+
+msgid "BACKGROUND_NPC_EVENT_BEAST_KEEPER_RESTLESS_CAGES"
+msgstr "No jardim de feras espirituais de {sect_name}, o tratador ouviu vários filhotes ganirem ao mesmo tempo e pendurou uma tabuleta para pedir uma patrulha noturna adicional."
+
+msgid "BACKGROUND_NPC_EVENT_FORGE_ARTISAN_COLD_ANVIL"
+msgstr "Na forja de {sect_name}, um artesão encontrou geada se formando sobre a bigorna e guardou a lâmina inacabada de uma espada em uma caixa de ferro."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_COOK_LATE_RICE"
+msgstr "Na cozinha dos fundos de {sect_name}, o cozinheiro contou três vezes as fichas de refeição e encontrou uma porção que ninguém havia buscado."
+
+msgid "BACKGROUND_NPC_EVENT_SWEEPER_CHILD_FALLEN_TALISMAN"
+msgstr "Abaixo dos degraus de pedra de {sect_name}, um jovem varredor encontrou o canto chamuscado de um talismã e o escondeu no cabo da vassoura."
+
+msgid "BACKGROUND_NPC_EVENT_VASSAL_STEWARD_GIFT_BOXES"
+msgstr "Diante do portão de {sect_name}, um administrador vassalo reorganizou as caixas de presentes em duas filas, sem jamais ousar pôr a mais valiosa na frente."
+
+msgid "BACKGROUND_NPC_EVENT_LETTER_SERVANT_RAIN_MESSAGE"
+msgstr "Enquanto uma chuva forte caía sobre {sect_name}, um criado mensageiro segurava um tubo de bambu encharcado e aguardava o assentimento do discípulo de serviço."
+
+msgid "BACKGROUND_NPC_EVENT_INNKEEPER_AVATAR_ROOM"
+msgstr "Quando {avatar_name} se hospedou em {region_name}, o estalajadeiro trocou a roupa de cama e transferiu discretamente os hóspedes mortais dos quartos vizinhos para o andar inferior."
+
+msgid "BACKGROUND_NPC_EVENT_BLACKSMITH_AVATAR_WEAPON_GLANCE"
+msgstr "Quando {avatar_name} passou pela forja de {region_name}, o ferreiro viu a luz espiritual sobre a arma e puxou o aprendiz para trás."
+
+msgid "BACKGROUND_NPC_EVENT_ARTIFACT_SHOPKEEPER_AVATAR_BOW"
+msgstr "Quando {avatar_name} entrou na loja de artefatos de {region_name}, o lojista contornou o balcão para fazer uma reverência, e até o mais barulhento dos assistentes se calou."
+
+msgid "BACKGROUND_NPC_EVENT_TAX_COLLECTOR_AVATAR_SEAL"
+msgstr "Quando {avatar_name} passou pelo posto fiscal de {region_name}, o coletor lançou um olhar para o selo oficial e empurrou o livro de inspeção para o fundo da pilha."
+
+msgid "BACKGROUND_NPC_EVENT_CONSTABLE_AVATAR_EVIL_CASE"
+msgstr "Quando {avatar_name} passou pela sala de investigações de {region_name}, um oficial de justiça virou para baixo um depoimento ainda úmido e fingiu moer tinta."
+
+msgid "BACKGROUND_NPC_EVENT_POSTAL_COURIER_AVATAR_ROAD"
+msgstr "Enquanto {avatar_name} percorria a estrada postal de {region_name}, um mensageiro levou o cavalo para o lado e esperou a poeira baixar antes de tornar a montar."
+
+msgid "BACKGROUND_NPC_EVENT_SHIP_CAPTAIN_AVATAR_BOARD"
+msgstr "Quando {avatar_name} embarcou em uma balsa em {region_name}, o capitão recolheu a prancha de acesso e advertiu os marinheiros para não perguntarem aonde o visitante ia."
+
+msgid "BACKGROUND_NPC_EVENT_PEARL_DIVER_AVATAR_TIDE"
+msgstr "Quando {avatar_name} parou junto à linha da maré de {region_name}, um mergulhador de pérolas se afastou e escondeu atrás do recife o cesto de conchas recém-colhidas."
+
+msgid "BACKGROUND_NPC_EVENT_MINE_FOREMAN_AVATAR_TUNNEL"
+msgstr "Quando {avatar_name} se aproximou de um túnel da mina em {region_name}, o capataz fez os trabalhadores encostarem na parede, e até suas tosses foram abafadas."
+
+msgid "BACKGROUND_NPC_EVENT_MOUNTAIN_PEDDLER_AVATAR_GOODS"
+msgstr "Quando {avatar_name} parou diante de uma barraca de produtos das montanhas em {region_name}, o mascate afastou as mercadorias mortais e deixou à mostra apenas bugigangas tocadas por energia espiritual."
+
+msgid "BACKGROUND_NPC_EVENT_BEAST_KEEPER_AVATAR_HUSH"
+msgstr "Quando {avatar_name} passou pelos cercados de feras espirituais de {sect_name}, o tratador fez às pressas um gesto de silêncio, temendo que os filhotes soltassem algum som."
+
+msgid "BACKGROUND_NPC_EVENT_FORGE_ARTISAN_AVATAR_PAUSE"
+msgstr "Quando {avatar_name} passou pela forja de {sect_name}, o artesão interrompeu as marteladas e mergulhou lentamente a peça incandescente em uma fonte fria."
+
+msgid "BACKGROUND_NPC_EVENT_SECT_COOK_AVATAR_EXTRA_BOWL"
+msgstr "Quando {avatar_name} passou pela cozinha dos fundos de {sect_name}, o cozinheiro serviu discretamente uma tigela extra de mingau de arroz espiritual, mas não ousou fazer o convite."
+
+msgid "BACKGROUND_NPC_EVENT_SWEEPER_CHILD_AVATAR_BROOM"
+msgstr "Quando {avatar_name} pisou na escadaria de pedra de {sect_name}, o jovem varredor segurou a vassoura diante do peito e desobstruiu o caminho central."
+
+msgid "BACKGROUND_NPC_EVENT_RELIEF_OFFICER_HELP_PEOPLE_ECHO"
+msgstr "Depois que {avatar_name} ajudou o povo de {region_name}, o oficial de assistência recopiou o registro do abrigo de distribuição de mingau e deixou deliberadamente a primeira linha em branco."
+
+msgid "BACKGROUND_NPC_EVENT_WEAPON_SHOPKEEPER_BUY_ECHO"
+msgstr "Depois que {avatar_name} comprou uma arma em {region_name}, o lojista tornou a pendurar as lâminas restantes e passou meio dia sem anunciar seus produtos em voz alta."
+
+msgid "BACKGROUND_NPC_EVENT_PAWNSHOP_SELL_ECHO"
+msgstr "Depois que {avatar_name} deixou a casa de penhores de {region_name}, o avaliador guardou o item recebido sob chave e mandou o escrivão registrar menos detalhes sobre sua origem."
+
+msgid "BACKGROUND_NPC_EVENT_BLACKSMITH_REFINE_ECHO"
+msgstr "Depois que {avatar_name} refinou um item em {region_name}, o ferreiro recolheu um pouco das cinzas frias e sentiu um formigamento nas pontas dos dedos."
+
+msgid "BACKGROUND_NPC_EVENT_ARTIFACT_SHOPKEEPER_CAST_ECHO"
+msgstr "Depois que {avatar_name} lançou um feitiço e deixou {region_name}, o lojista de artefatos baixou a cortina e conferiu cada objeto pequeno no armário."
+
+msgid "BACKGROUND_NPC_EVENT_HUNTER_HUNT_ECHO"
+msgstr "Depois que {avatar_name} caçou em {region_name}, um caçador seguiu os galhos quebrados por alguns passos e então desmontou todas as armadilhas antigas."
+
+msgid "BACKGROUND_NPC_EVENT_HERB_GATHERER_HARVEST_ECHO"
+msgstr "Depois que {avatar_name} fez uma coleta em {region_name}, um coletor de ervas se agachou junto à clareira e ousou levar apenas algumas ervas comuns."
+
+msgid "BACKGROUND_NPC_EVENT_MINER_MINE_ECHO"
+msgstr "Depois que {avatar_name} deixou o veio mineral de {region_name}, os mineiros cobriram com um pano o padrão recém-exposto e esperaram pelo capataz."
+
+msgid "BACKGROUND_NPC_EVENT_INNKEEPER_REST_ECHO"
+msgstr "Depois que {avatar_name} descansou por uma noite em {region_name}, o estalajadeiro deixou o quarto vazio por três dias e trocou apenas o incenso a cada manhã."
+
+msgid "BACKGROUND_NPC_EVENT_POST_STATION_MOVE_ECHO"
+msgstr "Depois que {avatar_name} deixou a estação de correio de {region_name}, o chefe da estação limpou a tabuleta da próxima rota e alterou discretamente o horário da viagem noturna."
+
+msgid "BACKGROUND_NPC_EVENT_BEAST_KEEPER_SECT_MISSION_ECHO"
+msgstr "Depois que {avatar_name} concluiu uma tarefa da seita, o tratador de feras espirituais tornou a trancar uma jaula vazia e contou discretamente os filhotes mais uma vez."
+
+msgid "BACKGROUND_NPC_EVENT_FORGE_ARTISAN_SECT_MISSION_ECHO"
+msgstr "Depois que {avatar_name} entregou uma missão da seita, o artesão da forja reuniu os fragmentos restantes e os marcou como \"aguardando nova inspeção\"."
+
+msgid "BACKGROUND_NPC_EVENT_CENSOR_RETAINER_GOVERN_ECHO"
+msgstr "Depois que {avatar_name} cuidou dos assuntos do governo em {region_name}, o servidor do censor dobrou as anotações ao meio e entregou apenas a primeira parte."
+
+msgid "BACKGROUND_NPC_EVENT_NIGHT_WATCHMAN_PLUNDER_ECHO"
+msgstr "Depois que {avatar_name} deixou os becos noturnos de {region_name}, o vigia guardou a matraca sob o braço e não tornou a anunciar que tudo estava em paz."

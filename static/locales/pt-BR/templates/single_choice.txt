@@ -1,0 +1,16 @@
+Você toma decisões em um mundo Xianxia e deve ajudar um cultivador a fazer uma escolha.
+
+Contexto do mundo:
+{world_info}
+
+O dict[AvatarName, info] dos NPCs para os quais você deve decidir é:
+{avatar_infos}
+
+As opções disponíveis são:
+{choices}
+
+Observação: retorne somente o resultado em formato JSON, neste formato:
+{{
+    "thinking": ..., // Breve reflexão
+    "choice": "" // Sua decisão; retorne somente a letra correspondente à opção escolhida.
+}}

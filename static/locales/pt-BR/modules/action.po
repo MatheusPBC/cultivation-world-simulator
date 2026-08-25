@@ -1,0 +1,515 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid ""
+"Evil alignment follows the principles of survival of the fittest, "
+"prioritizing self-interest above all, disdaining rules, and venerating power"
+" and fear. Acts ruthlessly, often resorting to murder and plunder."
+msgstr ""
+"O alinhamento maligno segue o princípio da sobrevivência do mais forte, "
+"prioriza o interesse próprio acima de tudo, despreza regras e venera o poder "
+"e o medo. Age sem piedade, recorrendo com frequência ao assassinato e ao "
+"saque."
+
+msgid ""
+"Neutral alignment follows the principles of going with the flow, seeking "
+"benefit and avoiding harm, valuing self-cultivation and balance, and not "
+"easily taking sides."
+msgstr ""
+"O alinhamento neutro segue o princípio de acompanhar o curso dos "
+"acontecimentos, buscar benefícios e evitar danos, valorizar o cultivo pessoal "
+"e o equilíbrio e não tomar partido facilmente."
+
+msgid ""
+"Righteous alignment follows the principles of helping the weak, maintaining "
+"order, and vanquishing evil."
+msgstr ""
+"O alinhamento justo segue os princípios de ajudar os fracos, manter a ordem e "
+"derrotar o mal."
+
+# Action Short Names (for legal_actions)
+msgid "action_dualcultivation_short_name"
+msgstr "Cultivo dual"
+
+msgid "action_educate_short_name"
+msgstr "Educar"
+
+msgid "action_meditate_short_name"
+msgstr "Meditar"
+
+# Action: Play Extended
+msgid "action_reading"
+msgstr "Leitura"
+
+msgid "action_reading_desc"
+msgstr "Leia livros antigos para adquirir conhecimento."
+
+msgid "action_respire_short_name"
+msgstr "Respirar Qi"
+
+msgid "action_tea_party"
+msgstr "Encontro para o chá"
+
+msgid "action_tea_party_desc"
+msgstr "Compartilhe chá com os amigos."
+
+msgid "action_tea_party_story_prompt"
+msgstr "Duas pessoas estão participando de um elegante encontro para o chá."
+
+msgid "action_tea_tasting"
+msgstr "Degustação de chá"
+
+msgid "action_tea_tasting_desc"
+msgstr "Saboreie um bom chá e cultive a serenidade."
+
+msgid "action_temper_short_name"
+msgstr "Temperamento Corporal"
+
+msgid "sect_mission_action_name"
+msgstr "Missão da seita"
+
+msgid "sect_mission_description"
+msgstr ""
+"Permaneça na sede da sua seita para assumir patrulhas, guardas e tarefas "
+"internas e, após alguns meses, receba o resultado e as recompensas."
+
+msgid "sect_mission_requirements"
+msgstr ""
+"É necessário ser discípulo da seita e estar na sede da sua própria seita."
+
+msgid "sect_mission_hq_only"
+msgstr "Missões da seita só podem ser aceitas na sede da sua própria seita."
+
+msgid "sect_mission_members_only"
+msgstr "Apenas discípulos da seita podem aceitar missões da seita."
+
+msgid "sect_mission_no_task_available"
+msgstr "No momento, não há missão da seita adequada ao seu reino."
+
+msgid "sect_mission_start_headquarter"
+msgstr ""
+"{avatar} aceitou a missão da seita \"{title}\" na sede da {sect_name}. A "
+"duração prevista é de {duration} meses."
+
+msgid "sect_mission_start_member_request"
+msgstr ""
+"{avatar} aceitou a missão da seita \"{title}\" a pedido de {issuer}, outro "
+"discípulo. A duração prevista é de {duration} meses."
+
+msgid "sect_mission_result_success"
+msgstr ""
+"{avatar} concluiu \"{title}\" com sucesso e recebeu {stones} Pedras "
+"Espirituais e {contribution} de contribuição para a seita."
+
+msgid "sect_mission_result_fail"
+msgstr ""
+"{avatar} ficou ferido ao realizar \"{title}\" e perdeu {damage} PV. PV atuais: "
+"{current}/{max}."
+
+msgid "sect_mission_result_fail_death_append"
+msgstr " Os ferimentos foram fatais, e o personagem morreu no local."
+
+msgid "sect_mission_story_prompt_success"
+msgstr ""
+"Desenvolva a história em torno do título específico desta missão da seita, "
+"descrevendo os detalhes da tarefa, os contratempos e a atmosfera da seita, e "
+"termine com a conclusão bem-sucedida da missão. A tarefa ainda ocorre dentro "
+"da sede da seita e em suas áreas anexas."
+
+msgid "sect_mission_story_prompt_fail"
+msgstr ""
+"Desenvolva a história em torno do título específico desta missão da seita, "
+"descrevendo os detalhes da tarefa, os contratempos e as reviravoltas "
+"inesperadas, e termine com o fracasso da missão, ferimentos graves ou até uma "
+"situação de quase morte. A tarefa ainda ocorre dentro da sede da seita e em "
+"suas áreas anexas."
+
+msgid "action_traveling"
+msgstr "Viagem"
+
+msgid "action_traveling_desc"
+msgstr "Viaje para conhecer o mundo."
+
+msgid "action_zither_playing"
+msgstr "Tocar cítara"
+
+msgid "action_zither_playing_desc"
+msgstr "Toque cítara e cultive seu temperamento."
+
+msgid "evil"
+msgstr "Maligno"
+
+msgid "failed"
+msgstr "fracassou"
+
+msgid "neutral"
+msgstr "Neutro"
+
+# Action: Play
+msgid "play_action_name"
+msgstr "Lazer"
+
+msgid "play_description"
+msgstr "Atividades de lazer para relaxar o corpo e a mente"
+
+msgid "play_requirements"
+msgstr "Alvo dentro do alcance de interação"
+
+msgid "succeeded"
+msgstr "teve sucesso"
+
+msgid ""
+"{attacker} initiates battle against {target} (Power: {attacker} {att_power} "
+"vs {target} {def_power})"
+msgstr ""
+"{attacker} inicia uma batalha contra {target} (Poder: {attacker} {att_power} "
+"contra {target} {def_power})"
+
+msgid "{avatar} begins leisure activities"
+msgstr "{avatar} começou suas atividades de lazer"
+
+msgid ""
+"{avatar} failed to cast {realm}-tier treasure, all materials turned to ash"
+msgstr ""
+"{avatar} não conseguiu forjar um tesouro de grau {realm}; todos os materiais "
+"viraram cinzas"
+
+msgid ""
+"{avatar} failed to refine {realm}-tier elixir, all materials turned to ash"
+msgstr ""
+"{avatar} não conseguiu refinar um elixir de grau {realm}; todos os materiais "
+"viraram cinzas"
+
+msgid ""
+"{avatar} finished nurturing {weapon}, proficiency increased to "
+"{proficiency}%"
+msgstr ""
+"{avatar} terminou de nutrir {weapon}; a proficiência aumentou para "
+"{proficiency}%"
+
+msgid "{avatar} finished {action}."
+msgstr "{avatar} concluiu {action}."
+
+msgid ""
+"{avatar} had an epiphany during meditation! Cultivation increased "
+"significantly (+{exp})."
+msgstr ""
+"{avatar} teve uma epifania durante a meditação! O cultivo aumentou "
+"significativamente (+{exp})."
+
+msgid ""
+"{avatar} nurturing {old_weapon}, the weapon's spirituality greatly "
+"increased, evolved into {new_weapon}!"
+msgstr ""
+"Enquanto {avatar} nutria {old_weapon}, a espiritualidade da arma aumentou "
+"consideravelmente, e ela evoluiu para {new_weapon}!"
+
+msgid ""
+"{avatar} successfully tamed spirit beast, {realm} realm {beast} became their"
+" spirit beast"
+msgstr ""
+"{avatar} domou uma fera espiritual com sucesso; {beast}, do reino {realm}, "
+"tornou-se sua fera espiritual"
+
+msgid "{root_name} ({elements})"
+msgstr "{root_name} ({elements})"
+
+msgid "An anonymous passerby (extra)"
+msgstr "Um transeunte anônimo"
+
+msgid "Current world celestial phenomenon: {name}"
+msgstr "Fenômeno celestial atual do mundo: {name}"
+
+msgid "sect_task_title_sect_task_patrol_gate"
+msgstr "Patrulhar o Portão da Montanha"
+
+msgid "sect_task_title_sect_task_watch_storehouse"
+msgstr "Vigiar o armazém"
+
+msgid "sect_task_title_sect_task_tend_herb_garden"
+msgstr "Cuidar do jardim de ervas"
+
+msgid "sect_task_title_sect_task_assist_deacon"
+msgstr "Auxiliar o diácono"
+
+msgid "sect_task_title_sect_task_calm_spirit_beast"
+msgstr "Conter a agitação das feras espirituais"
+
+msgid "sect_task_title_sect_task_escort_supplies"
+msgstr "Escoltar suprimentos internos"
+
+msgid "sect_task_title_sect_task_receive_returnees"
+msgstr "Receber os discípulos que retornam"
+
+msgid "sect_task_title_sect_task_maintain_array_node"
+msgstr "Fazer a manutenção do nó da formação"
+
+msgid "sect_task_title_sect_task_inspect_restrictions"
+msgstr "Inspecionar as restrições"
+
+msgid "sect_task_title_sect_task_guard_scripture_pavilion"
+msgstr "Guardar o Pavilhão das Escrituras"
+
+msgid "sect_task_title_sect_task_investigate_night_anomaly"
+msgstr "Investigar a anomalia noturna"
+
+msgid "sect_task_title_sect_task_host_law_hall"
+msgstr "Presidir o Salão da Lei"
+
+msgid "sect_task_title_sect_task_clean_training_grounds"
+msgstr "Limpar resíduos de restrições do campo de treinamento"
+
+msgid "sect_task_title_sect_task_watch_reception_platform"
+msgstr "Guardar a plataforma de recepção"
+
+msgid "sect_task_title_sect_task_sort_low_tier_scrolls"
+msgstr "Organizar escrituras de grau inferior"
+
+msgid "sect_task_title_sect_task_count_outer_supplies"
+msgstr "Inventariar os suprimentos da seita externa"
+
+msgid "sect_task_title_sect_task_maintain_irrigation_channels"
+msgstr "Fazer a manutenção dos canais de irrigação dos campos espirituais"
+
+msgid "sect_task_title_sect_task_feed_spirit_beasts"
+msgstr "Alimentar feras espirituais de grau inferior"
+
+msgid "sect_task_title_sect_task_register_new_disciples"
+msgstr "Registrar novos discípulos"
+
+msgid "sect_task_title_sect_task_search_lost_tokens"
+msgstr "Procurar fichas perdidas"
+
+msgid "sect_task_title_sect_task_patrol_restriction_barrier"
+msgstr "Patrulhar as restrições do Portão da Montanha"
+
+msgid "sect_task_title_sect_task_guard_pill_hall"
+msgstr "Guardar o Salão das Pílulas"
+
+msgid "sect_task_title_sect_task_escort_message_jade"
+msgstr "Escoltar placas de jade mensageiras"
+
+msgid "sect_task_title_sect_task_mediate_disciple_dispute"
+msgstr "Mediar uma disputa entre discípulos"
+
+msgid "sect_task_title_sect_task_inspect_market_order"
+msgstr "Inspecionar a ordem no bazar anexo"
+
+msgid "sect_task_title_sect_task_search_missing_outer_disciple"
+msgstr "Procurar discípulos externos desaparecidos"
+
+msgid "sect_task_title_sect_task_repair_field_barrier"
+msgstr "Reparar a barreira do campo espiritual"
+
+msgid "sect_task_title_sect_task_assist_apprentice_trial"
+msgstr "Auxiliar em uma prova de seleção de aprendizes"
+
+msgid "sect_task_title_sect_task_inspect_grand_array_nodes"
+msgstr "Inspecionar os nós da Grande Formação Protetora"
+
+msgid "sect_task_title_sect_task_guard_seclusion_cave"
+msgstr "Guardar o perímetro da caverna de reclusão"
+
+msgid "sect_task_title_sect_task_track_infiltrator"
+msgstr "Rastrear um espião infiltrado"
+
+msgid "sect_task_title_sect_task_investigate_leyline_fluctuation"
+msgstr "Investigar flutuações nas linhas ley"
+
+msgid "sect_task_title_sect_task_escort_secret_treasury"
+msgstr "Escoltar materiais do tesouro secreto"
+
+msgid "sect_task_title_sect_task_suppress_earthfire"
+msgstr "Conter um vazamento de fogo terrestre"
+
+msgid "sect_task_title_sect_task_investigate_forbidden_art"
+msgstr "Investigar artes proibidas ocultas"
+
+msgid "sect_task_title_sect_task_guard_forbidden_area"
+msgstr "Guardar a entrada da área proibida"
+
+msgid "sect_task_title_sect_task_oversee_grand_array_core"
+msgstr "Supervisionar o núcleo da Grande Formação Protetora"
+
+msgid "sect_task_title_sect_task_review_treasury_irregularities"
+msgstr "Auditar as alocações do tesouro"
+
+msgid "sect_task_title_sect_task_secure_sect_ceremony"
+msgstr "Garantir a segurança da cerimônia da seita"
+
+msgid "sect_task_title_sect_task_trial_major_rule_case"
+msgstr "Julgar um caso grave de violação das regras"
+
+msgid "sect_task_title_sect_task_screen_core_promotion"
+msgstr "Avaliar as provas de promoção a discípulo central"
+
+msgid "sect_task_title_sect_task_coordinate_border_defense"
+msgstr "Coordenar a defesa da fronteira"
+
+msgid "sect_task_title_sect_task_investigate_internal_traitor"
+msgstr "Investigar uma suspeita de traição interna"
+
+msgid "action_setformation_short_name"
+msgstr "Montar formação"
+
+msgid "set_formation_action_name"
+msgstr "Montar formação"
+
+msgid "set_formation_description"
+msgstr "Monte uma formação na região atual. Requer um disco de formação equipado e consome Pedras Espirituais. Cada região pode ter apenas uma formação ativa por vez; uma nova formação substitui a anterior. A Formação de Concentração Espiritual aumenta os ganhos de cultivo pela respiração de Qi e é adequada para regiões de cultivo e sedes de seitas. A Formação de Guarda da Montanha melhora a capacidade de combate dentro da formação e é adequada para sedes de seitas e regiões de cultivo. A Formação de Cura melhora a recuperação e é adequada para sedes de seitas, regiões de cultivo e cidades. A Formação de Clareza melhora a estabilidade da reclusão e do avanço e é adequada para regiões de cultivo e sedes de seitas. A Formação de Busca de Veios aumenta os ganhos de mineração e é adequada para regiões comuns com veios minerais. A Formação de Crescimento da Madeira aumenta os ganhos de coleta e é adequada para regiões comuns com plantas. A Formação de Condução de Feras aumenta os ganhos de caça e é adequada para regiões comuns com animais."
+
+msgid "set_formation_requirements"
+msgstr "Requer um disco de formação equipado, um local válido para a formação selecionada e Pedras Espirituais suficientes."
+
+msgid "formation_spirit_gathering_name"
+msgstr "Formação de Concentração Espiritual"
+
+msgid "formation_mountain_guard_name"
+msgstr "Formação de Guarda da Montanha"
+
+msgid "formation_healing_name"
+msgstr "Formação de Cura"
+
+msgid "formation_clarity_name"
+msgstr "Formação de Clareza"
+
+msgid "formation_vein_seeking_name"
+msgstr "Formação de Busca de Veios"
+
+msgid "formation_wood_growth_name"
+msgstr "Formação de Crescimento da Madeira"
+
+msgid "formation_beast_driving_name"
+msgstr "Formação de Condução de Feras"
+
+msgid "Missing formation disk"
+msgstr "Falta um disco de formação"
+
+msgid "Invalid formation type"
+msgstr "Tipo de formação inválido"
+
+msgid "Current location cannot set formation"
+msgstr "Não é possível montar uma formação no local atual"
+
+msgid "Formation cannot be set in current region"
+msgstr "A formação não pode ser montada na região atual"
+
+msgid "Not enough spirit stones"
+msgstr "Pedras Espirituais insuficientes"
+
+msgid "Current region"
+msgstr "Região atual"
+
+msgid "{avatar} begins setting {formation} in {region}."
+msgstr "{avatar} começou a montar {formation} em {region}."
+
+msgid "{avatar} set {formation} in {region}."
+msgstr "{avatar} montou {formation} em {region}."
+
+msgid "{avatar} set {formation} in {region}; the original formation in this region was replaced."
+msgstr "{avatar} montou {formation} em {region}; a formação anterior dessa região foi substituída."
+
+msgid "action_inflictgu_short_name"
+msgstr "Implantar Gu"
+
+msgid "inflict_gu_action_name"
+msgstr "Implantar Gu"
+
+msgid "inflict_gu_description"
+msgstr "Implante um Gu no alvo. Em caso de sucesso, seu efeito é processado mensalmente."
+
+msgid "inflict_gu_requirements"
+msgstr "Requer uma ferramenta de Gu equipada."
+
+msgid "gu_qianxin_name"
+msgstr "Gu do Elo do Coração"
+
+msgid "gu_shixue_name"
+msgstr "Gu Devorador de Sangue"
+
+msgid "gu_shiyuan_name"
+msgstr "Gu Erosor de Essência"
+
+msgid "gu_luanxin_name"
+msgstr "Gu da Confusão Mental"
+
+msgid "Missing Gu tool"
+msgstr "Falta uma ferramenta de Gu"
+
+msgid "Invalid Gu type"
+msgstr "Tipo de Gu inválido"
+
+msgid "Cannot inflict Gu on self"
+msgstr "Não é possível implantar Gu em si mesmo"
+
+msgid "{caster} attempts to inflict {gu_name} on {target}."
+msgstr "{caster} tenta implantar {gu_name} em {target}."
+
+msgid "{caster} successfully inflicted {gu_name} on {target}."
+msgstr "{caster} implantou {gu_name} em {target} com sucesso."
+
+msgid "{caster} failed to inflict {gu_name} on {target}."
+msgstr "{caster} não conseguiu implantar {gu_name} em {target}."
+
+msgid ""
+"{caster} failed to inflict {gu_name} on {target}; the attempt was detected."
+msgstr "{caster} não conseguiu implantar {gu_name} em {target}; a tentativa foi detectada."
+
+msgid "{target}'s {gu_name} took effect, losing {amount} HP."
+msgstr "O {gu_name} de {target} fez efeito, causando a perda de {amount} PV."
+
+msgid ""
+"{target}'s {gu_name} took effect, losing {amount} cultivation experience."
+msgstr "O {gu_name} de {target} fez efeito, causando a perda de {amount} de experiência de cultivo."
+
+# Grave POI action
+
+msgid "dig_grave_action_name"
+msgstr "Escavar túmulo"
+
+msgid "dig_grave_description"
+msgstr "Tente desenterrar armas ou relíquias auxiliares de um túmulo conhecido no local atual. A tentativa pode fracassar ou causar ferimentos e reduz levemente a sorte."
+
+msgid "dig_grave_requirements"
+msgstr "Requer estar diante de um túmulo conhecido."
+
+msgid "Cannot resolve grave: {poi}"
+msgstr "Não foi possível localizar o túmulo: {poi}"
+
+msgid "Grave has expired"
+msgstr "O túmulo expirou"
+
+msgid "Grave is unknown"
+msgstr "O túmulo é desconhecido"
+
+msgid "Must be at the grave to dig"
+msgstr "É necessário estar no túmulo para escavá-lo"
+
+msgid "{avatar} dug at {grave}, but found no usable relics."
+msgstr "{avatar} escavou {grave}, mas não encontrou relíquias utilizáveis."
+
+msgid "{avatar} disturbed {grave}, but the relic inside had already decayed."
+msgstr "{avatar} perturbou {grave}, mas a relíquia em seu interior já havia se deteriorado."
+
+msgid "{avatar} failed to dig up useful relics from {grave}."
+msgstr "{avatar} não conseguiu desenterrar relíquias úteis de {grave}."
+
+msgid "{avatar} triggered lingering grave restrictions at {grave} and was injured for {damage} HP."
+msgstr "{avatar} ativou restrições remanescentes em {grave} e sofreu {damage} PV de dano."
+
+msgid "{avatar} dug up {item} from {grave}."
+msgstr "{avatar} desenterrou {item} de {grave}."
+
+msgid "{avatar} dug up {item} from {grave}. {result}"
+msgstr "{avatar} desenterrou {item} de {grave}. {result}"

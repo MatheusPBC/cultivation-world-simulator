@@ -1,0 +1,54 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid ""
+"\n"
+"Effect: {effect_desc}"
+msgstr ""
+"\n"
+"Efeito: {effect_desc}"
+
+msgid " (Distance: {months} months)"
+msgstr " (Distância: {months} meses)"
+
+msgid " (Owner: {owner}, {realm})"
+msgstr " (Proprietário: {owner}, {realm})"
+
+msgid " (Resource Distribution: {species_info})"
+msgstr " (Distribuição de recursos: {species_info})"
+
+msgid " ({desc})"
+msgstr " ({desc})"
+
+msgid " ({essence_type} Essence: {essence_density})"
+msgstr " (Essência de {essence_type}: {essence_density})"
+
+msgid " ({store_info})"
+msgstr " ({store_info})"
+
+msgid " | {store_info}"
+msgstr " | {store_info}"
+
+msgid "City Region (can trade)"
+msgstr "Região urbana (permite comércio)"
+
+msgid "City Region: {name} - {desc}{desc_part}"
+msgstr "Região urbana: {name} - {desc}{desc_part}"
+
+# LLM Prompt
+msgid "auction_story_prompt"
+msgstr ""
+"Escolha o aspecto mais interessante ou um único lance para descrever, sem "
+"precisar abordar tudo. Concentre-se na atmosfera tensa durante a disputa de "
+"lances."

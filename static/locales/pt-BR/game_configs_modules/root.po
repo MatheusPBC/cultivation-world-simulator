@@ -1,0 +1,73 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "ROOT_10_DESC"
+msgstr "Aptidão incomparável e domínio dos cinco elementos"
+
+msgid "ROOT_10_NAME"
+msgstr "Raiz Espiritual Celestial"
+
+msgid "ROOT_1_DESC"
+msgstr "Forte e decisiva, com grande poder ofensivo"
+
+msgid "ROOT_1_NAME"
+msgstr "Raiz Espiritual de Metal"
+
+msgid "ROOT_2_DESC"
+msgstr "Gentil e resiliente, com grande capacidade de recuperação"
+
+msgid "ROOT_2_NAME"
+msgstr "Raiz Espiritual de Madeira"
+
+msgid "ROOT_3_DESC"
+msgstr "Sábia e adaptável, com movimentos leves"
+
+msgid "ROOT_3_NAME"
+msgstr "Raiz Espiritual de Água"
+
+msgid "ROOT_4_DESC"
+msgstr "Ardente e impetuosa, com técnicas ofensivas de grande impacto"
+
+msgid "ROOT_4_NAME"
+msgstr "Raiz Espiritual de Fogo"
+
+msgid "ROOT_5_DESC"
+msgstr "Estável e pragmática, com grande poder defensivo"
+
+msgid "ROOT_5_NAME"
+msgstr "Raiz Espiritual de Terra"
+
+msgid "ROOT_6_DESC"
+msgstr "Extremamente explosiva e de primeira linha em combate"
+
+msgid "ROOT_6_NAME"
+msgstr "Raiz Espiritual de Trovão"
+
+msgid "ROOT_7_DESC"
+msgstr "Excelente controle e grande capacidade de resistência"
+
+msgid "ROOT_7_NAME"
+msgstr "Raiz Espiritual de Gelo"
+
+msgid "ROOT_8_DESC"
+msgstr "Movimentação excepcional e difícil de acompanhar"
+
+msgid "ROOT_8_NAME"
+msgstr "Raiz Espiritual de Vento"
+
+msgid "ROOT_9_DESC"
+msgstr "Voltada à furtividade, com talento para ilusões e enganos"
+
+msgid "ROOT_9_NAME"
+msgstr "Raiz Espiritual Sombria"

@@ -1,0 +1,82 @@
+# Treasure POI fallback keys. Keep the global msgid set aligned with zh-CN.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "take_treasure_action_name"
+msgstr "Reivindicar tesouro"
+
+msgid "take_treasure_description"
+msgstr "Tente reivindicar um tesouro descoberto no local onde você está."
+
+msgid "take_treasure_requirements"
+msgstr "É preciso estar diante de um tesouro descoberto."
+
+msgid "Cannot resolve treasure: {poi}"
+msgstr "Não foi possível identificar o tesouro: {poi}"
+
+msgid "Treasure has faded away"
+msgstr "O tesouro desapareceu"
+
+msgid "Treasure is unknown"
+msgstr "O tesouro é desconhecido"
+
+msgid "Treasure has already been claimed"
+msgstr "O tesouro já foi reivindicado"
+
+msgid "Must be at the treasure to claim it"
+msgstr "É preciso estar diante do tesouro para reivindicá-lo"
+
+msgid "{avatar} failed to claim {treasure}."
+msgstr "{avatar} não conseguiu reivindicar {treasure}."
+
+msgid "{avatar} triggered the treasure's restriction at {treasure} and was injured for {damage} HP."
+msgstr "{avatar} ativou a restrição de {treasure} e sofreu {damage} de dano à vida."
+
+msgid "{avatar} found that the treasure at {treasure} had decayed beyond use."
+msgstr "{avatar} descobriu que o tesouro em {treasure} havia se deteriorado e já não podia ser usado."
+
+msgid "{avatar} successfully claimed {item} from {treasure}."
+msgstr "{avatar} reivindicou {item} de {treasure} com sucesso."
+
+msgid "{avatar} claimed {item} from {treasure}. {result}"
+msgstr "{avatar} reivindicou {item} de {treasure}. {result}"
+
+msgid "Leave『{new_name}』where it was found"
+msgstr "Deixar '{new_name}' onde foi encontrado"
+
+msgid "{avatar_name} left {item_name} where it was found."
+msgstr "{avatar_name} deixou {item_name} onde o encontrou."
+
+msgid "{realm} treasure"
+msgstr "Tesouro de {realm}"
+
+msgid "An ancient treasure shines with a restrained spiritual radiance."
+msgstr "Um tesouro antigo brilha com uma discreta radiância espiritual."
+
+msgid "A strange spiritual radiance appeared somewhere in the world. A {realm} treasure seems to have emerged."
+msgstr "Uma estranha radiância espiritual surgiu em algum lugar do mundo. Parece que apareceu um tesouro de {realm}."
+
+msgid "The spiritual radiance of a treasure faded away before anyone could claim it."
+msgstr "A radiância espiritual de um tesouro se dissipou antes que alguém pudesse reivindicá-lo."
+
+msgid "{avatar} discovered a treasure at {location}: {poi}"
+msgstr "{avatar} descobriu um tesouro em {location}: {poi}"
+
+msgid "treasure_source_ancient_cultivator_relic"
+msgstr "Relíquia de cultivador antigo"
+
+msgid "treasure_source_spirit_vein_treasure"
+msgstr "Tesouro de veio espiritual"
+
+msgid "treasure_source_demon_king_relic"
+msgstr "Relíquia do Rei Demônio"
+
+msgid "treasure_source_demonic_artifact"
+msgstr "Artefato demoníaco"
+
+msgid "treasure_source_meteorite_relic"
+msgstr "Relíquia de meteorito"
+
+msgid "treasure_source_lost_sect_artifact"
+msgstr "Artefato de seita perdida"

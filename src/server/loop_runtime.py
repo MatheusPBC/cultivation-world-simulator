@@ -55,7 +55,7 @@ def build_avatar_updates(
                 "id": str(avatar.id),
                 "name": avatar.name,
                 "is_dead": True,
-                "action": "已故",
+                "action": "",
             }
         )
 
@@ -76,6 +76,7 @@ def build_avatar_updates(
                 "realm": getattr(getattr(getattr(avatar, "cultivation_progress", None), "realm", None), "value", ""),
                 "cultivation": cultivation_display,
                 "cultivation_display": cultivation_display["display_full_name"],
+                "action": avatar.current_action_name,
                 "action_emoji": resolve_avatar_action_emoji(avatar),
             }
         )

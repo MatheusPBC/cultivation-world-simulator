@@ -5,6 +5,7 @@ from typing import List, Optional, TYPE_CHECKING, Any
 from src.utils.df import game_configs, get_str, get_list_str, get_int
 from src.classes.effect import load_effect_from_str, format_effects_to_text
 from src.classes.rarity import Rarity, get_rarity_from_str
+from src.i18n import t
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -80,7 +81,7 @@ def _load_goldfingers() -> tuple[dict[int, Goldfinger], dict[str, Goldfinger]]:
             condition=get_str(row, "condition"),
             effects=effects,
             mechanism_type=get_str(row, "mechanism_type", "effect_only"),
-            story_prompt=get_str(row, "story_prompt"),
+            story_prompt=t(get_str(row, "story_prompt_id")) if get_str(row, "story_prompt_id") else get_str(row, "story_prompt"),
             mechanism_config=mechanism_config,
             effect_desc=effect_desc,
         )

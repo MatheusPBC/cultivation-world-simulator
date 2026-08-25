@@ -1,0 +1,131 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. plant.csv: 顽强生长在戈壁岩缝中的奇异植物，叶片坚硬...
+msgid "PLANT_10_DESC"
+msgstr ""
+"Uma planta peculiar que cresce tenazmente nas fendas rochosas do Gobi, com "
+"folhas duras como espadas, capaz de atrair e devorar a luz das estrelas à "
+"noite"
+
+#. plant.csv: 聚星草
+msgid "PLANT_10_NAME"
+msgstr "Erva Coletora de Estrelas"
+
+#. plant.csv: 生长在蓬莱岛灵泉之眼的伴生神树上，三百年...
+msgid "PLANT_11_DESC"
+msgstr ""
+"Cresce na árvore divina que acompanha o Olho da Fonte Espiritual na Ilha de "
+"Penglai; floresce a cada trezentos anos e frutifica após outros trezentos, "
+"guardando uma imensa força vital"
+
+#. plant.csv: 涅盘赤果
+msgid "PLANT_11_NAME"
+msgstr "Fruto Rubro do Nirvana"
+
+#. plant.csv: 生长在灵气充沛之地的奇异草药，叶片呈淡蓝...
+msgid "PLANT_1_DESC"
+msgstr ""
+"Uma erva medicinal peculiar que cresce em lugares abundantes em qi "
+"espiritual, com folhas azul-claras e propriedades curativas mágicas"
+
+#. plant.csv: 奇草
+msgid "PLANT_1_NAME"
+msgstr "Erva Exótica"
+
+#. plant.csv: 千年古树吸收天地灵气而成，木质坚硬且蕴含...
+msgid "PLANT_2_DESC"
+msgstr ""
+"Formada por árvores milenares que absorveram o qi espiritual do Céu e da "
+"Terra, sua madeira é rígida e concentra grande poder espiritual"
+
+#. plant.csv: 灵木
+msgid "PLANT_2_NAME"
+msgstr "Madeira Espiritual"
+
+#. plant.csv: 生长于西域流沙的神奇植物，能储存大量灵气...
+msgid "PLANT_3_DESC"
+msgstr ""
+"Uma planta mágica que cresce nas Areias Movediças do Oeste, capaz de "
+"armazenar grandes quantidades de qi espiritual e água; seus espinhos contêm "
+"remédios espirituais"
+
+#. plant.csv: 沙漠仙人掌
+msgid "PLANT_3_NAME"
+msgstr "Cacto do Deserto"
+
+#. plant.csv: 极北冰原的珍贵灵药，花瓣洁白如雪，蕴含极...
+msgid "PLANT_4_DESC"
+msgstr ""
+"Um precioso remédio espiritual dos Campos Glaciais do Extremo Norte, com "
+"pétalas brancas como a neve e qi de frio extremo, capaz de dissipar o calor "
+"e neutralizar toxinas"
+
+#. plant.csv: 寒霜雪莲
+msgid "PLANT_4_NAME"
+msgstr "Lótus da Neve Gélida"
+
+#. plant.csv: 生长于天河河底的水系灵药，呈半透明蓝色，...
+msgid "PLANT_5_DESC"
+msgstr ""
+"Um remédio espiritual do elemento água que cresce no leito do Rio Tianhe. "
+"De cor azul translúcida, é capaz de fortalecer o poder espiritual aquático "
+"do cultivador"
+
+#. plant.csv: 水灵芝
+msgid "PLANT_5_NAME"
+msgstr "Lingzhi Aquático"
+
+#. plant.csv: 万丈雪峰的高山植物，花瓣细小洁白，能抗严...
+msgid "PLANT_6_DESC"
+msgstr ""
+"Uma planta alpina do Pico Nevado de Dez Mil Zhang, com pequenas pétalas "
+"brancas, resistente ao frio intenso e dotada de propriedades calmantes e "
+"sedativas"
+
+#. plant.csv: 雪绒花
+msgid "PLANT_6_NAME"
+msgstr "Flor de Neve"
+
+#. plant.csv: 青云林海中的古老巨树，树龄超过千年，树脂...
+msgid "PLANT_7_DESC"
+msgstr ""
+"Uma árvore ancestral gigantesca no Mar Florestal de Qingyun, com mais de "
+"mil anos de idade e uma resina rica em poder espiritual"
+
+#. plant.csv: 千年古松
+msgid "PLANT_7_NAME"
+msgstr "Pinheiro Ancestral Milenar"
+
+#. plant.csv: 沃土良田中培育的灵性稻谷，粒粒饱满灵气，...
+msgid "PLANT_8_DESC"
+msgstr ""
+"Arroz espiritual cultivado em terras férteis, com cada grão repleto de qi "
+"espiritual, capaz de fortalecer a constituição do cultivador"
+
+#. plant.csv: 五谷灵稻
+msgid "PLANT_8_NAME"
+msgstr "Arroz Espiritual dos Cinco Grãos"
+
+#. plant.csv: 紫竹林中的变异异种，竹身九曲，内空外坚。...
+msgid "PLANT_9_DESC"
+msgstr ""
+"Uma espécie mutante da Floresta de Bambu Roxo, cujo caule possui nove "
+"curvas, é oco por dentro e rígido por fora. Ao soprar do vento, emite nove "
+"sons cristalinos diferentes que alcançam diretamente a alma e purificam os "
+"demônios interiores"
+
+#. plant.csv: 九曲清音竹
+msgid "PLANT_9_NAME"
+msgstr "Bambu Melódico das Nove Curvas"

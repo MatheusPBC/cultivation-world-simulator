@@ -115,8 +115,8 @@ export function useAppShell(options: UseAppShellOptions) {
     resolveStartup()
     forcedScene.value = null
     options.onGameBgmStart()
-    options.isManualPaused.value = false
-    await options.onResumeGame()
+    options.isManualPaused.value = options.initStatus.value?.is_paused ?? false
+    if (!options.isManualPaused.value) await options.onResumeGame()
   }, { immediate: true })
 
   watch([baseScene, options.gameInitialized], ([nextBaseScene, initialized]) => {

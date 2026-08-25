@@ -1,0 +1,53 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. lode.csv: 蕴含玄铁的普通矿脉，常见于浅层地表...
+msgid "LODE_1_DESC"
+msgstr ""
+"Um veio mineral comum contendo ferro negro, encontrado com frequência nas "
+"camadas mais rasas do solo"
+
+#. lode.csv: 玄铁矿脉
+msgid "LODE_1_NAME"
+msgstr "Veio de Ferro Negro"
+
+#. lode.csv: 深埋地下的赤铜矿脉，周围往往伴生火热之气...
+msgid "LODE_2_DESC"
+msgstr ""
+"Um veio de cobre vermelho nas profundezas do subsolo, geralmente cercado "
+"por um qi de calor abrasador"
+
+#. lode.csv: 赤铜矿脉
+msgid "LODE_2_NAME"
+msgstr "Veio de Cobre Vermelho"
+
+#. lode.csv: 极其罕见的秘银富集地，银光闪烁，灵气逼人...
+msgid "LODE_3_DESC"
+msgstr ""
+"Um depósito de mithril extremamente raro, cintilante como prata e "
+"transbordante de qi espiritual"
+
+#. lode.csv: 秘银矿床
+msgid "LODE_3_NAME"
+msgstr "Depósito de Mithril"
+
+#. lode.csv: 位于绝壁深处的庚金矿脉，开采极为困难，但...
+msgid "LODE_4_DESC"
+msgstr ""
+"Um veio de gengjin nas profundezas de penhascos escarpados, extremamente "
+"difícil de minerar, mas valioso como uma fortuna"
+
+#. lode.csv: 庚金矿洞
+msgid "LODE_4_NAME"
+msgstr "Mina de Gengjin"

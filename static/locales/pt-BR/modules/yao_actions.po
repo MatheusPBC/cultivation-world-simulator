@@ -1,0 +1,76 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: pt-BR\n"
+
+msgid "rest_action_name"
+msgstr "Descansar"
+
+msgid "rest_description"
+msgstr "Pare para regular a respiração e recuperar vida ao longo de 3 meses. Yao da raça tartaruga recebem experiência de cultivo adicional durante o descanso."
+
+msgid "rest_requirements"
+msgstr "Sem requisitos especiais."
+
+msgid "eat_mortals_action_name"
+msgstr "Devorar mortais"
+
+msgid "eat_mortals_description"
+msgstr "Cultivadores yao entram furtivamente em assentamentos humanos para devorar mortais, refinando carne e medo em cultivo."
+
+msgid "eat_mortals_requirements"
+msgstr "Requer um cultivador yao em uma região urbana; cultivadores justos normalmente não fazem isso."
+
+msgid "Dead avatars cannot rest."
+msgstr "Personagens mortos não podem descansar."
+
+msgid "{avatar} begins resting."
+msgstr "{avatar} começa a descansar."
+
+msgid "{avatar} finished resting, recovered {hp} HP and gained {exp} cultivation experience."
+msgstr "{avatar} terminou de descansar, recuperou {hp} de vida e ganhou {exp} de experiência de cultivo."
+
+msgid "{avatar} finished resting and recovered {hp} HP."
+msgstr "{avatar} terminou de descansar e recuperou {hp} de vida."
+
+msgid "Only yao cultivators can eat mortals."
+msgstr "Somente cultivadores yao podem devorar mortais."
+
+msgid "Righteous cultivators will not eat mortals."
+msgstr "Cultivadores justos não devoram mortais."
+
+msgid "Can only eat mortals in city areas."
+msgstr "Só é possível devorar mortais em áreas urbanas."
+
+msgid "There are no mortals here to eat."
+msgstr "Não há mortais aqui para devorar."
+
+msgid "{avatar} stalks the mortal crowds of {city}."
+msgstr "{avatar} espreita as multidões de mortais em {city}."
+
+msgid "{avatar} ate {count} mortals in {city}, refining flesh and fear into {exp} cultivation experience."
+msgstr "{avatar} devorou {count} mortais em {city}, refinando carne e medo em {exp} de experiência de cultivo."
+
+msgid "{avatar} follows wild instincts to seek spiritual herbs at {location}"
+msgstr "{avatar} segue seus instintos selvagens em busca de ervas espirituais em {location}"
+
+msgid "{avatar} finished foraging through the wilds, obtained: {materials}"
+msgstr "{avatar} terminou de vasculhar as terras selvagens e obteve: {materials}"
+
+msgid "{avatar} begins tracking prey by scent and instinct at {location}"
+msgstr "{avatar} começa a rastrear presas pelo olfato e pelo instinto em {location}"
+
+msgid "{avatar} finished a primal hunt, obtained: {materials}"
+msgstr "{avatar} concluiu uma caçada primitiva e obteve: {materials}"
+
+msgid "effect_extra_rest_exp"
+msgstr "Experiência de cultivo ao descansar"
+
+msgid "effect_extra_rest_hp_recovery_rate"
+msgstr "Taxa de recuperação de vida ao descansar"
+
+msgid "effect_extra_eat_mortals_exp_multiplier"
+msgstr "Multiplicador de experiência de cultivo ao devorar mortais"
+
+msgid "effect_extra_cross_race_friendliness"
+msgstr "Modificador inicial de afinidade entre raças"

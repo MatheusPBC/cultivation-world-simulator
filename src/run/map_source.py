@@ -9,7 +9,7 @@ from src.classes.environment.tile import TileType
 from src.utils.df import game_configs, get_int, get_str
 
 
-MAP_SOURCE_SCHEMA_VERSION = 2
+MAP_SOURCE_SCHEMA_VERSION = 3
 DEFAULT_WILDERNESS_TILE = "plain"
 
 
@@ -32,15 +32,15 @@ class RegionTileBinding:
 
 @dataclass(frozen=True)
 class MapRegionOverride:
-    name: str | None = None
-    desc: str | None = None
+    name_id: str | None = None
+    desc_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {}
-        if self.name is not None:
-            data["name"] = self.name
-        if self.desc is not None:
-            data["desc"] = self.desc
+        if self.name_id is not None:
+            data["name_id"] = self.name_id
+        if self.desc_id is not None:
+            data["desc_id"] = self.desc_id
         return data
 
 
@@ -110,11 +110,11 @@ def _parse_region_overrides(raw: Any) -> dict[int, MapRegionOverride]:
         if not isinstance(value, dict):
             raise ValueError(f"Invalid region override for region {raw_region_id}")
         region_id = int(raw_region_id)
-        name = str(value.get("name") or "").strip() or None
-        desc = str(value.get("desc") or "").strip() or None
-        if not name and not desc:
+        name_id = str(value.get("name_id") or "").strip() or None
+        desc_id = str(value.get("desc_id") or "").strip() or None
+        if not name_id and not desc_id:
             continue
-        overrides[region_id] = MapRegionOverride(name=name, desc=desc)
+        overrides[region_id] = MapRegionOverride(name_id=name_id, desc_id=desc_id)
     return overrides
 
 

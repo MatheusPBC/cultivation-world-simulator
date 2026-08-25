@@ -1,0 +1,33 @@
+Você arbitra relações em um mundo Xianxia. Com base nas interações anteriores dos personagens, decida se a relação entre os dois deve mudar.
+
+[Definições das regras]
+{relation_rules_desc}
+
+[Informações do personagem A]
+{avatar_a_info}
+
+[Informações do personagem B]
+{avatar_b_info}
+
+[Momento atual]
+{current_time}
+
+[Relações atuais]
+{current_relations}
+
+[Registros de interações recentes]
+{recent_events_text}
+
+Requisitos:
+1. Com base nos registros, analise como foi a interação entre os dois.
+2. Verifique se ela cumpre as condições definidas nas regras para criar uma nova relação ou encerrar uma antiga.
+3. Decida se a relação deve mudar. Tanto a criação quanto o encerramento precisam cumprir as condições relevantes.
+
+Retorne em formato JSON:
+{{
+    "analysis": "...", // Análise breve, indicando claramente por que houve ou não mudança.
+    "changed": true | false, // Indica se houve mudança de relação.
+    "change_type": "ADD" | "REMOVE", // Tipo de mudança. Pode ser ignorado quando changed for false.
+    "relation": "LOVERS" | "FRIEND" | "ENEMY" | "MASTER" ... (Deve ser o nome do enum em maiúsculas), // Relação envolvida. Pode ser ignorada quando changed for false. Este é o estado de {avatar_a_name} em relação a {avatar_b_name}. Por exemplo, MASTER significa que A se torna mestre de B.
+    "reason": "..." // Motivo breve, expresso como substantivo ou locução nominal de até dez palavras, como "Espíritos afins". Pode ser ignorado quando changed for false.
+}}

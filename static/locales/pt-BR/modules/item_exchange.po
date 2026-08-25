@@ -1,0 +1,37 @@
+msgid ""
+msgstr ""
+"Language: pt_BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "decided to equip it"
+msgstr "decidiu equipá-lo"
+
+msgid "decided to keep current equipment"
+msgstr "decidiu manter o equipamento atual"
+
+msgid "decided to keep current technique"
+msgstr "decidiu manter a técnica atual"
+
+msgid "decided to learn it"
+msgstr "decidiu aprendê-la"
+
+msgid "item_verb_consume"
+msgstr "consumir"
+
+msgid "item_verb_consumed"
+msgstr "consumiu"
+
+msgid "{name} discarded {item_name}."
+msgstr "{name} descartou {item_name}."
+
+msgid "{name} equipped {grade}{label} '{item_name}'."
+msgstr "{name} equipou {label} de grau {grade}, '{item_name}'."
+
+msgid "{name} obtained {grade}{label} '{item_name}' and equipped it."
+msgstr "{name} obteve {label} de grau {grade}, '{item_name}', e o equipou."
+
+msgid ""
+"{name} sold the newly obtained {item_name}, earning {price} spirit stones."
+msgstr ""
+"{name} vendeu {item_name}, que acabara de obter, e recebeu {price} pedras "
+"espirituais."

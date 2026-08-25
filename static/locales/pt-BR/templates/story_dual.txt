@@ -1,0 +1,34 @@
+Você é um romancista de um mundo Xianxia e deve transformar um acontecimento em uma história de aproximadamente 200 a 500 palavras.
+
+Contexto do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+O dict[AvatarName, info] dos NPCs envolvidos é:
+{avatar_infos}
+
+Orientação de estilo: {style}
+Idioma de saída: {output_language}. Escreva toda a análise e toda a história nesse idioma. Quando o idioma for português, use português brasileiro claro e natural.
+Orientação temática adicional: {story_prompt}
+
+O acontecimento foi:
+{event}
+O resultado foi:
+{res}
+
+Requisitos:
+- Comece com uma frase direta que diga o que aconteceu e nomeie os dois participantes principais.
+- Sempre que possível, apresente os fatos nesta ordem: conflito ou objetivo, ação de cada personagem e resultado concreto.
+- O acontecimento e o resultado fornecidos são fatos e devem permanecer verdadeiros. Você pode acrescentar atmosfera plausível, testemunhas secundárias, rumores, obstáculos ou detalhes incidentais para dar vida à cena, mas nada disso pode alterar ou contradizer o acontecimento, os participantes, recompensas, ferimentos, mortes, relações ou desfecho.
+- Mantenha a ação e a consequência de cada personagem claramente ligadas a ele. Use nomes em vez de pronomes ambíguos.
+- Use parágrafos curtos. A atmosfera pode enriquecer a cena, mas nunca deve esconder quem fez o quê, quem venceu, perdeu, recebeu algo ou sofreu uma consequência.
+- Não termine com uma moral abstrata que esconda o desfecho. Encerre declarando a consequência prática para os dois personagens ou para o mundo.
+- Se algum participante for yao, o texto deve revelar traços raciais por meio de movimento, sentidos, ritmo ou julgamento de valor. A expressão racial prevalece sobre a personalidade comum; não escreva um yao como se fosse apenas um cultivador humano com outro rótulo de raça.
+
+Observação: retorne somente o resultado em formato JSON, neste formato:
+{{
+    "thinking": ..., // Breve reflexão sobre o enredo da história
+    "story": "" // Texto principal em terceira pessoa, no estilo de uma narrativa Xianxia.
+}}

@@ -1,0 +1,97 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Fortune Event Text - Technique
+msgid ""
+"You comprehended an upper-grade technique『{technique_name}』in your fortune."
+msgstr ""
+"Em um encontro afortunado, você compreendeu a técnica de grau superior "
+"\"{technique_name}\"."
+
+msgid "You comprehended superior technique '{technique}' during the fortune."
+msgstr "Durante o encontro afortunado, você compreendeu a técnica superior '{technique}'."
+
+msgid ""
+"You discovered a {realm} auxiliary equipment '{auxiliary}' during the "
+"fortune."
+msgstr ""
+"Durante o encontro afortunado, você encontrou o equipamento auxiliar "
+"'{auxiliary}' do reino {realm}."
+
+# Fortune Event Text - Auxiliary
+msgid "You discovered a {realm} auxiliary『{auxiliary_name}』in your fortune."
+msgstr "Em um encontro afortunado, você encontrou o equipamento auxiliar \"{auxiliary_name}\" do reino {realm}."
+
+# Fortune - discovery intro messages
+msgid "You discovered a {realm} weapon '{weapon}' during the fortune."
+msgstr "Durante o encontro afortunado, você encontrou a arma '{weapon}' do reino {realm}."
+
+# Fortune Event Text - Weapon
+msgid "You discovered a {realm} weapon『{weapon_name}』in your fortune."
+msgstr "Em um encontro afortunado, você encontrou a arma \"{weapon_name}\" do reino {realm}."
+
+msgid "fortune_dynamic_story_prompt"
+msgstr ""
+"O reino atual do personagem é {realm}. Ele estava em {location}, realizando a ação: [{action_desc}]. O resultado final foi: [{result}].\n"
+"Tarefa: com base no reino, no passado e na [ação que o personagem realizava], deduza um motivo plausível, coerente e criativo para o encontro afortunado, explicando como essa ação levou ao resultado. Descreva o ambiente com riqueza de detalhes e os pensamentos e emoções do personagem. Mantenha o texto entre 100 e 200 palavras."
+
+# Fortune messages
+msgid "fortune_event_base"
+msgstr "Teve um encontro afortunado ({title}): {result}"
+
+msgid "fortune_title_auxiliary"
+msgstr "Tesouro raro aparece"
+
+msgid "fortune_title_cultivation"
+msgstr "Avanço no cultivo"
+
+msgid "fortune_title_find_master"
+msgstr "Orientação de um mestre"
+
+msgid "fortune_title_mystery"
+msgstr "Encontro afortunado misterioso"
+
+msgid "fortune_title_spirit_stone"
+msgstr "Riqueza inesperada"
+
+msgid "fortune_title_technique"
+msgstr "Iluminação sobre uma técnica"
+
+msgid "fortune_title_weapon"
+msgstr "Descida de uma arma divina"
+
+msgid "unknown location"
+msgstr "local desconhecido"
+
+msgid "wandering aimlessly"
+msgstr "vagando sem rumo"
+
+msgid "{apprentice} became disciple of {master}"
+msgstr "{apprentice} tornou-se discípulo de {master}"
+
+# Fortune Event Text - Other Types
+msgid "{avatar_name} became disciple of {master_name}"
+msgstr "{avatar_name} tornou-se discípulo de {master_name}"
+
+msgid "{avatar_name} gained {exp_gain} cultivation experience"
+msgstr "{avatar_name} ganhou {exp_gain} de experiência de cultivo"
+
+msgid "{avatar_name} obtained {amount} spirit stones"
+msgstr "{avatar_name} obteve {amount} pedras espirituais"
+
+msgid "{name} cultivation increased by {exp} points"
+msgstr "O cultivo de {name} aumentou em {exp} pontos"
+
+msgid "{name} obtained {amount} spirit stones"
+msgstr "{name} obteve {amount} pedras espirituais"

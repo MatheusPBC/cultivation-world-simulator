@@ -6,7 +6,7 @@ import { avatarApi, systemApi } from '@/api'
 import type { useUiStore } from '@/stores/ui'
 import { logError } from '@/utils/appError'
 import { getAvatarPortraitUrl } from '@/utils/assetUrls'
-import { formatCultivationText } from '@/utils/cultivationText'
+import { formatCultivationText, formatRealmStage } from '@/utils/cultivationText'
 import scrollIcon from '@/assets/icons/ui/lucide/scroll.svg'
 import shieldIcon from '@/assets/icons/ui/lucide/shield.svg'
 import swordsIcon from '@/assets/icons/ui/lucide/swords.svg'
@@ -100,10 +100,10 @@ export function useAvatarDetailPanel(
   const showObjectiveModal = ref(false)
   const objectiveContent = ref('')
 
-  const currentEffectsText = computed(() => data().current_effects || data()['当前效果'])
+  const currentEffectsText = computed(() => data().current_effects)
   const currentEffectsLines = computed(() => {
     const text = currentEffectsText.value
-    if (!text || text === '无') return []
+    if (!text) return []
     return text.split('\n')
   })
 
@@ -166,14 +166,21 @@ export function useAvatarDetailPanel(
   ))
 
   const avatarHeaderSubtitle = computed(() => data().sect?.name || t('game.info_panel.avatar.stats.rogue'))
-  const avatarRealmText = computed(() => (
-    data().cultivation?.display_full_name || formatCultivationText(data().realm, t)
-  ))
+  const avatarRealmText = computed(() => {
+    const cultivation = data().cultivation
+    if (cultivation?.display_full_name) {
+      return formatCultivationText(cultivation.display_full_name, t)
+    }
+    if (cultivation?.realm_id || cultivation?.stage_id) {
+      return formatRealmStage(cultivation.realm_id, cultivation.stage_id, t)
+    }
+    return formatCultivationText(data().realm, t)
+  })
   const avatarCanonicalRealmText = computed(() => {
     const cultivation = data().cultivation
     if (!cultivation) return ''
     return cultivation.canonical_full_name !== cultivation.display_full_name
-      ? cultivation.canonical_full_name
+      ? formatCultivationText(cultivation.canonical_full_name, t)
       : ''
   })
 
@@ -189,7 +196,7 @@ export function useAvatarDetailPanel(
     if (locale.value.startsWith('ja')) {
       return `${listName}${rank}位`
     }
-    return `${listName} Rank ${rank}`
+    return `${listName} #${rank}`
   })
 
   const groupedRelations = computed(() => {
@@ -228,8 +235,8 @@ export function useAvatarDetailPanel(
   })
 
   function formatGenderLabel(rawGender: string): string {
-    if (rawGender === 'Male' || rawGender === 'male') return t('ui.create_avatar.gender_labels.male')
-    if (rawGender === 'Female' || rawGender === 'female') return t('ui.create_avatar.gender_labels.female')
+    if (['Male', 'male', '男'].includes(rawGender)) return t('ui.create_avatar.gender_labels.male')
+    if (['Female', 'female', '女'].includes(rawGender)) return t('ui.create_avatar.gender_labels.female')
     return rawGender
   }
 
@@ -238,7 +245,9 @@ export function useAvatarDetailPanel(
   }
 
   function formatRelationSub(rel: RelationInfo): string {
-    const realmText = rel.cultivation?.display_full_name || formatCultivationText(rel.realm, t)
+    const realmText = rel.cultivation
+      ? formatRealmStage(rel.cultivation.realm_id, rel.cultivation.stage_id, t)
+      : formatCultivationText(rel.realm, t)
     return [rel.sect?.trim(), realmText].filter(Boolean).join(' · ')
   }
 

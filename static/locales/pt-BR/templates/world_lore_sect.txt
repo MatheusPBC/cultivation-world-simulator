@@ -1,0 +1,45 @@
+Você cria um mundo Xianxia. Receberá o contexto original do mundo e um trecho de sua "visão de mundo e história".
+Primeiro compreenda essa visão de mundo; depois, use o contexto histórico para modificar as informações das seitas e das regiões correspondentes a elas.
+Observação: o sistema atual separa "entidade de seita" e "região da seita". Portanto, você pode modificar somente name/desc existentes em cada parte e não deve inventar uma nova estrutura.
+Especificamente:
+- A desc da entidade de seita deve se concentrar em sua identidade, estilo de cultivo, estrutura interna, instalações centrais, temperamento geral e tensões latentes.
+- A desc da região da seita deve se concentrar no terreno, arquitetura, camadas espaciais, anomalias ambientais, paisagem em movimento e atmosfera sensorial.
+- A desc da seita e a desc da região devem se complementar, sem repetir o mesmo conjunto de informações.
+
+Contexto do mundo:
+{world_info}
+
+Visão de mundo e história:
+{world_lore}
+
+Informações das seitas:
+{sects}
+
+Informações das regiões das seitas:
+{sect_regions}
+
+Com base nas informações acima, analise e retorne sugestões de modificação.
+
+Retorne em formato JSON:
+{{
+    "thinking": "Analise quais modificações devem ser feitas",
+    "sects_change":
+        {{
+            "id": {{ // id original
+                "name": str // novo nome
+                "desc": desc // nova descrição
+            }}
+        }},
+    "sect_regions_change": {{}} // dict com a mesma estrutura acima, para regiões de seita
+}}
+
+Requisitos:
+1. "thinking" precisa explicar apenas brevemente a base das modificações; concentre-se nos resultados retornados.
+2. As modificações devem priorizar a visão de mundo e depois o contexto histórico, sempre com coerência.
+3. Se um item não precisar de modificação, retorne um dicionário vazio {{}}.
+4. Para itens modificados, retorne somente "name" e "desc", sem nenhuma outra chave.
+5. Cada desc deve ter cerca de 120 a 180 palavras em português brasileiro; seja conciso, mas suficientemente detalhado.
+6. Não repita regras da seita, proibições, punições nem critérios de expulsão.
+7. Não inclua bônus para o jogador, efeitos numéricos nem explicações sobre mecânicas de jogo.
+8. As descrições da seita e da região devem ter funções claramente distintas e evitar repetição.
+9. Escreva todo o conteúdo textual retornado em português brasileiro claro e natural. Nomes próprios podem permanecer na forma original quando isso for adequado à ambientação.

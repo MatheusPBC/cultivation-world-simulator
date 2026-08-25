@@ -23,6 +23,7 @@ class GameQueryDependencies:
     get_map_presets_query: Any
     get_runtime_status: Any
     get_events_page: Any
+    get_world_journal_query: Any
     get_game_data_query: Any
     realm_order: Any
     alignment_enum: Any
@@ -75,6 +76,7 @@ class GameQueryService:
             build_public_runtime_status=self.get_runtime_status,
             build_public_current_run=self.get_current_run,
             build_public_events_page=self.get_events_page,
+            build_public_world_journal=self.get_world_journal,
             build_public_game_data=self.get_game_data,
             build_public_detail=self.get_detail,
             build_public_avatar_adjust_options=self.get_avatar_adjust_options,
@@ -151,6 +153,13 @@ class GameQueryService:
             major_scope=major_scope,
             cursor=cursor,
             limit=limit,
+        )
+
+    def get_world_journal(self, *, period_months: int) -> dict:
+        return self._deps.get_world_journal_query(
+            self._deps.runtime,
+            serialize_events_for_client=self._deps.serialize_events_for_client,
+            period_months=period_months,
         )
 
     def get_rankings(self) -> dict:

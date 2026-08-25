@@ -1,0 +1,28 @@
+{
+  "title": "Iniciar jogo",
+  "description": "Configure o estado inicial do mundo. Estas configurações não poderão ser alteradas depois que o jogo começar.",
+  "labels": {
+    "map": "Mapa do mundo",
+    "init_npc_num": "Cultivadores iniciais",
+    "sect_num": "Seitas ativas",
+    "new_npc_rate": "Taxa mensal de novos cultivadores",
+    "world_lore": "Cosmologia e história",
+    "world_secret": "Segredo do mundo",
+    "test_mode": "Modo de teste"
+  },
+  "tips": {
+    "sect_num": "O número de seitas deve ser menor que a metade do número de cultivadores iniciais.",
+    "test_mode": "Serve apenas para testar recursos e o fluxo do jogo. Nenhum LLM real será chamado; a IA usará regras internas."
+  },
+  "placeholders": {
+    "world_lore": "Descreva o sistema de cultivo, alinhamentos morais, seitas, regiões e eventos históricos importantes. Ativar isso usa o LLM e aumenta o tempo de inicialização. (Opcional)"
+  },
+  "options": {"test_mode": "Ativar modo de teste baseado em regras"},
+  "actions": {"start": "Iniciar"},
+  "messages": {
+    "load_failed": "Não foi possível carregar a configuração",
+    "start_success": "Configuração salva; inicializando o mundo...",
+    "start_failed": "Não foi possível iniciar o jogo"
+  },
+  "fallback_map": {"name": "Nove Províncias Centrais", "desc": ""}
+}

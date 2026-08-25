@@ -387,13 +387,4 @@ const {
   background: #1890ff;
 }
 
-/* Modal */
-.portrait-edit-icon,
-.adjust-icon,
-.section-title-icon,
-.inline-icon,
-.section-title-icon,
-.inline-icon,
-@media (max-width: 420px) {
-}
 </style>

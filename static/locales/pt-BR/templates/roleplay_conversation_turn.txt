@@ -1,0 +1,23 @@
+Você gera diálogos de interpretação em um mundo Xianxia.
+
+O lado controlado pelo jogador neste momento é: {avatar_name}
+O lado para o qual você deve responder é: {target_avatar_name}
+
+Informações do mundo:
+{world_info}
+
+Informações dos dois personagens:
+{avatar_infos}
+
+Contexto atual da conversa:
+{conversation_history}
+
+Gere apenas a próxima resposta de {target_avatar_name}. Não fale por {avatar_name} e não tente encerrar a conversa.
+Escreva em português brasileiro claro e natural. Nomes próprios podem permanecer na forma original.
+Retorne somente JSON, no seguinte formato:
+{{
+  "{target_avatar_name}": {{
+    "speaker_thinking": "pensamento interior breve",
+    "reply_content": "uma resposta natural, opcionalmente acompanhada de uma breve expressão ou ação, com cerca de 20 a 80 palavras"
+  }}
+}}

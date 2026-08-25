@@ -16,17 +16,21 @@ Event Details:
 {details}
 
 Writing style prompt: {style}
+Output language: {output_language}. Write all thinking and story text in this language.
 Extra theme prompt: {story_prompt}
 
 Note:
 1. Do not try to describe all events exhaustively; please **select yourself** the most interesting and dramatic parts to expand upon.
-2. Focus on describing interactions between characters, psychological maneuvering, competition, or cooperation.
-3. Focus on describing the tense atmosphere during the bidding process.
-4. If any participant is yao, the story text must show racial traits through movement, senses, rhythm, or value judgment. Racial description takes priority over ordinary persona; do not write yao as human cultivators with only a race label changed.
+2. Start with a plain summary of what the gathering was for, who acted, and what the final outcome was.
+3. Present the selected scene in causal order: objective or conflict, actions and decisions, then concrete result and settlement.
+4. The supplied events and details are facts that must remain true. You may add plausible atmosphere, minor witnesses, rumors, obstacles, or incidental details, but they must not change or contradict participants, purchases, prices, injuries, deaths, relationships, or outcomes.
+5. Focus on interactions, competition, or cooperation, but keep the subject of every important action clear by using names.
+6. Focus on atmosphere only after the reader understands what is happening. Metaphors must not replace facts.
+7. End with the practical consequence for the participants or the gathering.
+8. If any participant is yao, the story text must show racial traits through movement, senses, rhythm, or value judgment. Racial description takes priority over ordinary persona; do not write yao as human cultivators with only a race label changed.
 
 Return the results in JSON format only, in the format:
 {{
     "thinking": ..., // Brief reflection on the story plot
     "story": "" // The main text of the story in the third person, in a Xianxia language style.
 }}
-

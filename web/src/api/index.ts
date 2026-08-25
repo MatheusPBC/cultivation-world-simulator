@@ -22,6 +22,8 @@ export type {
   RunConfigDTO,
   EventDTO,
   EventsResponseDTO,
+  WorldJournalPeriodMonths,
+  WorldJournalResponseDTO,
   SectTerritoriesResponseDTO,
   DynastyOverviewResponseDTO
 } from '../types/api';

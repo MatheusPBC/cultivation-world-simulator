@@ -4,6 +4,9 @@ import json
 import urllib.request
 import urllib.error
 import asyncio
+import os
+import subprocess
+import tempfile
 from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
@@ -14,7 +17,7 @@ from src.run.log import log_llm_call
 from src.utils.config import CONFIG
 from .config import LLMMode, LLMConfig, get_task_mode
 from .parser import parse_json
-from .prompt import build_prompt, load_template
+from .prompt import append_output_locale_instruction, build_prompt, load_template
 from .exceptions import LLMError, ParseError, ProviderCallError, ProviderFailureKind
 from .runtime_mode import is_test_mode_enabled
 from .test_mode_fallbacks import TestModeLLMUnavailable, resolve_test_mode_task
@@ -403,8 +406,85 @@ def _call_anthropic(config: LLMConfig, prompt: str) -> str:
         raise ProviderCallError(ProviderFailureKind.UNKNOWN, str(e), cause=e) from e
 
 
+def _call_codex(config: LLMConfig, prompt: str) -> str:
+    """Call the authenticated Codex CLI without exposing OAuth tokens."""
+    codex_bin = os.environ.get("CWS_CODEX_BIN", "/usr/local/bin/codex")
+    node_bin = os.environ.get("CWS_CODEX_NODE", "")
+    codex_home = os.environ.get("CWS_CODEX_HOME", "/codex-home")
+
+    with tempfile.NamedTemporaryFile(prefix="cws-codex-", suffix=".txt", delete=False) as output_file:
+        output_path = output_file.name
+
+    command = [
+        *( [node_bin, codex_bin] if node_bin else [codex_bin] ),
+        "exec",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--cd",
+        "/tmp",
+        "--sandbox",
+        "read-only",
+        "--color",
+        "never",
+        "--output-last-message",
+        output_path,
+    ]
+    if config.model_name:
+        command.extend(["--model", config.model_name])
+
+    environment = os.environ.copy()
+    environment["CODEX_HOME"] = codex_home
+
+    try:
+        completed = subprocess.run(
+            command,
+            input=prompt,
+            text=True,
+            capture_output=True,
+            timeout=180,
+            env=environment,
+            check=False,
+        )
+        if completed.returncode != 0:
+            detail = (completed.stderr or completed.stdout).strip()
+            if len(detail) > 500:
+                detail = detail[-500:]
+            raise ProviderCallError(
+                ProviderFailureKind.UNKNOWN,
+                f"Codex CLI failed ({completed.returncode}): {detail}",
+                cause=RuntimeError(detail),
+            )
+
+        response = Path(output_path).read_text(encoding="utf-8").strip()
+        if not response:
+            raise ProviderCallError(
+                ProviderFailureKind.UNKNOWN,
+                "Codex CLI returned an empty response",
+            )
+        return response
+    except subprocess.TimeoutExpired as exc:
+        raise ProviderCallError(
+            ProviderFailureKind.NETWORK,
+            "Codex CLI timed out after 180 seconds",
+            cause=exc,
+        ) from exc
+    except OSError as exc:
+        raise ProviderCallError(
+            ProviderFailureKind.UNKNOWN,
+            f"Unable to start Codex CLI: {exc}",
+            cause=exc,
+        ) from exc
+    finally:
+        try:
+            Path(output_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def _call_with_requests(config: LLMConfig, prompt: str) -> str:
     """根据 api_format 分发到对应的调用实现"""
+    if config.api_format.lower() == "codex_cli":
+        return _call_codex(config, prompt)
     if config.api_format == "anthropic":
         return _call_anthropic(config, prompt)
     return _call_openai(config, prompt)
@@ -418,19 +498,20 @@ async def call_llm(prompt: str, mode: LLMMode = LLMMode.NORMAL) -> str:
     if is_test_mode_enabled():
         raise TestModeLLMUnavailable("raw_llm_call")
 
+    provider_prompt = append_output_locale_instruction(prompt)
     config = LLMConfig.from_mode(mode)
     semaphore = _get_semaphore()
     
     try:
         async with semaphore:
-            result = await asyncio.to_thread(_call_with_requests, config, prompt)
+            result = await asyncio.to_thread(_call_with_requests, config, provider_prompt)
     except Exception as exc:
         failure = classify_llm_error(exc if isinstance(exc, ProviderCallError) else str(exc), base_url=config.base_url)
         if failure.is_config_required:
             await _notify_config_required(failure.user_message)
         raise
     
-    log_llm_call(config.model_name, prompt, result)
+    log_llm_call(config.model_name, provider_prompt, result)
     return result
 
 

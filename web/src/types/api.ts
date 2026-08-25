@@ -453,6 +453,34 @@ export interface FetchEventsParams {
   limit?: number;
 }
 
+export type WorldJournalPeriodMonths = 1 | 3 | 12;
+
+export interface WorldJournalActivityDTO {
+  total_events: number;
+  major_events: number;
+  story_events: number;
+  routine_events: number;
+  active_avatar_count: number;
+}
+
+export interface WorldJournalOngoingDTO {
+  avatar_id: string;
+  avatar_name: string;
+  action: string;
+  event_count: number;
+}
+
+export interface WorldJournalResponseDTO {
+  period: {
+    months: WorldJournalPeriodMonths;
+    start_month_stamp: number;
+    end_month_stamp: number;
+  };
+  activity: WorldJournalActivityDTO;
+  highlights: EventDTO[];
+  ongoing: WorldJournalOngoingDTO[];
+}
+
 // --- Status ---
 
 export interface InitStatusDTO {

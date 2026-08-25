@@ -13,6 +13,7 @@ from src.run.map_source import (
     map_source_to_dict,
     read_map_source,
 )
+from src.i18n import t
 
 def load_cultivation_world_map(map_id: str | None = None) -> Map:
     """
@@ -138,11 +139,13 @@ def _load_and_assign_regions(game_map: Map, region_coords: dict[int, list[tuple[
             cors = region_coords[rid]
             
             override = (getattr(game_map, "region_overrides", {}) or {}).get(rid, {})
+            name_id = str(override.get("name_id") or "")
+            desc_id = str(override.get("desc_id") or "")
             # 构建参数
             params = {
                 "id": rid,
-                "name": str(override.get("name") or get_str(row, "name")),
-                "desc": str(override.get("desc") or get_str(row, "desc")),
+                "name": t(name_id) if name_id else get_str(row, "name"),
+                "desc": t(desc_id) if desc_id else get_str(row, "desc"),
                 "cors": cors,
             }
             

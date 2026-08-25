@@ -1,0 +1,118 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2026-08-19 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "custom_content.category.technique"
+msgstr "técnica"
+
+msgid "custom_content.category.weapon"
+msgstr "arma"
+
+msgid "custom_content.category.auxiliary_equipment"
+msgstr "equipamento auxiliar"
+
+msgid "custom_content.label.name"
+msgstr "Nome"
+
+msgid "custom_content.label.description"
+msgstr "Descrição"
+
+msgid "custom_content.label.attribute"
+msgstr "Atributo"
+
+msgid "custom_content.label.grade"
+msgstr "Grau"
+
+msgid "custom_content.label.weapon_type"
+msgstr "Tipo de arma"
+
+msgid "custom_content.label.realm"
+msgstr "Reino"
+
+msgid "custom_content.label.effect_summary"
+msgstr "Resumo dos efeitos"
+
+msgid "custom_content.label.effects"
+msgstr "efeitos"
+
+msgid "custom_content.label.value_type"
+msgstr "tipo de valor"
+
+msgid "custom_content.label.example"
+msgstr "exemplo"
+
+msgid "custom_content.label.magnitude_guidance"
+msgstr "orientação de magnitude"
+
+msgid "custom_content.reference.same_category"
+msgstr "Itens de referência da mesma categoria:"
+
+msgid "custom_content.reference.same_category_realm"
+msgstr "Itens de referência da mesma categoria e do mesmo reino:"
+
+msgid "custom_content.scope.without_realm"
+msgstr "Este é um novo item da categoria {category_label}; não é necessário especificar um reino."
+
+msgid "custom_content.scope.with_realm"
+msgstr "Este item da categoria {category_label} pertence ao reino \"{realm}\"."
+
+msgid "small"
+msgstr "pequeno"
+
+msgid "medium"
+msgstr "médio"
+
+msgid "large"
+msgstr "grande"
+
+msgid "cap"
+msgstr "limite"
+
+msgid "very high"
+msgstr "muito alto"
+
+msgid "base chance"
+msgstr "chance base"
+
+msgid "base value"
+msgstr "valor base"
+
+msgid "ordinary"
+msgstr "comum"
+
+msgid "fortunate"
+msgstr "afortunado"
+
+msgid "protagonist-tier"
+msgstr "nível de protagonista"
+
+msgid "unlucky"
+msgstr "azarado"
+
+msgid "tanky"
+msgstr "resistente"
+
+msgid "profit-focused"
+msgstr "focado em lucro"
+
+msgid "safer"
+msgstr "mais seguro"
+
+msgid "riskier"
+msgstr "mais arriscado"
+
+msgid "talent-tier"
+msgstr "nível de talento"
+
+msgid "final multiplier >= 1.0"
+msgstr "multiplicador final >= 1.0"

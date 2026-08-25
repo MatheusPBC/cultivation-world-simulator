@@ -1,0 +1,124 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-20 00:00+0000\n"
+"PO-Revision-Date: 2024-01-20 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: pt-BR\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+# Event Content
+msgid ""
+"In the auction for {item_name}, {winner_name} outbid {runner_up_name} with "
+"{price} spirit stones and won the item."
+msgstr ""
+"No leilão de {item_name}, {winner_name} superou o lance de {runner_up_name} "
+"com {price} pedras espirituais e arrematou o item."
+
+msgid "Retreat Bonus"
+msgstr "Compreensão do retiro"
+
+# Additional Missing Translations
+msgid "Unsupported item type: {item_type}"
+msgstr "Tipo de item não compatível: {item_type}"
+
+msgid "retreat_action_name"
+msgstr "Retiro"
+
+msgid "retreat_death_append"
+msgstr " E, após esgotar o último vestígio de vitalidade durante o retiro, faleceu."
+
+msgid "retreat_desc"
+msgstr ""
+"Entre em retiro para superar seus próprios limites. É extremamente "
+"arriscado e indicado apenas para quem possui grande perseverança."
+
+msgid "retreat_fail"
+msgstr ""
+"O retiro fracassou! A vitalidade foi gravemente afetada, reduzindo a "
+"longevidade em {years} anos."
+
+msgid "retreat_requirements"
+msgstr "Sem restrições; requer intervalo entre usos"
+
+msgid "retreat_start"
+msgstr "{avatar} iniciou um retiro, sem previsão de quando sairá."
+
+msgid "retreat_story_prompt_fail"
+msgstr ""
+"Este é um retiro fracassado. Descreva como o cultivador foi atormentado por "
+"demônios internos e dúvidas sobre si mesmo até, por fim, sofrer uma reação "
+"adversa durante o retiro. Não é necessário descrever combate."
+
+msgid "retreat_story_prompt_success"
+msgstr ""
+"Este é um retiro bem-sucedido. Descreva como o cultivador superou a solidão, "
+"compreendeu o Dao Celestial e, por fim, rompeu os limites de seu estado "
+"mental durante o retiro. Não é necessário descrever combate."
+
+msgid "retreat_success"
+msgstr ""
+"Retiro concluído com sucesso! O cultivo melhorou e a compreensão do Dao "
+"Celestial se aprofundou."
+
+msgid "{avatar_name} abandoned {item_name}."
+msgstr "{avatar_name} abandonou {item_name}."
+
+msgid ""
+"{avatar_name} sold newly obtained {item_name}, gained {price} spirit stones."
+msgstr ""
+"{avatar_name} vendeu {item_name}, que havia acabado de obter, e recebeu "
+"{price} pedras espirituais."
+
+msgid "game.sect_update_event"
+msgstr "Acerto anual de {sect_name}: receita de {income} pedras espirituais, {upkeep} pedras espirituais pagas em salários e saldo de {net_change} pedras espirituais."
+
+msgid "War weariness adjusted to {weariness_after} (active wars: {active_war_count}, yearly recovery: 3, previous: {weariness_before})."
+msgstr "Desgaste de guerra ajustado para {weariness_after} (guerras ativas: {active_war_count}, recuperação anual: 3, valor anterior: {weariness_before})."
+
+msgid "game.sect_thinking_event"
+msgstr "Reflexão da seita {sect_name}: {thinking}"
+
+msgid "{winner} won the martial tournament championship and earned {amount} sect contribution for {sect_name}."
+msgstr "{winner} venceu o torneio marcial e recebeu {amount} de contribuição para a seita {sect_name}."
+
+msgid "{teacher_name} taught and guided others at the preaching conference, earning {amount} sect contribution for {sect_name}."
+msgstr "{teacher_name} ensinou e orientou os demais na conferência de pregação, recebendo {amount} de contribuição para a seita {sect_name}."
+
+msgid "{winner_name} distinguished themselves in sect war and earned {amount} sect contribution for {sect_name}."
+msgstr "{winner_name} destacou-se na guerra entre seitas e recebeu {amount} de contribuição para a seita {sect_name}."
+
+msgid "Game automatically saved"
+msgstr "Jogo salvo automaticamente"
+
+msgid "{avatar_name} made a name in the cultivation world and came to be known as \"{nickname}\"."
+msgstr "{avatar_name} ganhou fama no mundo do cultivo e passou a ser conhecido como \"{nickname}\"."
+
+msgid "{avatar} self-created technique '{item}'"
+msgstr "{avatar} criou a própria técnica '{item}'."
+
+msgid "{avatar} self-created weapon '{item}'"
+msgstr "{avatar} criou a própria arma '{item}'."
+
+msgid "{avatar} self-created auxiliary equipment '{item}'"
+msgstr "{avatar} criou o próprio equipamento auxiliar '{item}'."
+
+msgid "Equipped newly created {kind} '{item}', sold old equipment '{old_item}' for {refund} spirit stones"
+msgstr "Equipou {kind} '{item}', recém-criado, e vendeu o equipamento antigo '{old_item}' por {refund} pedras espirituais"
+
+msgid "Equipped newly created {kind} '{item}'"
+msgstr "Equipou {kind} '{item}', recém-criado"
+
+
+# POI discovery
+
+msgid "{avatar} discovered a grave at {location}: {poi}"
+msgstr "{avatar} descobriu um túmulo em {location}: {poi}"
+
+msgid "{avatar} discovered a point of interest at {location}: {poi}"
+msgstr "{avatar} descobriu um ponto de interesse em {location}: {poi}"

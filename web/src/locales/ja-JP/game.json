@@ -1,5 +1,23 @@
 {
   "population": "人口",
+  "world_journal": {
+    "title": "世界日誌",
+    "coming_soon": "近日公開",
+    "tabs": { "now": "現在", "focus": "注目", "stories": "物語", "timeline": "タイムライン" },
+    "periods": { "one": "今月", "three": "3か月", "twelve": "1年" },
+    "important_changes": "重要な変化",
+    "important_empty": "この期間に重要な変化はありません。",
+    "ongoing": "進行中",
+    "ongoing_empty": "この期間に記録された活動はありません。",
+    "activity": "世界の動き",
+    "total_events": "イベント",
+    "major_events": "重要",
+    "story_events": "物語",
+    "active_avatars": "活動中のキャラクター",
+    "event_count": "{count}件の出来事",
+    "loading": "日誌を読み込み中...",
+    "error": "日誌を読み込めませんでした。"
+  },
   "status_bar": {
     "phenomenon": "天地異象",
     "effect": "効果: ",
@@ -600,7 +618,9 @@
     "no_events": "関連イベントなし",
     "back_to_list": "リストに戻る",
     "death_year": "第{year}年{month}月",
-    "rogue": "野修"
+    "rogue": "野修",
+    "status_alive": "存命",
+    "status_dead": "故人"
   },
   "world_secret": {
     "title": "世界の秘密",
