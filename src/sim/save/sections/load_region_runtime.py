@@ -28,6 +28,15 @@ class RegionRuntimeLoadSection:
                 region = game_map.regions[rid]
                 if isinstance(region, CityRegion):
                     region.population = status.get("population", region.population)
+                conditions = status.get("conditions") or []
+                if conditions:
+                    from src.classes.environment.region_condition import RegionCondition
+
+                    add_condition = getattr(region, "add_condition", None)
+                    if callable(add_condition):
+                        for condition_data in conditions:
+                            if isinstance(condition_data, dict):
+                                add_condition(RegionCondition.from_dict(condition_data))
 
         region_formations = {}
         for rid_str, formation in (world_data.get("region_formations", {}) or {}).items():

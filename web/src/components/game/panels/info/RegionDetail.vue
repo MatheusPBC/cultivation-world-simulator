@@ -4,6 +4,7 @@ import EntityRow from './components/EntityRow.vue';
 import RelationRow from './components/RelationRow.vue';
 import SecondaryPopup from './components/SecondaryPopup.vue';
 import { useI18n } from 'vue-i18n';
+import { computed } from 'vue';
 import { formatPopulationRatioText } from '@/utils/populationFormat';
 import { useRegionDetailPanel } from '@/composables/useRegionDetailPanel';
 import gemIcon from '@/assets/icons/ui/lucide/gem.svg';
@@ -28,6 +29,14 @@ const {
   jumpToSect,
   jumpToAvatar,
 } = useRegionDetailPanel(() => props.data);
+
+const regionalConditions = computed(() => props.data.regional_pressure?.conditions ?? []);
+const regionalCapabilities = computed(() => props.data.regional_capabilities ?? []);
+const regionalCauseIds = computed(() => [
+  ...new Set(regionalConditions.value
+    .map((condition) => condition.cause_event_id)
+    .filter((id): id is string => Boolean(id))),
+]);
 </script>
 
 <template>
@@ -67,6 +76,28 @@ const {
       <!-- Sect Jump Button -->
       <div v-if="data.sect_id" class="actions">
          <button class="btn primary" @click="jumpToSect(data.sect_id!)">{{ t('game.info_panel.region.view_sect') }}</button>
+      </div>
+    </div>
+
+    <div class="section regional-context" v-if="data.regional_pressure || regionalCapabilities.length">
+      <div class="section-title">{{ t('game.info_panel.region.regional_context_title') }}</div>
+      <div v-if="data.regional_pressure" class="pressure-line">
+        <span>{{ t('game.info_panel.region.pressure') }}</span>
+        <strong>{{ data.regional_pressure.level }}</strong>
+      </div>
+      <div v-if="regionalConditions.length" class="compact-list">
+        <div v-for="condition in regionalConditions" :key="condition.kind" class="compact-item">
+          {{ condition.kind }} · {{ condition.intensity }}
+        </div>
+      </div>
+      <div v-if="regionalCapabilities.length" class="compact-list">
+        <div class="subheading">{{ t('game.info_panel.region.capabilities') }}</div>
+        <div v-for="capability in regionalCapabilities" :key="capability.kind" class="compact-item">
+          {{ capability.kind }}: {{ capability.value }}
+        </div>
+      </div>
+      <div v-if="regionalCauseIds.length" class="causal-note">
+        {{ t('game.info_panel.region.causal_event') }}: {{ regionalCauseIds.join(', ') }}
       </div>
     </div>
 
@@ -243,6 +274,14 @@ const {
   color: #d8c27a;
   line-height: 1.5;
 }
+
+.regional-context { color: #c9d7e8; }
+.pressure-line, .compact-item, .causal-note { font-size: 12px; line-height: 1.45; }
+.pressure-line { display: flex; justify-content: space-between; }
+.pressure-line strong { color: #ffd666; }
+.compact-list { display: flex; flex-direction: column; gap: 2px; }
+.subheading { color: #8fb3d9; font-size: 11px; margin-top: 3px; }
+.causal-note { color: #9db6cf; border-left: 2px solid #5b8db8; padding-left: 6px; }
 
 .empty-hint {
   font-size: 12px;

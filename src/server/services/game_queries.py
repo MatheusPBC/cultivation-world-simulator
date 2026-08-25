@@ -871,6 +871,19 @@ def get_detail(
         from src.systems.formation import get_formation_display_info
 
         info["formation"] = get_formation_display_info(world, getattr(target, "id", None))
+        from src.systems.regional_pressure import (
+            resolve_region_capabilities,
+            summarize_regional_pressure,
+        )
+
+        capabilities = resolve_region_capabilities(target, world=world)
+        info["regional_pressure"] = summarize_regional_pressure(
+            target,
+            current_month=int(world.month_stamp),
+            phenomenon=getattr(world, "current_phenomenon", None),
+            capabilities=capabilities,
+        )
+        info["regional_capabilities"] = capabilities
         return info
     if target_type == "avatar":
         from src.server.assemblers.avatar_detail import build_avatar_detail

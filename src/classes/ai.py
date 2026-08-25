@@ -61,12 +61,14 @@ class LLMAI(AI):
             observed = world.get_observable_avatars(avatar)
             avatar_info = avatar.get_expanded_info(co_region_avatars=observed, detailed=True)
             from src.classes.core.avatar.info_presenter import get_avatar_ai_context
+            from src.systems.regional_pressure import build_avatar_regional_context
             avatar_ai_context = get_avatar_ai_context(avatar, co_region_avatars=observed)
             
             info = {
                 "avatar_name": avatar.name,
                 "avatar_info": avatar_info,
                 "avatar_ai_context": avatar_ai_context,
+                "regional_context": build_avatar_regional_context(avatar),
                 "world_info": world_info,
                 "world_lore": world.world_lore.text,
                 "general_action_infos": general_action_infos,

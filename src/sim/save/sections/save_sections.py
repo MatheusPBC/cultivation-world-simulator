@@ -86,6 +86,12 @@ class WorldSection:
                     cultivate_regions_hosts[str(rid)] = region.host_avatar.id
                 if isinstance(region, CityRegion):
                     regions_status[str(rid)] = {"population": region.population}
+                to_runtime_dict = getattr(region, "to_runtime_dict", None)
+                if callable(to_runtime_dict):
+                    runtime = to_runtime_dict() or {}
+                    regions_status.setdefault(str(rid), {})["conditions"] = list(
+                        runtime.get("conditions", []) or []
+                    )
 
         sect_runtime_states = {
             str(sect.id): {

@@ -64,6 +64,7 @@ Além da localização da interface e dos textos gerados por IA para português 
 - política de seitas sensível à história: o patriarca pode citar essas memórias ao decidir guerra ou paz, sem transformar ressentimento em resultado obrigatório;
 - seção **Memórias marcantes** no perfil do personagem e evidências subjetivas dentro da consulta **Por quê?**;
 - pausa `required_decision_failed` quando uma decisão mensal obrigatória da IA falha de verdade, sem confundir uma resposta válida vazia com erro do provider.
+- pressão regional derivada: condições persistentes pertencem à região, formações existentes geram evidência causal, e o detalhe da região expõe pressão, capacidades atuais e o evento de origem.
 
 ### Princípio arquitetural
 
@@ -71,7 +72,7 @@ O kernel causal é uma camada de observação e ligação entre sistemas existen
 
 ### Escopo atual
 
-Esta entrega constrói a fundação para mundos mais emergentes, mas ainda não implementa todos os sistemas imaginados para as próximas etapas. Fisiologia detalhada, crises de recursos, ecologia espiritual, rumores, economia reativa e causalidade intergeracional continuam sendo evolução futura. Em outras palavras: os trilhos causais estão prontos, mas as novas leis locais ainda serão adicionadas gradualmente.
+Esta entrega constrói a fundação para mundos mais emergentes e já inclui a primeira lei local observável: pressão regional baseada em ocupação, condições, fenômeno mundial e capacidades presentes. Fisiologia detalhada, crises de recursos, ecologia espiritual, rumores, economia reativa e causalidade intergeracional continuam sendo evolução futura. Em outras palavras: os trilhos causais estão prontos, e novas leis locais serão adicionadas gradualmente.
 
 Para experimentar todo o kernel, recomenda-se criar um mundo novo. Saves e textos livres antigos não são traduzidos ou reconstruídos retroativamente.
 

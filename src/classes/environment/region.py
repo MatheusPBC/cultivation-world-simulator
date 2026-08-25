@@ -13,6 +13,7 @@ from src.classes.environment.lode import Lode, lodes_by_id
 from src.classes.core.sect import sects_by_name
 from src.classes.items.store import StoreMixin
 from src.i18n import t
+from src.classes.environment.region_condition import RegionCondition
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -30,6 +31,9 @@ class Region(ABC):
     
     # 核心坐标数据，由 load_map.py 注入
     cors: list[tuple[int, int]] = field(default_factory=list)
+    # Persistent local state.  This is intentionally owned by Region rather
+    # than by pressure/formation systems.
+    conditions: list[RegionCondition] = field(default_factory=list)
     
     # 计算字段
     center_loc: tuple[int, int] = field(init=False)
@@ -54,6 +58,18 @@ class Region(ABC):
         else:
             # Fallback
             self.center_loc = (0, 0)
+        self.conditions = list(self.conditions or [])
+
+    def add_condition(self, condition: RegionCondition) -> None:
+        if not isinstance(condition, RegionCondition):
+            raise TypeError("condition must be a RegionCondition")
+        self.conditions.append(condition)
+
+    def get_active_conditions(self, current_month: int) -> list[RegionCondition]:
+        return [condition for condition in self.conditions if condition.is_active(current_month)]
+
+    def to_runtime_dict(self) -> dict:
+        return {"conditions": [condition.to_dict() for condition in self.conditions]}
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -97,7 +113,8 @@ class Region(ABC):
             "name": self.name,
             "desc": self.desc,
             "type": self.get_region_type(),
-            "type_name": t("Region")
+            "type_name": t("Region"),
+            "conditions": [condition.to_dict() for condition in self.conditions],
         }
 
 

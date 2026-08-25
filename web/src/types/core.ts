@@ -378,6 +378,28 @@ export interface RegionFormationInfo {
   effects?: Record<string, number | string | boolean | string[]>;
 }
 
+export interface RegionalCondition {
+  kind: string;
+  intensity: number;
+  started_month: number;
+  cause_event_id?: string | null;
+  expires_month?: number | null;
+}
+
+export interface RegionalPressureSummary {
+  occupancy_ratio: number;
+  condition_pressure: number;
+  level: 'low' | 'medium' | 'high';
+  conditions: RegionalCondition[];
+  phenomenon?: { name: string; desc: string } | null;
+}
+
+export interface RegionalCapability {
+  kind: string;
+  value: unknown;
+  reason?: string;
+}
+
 export interface RegionDetail extends EntityBase {
   desc: string;
   type: string;
@@ -403,6 +425,8 @@ export interface RegionDetail extends EntityBase {
   lodes: EffectEntity[];
   store_items?: (EffectEntity & { price: number })[];
   formation?: RegionFormationInfo | null;
+  regional_pressure?: RegionalPressureSummary | null;
+  regional_capabilities?: RegionalCapability[];
 }
 
 // --- 天地灵机 ---

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from src.classes.action import InstantAction
 from src.classes.action.param_options import ParamOptionSource
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
+from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.systems.formation import (
     build_formation_record,
@@ -143,4 +145,73 @@ class SetFormation(InstantAction):
                 formation=formation_name,
                 region=region.name,
             )
-        return [Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])]
+        event = Event(
+            self.world.month_stamp,
+            content,
+            related_avatars=[self.avatar.id],
+            is_major=True,
+            fact_kind=FactKind.DERIVED_CONDITION,
+        )
+
+        # A formation is an existing, domain-owned regional effect.  Mirror it
+        # as a semantic condition so regional pressure can consume one stable
+        # representation, while keeping the formation registry as the owner of
+        # formation mechanics.  The event id is assigned before the condition
+        # is built, making the causal origin navigable from the region state.
+        formation = getattr(self.world.map, "region_formations", {}).get(int(region.id))
+        if formation:
+            from src.classes.environment.region_condition import RegionCondition
+
+            kind = f"{self._last_formation_type or formation_type}_formation"
+            started_month = int(formation.get("start_month", self.world.month_stamp))
+            duration = int(formation.get("duration", 0))
+            expires_month = started_month + duration if duration > 0 else None
+            previous = None
+            get_conditions = getattr(region, "get_active_conditions", None)
+            if callable(get_conditions):
+                active_conditions = get_conditions(int(self.world.month_stamp))
+                previous = next(
+                    (item for item in active_conditions
+                     if getattr(item, "kind", "") == kind),
+                    None,
+                )
+                # Map owns the formation record, while Region owns the
+                # semantic condition.  Replacing a formation must therefore
+                # retire the prior active formation condition as well; an
+                # expired condition remains in the historical runtime list.
+                conditions = getattr(region, "conditions", None)
+                if isinstance(conditions, list):
+                    conditions[:] = [
+                        item for item in conditions
+                        if not (
+                            getattr(item, "kind", "").endswith("_formation")
+                            and item in active_conditions
+                        )
+                    ]
+
+            condition = RegionCondition(
+                kind=kind,
+                intensity=1.0,
+                started_month=started_month,
+                expires_month=expires_month,
+                cause_event_id=event.id,
+            )
+            add_condition = getattr(region, "add_condition", None)
+            if callable(add_condition):
+                add_condition(condition)
+
+            before = previous.to_dict() if previous is not None else None
+            event.causal_payload = {
+                "deltas": [
+                    StateDelta(
+                        event_id=event.id,
+                        owner_kind="region",
+                        owner_id=str(region.id),
+                        aspect=f"condition:{kind}",
+                        before=json.dumps(before, ensure_ascii=False, sort_keys=True) if before is not None else None,
+                        after=json.dumps(condition.to_dict(), ensure_ascii=False, sort_keys=True),
+                    ).to_dict()
+                ]
+            }
+
+        return [event]

@@ -608,7 +608,11 @@
       "host_meta": "主人",
       "no_host": "无主（可占据）",
       "price_meta": "{price}灵石",
-      "formation_remaining": "剩余 {months} 个月"
+      "formation_remaining": "剩余 {months} 个月",
+      "regional_context_title": "区域态势",
+      "pressure": "当前压力",
+      "capabilities": "可用能力",
+      "causal_event": "因果事件"
     },
     "sect": {
       "stats": {
