@@ -64,6 +64,7 @@ export function normalizeEventCausalDetail(
     effects: Array.isArray(input.effects) ? input.effects : [],
     deltas: Array.isArray(input.deltas) ? input.deltas : [],
     decision: input.decision ?? null,
+    decision_appraisals: Array.isArray(input.decision_appraisals) ? input.decision_appraisals : [],
     truncated: Boolean(input.truncated),
   }
 }

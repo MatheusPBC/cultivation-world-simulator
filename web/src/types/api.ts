@@ -529,6 +529,30 @@ export interface AgentDecisionRejectedDTO {
 export interface AgentDecisionChosenDTO {
   action_name: string;
   params: Record<string, unknown>;
+  appraisal_ids?: string[];
+}
+
+export interface DecisionAppraisalDTO {
+  appraisal_id: string;
+  // True when the citation survived in the decision's chosen_chain but the
+  // appraisal row itself was removed by the source event's ON DELETE CASCADE.
+  // The placeholder keeps the audit trail from silently shrinking, so the
+  // display fields below are null/empty and the row must not be interactive.
+  pruned: boolean;
+  focus_avatar_id: string;
+  focus_avatar_name: string;
+  // Raw enum value, kept only for machine semantics -- the frontend has no
+  // locale entries for tokens like "emotion_angry". Use `emotion` to render.
+  primary_emotion: string;
+  emotion: {
+    name: string;
+    emoji: string;
+    desc: string;
+  } | null;
+  summary: string | null;
+  valence: number | null;
+  source_event_id: string;
+  source_event_date: string;
 }
 
 export interface AgentDecisionDTO {
@@ -550,6 +574,7 @@ export interface EventCausalDetailDTO {
   effects: CausalEdgeDTO[];
   deltas: StateDeltaDTO[];
   decision: AgentDecisionDTO | null;
+  decision_appraisals: DecisionAppraisalDTO[];
   truncated: boolean;
 }
 

@@ -13,14 +13,18 @@ import AvatarStatsGrid from './avatar-detail/AvatarStatsGrid.vue';
 import AvatarEquipmentSection from './avatar-detail/AvatarEquipmentSection.vue';
 import AvatarRelationsSection from './avatar-detail/AvatarRelationsSection.vue';
 import AvatarEffectsSection from './avatar-detail/AvatarEffectsSection.vue';
+import AvatarMemoriesSection from './avatar-detail/AvatarMemoriesSection.vue';
 import { useUiStore } from '@/stores/ui';
+import { useWorldJournalStore } from '@/stores/worldJournal';
 import { useI18n } from 'vue-i18n';
 import { useAvatarDetailPanel } from '@/composables/useAvatarDetailPanel';
+import { appraisalStrengthI18nKey } from '@/utils/appraisalStrength';
 import brainIcon from '@/assets/icons/ui/lucide/brain.svg';
 import heartHandshakeIcon from '@/assets/icons/ui/lucide/heart-handshake.svg';
 import messageCircleIcon from '@/assets/icons/ui/lucide/message-circle.svg';
 import packageIcon from '@/assets/icons/ui/lucide/package.svg';
 import pencilLineIcon from '@/assets/icons/ui/lucide/pencil-line.svg';
+import scrollIcon from '@/assets/icons/ui/lucide/scroll.svg';
 import sparklesIcon from '@/assets/icons/ui/lucide/sparkles.svg';
 import triangleAlertIcon from '@/assets/icons/ui/lucide/triangle-alert.svg';
 
@@ -30,6 +34,15 @@ const props = defineProps<{
 }>();
 
 const uiStore = useUiStore();
+const journalStore = useWorldJournalStore();
+
+function strengthLabelFor(weight: number): string {
+  return t(appraisalStrengthI18nKey(weight));
+}
+
+function openMemorySource(sourceEventId: string) {
+  void journalStore.openCausalDetail(sourceEventId);
+}
 
 const {
   secondaryItem,
@@ -208,6 +221,18 @@ const {
           <span class="section-title-icon" :style="{ '--icon-url': `url(${sparklesIcon})` }" aria-hidden="true"></span>
         </template>
       </AvatarEffectsSection>
+
+      <AvatarMemoriesSection
+        :appraisals="data.personal_appraisals ?? []"
+        :title="t('game.info_panel.avatar.sections.memories')"
+        :empty-text="t('game.info_panel.avatar.memories.empty')"
+        :strength-label-for="strengthLabelFor"
+        @open-source="openMemorySource"
+      >
+        <template #icon>
+          <span class="section-title-icon" :style="{ '--icon-url': `url(${scrollIcon})` }" aria-hidden="true"></span>
+        </template>
+      </AvatarMemoriesSection>
     </div>
 
     <AvatarObjectiveModal

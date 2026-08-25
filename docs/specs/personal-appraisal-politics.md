@@ -130,3 +130,14 @@ Every sect decision round records an `AgentDecision(subject_kind="sect")`. Its c
 12. Backend tests, frontend tests/type-check, and `git diff --check` pass.
 13. A new-world smoke test passes before any publication or deployment.
 
+## Implementation status
+
+Tasks 1 through 4 are implemented on `feat/personal-appraisal-politics`: domain and SQLite persistence, monthly generation with deterministic test/provider fallback, sect-decision context and causal audit, plus the desktop/responsive avatar and Why views.
+
+The focused backend tests for appraisal, storage, sect politics, decision audit and API assembly pass. The affected frontend component/mapper/utility tests and TypeScript type-check pass. The direct six-month simulator smoke runs inside the official LLM test-mode scope and passes without contacting a provider; this is required because that test bypasses the server loop which normally propagates `RunConfig.test_mode`.
+
+The repository-wide backend suite was not used as completion evidence in this environment because an unrelated existing FastAPI `TestClient` test hangs before reaching this slice. The bounded appraisal smoke was isolated and verified separately instead of treating interrupted output as a passing suite.
+
+### Next UI slice
+
+The current mobile shell does not expose the full avatar-detail route, and the causal journal overlay is mounted only by the main dashboard. The new memory section is responsive wherever the existing `AvatarDetail` is rendered, but complete mobile navigation from an avatar memory to its source event requires extending the mobile shell and overlay ownership in a separate slice. No parallel mobile-only memory implementation should be created.

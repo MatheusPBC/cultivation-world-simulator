@@ -48,6 +48,7 @@
     "why_truncated": "部分起因未显示；打开更接近源头的事件可查看更多。",
     "why_considered_count": "当时考虑了 {count} 个选项",
     "why_rejected": "被放弃的选项",
+    "why_decision_appraisals": "被引用的个人记忆",
     "why_relation": {
       "triggered_by": "触发于",
       "enabled_by": "得益于",
@@ -518,7 +519,16 @@
         "goldfinger": "外挂",
         "materials": "材料",
         "relations": "关系",
-        "current_effects": "当前效果"
+        "current_effects": "当前效果",
+        "memories": "记忆犹新"
+      },
+      "memories": {
+        "empty": "尚无深刻的记忆。",
+        "strength": {
+          "strong": "记忆深刻",
+          "moderate": "记忆尚存",
+          "weak": "印象淡薄"
+        }
       },
       "weapon_meta": "熟练度 {value}",
       "adjust": {

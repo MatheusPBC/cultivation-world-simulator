@@ -1001,6 +1001,29 @@ class EventStorage:
             created_at=_parse_time(row["created_at"]),
         )
 
+    def get_event_appraisals_by_ids(self, appraisal_ids: list[str]) -> list["EventAppraisal"]:
+        """按 id 批量读取 EventAppraisal，用于解析决策 chosen_chain 中引用的证据。
+
+        与 `get_event_appraisals`（按 appraiser 查询）不同，这里按精确 id
+        查找，不涉及有效权重计算；结果顺序不保证与输入顺序一致，调用方
+        自行按需要重新排序。
+        """
+        if self._conn is None or not appraisal_ids:
+            return []
+        placeholders = ",".join("?" for _ in appraisal_ids)
+        with self._db_lock:
+            rows = self._conn.execute(
+                f"""
+                SELECT id, event_id, appraiser_avatar_id, focus_avatar_id,
+                    personal_importance, valence, persistence,
+                    primary_emotion, summary, source, created_at
+                FROM event_appraisals
+                WHERE id IN ({placeholders})
+                """,
+                list(appraisal_ids),
+            ).fetchall()
+        return [self._row_to_event_appraisal(row) for row in rows]
+
     def get_event_by_id(self, event_id: str) -> Optional["Event"]:
         """按 id 直接读取单个事件，不受默认时间线的 decision 过滤限制。"""
         if self._conn is None:

@@ -64,6 +64,24 @@ export interface FateRevelation {
   location?: string;
 }
 
+// --- 个人解读 (Personal Appraisal) ---
+
+export interface PersonalAppraisalEntry {
+  appraisal_id: string;
+  focus_avatar_id: string;
+  focus_avatar_name: string;
+  emotion: {
+    name: string;
+    emoji: string;
+    desc: string;
+  };
+  summary: string;
+  source_event_id: string;
+  source_event_date: string;
+  valence: number;
+  effective_weight: number;
+}
+
 // --- 角色 (Avatar) ---
 
 export interface AvatarSummary extends EntityBase, Coordinates {
@@ -148,6 +166,7 @@ export interface AvatarDetail extends EntityBase {
   // 列表数据
   materials: Material[];
   relations: RelationInfo[];
+  personal_appraisals: PersonalAppraisalEntry[];
   
   // 附加信息
   current_effects?: string;

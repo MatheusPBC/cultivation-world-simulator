@@ -325,6 +325,12 @@ class EventManager:
             )
         return []
 
+    def get_event_appraisals_by_ids(self, appraisal_ids: List[str]) -> List["EventAppraisal"]:
+        """按 id 批量读取 EventAppraisal；内存模式下返回空列表。"""
+        if self._storage:
+            return self._storage.get_event_appraisals_by_ids(appraisal_ids)
+        return []
+
     def update_decision_payload(self, event_id: str, causal_payload: Optional[dict]) -> None:
         """Rewrite a decision event's causal_payload in place (see EventStorage.update_causal_payload)."""
         if self._storage:

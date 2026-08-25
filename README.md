@@ -60,6 +60,9 @@ Além da localização da interface e dos textos gerados por IA para português 
 - `CausalRecorder` passivo, ligado aos sistemas existentes sem controlar sua execução;
 - consulta causal limitada e segura em `GET /api/v1/query/events/{event_id}/causal`;
 - ação **Por quê?** na Crônica para reconstruir causas, efeitos, decisões e mudanças de estado;
+- avaliações pessoais persistentes: acontecimentos importantes deixam memórias subjetivas nos participantes, com importância, valência, persistência e emoção;
+- política de seitas sensível à história: o patriarca pode citar essas memórias ao decidir guerra ou paz, sem transformar ressentimento em resultado obrigatório;
+- seção **Memórias marcantes** no perfil do personagem e evidências subjetivas dentro da consulta **Por quê?**;
 - pausa `required_decision_failed` quando uma decisão mensal obrigatória da IA falha de verdade, sem confundir uma resposta válida vazia com erro do provider.
 
 ### Princípio arquitetural
@@ -76,6 +79,7 @@ Documentação:
 
 - [Customizações PT-BR, Codex e mobile](docs/customizations/README.md)
 - [Especificação do Causal World Kernel](docs/specs/causal-world-kernel.md)
+- [Avaliações pessoais e política de seitas](docs/specs/personal-appraisal-politics.md)
 - [Estratégia e comandos de testes](docs/testing.md)
 
 <table border="0">

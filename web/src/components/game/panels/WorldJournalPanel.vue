@@ -323,6 +323,39 @@ onMounted(() => {
                 {{ t('game.world_journal.why_rejected') }}:
                 {{ causalDetail.decision.rejected.map((r) => r.action_name).join(', ') }}
               </p>
+
+              <div v-if="causalDetail.decision_appraisals.length" class="why-appraisals">
+                <h5>{{ t('game.world_journal.why_decision_appraisals') }}</h5>
+                <ul class="why-appraisal-list">
+                  <li
+                    v-for="entry in causalDetail.decision_appraisals"
+                    :key="entry.appraisal_id"
+                    class="why-appraisal-item"
+                  >
+                    <span v-if="entry.pruned" class="why-appraisal-pruned">
+                      <span class="why-appraisal-summary why-edge-text--pruned">
+                        {{ t('game.world_journal.why_pruned') }}
+                      </span>
+                    </span>
+                    <button
+                      v-else
+                      type="button"
+                      class="why-appraisal-button"
+                      @click="openWhy(entry.source_event_id)"
+                    >
+                      <span class="why-appraisal-line">
+                        <span class="why-appraisal-focus">{{ entry.focus_avatar_name }}</span>
+                        <span v-if="entry.emotion" class="why-appraisal-emotion">
+                          <span aria-hidden="true">{{ entry.emotion.emoji }}</span>
+                          {{ entry.emotion.name }}
+                        </span>
+                        <span class="why-appraisal-date">{{ entry.source_event_date }}</span>
+                      </span>
+                      <span class="why-appraisal-summary">{{ entry.summary }}</span>
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </section>
 
             <p v-if="causalDetail.truncated" class="journal-note">
@@ -785,6 +818,103 @@ onMounted(() => {
   line-height: 1.5;
 }
 
+.why-appraisals {
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.why-appraisals h5 {
+  margin: 0 0 6px;
+  color: #9f9380;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.why-appraisal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.why-appraisal-item {
+  min-width: 0;
+}
+
+.why-appraisal-button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #2e2e2e;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #ded8ca;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.why-appraisal-button:hover,
+.why-appraisal-button:focus-visible {
+  background: #222;
+}
+
+.why-appraisal-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.why-appraisal-focus {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.why-appraisal-pruned {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed #2e2e2e;
+  border-radius: 8px;
+  background: #161616;
+}
+
+.why-appraisal-emotion {
+  flex: 0 0 auto;
+  color: #7dd9bd;
+  font-size: 10px;
+}
+
+.why-appraisal-date {
+  flex: 0 0 auto;
+  color: #918b7f;
+  font-size: 10px;
+}
+
+.why-appraisal-summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #bbb;
+}
+
 .why-retry {
   margin-top: 10px;
   min-height: 44px;
@@ -827,6 +957,7 @@ onMounted(() => {
   .why-button,
   .subject-chip,
   .why-retry,
+  .why-appraisal-button,
   .focus-card-header {
     min-height: 48px;
   }

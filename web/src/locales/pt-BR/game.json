@@ -48,6 +48,7 @@
     "why_truncated": "Algumas causas não foram exibidas; abra o evento mais próximo da origem para ver mais.",
     "why_considered_count": "{count} opções consideradas",
     "why_rejected": "Opções rejeitadas",
+    "why_decision_appraisals": "Memórias pessoais citadas",
     "why_relation": {
       "triggered_by": "desencadeado por",
       "enabled_by": "possibilitado por",
@@ -499,7 +500,16 @@
         "goldfinger": "Dom Especial",
         "materials": "Materiais",
         "relations": "Relações",
-        "current_effects": "Efeitos Ativos"
+        "current_effects": "Efeitos Ativos",
+        "memories": "Memórias marcantes"
+      },
+      "memories": {
+        "empty": "Ainda não há memórias marcantes.",
+        "strength": {
+          "strong": "Memória vívida",
+          "moderate": "Memória persistente",
+          "weak": "Memória esmaecida"
+        }
       },
       "weapon_meta": "Proficiência {value}",
       "adjust": {

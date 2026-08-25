@@ -48,6 +48,7 @@
     "why_truncated": "Some causes were not shown; open the event closer to the source for more.",
     "why_considered_count": "{count} options considered",
     "why_rejected": "Rejected options",
+    "why_decision_appraisals": "Personal memories cited",
     "why_relation": {
       "triggered_by": "triggered by",
       "enabled_by": "enabled by",
@@ -499,7 +500,16 @@
         "goldfinger": "Goldfinger",
         "materials": "Materials",
         "relations": "Relations",
-        "current_effects": "Current Effects"
+        "current_effects": "Current Effects",
+        "memories": "Memorable Moments"
+      },
+      "memories": {
+        "empty": "No memorable moments yet.",
+        "strength": {
+          "strong": "Vivid memory",
+          "moderate": "Lingering memory",
+          "weak": "Fading memory"
+        }
       },
       "weapon_meta": "Proficiency {value}",
       "adjust": {

@@ -23,6 +23,7 @@ from src.server.services.game_queries import get_event_causal_detail
 from src.server.serialization import serialize_events_for_client
 from src.sim.simulator import Simulator
 from src.systems.time import Month, Year, create_month_stamp
+from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
 @pytest.mark.asyncio
@@ -56,10 +57,15 @@ async def test_bounded_multi_month_smoke_with_real_decisions(base_world, mock_ll
     total_events = 0
     decision_events = 0
 
-    for _ in range(months_to_run):
-        events = await sim.step()
-        total_events += len(events)
-        decision_events += sum(1 for e in events if e.fact_kind == FactKind.DECISION)
+    # This test invokes Simulator directly, outside the server loop that normally
+    # propagates RunConfig.test_mode into the LLM runtime context. Keep every LLM
+    # task on its registered deterministic fallback while preserving the mocked
+    # non-empty action decisions above.
+    with llm_test_mode_scope(True):
+        for _ in range(months_to_run):
+            events = await sim.step()
+            total_events += len(events)
+            decision_events += sum(1 for e in events if e.fact_kind == FactKind.DECISION)
 
     assert int(base_world.month_stamp) == start_month + months_to_run
     # Every avatar starts idle and `MoveToDirection` takes 6 months, so each

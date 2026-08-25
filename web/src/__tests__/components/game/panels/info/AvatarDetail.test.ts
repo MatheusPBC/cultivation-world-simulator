@@ -86,6 +86,15 @@ describe('AvatarDetail', () => {
                 goldfinger: 'Goldfinger',
                 relations: 'Relations',
                 current_effects: 'Current Effects',
+                memories: 'Memorable Moments',
+              },
+              memories: {
+                empty: 'No memorable moments yet.',
+                strength: {
+                  strong: 'Vivid memory',
+                  moderate: 'Lingering memory',
+                  weak: 'Fading memory',
+                },
               },
               adjust: {
                 entry: 'Adjust',
@@ -148,6 +157,7 @@ describe('AvatarDetail', () => {
     skills: [],
     events: [],
     relations: [],
+    personal_appraisals: [],
   }
 
   it('should render successfully', () => {

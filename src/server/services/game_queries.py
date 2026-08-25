@@ -724,8 +724,94 @@ def get_event_causal_detail(
         "effects": effects,
         "deltas": deltas,
         "decision": decision_dto,
+        "decision_appraisals": _resolve_decision_appraisals(world, event_manager, decision_dto),
         "truncated": truncated,
     }
+
+
+def _resolve_decision_appraisals(
+    world: Any,
+    event_manager: Any,
+    decision_dto: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """把 chosen_chain 中实际引用的 appraisal_id 解析为可展示的解读证据。
+
+    只解析决策真正引用过的 id，并严格保持引用顺序。已被清理的引用
+    （`event_appraisals` 对源事件是 ON DELETE CASCADE，`cleanup_events`
+    可以删掉源事件）会以 `pruned: True` 占位条目返回，而不是被静默丢弃：
+    审计链不能在展示层无声地变短。这与因果边指向已裁剪事件时
+    `edge_dto` 的处理方式一致（见本文件 `get_event_causal_detail`）。
+    """
+    if not decision_dto:
+        return []
+
+    cited_ids: list[str] = []
+    seen: set[str] = set()
+    for step in decision_dto.get("chosen_chain") or []:
+        for appraisal_id in step.get("appraisal_ids") or []:
+            appraisal_id = str(appraisal_id)
+            if appraisal_id not in seen:
+                seen.add(appraisal_id)
+                cited_ids.append(appraisal_id)
+
+    if not cited_ids:
+        return []
+
+    from src.server.assemblers.avatar_detail import (
+        build_emotion_display,
+        resolve_appraisal_focus_name,
+    )
+    from src.systems.time import get_date_str
+
+    appraisals_by_id = {
+        appraisal.id: appraisal
+        for appraisal in event_manager.get_event_appraisals_by_ids(cited_ids)
+    }
+
+    resolved: list[dict[str, Any]] = []
+    for appraisal_id in cited_ids:
+        appraisal = appraisals_by_id.get(appraisal_id)
+        if appraisal is None:
+            # 引用过但已随源事件级联删除：保留占位，前端以不可点击的
+            # pruned 样式呈现，使"少了一条证据"这件事本身可见。
+            resolved.append(
+                {
+                    "appraisal_id": appraisal_id,
+                    "pruned": True,
+                    "focus_avatar_id": "",
+                    "focus_avatar_name": "",
+                    "primary_emotion": "",
+                    "emotion": None,
+                    "summary": None,
+                    "valence": None,
+                    "source_event_id": "",
+                    "source_event_date": "",
+                }
+            )
+            continue
+        focus_avatar = world.avatar_manager.get_avatar(appraisal.focus_avatar_id)
+        source_event = event_manager.get_event_by_id(appraisal.event_id)
+        resolved.append(
+            {
+                "appraisal_id": appraisal.id,
+                "pruned": False,
+                "focus_avatar_id": appraisal.focus_avatar_id,
+                "focus_avatar_name": resolve_appraisal_focus_name(
+                    appraisal.focus_avatar_id,
+                    focus_avatar=focus_avatar,
+                    source_event=source_event,
+                ),
+                # 原始枚举值只用于机器语义（前端没有 "emotion_angry" 这类
+                # 词条）；玩家可见的名称/emoji 由 emotion 字段提供。
+                "primary_emotion": appraisal.primary_emotion.value,
+                "emotion": build_emotion_display(appraisal.primary_emotion),
+                "summary": appraisal.summary,
+                "valence": appraisal.valence,
+                "source_event_id": appraisal.event_id,
+                "source_event_date": get_date_str(int(source_event.month_stamp)) if source_event is not None else "",
+            }
+        )
+    return resolved
 
 
 def get_detail(
