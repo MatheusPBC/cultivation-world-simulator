@@ -51,6 +51,9 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
     if ctx.world.event_manager:
         for event in final_events:
             ctx.world.event_manager.add_event(event)
+        if ctx.pending_chronicle_chapter is not None:
+            ctx.world.event_manager.append_chronicle_chapter(ctx.pending_chronicle_chapter)
+            ctx.pending_chronicle_chapter = None
 
     log_events(final_events)
     ctx.world.month_stamp = ctx.world.month_stamp + 1

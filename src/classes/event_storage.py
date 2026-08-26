@@ -190,6 +190,18 @@ class EventStorage:
                         ON event_appraisals(appraiser_avatar_id);
                     CREATE INDEX IF NOT EXISTS idx_event_appraisals_focus_avatar_id
                         ON event_appraisals(focus_avatar_id);
+
+                    CREATE TABLE IF NOT EXISTS chronicle_chapters (
+                        id TEXT PRIMARY KEY,
+                        start_month_stamp INTEGER NOT NULL,
+                        end_month_stamp INTEGER NOT NULL UNIQUE,
+                        trigger TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at REAL NOT NULL
+                    );
+
+                    CREATE INDEX IF NOT EXISTS idx_chronicle_chapters_end
+                        ON chronicle_chapters(end_month_stamp DESC, id DESC);
                 """)
                 columns = {
                     row["name"]
@@ -777,6 +789,102 @@ class EventStorage:
         """获取最近的事件（供初始状态 API 使用）。"""
         events = self.query_page(EventQuery(limit=limit, include_decisions=include_decisions)).events
         return list(reversed(events))  # 时间正序。
+
+    def append_chronicle_chapter(self, chapter: "ChronicleChapter") -> bool:
+        """Append one immutable Chronicle chapter.
+
+        The end month is the publication-window idempotency key.  A duplicate
+        end month is deliberately a no-op; no existing payload is replaced.
+        """
+        if self._conn is None:
+            return False
+        from src.classes.chronicle import ChronicleChapter
+
+        if not isinstance(chapter, ChronicleChapter):
+            raise TypeError("chapter must be a ChronicleChapter")
+        try:
+            with self._transaction():
+                self._conn.execute(
+                    """
+                    INSERT INTO chronicle_chapters (
+                        id, start_month_stamp, end_month_stamp, trigger, payload_json, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chapter.id,
+                        chapter.start_month_stamp,
+                        chapter.end_month_stamp,
+                        chapter.trigger,
+                        json.dumps(chapter.to_dict(), ensure_ascii=False, separators=(",", ":")),
+                        float(chapter.created_at),
+                    ),
+                )
+            return True
+        except sqlite3.IntegrityError as exc:
+            if "chronicle_chapters.end_month_stamp" in str(exc) or "UNIQUE constraint failed: chronicle_chapters.end_month_stamp" in str(exc):
+                return False
+            raise
+
+    @staticmethod
+    def _chronicle_row_to_chapter(row) -> "ChronicleChapter":
+        from src.classes.chronicle import ChronicleChapter
+
+        return ChronicleChapter.from_dict(json.loads(row["payload_json"]))
+
+    def get_latest_chronicle_chapter(self) -> "ChronicleChapter | None":
+        if self._conn is None:
+            return None
+        with self._db_lock:
+            row = self._conn.execute(
+                "SELECT payload_json FROM chronicle_chapters ORDER BY end_month_stamp DESC, id DESC LIMIT 1"
+            ).fetchone()
+        return self._chronicle_row_to_chapter(row) if row else None
+
+    def get_chronicle_chapters_page(
+        self, cursor: str | None, limit: int
+    ) -> tuple[list["ChronicleChapter"], str | None, bool]:
+        if self._conn is None:
+            return [], None, False
+        if not isinstance(limit, int) or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        try:
+            cursor_value = int(cursor) if cursor is not None else None
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid Chronicle cursor") from exc
+
+        where = "WHERE end_month_stamp < ?" if cursor_value is not None else ""
+        params: tuple[object, ...] = (cursor_value, limit + 1) if cursor_value is not None else (limit + 1,)
+        with self._db_lock:
+            rows = self._conn.execute(
+                f"SELECT payload_json, end_month_stamp FROM chronicle_chapters {where} "
+                "ORDER BY end_month_stamp DESC, id DESC LIMIT ?",
+                params,
+            ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        chapters = [self._chronicle_row_to_chapter(row) for row in rows]
+        next_cursor = str(rows[-1]["end_month_stamp"]) if has_more and rows else None
+        return chapters, next_cursor, has_more
+
+    def get_events_between_months(self, start: int, end: int) -> list["Event"]:
+        """Return all events in an inclusive, deterministic month window."""
+        if self._conn is None:
+            return []
+        if int(start) > int(end):
+            return []
+        with self._db_lock:
+            rows = self._conn.execute(
+                """
+                SELECT rowid, id, month_stamp, content, is_major, is_story,
+                    event_type, render_key, render_params, subject_snapshots,
+                    created_at, fact_kind, causal_payload
+                FROM events
+                WHERE month_stamp BETWEEN ? AND ?
+                ORDER BY month_stamp ASC, created_at ASC, id ASC
+                """,
+                (int(start), int(end)),
+            ).fetchall()
+        return self._build_events_from_rows(rows)
 
     def cleanup(self, keep_major: bool = True, before_month_stamp: Optional[int] = None) -> int:
         """

@@ -1,0 +1,5 @@
+Você é o cronista do mundo. Escreva um capítulo curto usando somente os fatos estruturados abaixo.
+Não invente fatos. Cada parágrafo deve declarar source_event_ids e toda referência deve usar apenas IDs de events.
+Retorne JSON: {{"title":"...","source_event_ids":["..."],"paragraphs":[{{"source_event_ids":["..."],"segments":[{{"text":"...","reference":null}}]}}]}}.
+Janela {start_month_stamp} a {end_month_stamp}, gatilho {trigger}.
+Fatos candidatos: {events}

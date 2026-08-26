@@ -63,6 +63,20 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         # No AI appraisals: every candidate falls back to its deterministic
         # per-candidate rule profile in event_appraisal_service.
         return {"appraisals": []}
+    if task_name == "chronicle_chapter":
+        events = list(infos.get("events", []))
+        if not events:
+            return {"title": "", "source_event_ids": [], "paragraphs": []}
+        first = events[0]
+        event_id = str(first["id"])
+        return {
+            "title": "World Chronicle",
+            "source_event_ids": [event_id],
+            "paragraphs": [{
+                "source_event_ids": [event_id],
+                "segments": [{"text": str(first.get("content", ""))}],
+            }],
+        }
     if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:
         return {}
     if task_name.startswith("world_lore_"):
@@ -77,5 +91,5 @@ def registered_test_mode_tasks() -> frozenset[str]:
         "action_decision", "backstory", "long_term_objective", "nickname", "story_teller",
         "relation_resolver", "relation_delta", "single_choice", "sect_thinker", "sect_decider",
         "interaction_feedback", "fate_revelation", "random_minor_event", "event_appraisal",
-        "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary",
+        "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary", "chronicle_chapter",
     })
