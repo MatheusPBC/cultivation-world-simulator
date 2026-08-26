@@ -144,6 +144,7 @@ class AvatarSaveMixin:
             ],
             "temporary_effects": self.temporary_effects,
             "persistent_effects": self.persistent_effects,
+            "individual_consequences": self.individual_consequences.to_dict(),
             
             # 生育相关
             "children": [child.to_dict() for child in self.children],

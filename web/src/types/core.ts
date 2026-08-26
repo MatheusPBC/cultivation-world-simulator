@@ -150,6 +150,11 @@ export interface AvatarDetail extends EntityBase {
   thinking: string;
   short_term_objective: string;
   long_term_objective: string;
+  individual_consequences?: {
+    active_injury?: { severity: string; started_month: number; hp_lost: number; cause_event_ids: string[]; salience: number } | null;
+    recent_resolved: Array<Record<string, unknown>>;
+  };
+  derived_priority?: string;
   backstory?: string | null;
   fate_revelation?: FateRevelation | null;
   

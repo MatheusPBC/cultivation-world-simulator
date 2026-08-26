@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from src.i18n import t
 from src.classes.mutual_action.mutual_action import PressureAction
+from src.classes.action.action import can_take_risk
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.event import Event
 from src.classes.action.registry import register_action
@@ -62,6 +63,9 @@ class Occupy(PressureAction):
         return region, region.host_avatar, ""
 
     def can_start(self, region_name: str) -> tuple[bool, str]:
+        ok, reason = can_take_risk(self.avatar)
+        if not ok:
+            return ok, reason
         region, host, err = self._get_region_and_host(region_name)
         if err:
             return False, err

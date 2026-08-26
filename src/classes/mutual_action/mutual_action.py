@@ -7,6 +7,7 @@ import asyncio
 
 from src.i18n import t
 from src.classes.action.action import DefineAction, ActualActionMixin, LLMAction
+from src.classes.action.action import can_take_risk
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.event import Event, NULL_EVENT
 from src.utils.llm import call_llm_with_task_name
@@ -313,6 +314,10 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
         注意：此方法未使用 TargetingMixin.validate_target_avatar()，
         因为需要额外检查 target == self.avatar 和调用子类的 _can_start()。
         """
+        if self.__class__.__name__ in {"MutualAttack", "Spar", "Occupy", "DriveAway"}:
+            ok, reason = can_take_risk(self.avatar)
+            if not ok:
+                return ok, reason
         target = self._get_target_avatar(target_avatar)
         if target is None:
             return False, t("Target does not exist")

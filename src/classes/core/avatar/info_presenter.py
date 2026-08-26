@@ -259,6 +259,8 @@ def get_avatar_structured_info(avatar: "Avatar") -> dict:
         },
         "thinking": avatar.thinking,
         "short_term_objective": avatar.short_term_objective,
+        "individual_consequences": avatar.individual_consequences.to_dict(),
+        "derived_priority": avatar.individual_consequences.derived_priority,
         "long_term_objective": avatar.long_term_objective.content if avatar.long_term_objective else "",
         "backstory": avatar.backstory if avatar.backstory else None,
         "fate_revelation": _get_fate_revelation(avatar),

@@ -13,6 +13,13 @@ if TYPE_CHECKING:
     from src.classes.core.world import World
 
 
+def can_take_risk(avatar) -> tuple[bool, str]:
+    """Shared rule guard; the semantic state remains owned by Avatar."""
+    if getattr(getattr(avatar, "individual_consequences", None), "active_injury", None) is not None:
+        return False, t("伤势未愈，无法进行高风险行动")
+    return True, ""
+
+
 def long_action(step_month: int):
     """
     长态动作装饰器，用于为动作类自动添加时间管理功能

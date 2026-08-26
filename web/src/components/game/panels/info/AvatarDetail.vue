@@ -139,6 +139,21 @@ const {
         {{ data.action_state }}
       </div>
 
+      <div v-if="data.individual_consequences?.active_injury" class="section consequence-section">
+        <div class="section-title">{{ t('game.info_panel.avatar.consequences.injury_title') }}</div>
+        <div class="text-content">
+          {{ t('game.info_panel.avatar.consequences.injury_body', {
+            severity: data.individual_consequences.active_injury.severity,
+            hp: data.individual_consequences.active_injury.hp_lost,
+          }) }}
+        </div>
+        <div class="consequence-causes">
+          <button v-for="eventId in data.individual_consequences.active_injury.cause_event_ids" :key="eventId" class="adjust-btn" @click="openMemorySource(eventId)">
+            {{ t('game.info_panel.avatar.consequences.why') }}
+          </button>
+        </div>
+      </div>
+
       <AvatarStatsGrid
         :data="data"
         :formatted-ranking="formattedRanking"

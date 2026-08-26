@@ -7,7 +7,9 @@ from src.classes.birth import process_births
 from src.classes.core.avatar import Avatar
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.state_delta import StateDelta
 from src.classes.long_term_objective import process_avatar_long_term_objective
 from src.classes.nickname import process_avatar_nickname
 from src.sim.avatar_awake import process_awakening
@@ -97,6 +99,25 @@ async def phase_nickname_generation(living_avatars: list[Avatar]) -> list[Event]
     # 外号生成允许全量并发，结果里只有真正产出了事件的角色会留下记录。
     results = await asyncio.gather(*[process_avatar_nickname(avatar) for avatar in living_avatars])
     return [event for event in results if event]
+
+
+def phase_resolve_individual_consequences(living_avatars: list[Avatar]) -> list[Event]:
+    events: list[Event] = []
+    for avatar in living_avatars:
+        summary = avatar.individual_consequences.resolve_if_recovered(
+            month=int(avatar.world.month_stamp), current_hp=avatar.hp.cur, max_hp=avatar.hp.max
+        )
+        if summary is None:
+            continue
+        event = Event(
+            avatar.world.month_stamp,
+            f"{avatar.name}的{summary['severity']}伤势已经痊愈。",
+            related_avatars=[avatar.id], fact_kind=FactKind.DERIVED_CONDITION,
+            causal_payload={"deltas": [StateDelta(owner_kind="avatar", owner_id=str(avatar.id), aspect="active_injury", before=str(summary), after=None).to_dict()], "decision": None},
+        )
+        event.causal_links = [CausalLink(event_id=event.id, cause_event_id=cause_id, relation=CausalRelation.RESOLVES) for cause_id in summary["cause_event_ids"]]
+        events.append(event)
+    return events
 
 
 async def phase_long_term_objective_thinking(living_avatars: list[Avatar]) -> list[Event]:

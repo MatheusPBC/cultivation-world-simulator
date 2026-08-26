@@ -99,6 +99,8 @@ def build_avatar_prompt_context(
             "emotion": t(avatar.emotion.value),
             "long_term_objective": avatar.long_term_objective.content if avatar.long_term_objective else "",
             "short_term_objective": avatar.short_term_objective,
+            "individual_consequences": avatar.individual_consequences.to_dict(),
+            "derived_priority": avatar.individual_consequences.derived_priority,
             "goldfinger": _get_goldfinger_structured_payload(avatar),
             "active_opportunity": get_opportunity_context_text(avatar),
             "world_secret_knowledge": _get_world_secret_knowledge_payload(avatar),
@@ -114,6 +116,10 @@ def build_avatar_prompt_context(
         },
         "decision_hints": {
             "should_prioritize_safety": avatar.hp.cur < max(1, avatar.hp.max // 2),
+            "restricted_actions": (
+                ["Attack", "Assassinate", "Spar", "MutualAttack", "Occupy", "DriveAway", "SectMission", "DigGrave", "TakeTreasure"]
+                if avatar.individual_consequences.active_injury else []
+            ),
             "should_prioritize_sect_duty": bool(sect_context["sect_is_at_war"]),
             "can_seek_support_from_sect": bool(sect_context["can_seek_support_from_sect"]),
         },

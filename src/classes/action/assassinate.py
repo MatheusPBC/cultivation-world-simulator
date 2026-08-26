@@ -4,6 +4,7 @@ import random
 
 from src.i18n import t
 from src.classes.action import InstantAction
+from src.classes.action.action import can_take_risk
 from src.classes.action.cooldown import cooldown_action
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.action.targeting_mixin import TargetingMixin
@@ -78,6 +79,9 @@ class Assassinate(InstantAction, TargetingMixin):
             self._last_result = (winner, loser, loser_damage, winner_damage)
 
     def can_start(self, avatar_name: str) -> tuple[bool, str]:
+        ok, reason = can_take_risk(self.avatar)
+        if not ok:
+            return ok, reason
         # 注意：cooldown_action 装饰器会覆盖这个方法并在调用此方法前检查 CD
         _, ok, reason = self.validate_target_avatar(avatar_name)
         return ok, reason
@@ -105,10 +109,16 @@ class Assassinate(InstantAction, TargetingMixin):
                            avatar=self.avatar.name, target=target.name)
             
             # 杀人夺宝
-            loot_text = await kill_and_grab(self.avatar, target)
+            loot_text, transfer = await kill_and_grab(self.avatar, target)
             result_text += loot_text
             
             result_event = Event(self.world.month_stamp, result_text, related_avatars=rel_ids, is_major=True)
+            if transfer is not None:
+                from src.classes.state_delta import StateDelta
+                result_event.causal_payload = {"deltas": [
+                    StateDelta(owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
+                    StateDelta(owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
+                ], "decision": None}
             
             story_event = await StoryEventService.maybe_create_story(
                 kind=StoryEventKind.COMBAT,
@@ -148,4 +158,3 @@ class Assassinate(InstantAction, TargetingMixin):
                 prefix=t("Assassination failed! Both sides engaged in fierce battle."),
                 check_loot=True
             )
-

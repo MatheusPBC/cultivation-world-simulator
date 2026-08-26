@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from src.i18n import t
 from src.classes.action import InstantAction
+from src.classes.action.action import can_take_risk
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.action.targeting_mixin import TargetingMixin
 from src.classes.event import Event
@@ -52,6 +53,9 @@ class Attack(InstantAction, TargetingMixin):
         self._last_result = (winner, loser, loser_damage, winner_damage)
 
     def can_start(self, avatar_name: str) -> tuple[bool, str]:
+        ok, reason = can_take_risk(self.avatar)
+        if not ok:
+            return ok, reason
         if not avatar_name:
             return False, t("Missing target parameter")
             

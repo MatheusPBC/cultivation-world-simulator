@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from src.classes.action import TimedAction
+from src.classes.action.action import can_take_risk
 from src.classes.core.sect import Sect
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
@@ -163,6 +164,9 @@ class SectMission(TimedAction):
         return getattr(self.avatar, "sect", None) is not None and bool(self._get_candidate_tasks())
 
     def can_start(self) -> tuple[bool, str]:
+        ok, reason = can_take_risk(self.avatar)
+        if not ok:
+            return ok, reason
         sect = getattr(self.avatar, "sect", None)
         if sect is None:
             return False, t("sect_mission_members_only")
@@ -223,15 +227,16 @@ class SectMission(TimedAction):
                 stones=self.reward_magic_stones,
                 contribution=actual_contribution,
             )
-            events.append(
-                Event(
+            result_event = Event(
                     month_stamp=self.world.month_stamp,
                     content=result_text,
                     related_avatars=related_avatar_ids,
                     related_sects=related_sect_ids,
                     is_major=False,
                 )
-            )
+            from src.classes.individual_consequence import record_injury_from_event
+            record_injury_from_event(self.avatar, result_event, self.fail_damage)
+            events.append(result_event)
             story_prompt = t("sect_mission_story_prompt_success")
         else:
             self.fail_damage = self._roll_fail_damage()
