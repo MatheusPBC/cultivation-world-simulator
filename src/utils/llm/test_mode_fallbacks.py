@@ -67,14 +67,27 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         events = list(infos.get("events", []))
         if not events:
             return {"title": "", "source_event_ids": [], "paragraphs": []}
-        first = events[0]
+        # Keep the rule-based chapter useful for the same read path as a
+        # provider chapter: expose one factual event anchor so the Chronicle
+        # dossier (and the existing Why query) can be exercised in test mode.
+        first = next((item for item in events if item.get("is_major")), events[0])
         event_id = str(first["id"])
         return {
             "title": "World Chronicle",
             "source_event_ids": [event_id],
             "paragraphs": [{
                 "source_event_ids": [event_id],
-                "segments": [{"text": str(first.get("content", ""))}],
+                "segments": [{
+                    "text": str(first.get("content", "")),
+                    "reference": {
+                        "id": f"event-{event_id}",
+                        "kind": "event",
+                        "label": f"Event {event_id}",
+                        "target_id": event_id,
+                        "claim_kind": "fact",
+                        "source_event_ids": [event_id],
+                    },
+                }],
             }],
         }
     if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:

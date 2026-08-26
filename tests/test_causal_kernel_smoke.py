@@ -17,12 +17,13 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.core.world import World
 from src.classes.event import NULL_EVENT, Event, FactKind
 from src.server.runtime import DEFAULT_GAME_STATE, GameSessionRuntime
-from src.server.services.game_queries import get_event_causal_detail
+from src.server.services.game_queries import get_chronicle_dossier, get_event_causal_detail, get_world_chronicle
 from src.server.serialization import serialize_events_for_client
 from src.sim.simulator import Simulator
-from src.systems.time import Month, Year, create_month_stamp
+from src.systems.time import Month, MonthStamp, Year, create_month_stamp
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
@@ -79,6 +80,91 @@ async def test_bounded_multi_month_smoke_with_real_decisions(base_world, mock_ll
     # No hard ceiling is prescribed by the spec; this only guards against a
     # gross blow-up (e.g. an accidental per-tile or per-pair event emission).
     assert total_events < 500, f"unexpectedly high event volume for {months_to_run} months: {total_events}"
+
+
+@pytest.mark.asyncio
+async def test_persisted_fact_chronicle_dossier_and_why_stay_connected(base_world, tmp_path, monkeypatch):
+    """Exercise the bounded read path from a persisted fact to the Why query.
+
+    This deliberately uses direct services instead of FastAPI TestClient: the
+    local AnyIO/Starlette combination can hang when sync routes are dispatched
+    through its thread pool.  The provider boundary is patched separately so
+    test mode must prove it does not await a real model call.
+    """
+    world = World.create_with_db(
+        map=base_world.map,
+        month_stamp=create_month_stamp(Year(0), Month.APRIL),
+        events_db_path=tmp_path / "chronicle-smoke.db",
+    )
+    try:
+        cause = Event(
+            MonthStamp(int(world.month_stamp) - 1),
+            "A persisted cause",
+            id="chronicle-cause",
+            created_at=1.0,
+        )
+        fact = Event(
+            world.month_stamp,
+            "A persisted factual event",
+            id="chronicle-fact",
+            is_major=True,
+            created_at=2.0,
+            causal_links=[
+                CausalLink(
+                    event_id="chronicle-fact",
+                    cause_event_id="chronicle-cause",
+                    relation=CausalRelation.TRIGGERED_BY,
+                )
+            ],
+        )
+        world.event_manager.add_event(cause)
+        world.event_manager.add_event(fact)
+        assert world.event_manager.get_event_by_id(fact.id) is not None
+
+        # ChronicleService reaches this client function only for a real
+        # provider call.  Its test-mode branch must return the registered
+        # deterministic draft before awaiting it.
+        provider = AsyncMock(side_effect=AssertionError("provider must not be called in test mode"))
+        monkeypatch.setattr("src.utils.llm.client.call_llm_with_template", provider)
+        from src.systems.chronicle_service import ChronicleService
+
+        with llm_test_mode_scope(True):
+            chapter = await ChronicleService().maybe_generate_chapter(world, [])
+
+        assert chapter is not None
+        assert chapter.source_event_ids == (fact.id,)
+        assert chapter.paragraphs[0].segments[0].reference is not None
+        assert chapter.paragraphs[0].segments[0].reference.target_id == fact.id
+        provider.assert_not_awaited()
+        assert world.event_manager.append_chronicle_chapter(chapter) is True
+
+        runtime = GameSessionRuntime(dict(DEFAULT_GAME_STATE))
+        runtime.set_world_and_sim(world, None)
+        list_payload = get_world_chronicle(runtime, cursor=None, limit=20)
+        assert [item["id"] for item in list_payload["chapters"]] == [chapter.id]
+        listed_chapter = list_payload["chapters"][0]
+        anchor = listed_chapter["paragraphs"][0]["segments"][0]["reference"]
+
+        serialize = lambda events, **_kwargs: serialize_events_for_client(events, world=world)
+        dossier = get_chronicle_dossier(
+            runtime,
+            serialize_events_for_client=serialize,
+            chapter_id=listed_chapter["id"],
+            anchor_id=anchor["id"],
+        )
+        surviving_id = dossier["focal_event"]["id"]
+        assert surviving_id == fact.id
+        assert [item["id"] for item in dossier["sequence"]] == [cause.id, fact.id]
+
+        why = get_event_causal_detail(
+            runtime,
+            serialize_events_for_client=serialize,
+            event_id=surviving_id,
+        )
+        assert why["event"]["id"] == fact.id
+        assert why["causes"][0]["event"]["id"] == cause.id
+    finally:
+        world.event_manager.close()
 
 
 def test_why_query_stays_cheap_on_a_moderately_deep_chain(base_world):
