@@ -3,3 +3,5 @@ Não invente fatos. Cada parágrafo deve declarar source_event_ids e toda refer�
 Retorne JSON: {{"title":"...","source_event_ids":["..."],"paragraphs":[{{"source_event_ids":["..."],"segments":[{{"text":"...","reference":null}}]}}]}}.
 Janela {start_month_stamp} a {end_month_stamp}, gatilho {trigger}.
 Fatos candidatos: {events}
+Referências de entidade usam somente IDs existentes em entities: avatar/sect/region preenchem target_id e claim_kind null; referências event preenchem claim_kind (fact ou inference), fact exige target_id e inference exige target_id null.
+Entidades disponíveis: {entities}

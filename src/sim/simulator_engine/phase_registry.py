@@ -164,6 +164,9 @@ async def generate_event_appraisals(_simulator, ctx):
 async def generate_chronicle(_simulator, ctx):
     from src.systems.chronicle_service import ChronicleService
 
+    # Chronicle sees this step's causal facts before finalizer persistence;
+    # finalizer attaches again idempotently as its normal storage boundary.
+    ctx.causal.attach_to(ctx.events)
     ctx.pending_chronicle_chapter = await ChronicleService().maybe_generate_chapter(ctx.world, ctx.events)
 
 

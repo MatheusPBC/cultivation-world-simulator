@@ -118,3 +118,29 @@ def test_event_manager_delegates_chronicle_and_month_queries(tmp_path: Path):
     assert manager.get_latest_chronicle_chapter() == chapter
     assert [event.id for event in manager.get_events_between_months(2, 3)] == ["event-2", "event-3"]
     manager.close()
+
+
+def test_finalizer_does_not_publish_when_a_chapter_source_failed_to_persist():
+    from types import SimpleNamespace
+    from src.sim.simulator_engine.finalizer import finalize_step
+    from src.sim.simulator_engine.context import SimulationStepContext
+
+    chapter = make_chapter(1)
+    event_manager = SimpleNamespace(
+        add_event=lambda _event: False,
+        get_event_by_id=lambda _event_id: None,
+        append_chronicle_chapter=lambda _chapter: pytest.fail("chapter must not publish"),
+    )
+    fake_world = SimpleNamespace(
+        avatar_manager=SimpleNamespace(avatars={}),
+        event_manager=event_manager,
+        month_stamp=MonthStamp(1),
+    )
+    ctx = SimulationStepContext.__new__(SimulationStepContext)
+    ctx.world = fake_world
+    ctx.events = [Event(MonthStamp(1), "fact", id="event-1")]
+    ctx.causal = SimpleNamespace(attach_to=lambda _events: None)
+    ctx.pending_chronicle_chapter = chapter
+
+    finalize_step(ctx)
+    assert ctx.pending_chronicle_chapter is None

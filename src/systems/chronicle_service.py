@@ -7,7 +7,7 @@ import uuid
 from typing import Any, Mapping
 
 from src.classes.chronicle import ChronicleChapter, ChronicleParagraph, ChronicleReference, ChronicleSegment
-from src.classes.event import Event, FactKind
+from src.classes.event import Event
 from src.i18n.template_resolver import resolve_locale_template_path
 from src.run.log import get_logger
 from src.utils.llm import call_llm_with_task_name
@@ -59,6 +59,29 @@ class ChronicleService:
         return {"avatar": avatar_ids, "sect": sect_ids, "region": {str(key) for key in regions}}
 
     @staticmethod
+    def _world_entities(world: Any) -> dict[str, list[dict[str, str]]]:
+        avatars = getattr(getattr(world, "avatar_manager", None), "avatars", {}) or {}
+        avatar_rows = [
+            {"id": str(getattr(item, "id", key)), "label": str(getattr(item, "name", getattr(item, "id", key)))}
+            for key, item in avatars.items()
+        ]
+        sects = list(getattr(world, "existed_sects", None) or [])
+        try:
+            sects.extend(world.sect_context.get_active_sects())
+        except (AttributeError, TypeError):
+            pass
+        sect_rows = [
+            {"id": str(getattr(item, "id", "")), "label": str(getattr(item, "name", getattr(item, "id", "")))}
+            for item in sects if getattr(item, "id", None) is not None
+        ]
+        regions = getattr(getattr(world, "map", None), "regions", {}) or {}
+        region_rows = [
+            {"id": str(key), "label": str(getattr(item, "name", key))}
+            for key, item in regions.items()
+        ]
+        return {"avatars": avatar_rows, "sects": sect_rows, "regions": region_rows}
+
+    @staticmethod
     def _merge_events(world: Any, current_events: list[Event], start: int, end: int) -> list[Event]:
         manager = getattr(world, "event_manager", None)
         persisted = manager.get_events_between_months(start, end) if manager is not None else []
@@ -66,7 +89,15 @@ class ChronicleService:
         for event in [*persisted, *current_events]:
             if start <= int(event.month_stamp) <= end:
                 merged.setdefault(event.id, event)
-        return sorted(merged.values(), key=lambda event: (int(event.month_stamp), float(event.created_at), event.id))
+        events = sorted(merged.values(), key=lambda event: (int(event.month_stamp), float(event.created_at), event.id))
+        if manager is not None:
+            for event in events:
+                if getattr(event, "causal_links", None):
+                    continue
+                get_links = getattr(manager, "get_causal_links_for_event", None)
+                if get_links is not None:
+                    event.causal_links = list(get_links(event.id) or [])
+        return events
 
     @staticmethod
     def _window(world: Any, current_month: int) -> tuple[int, int, str | None]:
@@ -79,7 +110,7 @@ class ChronicleService:
         return int(latest.end_month_stamp) + 1, current_month, latest
 
     @staticmethod
-    def _parse_draft(
+    def _parse_draft_impl(
         draft: Mapping[str, Any],
         *,
         world: Any,
@@ -168,6 +199,36 @@ class ChronicleService:
             created_at=float(draft.get("created_at", time.time())),
         )
 
+    @classmethod
+    def _parse_draft(cls, draft: Mapping[str, Any], **kwargs: Any) -> ChronicleChapter:
+        try:
+            return cls._parse_draft_impl(draft, **kwargs)
+        except ChronicleDraftError:
+            raise
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ChronicleDraftError("Chronicle draft has invalid structured fields") from exc
+
+    @staticmethod
+    def _bound_candidates(candidates: list[Event]) -> list[Event]:
+        if len(candidates) <= MAX_CHRONICLE_CANDIDATES:
+            return candidates
+        by_id = {event.id: event for event in candidates}
+        required_ids = {event.id for event in candidates if event.is_major}
+        frontier = list(required_ids)
+        while frontier:
+            event = by_id.get(frontier.pop())
+            if event is None:
+                continue
+            for link in getattr(event, "causal_links", None) or []:
+                cause_id = str(link.cause_event_id)
+                if cause_id in by_id and cause_id not in required_ids:
+                    required_ids.add(cause_id)
+                    frontier.append(cause_id)
+        required = [event for event in candidates if event.id in required_ids]
+        optional = [event for event in candidates if event.id not in required_ids]
+        optional = optional[-max(0, MAX_CHRONICLE_CANDIDATES - len(required)):]
+        return sorted([*required, *optional], key=lambda event: (int(event.month_stamp), float(event.created_at), event.id))
+
     async def maybe_generate_chapter(self, world: Any, current_events: list[Event]) -> ChronicleChapter | None:
         current_month = int(world.month_stamp)
         start, end, latest = self._window(world, current_month)
@@ -181,31 +242,17 @@ class ChronicleService:
         if not current_major and not deadline:
             return None
         trigger = "major_event" if current_major else "max_interval"
-        if len(candidates) > MAX_CHRONICLE_CANDIDATES:
-            # Keep the newest bounded slice, but never discard a major event in
-            # the current publication month.  Their direct causal evidence is
-            # retained when it is present in the same pending window.
-            required_ids = {
-                event.id
-                for event in candidates
-                if int(event.month_stamp) == current_month and event.is_major
-            }
-            selected = candidates[-MAX_CHRONICLE_CANDIDATES:]
-            selected_ids = {event.id for event in selected}
-            for required_id in required_ids - selected_ids:
-                required_event = next(event for event in candidates if event.id == required_id)
-                selected.pop(0)
-                selected.append(required_event)
-            candidates = sorted(selected, key=lambda event: (int(event.month_stamp), float(event.created_at), event.id))
+        candidates = self._bound_candidates(candidates)
         infos = {
             "start_month_stamp": start,
             "end_month_stamp": end,
             "trigger": trigger,
             "events": [_event_dict(event) for event in candidates],
+            "entities": self._world_entities(world),
         }
         try:
             draft = await self._call_model(world, infos)
             return self._parse_draft(draft, world=world, candidates=candidates, start=start, end=end, trigger=trigger)
-        except (LLMError, ParseError, ProviderCallError, ChronicleDraftError, ValueError, TypeError, KeyError) as exc:
+        except (LLMError, ProviderCallError, ChronicleDraftError) as exc:
             get_logger().logger.warning("Chronicle generation skipped: %s", exc)
             return None

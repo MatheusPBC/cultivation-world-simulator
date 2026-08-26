@@ -3,3 +3,5 @@
 返回 JSON：{{"title":"...","source_event_ids":["..."],"paragraphs":[{{"source_event_ids":["..."],"segments":[{{"text":"...","reference":null}}]}}]}}。
 窗口 {start_month_stamp} 至 {end_month_stamp}，触发原因 {trigger}。
 事实候选：{events}
+实体引用必须使用 entities 中存在的 ID：avatar/sect/region 引用填写 target_id 且 claim_kind 为 null；event 引用填写 claim_kind（fact 或 inference），fact 必须填写 target_id，inference 的 target_id 必须为 null。
+可用实体：{entities}

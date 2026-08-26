@@ -86,7 +86,7 @@ class EventManager:
                 snapshots[avatar_id_str] = str(name)
         event.subject_snapshots = snapshots
 
-    def add_event(self, event: "Event") -> None:
+    def add_event(self, event: "Event") -> bool:
         """
         添加事件。
 
@@ -96,15 +96,16 @@ class EventManager:
         # 过滤空事件。
         from src.classes.event import is_null_event
         if is_null_event(event):
-            return
+            return True
 
         self._capture_subject_snapshots(event)
 
         if self._storage:
-            self._storage.add_event(event)
+            return self._storage.add_event(event)
         else:
             # 内存后备模式。
             self._memory_events.append(event)
+            return True
 
     @staticmethod
     def _is_observed_by(event: "Event", avatar_id: str) -> bool:
