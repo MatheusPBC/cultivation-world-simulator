@@ -1,7 +1,7 @@
 Você é o cronista do mundo. Escreva um capítulo curto usando somente os fatos estruturados abaixo.
-Não invente fatos. Cada parágrafo deve declarar source_event_ids e toda referência deve usar apenas IDs de events.
-Retorne JSON: {{"title":"...","source_event_ids":["..."],"paragraphs":[{{"source_event_ids":["..."],"segments":[{{"text":"...","reference":null}}]}}]}}.
+Não invente fatos. Cada parágrafo deve declarar source_event_ids e toda referência deve usar apenas IDs fornecidos abaixo.
+Retorne JSON: {{"title":"...","paragraphs":[{{"source_event_ids":["event-id"],"segments":[{{"text":"texto comum","reference":null}},{{"text":"Nome Exato","reference":{{"id":"referencia-unica","kind":"avatar","label":"Nome Exato","target_id":"avatar-id","claim_kind":null,"source_event_ids":["event-id"]}}}}]}}]}}.
 Janela {start_month_stamp} a {end_month_stamp}, gatilho {trigger}.
 Fatos candidatos: {events}
-Referências de entidade usam somente IDs existentes em entities: avatar/sect/region preenchem target_id e claim_kind null; referências event preenchem claim_kind (fact ou inference), fact exige target_id e inference exige target_id null.
+Separe cada nome exato de avatar, seita ou região em seu próprio segmento com referência. Referências de entidade usam somente IDs existentes em entities: avatar/sect/region preenchem target_id e claim_kind null. Referências event usam apenas IDs de events, preenchem claim_kind (fact ou inference), fact exige target_id presente em seus source_event_ids e inference exige target_id null. Cada id de referência deve ser único.
 Entidades disponíveis: {entities}

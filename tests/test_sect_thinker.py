@@ -126,9 +126,30 @@ async def test_sect_thinker_falls_back_when_llm_unavailable():
 def test_sect_thinker_llm_available_uses_runtime_config():
     mock_service = MagicMock()
     mock_service.get_llm_runtime_config.return_value = (
-        type("Profile", (), {"base_url": "http://test", "model_name": "test-model", "fast_model_name": "test-fast"})(),
+        type("Profile", (), {
+            "base_url": "http://test",
+            "model_name": "test-model",
+            "fast_model_name": "test-fast",
+            "api_format": "openai",
+        })(),
         "secret",
     )
+    with patch("src.classes.sect_thinker.get_settings_service", return_value=mock_service):
+        assert SectThinker._llm_available() is True
+
+
+def test_sect_thinker_accepts_codex_oauth_without_api_key():
+    mock_service = MagicMock()
+    mock_service.get_llm_runtime_config.return_value = (
+        type("Profile", (), {
+            "base_url": "codex://local",
+            "model_name": "gpt-5.6-terra",
+            "fast_model_name": "gpt-5.6-luna",
+            "api_format": "codex_cli",
+        })(),
+        "",
+    )
+
     with patch("src.classes.sect_thinker.get_settings_service", return_value=mock_service):
         assert SectThinker._llm_available() is True
 
@@ -141,7 +162,12 @@ async def test_sect_thinker_warns_when_response_too_short():
     original_lang = str(language_manager)
     mock_service = MagicMock()
     mock_service.get_llm_runtime_config.return_value = (
-        type("Profile", (), {"base_url": "http://test", "model_name": "test-model", "fast_model_name": "test-fast"})(),
+        type("Profile", (), {
+            "base_url": "http://test",
+            "model_name": "test-model",
+            "fast_model_name": "test-fast",
+            "api_format": "openai",
+        })(),
         "secret",
     )
 

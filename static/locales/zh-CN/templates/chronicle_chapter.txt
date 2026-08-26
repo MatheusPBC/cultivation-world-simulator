@@ -1,7 +1,7 @@
 你是世界编年史作者。只根据以下结构化事实写一章简短编年史。
-不得创造事实；每个段落必须列出 source_event_ids，所有引用只能使用 events 中的 ID。
-返回 JSON：{{"title":"...","source_event_ids":["..."],"paragraphs":[{{"source_event_ids":["..."],"segments":[{{"text":"...","reference":null}}]}}]}}。
+不得创造事实；每个段落必须列出 source_event_ids，所有引用只能使用下方提供的 ID。
+返回 JSON：{{"title":"...","paragraphs":[{{"source_event_ids":["event-id"],"segments":[{{"text":"普通文本","reference":null}},{{"text":"准确名称","reference":{{"id":"唯一引用","kind":"avatar","label":"准确名称","target_id":"avatar-id","claim_kind":null,"source_event_ids":["event-id"]}}}}]}}]}}。
 窗口 {start_month_stamp} 至 {end_month_stamp}，触发原因 {trigger}。
 事实候选：{events}
-实体引用必须使用 entities 中存在的 ID：avatar/sect/region 引用填写 target_id 且 claim_kind 为 null；event 引用填写 claim_kind（fact 或 inference），fact 必须填写 target_id，inference 的 target_id 必须为 null。
+每个准确的角色、宗门或地区名称必须拆成独立 segment 并附带引用。实体引用必须使用 entities 中存在的 ID：avatar/sect/region 引用填写 target_id 且 claim_kind 为 null。event 引用只能使用 events 中的 ID，并填写 claim_kind（fact 或 inference）；fact 的 target_id 必须包含在其 source_event_ids 中，inference 的 target_id 必须为 null。每个引用 id 必须唯一。
 可用实体：{entities}

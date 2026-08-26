@@ -387,8 +387,29 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
 def test_sect_decider_llm_available_uses_runtime_config():
     mock_service = MagicMock()
     mock_service.get_llm_runtime_config.return_value = (
-        type("Profile", (), {"base_url": "http://test", "model_name": "test-model", "fast_model_name": "test-fast"})(),
+        type("Profile", (), {
+            "base_url": "http://test",
+            "model_name": "test-model",
+            "fast_model_name": "test-fast",
+            "api_format": "openai",
+        })(),
         "secret",
+    )
+
+    with patch("src.classes.sect_decider.get_settings_service", return_value=mock_service):
+        assert SectDecider._llm_available() is True
+
+
+def test_sect_decider_accepts_codex_oauth_without_api_key():
+    mock_service = MagicMock()
+    mock_service.get_llm_runtime_config.return_value = (
+        type("Profile", (), {
+            "base_url": "codex://local",
+            "model_name": "gpt-5.6-terra",
+            "fast_model_name": "gpt-5.6-luna",
+            "api_format": "codex_cli",
+        })(),
+        "",
     )
 
     with patch("src.classes.sect_decider.get_settings_service", return_value=mock_service):
@@ -470,7 +491,12 @@ async def test_sect_decider_warns_when_llm_plan_call_fails(base_world):
     )
     mock_service = MagicMock()
     mock_service.get_llm_runtime_config.return_value = (
-        type("Profile", (), {"base_url": "http://test", "model_name": "test-model", "fast_model_name": "test-fast"})(),
+        type("Profile", (), {
+            "base_url": "http://test",
+            "model_name": "test-model",
+            "fast_model_name": "test-fast",
+            "api_format": "openai",
+        })(),
         "secret",
     )
 

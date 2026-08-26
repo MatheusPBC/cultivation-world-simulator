@@ -10,6 +10,7 @@ from src.run.log import get_logger
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.validation import is_llm_runtime_configured
 from src.utils.strings import to_json_str_with_intent
 
 if TYPE_CHECKING:
@@ -70,7 +71,7 @@ class SectThinker:
     @classmethod
     def _llm_available(cls) -> bool:
         profile, api_key = get_settings_service().get_llm_runtime_config()
-        return bool(profile.base_url and api_key and profile.model_name)
+        return is_llm_runtime_configured(profile, api_key)
 
     @classmethod
     def get_thinking_interval_years(cls) -> int:
