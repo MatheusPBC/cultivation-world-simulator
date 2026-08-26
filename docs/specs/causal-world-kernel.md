@@ -164,6 +164,10 @@ in the tree advances the month.
   It always produces `is_story=True` events and is probability-gated by
   `StoryEventKind` against `CONFIG.world.story.probabilities`
   (`static/config.yml:110`), except `GATHERING` which is fixed at `1.0`.
+- [World Chronicle v1](world-chronicle-v1.md) is an append-only narrative
+  projection over this causal event store. Persisted events, domain state, and
+  causal records remain the authority; the LLM may narrate and cite validated
+  event IDs, but it owns no facts and cannot create domain state.
 
 ### 2.7 Query and UI
 

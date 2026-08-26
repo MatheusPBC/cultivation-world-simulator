@@ -66,6 +66,24 @@ describe('public api module migration', () => {
     expect(result).toEqual(journal)
   })
 
+  it('eventApi fetches the first Chronicle page from the exact endpoint', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    getMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })
+
+    await eventApi.fetchWorldChronicle({ limit: 20 })
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/world/chronicle?limit=20')
+  })
+
+  it('eventApi fetches a Chronicle dossier with encoded identifiers and bounds', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    getMock.mockResolvedValue({ chapter_id: 'chapter/a', anchor: {}, focal_event: null, sequence: [], pruned_source_ids: [], truncated: false })
+
+    await eventApi.fetchChronicleDossier('chapter/a', 'anchor 1', { depth: 3, limit: 40 })
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/world/chronicle/chapter%2Fa/anchors/anchor%201/dossier?depth=3&limit=40')
+  })
+
   it('eventApi fetches the causal detail for one event with depth/limit params', async () => {
     const { eventApi } = await import('@/api/modules/event')
     const detail = {
@@ -85,6 +103,7 @@ describe('public api module migration', () => {
       effects: [],
       deltas: [],
       decision: null,
+      decision_appraisals: [],
       truncated: false,
     }
     getMock.mockResolvedValue(detail)

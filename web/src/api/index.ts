@@ -24,6 +24,12 @@ export type {
   EventsResponseDTO,
   WorldJournalPeriodMonths,
   WorldJournalResponseDTO,
+  ChronicleChapterDTO,
+  ChronicleDossierResponseDTO,
+  ChronicleParagraphDTO,
+  ChronicleReferenceDTO,
+  ChronicleSegmentDTO,
+  WorldChronicleResponseDTO,
   SectTerritoriesResponseDTO,
   DynastyOverviewResponseDTO
 } from '../types/api';

@@ -19,6 +19,9 @@ CAUSAL_QUERY_DEFAULT_NODE_LIMIT = 40
 # existing highlights/ongoing bound (§7.2) rather than paginating a new list.
 WORLD_JOURNAL_STORY_LIST_CAP = 20
 
+CHRONICLE_QUERY_MAX_LIMIT = 50
+CHRONICLE_QUERY_DEFAULT_LIMIT = 20
+
 
 def get_runtime_status(runtime, version: str) -> dict[str, Any]:
     from src.server.services.roleplay_service import get_roleplay_session as build_roleplay_session
@@ -725,6 +728,146 @@ def get_event_causal_detail(
         "deltas": deltas,
         "decision": decision_dto,
         "decision_appraisals": _resolve_decision_appraisals(world, event_manager, decision_dto),
+        "truncated": truncated,
+    }
+
+
+def get_world_chronicle(runtime, *, cursor: str | None, limit: int) -> dict[str, Any]:
+    """Return the newest Chronicle chapters, using EventManager pagination."""
+    world = _require_world(runtime)
+    event_manager = getattr(world, "event_manager", None)
+    if event_manager is None:
+        raise_public_error(status_code=503, code="EVENTS_NOT_READY", message="Event manager not initialized")
+    try:
+        page_limit = max(1, min(int(limit), CHRONICLE_QUERY_MAX_LIMIT))
+    except (TypeError, ValueError):
+        raise_public_error(
+            status_code=400,
+            code="INVALID_CHRONICLE_LIMIT",
+            message="Invalid Chronicle limit",
+        )
+    try:
+        chapters, next_cursor, has_more = event_manager.get_chronicle_chapters_page(cursor, page_limit)
+    except ValueError:
+        raise_public_error(
+            status_code=400,
+            code="INVALID_CHRONICLE_CURSOR",
+            message="Invalid Chronicle cursor",
+        )
+    return {
+        "chapters": [chapter.to_dict() for chapter in chapters],
+        "next_cursor": next_cursor,
+        "has_more": has_more,
+    }
+
+
+def get_chronicle_dossier(
+    runtime,
+    *,
+    serialize_events_for_client: Callable[[list[Any]], list[dict[str, Any]]],
+    chapter_id: str,
+    anchor_id: str,
+    depth: int = CAUSAL_QUERY_DEFAULT_DEPTH,
+    limit: int = CAUSAL_QUERY_DEFAULT_NODE_LIMIT,
+) -> dict[str, Any]:
+    """Build a bounded, cycle-safe causal dossier for a Chronicle reference."""
+    world = _require_world(runtime)
+    manager = getattr(world, "event_manager", None)
+    if manager is None:
+        raise_public_error(status_code=503, code="EVENTS_NOT_READY", message="Event manager not initialized")
+
+    chapter = manager.get_chronicle_chapter(chapter_id)
+    if chapter is None:
+        raise_public_error(status_code=404, code="CHAPTER_NOT_FOUND", message="Chronicle chapter not found")
+
+    reference = None
+    for paragraph in chapter.paragraphs:
+        for segment in paragraph.segments:
+            if segment.reference is not None and segment.reference.id == anchor_id:
+                reference = segment.reference
+                break
+        if reference is not None:
+            break
+    if reference is None:
+        raise_public_error(status_code=404, code="ANCHOR_NOT_FOUND", message="Chronicle anchor not found")
+    if reference.kind != "event":
+        raise_public_error(status_code=400, code="CHRONICLE_ANCHOR_INVALID", message="Chronicle anchor is not an event")
+
+    try:
+        clamped_depth = max(1, min(int(depth), CAUSAL_QUERY_MAX_DEPTH))
+        clamped_limit = max(1, min(int(limit), CAUSAL_QUERY_MAX_NODE_LIMIT))
+    except (TypeError, ValueError):
+        raise_public_error(
+            status_code=400,
+            code="INVALID_CHRONICLE_QUERY",
+            message="Invalid Chronicle dossier bounds",
+        )
+
+    roots = list(reference.source_event_ids)
+    events: dict[str, Any] = {}
+    pruned: list[str] = []
+    truncated = False
+
+    def add_pruned(event_id: str) -> None:
+        if event_id not in pruned:
+            pruned.append(event_id)
+
+    for root_id in roots:
+        event = manager.get_event_by_id(root_id)
+        if event is None:
+            add_pruned(root_id)
+        elif len(events) < clamped_limit:
+            events[root_id] = event
+        else:
+            # Do not walk an unbounded set of source events when the public
+            # node limit has already been reached.
+            truncated = True
+
+    frontier = list(events)
+    visited = set(frontier)
+    for _ in range(clamped_depth):
+        if truncated and len(events) >= clamped_limit:
+            break
+        next_frontier = []
+        for event_id in frontier:
+            for link in manager.get_causal_links_for_event(event_id):
+                cause_id = link.cause_event_id
+                cause = manager.get_event_by_id(cause_id)
+                if cause is None:
+                    add_pruned(cause_id)
+                    continue
+                if cause_id not in visited:
+                    if len(events) >= clamped_limit:
+                        truncated = True
+                        break
+                    visited.add(cause_id)
+                    events[cause_id] = cause
+                    next_frontier.append(cause_id)
+            if truncated and len(events) >= clamped_limit:
+                break
+        frontier = next_frontier
+        if not frontier:
+            break
+    if frontier:
+        truncated = True
+    focal = manager.get_event_by_id(reference.target_id) if reference.claim_kind == "fact" and reference.target_id else None
+    if focal is not None:
+        if focal.id not in events and len(events) < clamped_limit:
+            events[focal.id] = focal
+        elif focal.id not in events:
+            truncated = True
+    elif reference.claim_kind == "fact" and reference.target_id:
+        add_pruned(reference.target_id)
+    ordered = sorted(events.values(), key=lambda e: (int(e.month_stamp), float(e.created_at), e.id))
+    if len(ordered) > clamped_limit:
+        truncated = True
+        ordered = ordered[:clamped_limit]
+    return {
+        "chapter_id": chapter_id,
+        "anchor": reference.to_dict(),
+        "focal_event": serialize_events_for_client([focal], world=world)[0] if focal else None,
+        "sequence": serialize_events_for_client(ordered, world=world),
+        "pruned_source_ids": pruned,
         "truncated": truncated,
     }
 

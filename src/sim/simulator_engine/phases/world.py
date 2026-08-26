@@ -222,6 +222,11 @@ def phase_update_celestial_phenomenon(world) -> list[Event]:
     return events
 
 
+# Natural logistic growth is continuous background state. The chronicle only
+# needs a population transition once residents would notice a material shift.
+POPULATION_EVENT_MIN_ABSOLUTE_CHANGE = 25.0
+
+
 def phase_update_city_population(world, causal=None) -> list[Event]:
     # 城市人口使用 logistic 公式按月自然变化。
     # `causal` 是可选的 CausalRecorder（见 causal_recorder.py）：
@@ -232,7 +237,7 @@ def phase_update_city_population(world, causal=None) -> list[Event]:
             before = region.population
             region.update_population_monthly()
             after = region.population
-            if causal is not None and after != before:
+            if causal is not None and abs(after - before) >= POPULATION_EVENT_MIN_ABSOLUTE_CHANGE:
                 event = Event(
                     world.month_stamp,
                     t(

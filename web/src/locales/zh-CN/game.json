@@ -6,7 +6,8 @@
       "now": "当前",
       "focus": "关注",
       "stories": "故事",
-      "timeline": "时间线"
+      "timeline": "时间线",
+      "chronicle": "编年史"
     },
     "periods": {
       "one": "本月",
@@ -49,6 +50,27 @@
     "why_considered_count": "当时考虑了 {count} 个选项",
     "why_rejected": "被放弃的选项",
     "why_decision_appraisals": "被引用的个人记忆",
+    "chronicle": {
+      "loading": "正在加载编年史...",
+      "error": "无法加载编年史。",
+      "empty": "尚未发布编年史章节。",
+      "load_more": "加载更早章节",
+      "fact": "事实",
+      "inference": "编年史解读",
+      "source_count": "{count} 个来源",
+      "trigger": {
+        "major_event": "重大事件",
+        "max_interval": "阶段回顾"
+      },
+      "dossier": "因果档案",
+      "close": "关闭",
+      "dossier_error": "无法加载因果档案。",
+      "pruned": "{count} 个来源已从历史中清理。",
+      "truncated": "因果序列已截断，部分来源未显示。",
+      "sequence": "因果序列",
+      "sequence_empty": "没有可显示的存留事件。",
+      "why": "为什么？"
+    },
     "why_relation": {
       "triggered_by": "触发于",
       "enabled_by": "得益于",

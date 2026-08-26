@@ -161,6 +161,15 @@ async def generate_event_appraisals(_simulator, ctx):
     await appraisal.phase_generate_event_appraisals(ctx.world, ctx.events)
 
 
+async def generate_chronicle(_simulator, ctx):
+    from src.systems.chronicle_service import ChronicleService
+
+    # Chronicle sees this step's causal facts before finalizer persistence;
+    # finalizer attaches again idempotently as its normal storage boundary.
+    ctx.causal.attach_to(ctx.events)
+    ctx.pending_chronicle_chapter = await ChronicleService().maybe_generate_chapter(ctx.world, ctx.events)
+
+
 def finalize_step_phase(_simulator, ctx):
     return finalize_step(ctx)
 
@@ -197,7 +206,8 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_calculated_relations", 28, "update_calculated_relations", update_calculated_relations),
     SimulationPhase("annual_maintenance", 29, "annual_maintenance", annual_maintenance),
     SimulationPhase("generate_event_appraisals", 30, "generate_event_appraisals", generate_event_appraisals),
-    SimulationPhase("finalize_step", 31, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("generate_chronicle", 31, "generate_chronicle", generate_chronicle),
+    SimulationPhase("finalize_step", 32, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

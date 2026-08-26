@@ -166,6 +166,7 @@ tools/wiki/dist/
 笔记/
 tmp*/
 i18n_missing_report.md
+.superpowers/
 
 #############################
 # Docker

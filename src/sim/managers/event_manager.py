@@ -42,6 +42,7 @@ class EventManager:
         self._subject_resolver: Callable[[str], object | None] | None = None
         # 内存后备，仅当 storage 为 None 时使用，主要用于测试。
         self._memory_events: List["Event"] = []
+        self._memory_chronicle_chapters: list[object] = []
 
     @classmethod
     def create_with_db(cls, db_path: Path) -> "EventManager":
@@ -85,7 +86,7 @@ class EventManager:
                 snapshots[avatar_id_str] = str(name)
         event.subject_snapshots = snapshots
 
-    def add_event(self, event: "Event") -> None:
+    def add_event(self, event: "Event") -> bool:
         """
         添加事件。
 
@@ -95,15 +96,16 @@ class EventManager:
         # 过滤空事件。
         from src.classes.event import is_null_event
         if is_null_event(event):
-            return
+            return True
 
         self._capture_subject_snapshots(event)
 
         if self._storage:
-            self._storage.add_event(event)
+            return self._storage.add_event(event)
         else:
             # 内存后备模式。
             self._memory_events.append(event)
+            return True
 
     @staticmethod
     def _is_observed_by(event: "Event", avatar_id: str) -> bool:
@@ -153,6 +155,48 @@ class EventManager:
         if not include_decisions:
             events = [e for e in events if getattr(e, "fact_kind", FactKind.OCCURRENCE) != FactKind.DECISION]
         return events[-limit:]
+
+    def append_chronicle_chapter(self, chapter) -> bool:
+        if self._storage:
+            return self._storage.append_chronicle_chapter(chapter)
+        if any(getattr(item, "end_month_stamp", None) == chapter.end_month_stamp for item in self._memory_chronicle_chapters):
+            return False
+        self._memory_chronicle_chapters.append(chapter)
+        return True
+
+    def get_latest_chronicle_chapter(self):
+        if self._storage:
+            return self._storage.get_latest_chronicle_chapter()
+        return max(self._memory_chronicle_chapters, key=lambda item: (item.end_month_stamp, item.id), default=None)
+
+    def get_chronicle_chapter(self, chapter_id: str):
+        if self._storage:
+            return self._storage.get_chronicle_chapter(chapter_id)
+        return next(
+            (item for item in self._memory_chronicle_chapters if item.id == chapter_id),
+            None,
+        )
+
+    def get_chronicle_chapters_page(self, cursor: str | None, limit: int):
+        if self._storage:
+            return self._storage.get_chronicle_chapters_page(cursor, limit)
+        if not isinstance(limit, int) or limit <= 0:
+            raise ValueError("limit must be a positive integer")
+        cursor_value = int(cursor) if cursor is not None else None
+        chapters = sorted(self._memory_chronicle_chapters, key=lambda item: (item.end_month_stamp, item.id), reverse=True)
+        if cursor_value is not None:
+            chapters = [item for item in chapters if item.end_month_stamp < cursor_value]
+        page = chapters[:limit]
+        has_more = len(chapters) > limit
+        return page, str(page[-1].end_month_stamp) if has_more else None, has_more
+
+    def get_events_between_months(self, start: int, end: int) -> list["Event"]:
+        if self._storage:
+            return self._storage.get_events_between_months(start, end)
+        return sorted(
+            [event for event in self._memory_events if int(start) <= int(event.month_stamp) <= int(end)],
+            key=lambda event: (int(event.month_stamp), event.created_at, event.id),
+        )
 
     def get_events_by_avatar(self, avatar_id: str, *, limit: int = 50) -> List["Event"]:
         """获取角色相关的事件（时间正序）。"""

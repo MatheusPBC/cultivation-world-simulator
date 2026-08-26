@@ -5,15 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import WorldJournalPanel from '@/components/game/panels/WorldJournalPanel.vue'
 
-const { fetchWorldJournalMock, fetchEventCausalDetailMock } = vi.hoisted(() => ({
+const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock } = vi.hoisted(() => ({
   fetchWorldJournalMock: vi.fn(),
   fetchEventCausalDetailMock: vi.fn(),
+  fetchWorldChronicleMock: vi.fn(),
+  fetchChronicleDossierMock: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
   eventApi: {
     fetchWorldJournal: fetchWorldJournalMock,
     fetchEventCausalDetail: fetchEventCausalDetailMock,
+    fetchWorldChronicle: fetchWorldChronicleMock,
+    fetchChronicleDossier: fetchChronicleDossierMock,
   },
   avatarApi: {
     fetchDetailInfo: vi.fn(),
@@ -41,6 +45,7 @@ function createJournalI18n() {
               focus: 'Em foco',
               stories: 'Historias',
               timeline: 'Linha do tempo',
+              chronicle: 'Cronica',
             },
             periods: { one: 'Este mes', three: '3 meses', twelve: '1 ano' },
             important_changes: 'Mudancas importantes',
@@ -86,6 +91,24 @@ function createJournalI18n() {
               resolves: 'resolve',
               prevented_by: 'impedido por',
               contributed_to: 'contribuiu para',
+            },
+            chronicle: {
+              loading: 'Carregando cronica...',
+              error: 'Nao foi possivel carregar a cronica.',
+              empty: 'Nenhuma cronica publicada.',
+              load_more: 'Carregar anteriores',
+              fact: 'Fato',
+              inference: 'Interpretacao',
+              source_count: '{count} fontes',
+              trigger: { major_event: 'Evento importante', max_interval: 'Revisao' },
+              dossier: 'Dossie causal',
+              close: 'Fechar',
+              dossier_error: 'Nao foi possivel carregar o dossie.',
+              pruned: '{count} fontes removidas',
+              truncated: 'Sequencia truncada',
+              sequence: 'Sequencia causal',
+              sequence_empty: 'Nenhum evento',
+              why: 'Por que?',
             },
           },
           event_templates: {},
@@ -165,7 +188,10 @@ describe('WorldJournalPanel', () => {
     vi.useRealTimers()
     fetchWorldJournalMock.mockReset()
     fetchEventCausalDetailMock.mockReset()
+    fetchWorldChronicleMock.mockReset()
+    fetchChronicleDossierMock.mockReset()
     fetchWorldJournalMock.mockResolvedValue(baseJournal)
+    fetchWorldChronicleMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })
   })
 
   afterEach(() => {
@@ -212,6 +238,57 @@ describe('WorldJournalPanel', () => {
     await wrapper.get('[data-testid="journal-tab-timeline"]').trigger('click')
     expect(wrapper.find('[data-testid="journal-now"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="journal-timeline"]').text()).toContain('Timeline existente')
+  })
+
+  it('keeps the four existing tabs and loads the fifth Chronicle tab', async () => {
+    const wrapper = mountPanel()
+    await settlePromises()
+
+    expect(wrapper.findAll('.journal-tab')).toHaveLength(5)
+    await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
+    await settlePromises()
+
+    expect(fetchWorldChronicleMock).toHaveBeenCalledWith({ limit: 20 })
+    expect(wrapper.get('[data-testid="journal-chronicle"]').exists()).toBe(true)
+  })
+
+  it('keeps the Chronicle Why overlay above the dossier drawer', async () => {
+    fetchWorldChronicleMock.mockResolvedValue({
+      chapters: [{
+        id: 'chapter-1', start_month_stamp: 1, end_month_stamp: 1, trigger: 'major_event', title: 'Cronica', created_at: 1,
+        source_event_ids: ['event-1'],
+        paragraphs: [{ source_event_ids: ['event-1'], segments: [{
+          text: 'Um fato',
+          reference: { id: 'event-ref', kind: 'event', label: 'Um fato', target_id: 'event-1', claim_kind: 'fact', source_event_ids: ['event-1'] },
+        }] }],
+      }],
+      next_cursor: null,
+      has_more: false,
+    })
+    fetchChronicleDossierMock.mockResolvedValue({
+      chapter_id: 'chapter-1',
+      anchor: { id: 'event-ref', kind: 'event', label: 'Um fato', target_id: 'event-1', claim_kind: 'fact', source_event_ids: ['event-1'] },
+      focal_event: null,
+      sequence: [{ ...baseJournal.highlights[0], id: 'event-1' }],
+      pruned_source_ids: [],
+      truncated: false,
+    })
+    fetchEventCausalDetailMock.mockResolvedValue({
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+    })
+
+    const wrapper = mountPanel()
+    await settlePromises()
+    await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
+    await settlePromises()
+    await wrapper.get('[data-testid="chronicle-ref-event-ref"]').trigger('click')
+    await settlePromises()
+    await wrapper.get('[data-testid="dossier-why-event-1"]').trigger('click')
+    await settlePromises()
+
+    const whyOverlay = wrapper.get('[data-testid="why-overlay"]')
+    expect(whyOverlay.isVisible()).toBe(true)
+    expect(whyOverlay.classes()).toContain('why-overlay--above-dossier')
   })
 
   it('shows people and objectives in the Focus tab', async () => {

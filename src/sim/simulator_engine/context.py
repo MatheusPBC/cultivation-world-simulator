@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from src.classes.core.avatar import Avatar
 from src.classes.core.world import World
 from src.classes.event import Event
+from src.classes.chronicle import ChronicleChapter
 from src.sim.simulator_engine.causal_recorder import CausalRecorder
 from src.systems.time import Month, MonthStamp
 
@@ -21,6 +22,7 @@ class SimulationStepContext:
     month_stamp: MonthStamp | None = None
     # 被动因果记录器：由已经完成变更的领域 owner 写入，finalize_step 统一drain。
     causal: CausalRecorder = field(default_factory=CausalRecorder)
+    pending_chronicle_chapter: ChronicleChapter | None = None
 
     @classmethod
     def create(cls, world: World) -> "SimulationStepContext":
