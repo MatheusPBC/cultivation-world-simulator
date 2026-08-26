@@ -187,7 +187,7 @@ class TestCityPopulation:
 
         assert events == []
 
-    def test_causal_recorder_emits_state_transition_with_population_delta(self, base_world):
+    def test_causal_recorder_ignores_routine_population_growth(self, base_world):
         city = CityRegion(id=42, name="TestCity", desc="Test", population=40.0, population_capacity=100.0)
         tile = Tile(0, 0, TileType.CITY)
         tile.region = city
@@ -200,6 +200,38 @@ class TestCityPopulation:
         events = phase_update_city_population(base_world, causal)
 
         expected_after = before + 0.03 * before * (1 - before / 100.0)
+        assert city.population == pytest.approx(expected_after)
+        assert events == []
+
+    def test_causal_recorder_ignores_substantial_but_not_noteworthy_growth(self, base_world):
+        city = CityRegion(id=42, name="TestCity", desc="Test", population=1000.0, population_capacity=2000.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[42] = city
+
+        causal = CausalRecorder()
+        before = city.population
+
+        events = phase_update_city_population(base_world, causal)
+
+        expected_after = before + 0.03 * before * (1 - before / 2000.0)
+        assert city.population == pytest.approx(expected_after)
+        assert events == []
+
+    def test_causal_recorder_emits_noteworthy_population_transition(self, base_world):
+        city = CityRegion(id=42, name="TestCity", desc="Test", population=2000.0, population_capacity=4000.0)
+        tile = Tile(0, 0, TileType.CITY)
+        tile.region = city
+        base_world.map.tiles[(0, 0)] = tile
+        base_world.map.regions[42] = city
+
+        causal = CausalRecorder()
+        before = city.population
+
+        events = phase_update_city_population(base_world, causal)
+
+        expected_after = before + 0.03 * before * (1 - before / 4000.0)
         assert city.population == pytest.approx(expected_after)
         assert len(events) == 1
         event = events[0]
