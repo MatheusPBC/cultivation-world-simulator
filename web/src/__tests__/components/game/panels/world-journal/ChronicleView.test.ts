@@ -20,6 +20,8 @@ function mountView() {
           { text: '<script>alert(1)</script>', reference: null },
           { text: ' and ', reference: null },
           { text: 'the sect', reference: { id: 'sect-1', kind: 'sect', label: 'Cloud Sect', target_id: '7', claim_kind: null, source_event_ids: ['event-1'] } },
+          { text: ' and Alice', reference: { id: 'avatar-1', kind: 'avatar', label: 'Alice', target_id: 'a1', claim_kind: 'inference', source_event_ids: ['event-1'] } },
+          { text: ' near the valley', reference: { id: 'region-1', kind: 'region', label: 'Valley', target_id: 'r1', claim_kind: null, source_event_ids: ['event-1'] } },
         ] }],
       }],
       hasMore: true,
@@ -36,7 +38,7 @@ describe('ChronicleView', () => {
     const wrapper = mountView()
 
     expect(wrapper.find('[data-testid="chronicle-fact-badge"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="chronicle-inference-badge"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="chronicle-inference-badge"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('<script>alert(1)</script>')
     expect(wrapper.find('[v-html]').exists()).toBe(false)
     expect(wrapper.text()).toContain('1 个来源')
@@ -45,5 +47,18 @@ describe('ChronicleView', () => {
     expect(openDossierMock).toHaveBeenCalledWith('chapter-1', 'fact-1')
     await wrapper.get('[data-testid="chronicle-ref-sect-1"]').trigger('click')
     expect(selectMock).toHaveBeenCalledWith('sect', '7')
+    await wrapper.get('[data-testid="chronicle-ref-avatar-1"]').trigger('click')
+    expect(selectMock).toHaveBeenCalledWith('avatar', 'a1')
+    await wrapper.get('[data-testid="chronicle-ref-region-1"]').trigger('click')
+    expect(selectMock).toHaveBeenCalledWith('region', 'r1')
+  })
+
+  it('keeps an error visible when loading an older page with existing chapters', () => {
+    const wrapper = mountView()
+    return wrapper.setProps({ error: true }).then(() => {
+      expect(wrapper.get('[data-testid="chronicle-error"]')).toBeTruthy()
+      expect(wrapper.text()).toContain('加载失败')
+      expect(wrapper.text()).toContain('Rise')
+    })
   })
 })

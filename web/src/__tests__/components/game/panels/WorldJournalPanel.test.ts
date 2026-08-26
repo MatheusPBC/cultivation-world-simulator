@@ -252,6 +252,45 @@ describe('WorldJournalPanel', () => {
     expect(wrapper.get('[data-testid="journal-chronicle"]').exists()).toBe(true)
   })
 
+  it('keeps the Chronicle Why overlay above the dossier drawer', async () => {
+    fetchWorldChronicleMock.mockResolvedValue({
+      chapters: [{
+        id: 'chapter-1', start_month_stamp: 1, end_month_stamp: 1, trigger: 'major_event', title: 'Cronica', created_at: 1,
+        source_event_ids: ['event-1'],
+        paragraphs: [{ source_event_ids: ['event-1'], segments: [{
+          text: 'Um fato',
+          reference: { id: 'event-ref', kind: 'event', label: 'Um fato', target_id: 'event-1', claim_kind: 'fact', source_event_ids: ['event-1'] },
+        }] }],
+      }],
+      next_cursor: null,
+      has_more: false,
+    })
+    fetchChronicleDossierMock.mockResolvedValue({
+      chapter_id: 'chapter-1',
+      anchor: { id: 'event-ref', kind: 'event', label: 'Um fato', target_id: 'event-1', claim_kind: 'fact', source_event_ids: ['event-1'] },
+      focal_event: null,
+      sequence: [{ ...baseJournal.highlights[0], id: 'event-1' }],
+      pruned_source_ids: [],
+      truncated: false,
+    })
+    fetchEventCausalDetailMock.mockResolvedValue({
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+    })
+
+    const wrapper = mountPanel()
+    await settlePromises()
+    await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
+    await settlePromises()
+    await wrapper.get('[data-testid="chronicle-ref-event-ref"]').trigger('click')
+    await settlePromises()
+    await wrapper.get('[data-testid="dossier-why-event-1"]').trigger('click')
+    await settlePromises()
+
+    const whyOverlay = wrapper.get('[data-testid="why-overlay"]')
+    expect(whyOverlay.isVisible()).toBe(true)
+    expect(whyOverlay.classes()).toContain('why-overlay--above-dossier')
+  })
+
   it('shows people and objectives in the Focus tab', async () => {
     const wrapper = mountPanel()
     await settlePromises()

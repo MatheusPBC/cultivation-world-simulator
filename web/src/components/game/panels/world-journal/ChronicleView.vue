@@ -62,6 +62,9 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
       {{ t('game.world_journal.chronicle.error') }}
     </p>
     <p v-else-if="chapters.length === 0" class="chronicle-state">{{ t('game.world_journal.chronicle.empty') }}</p>
+    <p v-if="error" class="chronicle-state chronicle-state--error" data-testid="chronicle-error">
+      {{ t('game.world_journal.chronicle.error') }}
+    </p>
 
     <article v-for="chapter in chapters" :key="chapter.id" class="chronicle-chapter">
       <header class="chronicle-chapter__header">

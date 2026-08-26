@@ -302,7 +302,7 @@ onMounted(() => {
       :on-open-why="journalStore.openCausalDetail"
     />
 
-    <div v-if="causalEventId" class="why-overlay" data-testid="why-overlay" role="dialog" aria-modal="true">
+    <div v-if="causalEventId" class="why-overlay why-overlay--above-dossier" data-testid="why-overlay" role="dialog" aria-modal="true">
       <div class="why-panel">
         <header class="why-header">
           <h3>{{ t('game.world_journal.why_title') }}</h3>
@@ -745,6 +745,10 @@ onMounted(() => {
   align-items: flex-end;
   background: rgba(0, 0, 0, 0.6);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.why-overlay--above-dossier {
+  z-index: 70;
 }
 
 .why-panel {
