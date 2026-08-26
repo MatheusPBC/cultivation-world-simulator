@@ -117,6 +117,25 @@ async def test_all_major_events_and_transitive_ancestors_survive_candidate_bound
 
 
 @pytest.mark.asyncio
+async def test_exact_required_candidate_bound_excludes_optional_events(monkeypatch):
+    majors = [event(1, f"major-{idx}", major=True) for idx in range(64)]
+    optional = event(1, "optional")
+    captured = {}
+    service = ChronicleService()
+
+    async def call(_world, infos):
+        captured.update(infos)
+        return {"title": "Bounded", "paragraphs": [{"source_event_ids": ["major-0"], "segments": [{"text": "fact"}]}]}
+
+    monkeypatch.setattr(service, "_call_model", call)
+    result = await service.maybe_generate_chapter(world(3, majors + [optional]), [])
+
+    assert result is not None
+    supplied = {item["id"] for item in captured["events"]}
+    assert supplied == {item.id for item in majors}
+
+
+@pytest.mark.asyncio
 async def test_entity_reference_target_is_validated(monkeypatch):
     source = event(3, "source", major=True)
     game_world = SimpleNamespace(

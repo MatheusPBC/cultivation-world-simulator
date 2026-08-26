@@ -11,7 +11,7 @@ from src.classes.event import Event
 from src.i18n.template_resolver import resolve_locale_template_path
 from src.run.log import get_logger
 from src.utils.llm import call_llm_with_task_name
-from src.utils.llm.exceptions import LLMError, ParseError, ProviderCallError
+from src.utils.llm.exceptions import LLMError, ProviderCallError
 
 
 CHRONICLE_TASK_NAME = "chronicle_chapter"
@@ -226,7 +226,8 @@ class ChronicleService:
                     frontier.append(cause_id)
         required = [event for event in candidates if event.id in required_ids]
         optional = [event for event in candidates if event.id not in required_ids]
-        optional = optional[-max(0, MAX_CHRONICLE_CANDIDATES - len(required)):]
+        optional_limit = MAX_CHRONICLE_CANDIDATES - len(required)
+        optional = optional[-optional_limit:] if optional_limit > 0 else []
         return sorted([*required, *optional], key=lambda event: (int(event.month_stamp), float(event.created_at), event.id))
 
     async def maybe_generate_chapter(self, world: Any, current_events: list[Event]) -> ChronicleChapter | None:
