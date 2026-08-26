@@ -16,6 +16,8 @@ def create_public_query_router(
     build_map_presets: Callable[..., dict] | None = None,
     build_current_run: Callable[[], dict] | None = None,
     build_events_page: Callable[..., dict] | None = None,
+    build_world_chronicle: Callable[..., dict] | None = None,
+    build_chronicle_dossier: Callable[..., dict] | None = None,
     build_rankings: Callable[[], dict] | None = None,
     build_sect_relations: Callable[[], dict] | None = None,
     build_game_data: Callable[[], dict] | None = None,
@@ -102,6 +104,37 @@ def create_public_query_router(
     @router.get("/api/v1/query/world/journal")
     def get_world_journal_v1(period_months: Literal["1", "3", "12"] = "1"):
         return ok_response(query_service.get_world_journal(period_months=int(period_months)))
+
+    @router.get("/api/v1/query/world/chronicle")
+    def get_world_chronicle_v1(cursor: str | None = None, limit: int = 20):
+        if query_service is not None:
+            return ok_response(query_service.get_world_chronicle(cursor=cursor, limit=limit))
+        return ok_response(build_world_chronicle(cursor=cursor, limit=limit))
+
+    @router.get("/api/v1/query/world/chronicle/{chapter_id}/anchors/{anchor_id}/dossier")
+    def get_chronicle_dossier_v1(
+        chapter_id: str,
+        anchor_id: str,
+        depth: int = 3,
+        limit: int = 40,
+    ):
+        if query_service is not None:
+            return ok_response(
+                query_service.get_chronicle_dossier(
+                    chapter_id=chapter_id,
+                    anchor_id=anchor_id,
+                    depth=depth,
+                    limit=limit,
+                )
+            )
+        return ok_response(
+            build_chronicle_dossier(
+                chapter_id=chapter_id,
+                anchor_id=anchor_id,
+                depth=depth,
+                limit=limit,
+            )
+        )
 
     @router.get("/api/v1/query/events/{event_id}/causal")
     def get_event_causal_detail_v1(

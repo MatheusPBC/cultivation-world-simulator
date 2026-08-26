@@ -169,6 +169,14 @@ class EventManager:
             return self._storage.get_latest_chronicle_chapter()
         return max(self._memory_chronicle_chapters, key=lambda item: (item.end_month_stamp, item.id), default=None)
 
+    def get_chronicle_chapter(self, chapter_id: str):
+        if self._storage:
+            return self._storage.get_chronicle_chapter(chapter_id)
+        return next(
+            (item for item in self._memory_chronicle_chapters if item.id == chapter_id),
+            None,
+        )
+
     def get_chronicle_chapters_page(self, cursor: str | None, limit: int):
         if self._storage:
             return self._storage.get_chronicle_chapters_page(cursor, limit)

@@ -840,6 +840,17 @@ class EventStorage:
             ).fetchone()
         return self._chronicle_row_to_chapter(row) if row else None
 
+    def get_chronicle_chapter(self, chapter_id: str) -> "ChronicleChapter | None":
+        """Read one Chronicle chapter by its immutable id."""
+        if self._conn is None:
+            return None
+        with self._db_lock:
+            row = self._conn.execute(
+                "SELECT payload_json FROM chronicle_chapters WHERE id = ?",
+                (chapter_id,),
+            ).fetchone()
+        return self._chronicle_row_to_chapter(row) if row else None
+
     def get_chronicle_chapters_page(
         self, cursor: str | None, limit: int
     ) -> tuple[list["ChronicleChapter"], str | None, bool]:

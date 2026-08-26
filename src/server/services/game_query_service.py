@@ -25,6 +25,8 @@ class GameQueryDependencies:
     get_events_page: Any
     get_world_journal_query: Any
     get_event_causal_detail_query: Any
+    get_world_chronicle_query: Any
+    get_chronicle_dossier_query: Any
     get_game_data_query: Any
     realm_order: Any
     alignment_enum: Any
@@ -79,6 +81,8 @@ class GameQueryService:
             build_public_events_page=self.get_events_page,
             build_public_world_journal=self.get_world_journal,
             build_public_event_causal_detail=self.get_event_causal_detail,
+            build_public_world_chronicle=self.get_world_chronicle,
+            build_public_chronicle_dossier=self.get_chronicle_dossier,
             build_public_game_data=self.get_game_data,
             build_public_detail=self.get_detail,
             build_public_avatar_adjust_options=self.get_avatar_adjust_options,
@@ -169,6 +173,30 @@ class GameQueryService:
             self._deps.runtime,
             serialize_events_for_client=self._deps.serialize_events_for_client,
             event_id=event_id,
+            depth=depth,
+            limit=limit,
+        )
+
+    def get_world_chronicle(self, *, cursor: str | None, limit: int) -> dict:
+        return self._deps.get_world_chronicle_query(
+            self._deps.runtime,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def get_chronicle_dossier(
+        self,
+        *,
+        chapter_id: str,
+        anchor_id: str,
+        depth: int,
+        limit: int,
+    ) -> dict:
+        return self._deps.get_chronicle_dossier_query(
+            self._deps.runtime,
+            serialize_events_for_client=self._deps.serialize_events_for_client,
+            chapter_id=chapter_id,
+            anchor_id=anchor_id,
             depth=depth,
             limit=limit,
         )
