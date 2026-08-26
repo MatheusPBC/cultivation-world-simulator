@@ -488,6 +488,11 @@
       "backstory": "身世",
       "fate": "命格",
       "short_term_objective": "短期目标",
+      "consequences": {
+        "injury_title": "个人后果：伤势",
+        "injury_body": "当前为{severity}伤势，累计损失 {hp} 点气血。优先恢复，冒险行动已受限。",
+        "why": "查看缘由"
+      },
       "stats": {
         "realm": "修行阶层",
         "origin": "出身",

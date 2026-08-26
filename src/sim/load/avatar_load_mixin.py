@@ -95,6 +95,8 @@ class AvatarLoadMixin:
         
         # 设置HP
         avatar.hp = HP.from_dict(data["hp"])
+        from src.classes.individual_consequence import IndividualConsequenceState
+        avatar.individual_consequences = IndividualConsequenceState.from_dict(data.get("individual_consequences"))
         
         # 设置物品与资源
         avatar.magic_stone = MagicStone(data.get("magic_stone", 0))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from dataclasses import dataclass
 import random
 
 from src.systems.single_choice import (
@@ -14,7 +15,15 @@ if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
 
 
-async def kill_and_grab(winner: Avatar, loser: Avatar) -> str:
+@dataclass(frozen=True)
+class EquipmentTransfer:
+    kind: str
+    item_snapshot: dict
+    loser_id: str
+    winner_id: str
+
+
+async def kill_and_grab(winner: Avatar, loser: Avatar) -> tuple[str, EquipmentTransfer | None]:
     """
     处理杀人夺宝逻辑
     
@@ -36,7 +45,7 @@ async def kill_and_grab(winner: Avatar, loser: Avatar) -> str:
         loot_candidates.append(("auxiliary", loser.auxiliary))
     
     if not loot_candidates:
-        return ""
+        return "", None
 
     # 优先高境界
     loot_candidates.sort(key=lambda x: x[1].realm, reverse=True)
@@ -70,6 +79,11 @@ async def kill_and_grab(winner: Avatar, loser: Avatar) -> str:
         else:
             loser.change_auxiliary(None)
         
-        return f"缴获了{item_label}『{loot_item.name}』。{outcome.result_text}"
+        return f"缴获了{item_label}『{loot_item.name}』。{outcome.result_text}", EquipmentTransfer(
+            kind=loot_type,
+            item_snapshot={"id": getattr(loot_item, "id", None), "name": loot_item.name, "realm": str(loot_item.realm)},
+            loser_id=str(getattr(loser, "id", "")),
+            winner_id=str(getattr(winner, "id", "")),
+        )
     
-    return ""
+    return "", None

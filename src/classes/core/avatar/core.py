@@ -48,6 +48,7 @@ from src.classes.avatar_metrics import AvatarMetrics
 from src.classes.mortal import Mortal
 from src.classes.gender import Gender
 from src.classes.world_secret import AvatarWorldSecretKnowledge
+from src.classes.individual_consequence import IndividualConsequenceState
 
 # Mixin 导入
 from src.classes.effect import EffectsMixin
@@ -131,6 +132,7 @@ class Avatar(
     temporary_effects: List[dict] = field(default_factory=list)
     # 永久效果列表: [{"source": str, "effects": dict}]
     persistent_effects: List[dict] = field(default_factory=list)
+    individual_consequences: IndividualConsequenceState = field(default_factory=IndividualConsequenceState)
 
     is_dead: bool = False
     death_info: Optional[dict] = None

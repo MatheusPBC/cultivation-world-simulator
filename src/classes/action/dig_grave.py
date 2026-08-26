@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 
 from src.classes.action import InstantAction
+from src.classes.action.action import can_take_risk
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.action_runtime import ActionResult, ActionStatus
 from src.classes.event import Event
@@ -70,6 +71,9 @@ class DigGrave(InstantAction):
         return random.choice(best)
 
     def can_start(self, poi_id: str) -> tuple[bool, str]:
+        ok, reason = can_take_risk(self.avatar)
+        if not ok:
+            return ok, reason
         grave = self._get_grave(poi_id)
         if grave is None:
             return False, t("Cannot resolve grave: {poi}", poi=poi_id)
@@ -128,6 +132,9 @@ class DigGrave(InstantAction):
                 damage=damage,
             )
         self._last_event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=True)
+        if "damage" in locals():
+            from src.classes.individual_consequence import record_injury_from_event
+            record_injury_from_event(self.avatar, self._last_event, damage)
 
     def step(self, **params) -> ActionResult:
         self._execute(**params)

@@ -154,6 +154,7 @@ def _apply_injury(owner: "Avatar") -> tuple[str, bool]:
     if max_ratio < min_ratio:
         min_ratio, max_ratio = max_ratio, min_ratio
     damage = max(1, int(owner.hp.max * random.uniform(min_ratio, max_ratio)))
+    owner._last_opportunity_injury_damage = damage
     owner.hp.cur -= damage
     if owner.hp.cur <= 0:
         handle_death(owner.world, owner, DeathReason(DeathType.SERIOUS_INJURY))
@@ -182,6 +183,11 @@ async def _resolve_opportunity(owner: "Avatar", record: OpportunityRecord, relat
         result_text, is_major = _apply_empty(owner)
 
     base_event = _event(owner, result_text, related_avatars=related_avatars, is_major=is_major)
+    if outcome == OpportunityOutcome.INJURY and not getattr(owner, "is_dead", False):
+        damage = int(getattr(owner, "_last_opportunity_injury_damage", 0) or 0)
+        if damage:
+            from src.classes.individual_consequence import record_injury_from_event
+            record_injury_from_event(owner, base_event, damage)
     story_event = await StoryEventService.maybe_create_story(
         kind=StoryEventKind.OPPORTUNITY,
         month_stamp=owner.world.month_stamp,

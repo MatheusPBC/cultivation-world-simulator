@@ -235,7 +235,7 @@ async def gen_battle_result_text(
     action_desc: str = "战胜了",
     postfix: str = "",
     check_loot: bool = False
-) -> str:
+) -> tuple[str, object | None]:
     """
     生成标准战斗结果文本。
     """
@@ -244,10 +244,12 @@ async def gen_battle_result_text(
         text = f"{text_prefix}{winner.name} {action_desc} {loser.name}{postfix}，造成 {l_dmg} 点伤害。{loser.name} 遭受重创，当场陨落。"
         if check_loot:
             from src.classes.kill_and_grab import kill_and_grab
-            text += await kill_and_grab(winner, loser)
-        return text
+            loot_text, transfer = await kill_and_grab(winner, loser)
+            text += loot_text
+            return text, transfer
+        return text, None
     else:
-        return f"{text_prefix}{winner.name} {action_desc} {loser.name}{postfix}，{loser.name} 受伤 {l_dmg} 点，{winner.name} 也受伤 {w_dmg} 点。"
+        return f"{text_prefix}{winner.name} {action_desc} {loser.name}{postfix}，{loser.name} 受伤 {l_dmg} 点，{winner.name} 也受伤 {w_dmg} 点。", None
 
 
 async def handle_battle_finish(
@@ -292,8 +294,9 @@ async def handle_battle_finish(
     # 生成结果文本
     if outcome_text_func:
         result_text = await outcome_text_func(winner, loser, loser_damage, winner_damage, is_fatal)
+        transfer = None
     else:
-        result_text = await gen_battle_result_text(
+        result_text, transfer = await gen_battle_result_text(
             winner, loser, loser_damage, winner_damage, is_fatal,
             prefix=prefix, action_desc=action_desc, postfix=postfix, check_loot=check_loot
         )
@@ -318,6 +321,17 @@ async def handle_battle_finish(
             "subject_name": loser.name,
         },
     )
+    from src.classes.individual_consequence import record_injury_from_event
+    record_injury_from_event(loser, result_event, loser_damage)
+    record_injury_from_event(winner, result_event, winner_damage)
+    if transfer is not None:
+        from src.classes.state_delta import StateDelta
+        payload = result_event.causal_payload or {"deltas": [], "decision": None}
+        payload["deltas"].extend([
+            StateDelta(owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
+            StateDelta(owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
+        ])
+        result_event.causal_payload = payload
     
     # 确定故事生成的起始文本（如果为空则使用结果文本作为兜底）
     start_content = start_event_content

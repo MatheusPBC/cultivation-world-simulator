@@ -95,6 +95,10 @@ def update_age_and_birth(simulator, ctx):
     ctx.add_events(lifecycle.phase_update_age_and_birth(simulator.world, ctx.living_avatars))
 
 
+def resolve_individual_consequences(_simulator, ctx):
+    ctx.add_events(lifecycle.phase_resolve_individual_consequences(ctx.living_avatars))
+
+
 async def backstory_generation(_simulator, ctx):
     await lifecycle.phase_backstory_generation(ctx.living_avatars)
 
@@ -179,6 +183,7 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_age_and_birth", 15, "update_age_and_birth", update_age_and_birth),
     SimulationPhase("backstory_generation", 16, "backstory_generation", backstory_generation),
     SimulationPhase("passive_effects", 17, "passive_effects", passive_effects),
+    SimulationPhase("resolve_individual_consequences", 17, "resolve_individual_consequences", resolve_individual_consequences),
     SimulationPhase("autonomous_custom_creation", 18, "autonomous_custom_creation", autonomous_custom_creation),
     SimulationPhase("random_minor_events", 19, "random_minor_events", random_minor_events),
     SimulationPhase("background_npc_events", 20, "background_npc_events", background_npc_events),
