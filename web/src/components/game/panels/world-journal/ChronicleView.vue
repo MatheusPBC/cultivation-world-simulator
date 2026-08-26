@@ -92,7 +92,7 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
               class="chronicle-badge chronicle-badge--inference"
               data-testid="chronicle-inference-badge"
             >{{ t('game.world_journal.chronicle.inference') }}</span>
-            <span class="chronicle-reference__label">{{ referenceLabel(segment.reference) }}</span>
+            <span v-if="segment.reference.kind === 'event'" class="chronicle-reference__label">{{ referenceLabel(segment.reference) }}</span>
           </button>
           <span v-else>{{ segment.text }}</span>
         </template>

@@ -410,7 +410,11 @@ def _call_anthropic(config: LLMConfig, prompt: str) -> str:
         raise ProviderCallError(ProviderFailureKind.UNKNOWN, str(e), cause=e) from e
 
 
-def _call_codex(config: LLMConfig, prompt: str) -> str:
+def _call_codex(
+    config: LLMConfig,
+    prompt: str,
+    output_schema: dict[str, object] | None = None,
+) -> str:
     """Call the authenticated Codex CLI without exposing OAuth tokens."""
     codex_bin = os.environ.get("CWS_CODEX_BIN", "/usr/local/bin/codex")
     node_bin = os.environ.get("CWS_CODEX_NODE", "")
@@ -418,6 +422,17 @@ def _call_codex(config: LLMConfig, prompt: str) -> str:
 
     with tempfile.NamedTemporaryFile(prefix="cws-codex-", suffix=".txt", delete=False) as output_file:
         output_path = output_file.name
+    schema_path: str | None = None
+    if output_schema is not None:
+        with tempfile.NamedTemporaryFile(
+            prefix="cws-codex-schema-",
+            suffix=".json",
+            mode="w",
+            encoding="utf-8",
+            delete=False,
+        ) as schema_file:
+            json.dump(output_schema, schema_file, ensure_ascii=False)
+            schema_path = schema_file.name
 
     command = [
         *( [node_bin, codex_bin] if node_bin else [codex_bin] ),
@@ -435,6 +450,8 @@ def _call_codex(config: LLMConfig, prompt: str) -> str:
     ]
     if config.model_name:
         command.extend(["--model", config.model_name])
+    if schema_path is not None:
+        command.extend(["--output-schema", schema_path])
 
     environment = os.environ.copy()
     environment["CODEX_HOME"] = codex_home
@@ -483,18 +500,31 @@ def _call_codex(config: LLMConfig, prompt: str) -> str:
             Path(output_path).unlink(missing_ok=True)
         except OSError:
             pass
+        if schema_path is not None:
+            try:
+                Path(schema_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
-def _call_with_requests(config: LLMConfig, prompt: str) -> str:
+def _call_with_requests(
+    config: LLMConfig,
+    prompt: str,
+    output_schema: dict[str, object] | None = None,
+) -> str:
     """根据 api_format 分发到对应的调用实现"""
     if config.api_format.lower() == "codex_cli":
-        return _call_codex(config, prompt)
+        return _call_codex(config, prompt, output_schema=output_schema)
     if config.api_format == "anthropic":
         return _call_anthropic(config, prompt)
     return _call_openai(config, prompt)
 
 
-async def call_llm(prompt: str, mode: LLMMode = LLMMode.NORMAL) -> str:
+async def call_llm(
+    prompt: str,
+    mode: LLMMode = LLMMode.NORMAL,
+    output_schema: dict[str, object] | None = None,
+) -> str:
     """
     基础 LLM 调用，自动控制并发
     使用 urllib 直接调用 OpenAI 兼容接口
@@ -508,7 +538,12 @@ async def call_llm(prompt: str, mode: LLMMode = LLMMode.NORMAL) -> str:
     
     try:
         async with semaphore:
-            result = await asyncio.to_thread(_call_with_requests, config, provider_prompt)
+            result = await asyncio.to_thread(
+                _call_with_requests,
+                config,
+                provider_prompt,
+                output_schema,
+            )
     except Exception as exc:
         failure = classify_llm_error(exc if isinstance(exc, ProviderCallError) else str(exc), base_url=config.base_url)
         if failure.is_config_required:
@@ -522,7 +557,8 @@ async def call_llm(prompt: str, mode: LLMMode = LLMMode.NORMAL) -> str:
 async def call_llm_json(
     prompt: str,
     mode: LLMMode = LLMMode.NORMAL,
-    max_retries: int | None = None
+    max_retries: int | None = None,
+    output_schema: dict[str, object] | None = None,
 ) -> dict:
     """调用 LLM 并解析为 JSON，带重试"""
     if max_retries is None:
@@ -530,7 +566,7 @@ async def call_llm_json(
     
     last_error: ParseError | None = None
     for attempt in range(max_retries + 1):
-        response = await call_llm(prompt, mode)
+        response = await call_llm(prompt, mode, output_schema=output_schema)
         try:
             return parse_json(response)
         except ParseError as e:
@@ -547,19 +583,21 @@ async def call_llm_with_template(
     template_path: Path | str,
     infos: dict,
     mode: LLMMode = LLMMode.NORMAL,
-    max_retries: int | None = None
+    max_retries: int | None = None,
+    output_schema: dict[str, object] | None = None,
 ) -> dict:
     """使用模板调用 LLM"""
     template = load_template(template_path)
     prompt = build_prompt(template, infos)
-    return await call_llm_json(prompt, mode, max_retries)
+    return await call_llm_json(prompt, mode, max_retries, output_schema=output_schema)
 
 
 async def call_llm_with_task_name(
     task_name: str,
     template_path: Path | str,
     infos: dict,
-    max_retries: int | None = None
+    max_retries: int | None = None,
+    output_schema: dict[str, object] | None = None,
 ) -> dict:
     """
     根据任务名称自动选择 LLM 模式并调用
@@ -578,7 +616,13 @@ async def call_llm_with_task_name(
 
     mode = get_task_mode(task_name)
     
-    return await call_llm_with_template(template_path, infos, mode, max_retries)
+    return await call_llm_with_template(
+        template_path,
+        infos,
+        mode,
+        max_retries,
+        output_schema=output_schema,
+    )
 
 
 def test_connectivity(mode: LLMMode = LLMMode.NORMAL, config: Optional[LLMConfig] = None) -> tuple[bool, str]:

@@ -31,6 +31,7 @@ from src.systems.single_choice import (
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.validation import is_llm_runtime_configured
 from src.utils.strings import to_json_str_with_intent
 
 if TYPE_CHECKING:
@@ -205,7 +206,7 @@ class SectDecider:
     @classmethod
     def _llm_available(cls) -> bool:
         profile, api_key = get_settings_service().get_llm_runtime_config()
-        return bool(profile.base_url and api_key and profile.model_name)
+        return is_llm_runtime_configured(profile, api_key)
 
     @classmethod
     def _warn_plan_skip(cls, sect: "Sect", reason: str) -> None:

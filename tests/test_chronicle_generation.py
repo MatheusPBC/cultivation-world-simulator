@@ -138,6 +138,7 @@ async def test_exact_required_candidate_bound_excludes_optional_events(monkeypat
 @pytest.mark.asyncio
 async def test_entity_reference_target_is_validated(monkeypatch):
     source = event(3, "source", major=True)
+    source.related_avatars = ["avatar-1"]
     game_world = SimpleNamespace(
         month_stamp=MonthStamp(3),
         event_manager=SimpleNamespace(
@@ -159,6 +160,114 @@ async def test_entity_reference_target_is_validated(monkeypatch):
         return draft
     monkeypatch.setattr(service, "_call_model", call)
     assert await service.maybe_generate_chapter(game_world, [source])
+
+
+@pytest.mark.asyncio
+async def test_unreferenced_entity_mention_is_rebuilt_as_safe_entity_anchor(monkeypatch):
+    source = event(3, "source", major=True)
+    source.related_avatars = ["avatar-1"]
+    game_world = SimpleNamespace(
+        month_stamp=MonthStamp(3),
+        event_manager=SimpleNamespace(
+            get_latest_chronicle_chapter=lambda: None,
+            get_events_between_months=lambda _start, _end: [],
+        ),
+        avatar_manager=SimpleNamespace(
+            avatars={"avatar-1": SimpleNamespace(id="avatar-1", name="Tang Ruoshuang")},
+        ),
+        map=SimpleNamespace(regions={}),
+    )
+    service = ChronicleService()
+
+    async def call(_world, _infos):
+        return {
+            "title": "Ascensão",
+            "source_event_ids": ["wrong-top-level-source"],
+            "paragraphs": [{
+                "source_event_ids": ["source"],
+                "segments": [{
+                    "text": "Tang Ruoshuang venceu o confronto.",
+                    "reference": None,
+                }],
+            }],
+        }
+
+    monkeypatch.setattr(service, "_call_model", call)
+    chapter = await service.maybe_generate_chapter(game_world, [source])
+
+    assert chapter is not None
+    assert chapter.source_event_ids == ("source",)
+    assert [segment.text for segment in chapter.paragraphs[0].segments] == [
+        "Tang Ruoshuang",
+        " venceu o confronto.",
+    ]
+    reference = chapter.paragraphs[0].segments[0].reference
+    assert reference is not None
+    assert reference.kind == "avatar"
+    assert reference.target_id == "avatar-1"
+    assert reference.source_event_ids == ("source",)
+
+
+@pytest.mark.asyncio
+async def test_invalid_explicit_reference_rejects_chapter(monkeypatch):
+    source = event(3, "source", major=True)
+    service = ChronicleService()
+
+    async def call(_world, _infos):
+        return {
+            "title": "Unsupported claim",
+            "paragraphs": [{
+                "source_event_ids": ["source"],
+                "segments": [{
+                    "text": "A claim without valid evidence",
+                    "reference": {
+                        "id": "invalid-event",
+                        "kind": "event",
+                        "label": "fact",
+                        "target_id": "unknown-event",
+                        "claim_kind": "fact",
+                        "source_event_ids": ["source"],
+                    },
+                }],
+            }],
+        }
+
+    monkeypatch.setattr(service, "_call_model", call)
+
+    assert await service.maybe_generate_chapter(world(3), [source]) is None
+
+
+@pytest.mark.asyncio
+async def test_entity_anchor_does_not_match_inside_another_word(monkeypatch):
+    source = event(3, "source", major=True)
+    source.related_avatars = ["avatar-1"]
+    game_world = SimpleNamespace(
+        month_stamp=MonthStamp(3),
+        event_manager=SimpleNamespace(
+            get_latest_chronicle_chapter=lambda: None,
+            get_events_between_months=lambda _start, _end: [],
+        ),
+        avatar_manager=SimpleNamespace(
+            avatars={"avatar-1": SimpleNamespace(id="avatar-1", name="An")},
+        ),
+        map=SimpleNamespace(regions={}),
+    )
+    service = ChronicleService()
+
+    async def call(_world, _infos):
+        return {
+            "title": "No false anchor",
+            "paragraphs": [{
+                "source_event_ids": ["source"],
+                "segments": [{"text": "Anvil avançou.", "reference": None}],
+            }],
+        }
+
+    monkeypatch.setattr(service, "_call_model", call)
+    chapter = await service.maybe_generate_chapter(game_world, [source])
+
+    assert chapter is not None
+    assert chapter.paragraphs[0].segments == (ChronicleSegment(text="Anvil avançou."),)
 
 
 @pytest.mark.asyncio

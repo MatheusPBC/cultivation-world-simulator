@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from src.run.static_data_registry import build_static_game_data_registry
 from src.server.assemblers.avatar_detail import build_avatar_detail
 from src.server.assemblers.avatar_list import build_avatar_list_payload
@@ -55,3 +57,15 @@ def test_simulation_phase_registry_has_stable_order_and_finalize_tail():
 def test_avatar_api_assemblers_are_dedicated_entrypoints():
     assert callable(build_avatar_detail)
     assert callable(build_avatar_list_payload)
+
+
+def test_avatar_detail_uses_canonical_gender_for_asset_resolution():
+    avatar = SimpleNamespace(
+        gender=SimpleNamespace(value="female"),
+        cultivation_progress=SimpleNamespace(realm=SimpleNamespace(value="QI_REFINEMENT")),
+        get_structured_info=lambda: {"id": "avatar-1", "gender": "Feminino"},
+    )
+
+    detail = build_avatar_detail(avatar, resolve_avatar_pic_id=lambda _avatar: 6)
+
+    assert detail["gender"] == "female"

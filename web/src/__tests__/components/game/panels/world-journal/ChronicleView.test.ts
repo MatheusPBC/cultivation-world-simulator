@@ -51,6 +51,9 @@ describe('ChronicleView', () => {
     expect(selectMock).toHaveBeenCalledWith('avatar', 'a1')
     await wrapper.get('[data-testid="chronicle-ref-region-1"]').trigger('click')
     expect(selectMock).toHaveBeenCalledWith('region', 'r1')
+
+    expect(wrapper.get('[data-testid="chronicle-ref-sect-1"]').text()).toBe('the sect')
+    expect(wrapper.get('[data-testid="chronicle-ref-avatar-1"]').text()).toBe('and Alice编年史解读')
   })
 
   it('keeps an error visible when loading an older page with existing chapters', () => {
