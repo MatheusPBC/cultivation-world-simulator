@@ -1,11 +1,15 @@
 import { httpClient } from '../http';
 import type {
   EventCausalDetailDTO,
+  ChronicleDossierResponseDTO,
+  FetchChronicleDossierParams,
+  FetchWorldChronicleParams,
   EventsResponseDTO,
   FetchEventCausalDetailParams,
   FetchEventsParams,
   WorldJournalPeriodMonths,
   WorldJournalResponseDTO,
+  WorldChronicleResponseDTO,
 } from '../../types/api';
 import { normalizeEventCausalDetail, normalizeEventsResponse } from '../mappers/event';
 
@@ -27,6 +31,30 @@ export const eventApi = {
   fetchWorldJournal(periodMonths: WorldJournalPeriodMonths) {
     return httpClient.get<WorldJournalResponseDTO>(
       `/api/v1/query/world/journal?period_months=${periodMonths}`,
+    );
+  },
+
+  async fetchWorldChronicle(params: FetchWorldChronicleParams = {}) {
+    const query = new URLSearchParams();
+    if (params.cursor) query.set('cursor', params.cursor);
+    if (params.limit != null) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return httpClient.get<WorldChronicleResponseDTO>(
+      `/api/v1/query/world/chronicle${qs ? '?' + qs : ''}`,
+    );
+  },
+
+  async fetchChronicleDossier(
+    chapterId: string,
+    anchorId: string,
+    params: FetchChronicleDossierParams = {},
+  ) {
+    const query = new URLSearchParams();
+    if (params.depth != null) query.set('depth', String(params.depth));
+    if (params.limit != null) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return httpClient.get<ChronicleDossierResponseDTO>(
+      `/api/v1/query/world/chronicle/${encodeURIComponent(chapterId)}/anchors/${encodeURIComponent(anchorId)}/dossier${qs ? '?' + qs : ''}`,
     );
   },
 

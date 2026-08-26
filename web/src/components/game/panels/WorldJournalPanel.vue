@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 import EventPanel from '@/components/game/panels/EventPanel.vue'
+import ChronicleDossierDrawer from '@/components/game/panels/world-journal/ChronicleDossierDrawer.vue'
+import ChronicleView from '@/components/game/panels/world-journal/ChronicleView.vue'
 import { useUiStore } from '@/stores/ui'
 import { useWorldJournalStore, type WorldJournalTab } from '@/stores/worldJournal'
 import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, WorldJournalPeriodMonths } from '@/types/api'
@@ -11,7 +13,24 @@ import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, WorldJournalPeriodMonths
 const { t } = useI18n()
 const uiStore = useUiStore()
 const journalStore = useWorldJournalStore()
-const { activeTab, periodMonths, journal, loading, hasError, causalEventId, causalDetail, causalLoading, causalError } =
+const {
+  activeTab,
+  periodMonths,
+  journal,
+  loading,
+  hasError,
+  chronicle,
+  chronicleLoading,
+  chronicleError,
+  chronicleDossier,
+  chronicleDossierChapterId,
+  chronicleDossierLoading,
+  chronicleDossierError,
+  causalEventId,
+  causalDetail,
+  causalLoading,
+  causalError,
+} =
   storeToRefs(journalStore)
 
 const tabs: Array<{
@@ -22,6 +41,7 @@ const tabs: Array<{
   { key: 'focus', labelKey: 'game.world_journal.tabs.focus' },
   { key: 'stories', labelKey: 'game.world_journal.tabs.stories' },
   { key: 'timeline', labelKey: 'game.world_journal.tabs.timeline' },
+  { key: 'chronicle', labelKey: 'game.world_journal.tabs.chronicle' },
 ]
 
 const periods: Array<{ months: WorldJournalPeriodMonths; labelKey: string }> = [
@@ -32,6 +52,7 @@ const periods: Array<{ months: WorldJournalPeriodMonths; labelKey: string }> = [
 
 function selectTab(tab: WorldJournalTab) {
   journalStore.selectTab(tab)
+  if (tab === 'chronicle' && !chronicle.value) void journalStore.refreshChronicle()
 }
 
 function renderEventText(event: EventDTO) {
@@ -72,6 +93,14 @@ function relationLabel(edge: CausalEdgeDTO) {
 function edgeEventText(edge: CausalEdgeDTO) {
   if (edge.pruned || !edge.event) return t('game.world_journal.why_pruned')
   return renderEventText(edge.event)
+}
+
+function openChronicleDossier(chapterId: string, anchorId: string) {
+  void journalStore.openChronicleDossier(chapterId, anchorId)
+}
+
+function closeChronicleDossier() {
+  journalStore.closeChronicleDossier()
 }
 
 onMounted(() => {
@@ -249,9 +278,29 @@ onMounted(() => {
       </template>
     </div>
 
+    <div v-else-if="activeTab === 'chronicle'" class="journal-body journal-body--chronicle" data-testid="journal-chronicle">
+      <ChronicleView
+        :chapters="chronicle?.chapters ?? []"
+        :has-more="chronicle?.has_more ?? false"
+        :loading="chronicleLoading"
+        :error="chronicleError"
+        @load-more="journalStore.loadMoreChronicle()"
+        @open-dossier="openChronicleDossier"
+      />
+    </div>
+
     <div v-else class="journal-timeline" data-testid="journal-timeline">
       <EventPanel />
     </div>
+
+    <ChronicleDossierDrawer
+      :open="chronicleDossierChapterId !== null"
+      :dossier="chronicleDossier"
+      :loading="chronicleDossierLoading"
+      :error="chronicleDossierError"
+      :on-close="closeChronicleDossier"
+      :on-open-why="journalStore.openCausalDetail"
+    />
 
     <div v-if="causalEventId" class="why-overlay" data-testid="why-overlay" role="dialog" aria-modal="true">
       <div class="why-panel">
@@ -399,7 +448,7 @@ onMounted(() => {
 
 .journal-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .journal-tab {

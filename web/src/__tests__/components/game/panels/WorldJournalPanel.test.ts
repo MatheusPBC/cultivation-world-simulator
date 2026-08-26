@@ -5,15 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import WorldJournalPanel from '@/components/game/panels/WorldJournalPanel.vue'
 
-const { fetchWorldJournalMock, fetchEventCausalDetailMock } = vi.hoisted(() => ({
+const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock } = vi.hoisted(() => ({
   fetchWorldJournalMock: vi.fn(),
   fetchEventCausalDetailMock: vi.fn(),
+  fetchWorldChronicleMock: vi.fn(),
+  fetchChronicleDossierMock: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
   eventApi: {
     fetchWorldJournal: fetchWorldJournalMock,
     fetchEventCausalDetail: fetchEventCausalDetailMock,
+    fetchWorldChronicle: fetchWorldChronicleMock,
+    fetchChronicleDossier: fetchChronicleDossierMock,
   },
   avatarApi: {
     fetchDetailInfo: vi.fn(),
@@ -41,6 +45,7 @@ function createJournalI18n() {
               focus: 'Em foco',
               stories: 'Historias',
               timeline: 'Linha do tempo',
+              chronicle: 'Cronica',
             },
             periods: { one: 'Este mes', three: '3 meses', twelve: '1 ano' },
             important_changes: 'Mudancas importantes',
@@ -86,6 +91,24 @@ function createJournalI18n() {
               resolves: 'resolve',
               prevented_by: 'impedido por',
               contributed_to: 'contribuiu para',
+            },
+            chronicle: {
+              loading: 'Carregando cronica...',
+              error: 'Nao foi possivel carregar a cronica.',
+              empty: 'Nenhuma cronica publicada.',
+              load_more: 'Carregar anteriores',
+              fact: 'Fato',
+              inference: 'Interpretacao',
+              source_count: '{count} fontes',
+              trigger: { major_event: 'Evento importante', max_interval: 'Revisao' },
+              dossier: 'Dossie causal',
+              close: 'Fechar',
+              dossier_error: 'Nao foi possivel carregar o dossie.',
+              pruned: '{count} fontes removidas',
+              truncated: 'Sequencia truncada',
+              sequence: 'Sequencia causal',
+              sequence_empty: 'Nenhum evento',
+              why: 'Por que?',
             },
           },
           event_templates: {},
@@ -165,7 +188,10 @@ describe('WorldJournalPanel', () => {
     vi.useRealTimers()
     fetchWorldJournalMock.mockReset()
     fetchEventCausalDetailMock.mockReset()
+    fetchWorldChronicleMock.mockReset()
+    fetchChronicleDossierMock.mockReset()
     fetchWorldJournalMock.mockResolvedValue(baseJournal)
+    fetchWorldChronicleMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })
   })
 
   afterEach(() => {
@@ -212,6 +238,18 @@ describe('WorldJournalPanel', () => {
     await wrapper.get('[data-testid="journal-tab-timeline"]').trigger('click')
     expect(wrapper.find('[data-testid="journal-now"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="journal-timeline"]').text()).toContain('Timeline existente')
+  })
+
+  it('keeps the four existing tabs and loads the fifth Chronicle tab', async () => {
+    const wrapper = mountPanel()
+    await settlePromises()
+
+    expect(wrapper.findAll('.journal-tab')).toHaveLength(5)
+    await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
+    await settlePromises()
+
+    expect(fetchWorldChronicleMock).toHaveBeenCalledWith({ limit: 20 })
+    expect(wrapper.get('[data-testid="journal-chronicle"]').exists()).toBe(true)
   })
 
   it('shows people and objectives in the Focus tab', async () => {

@@ -488,6 +488,67 @@ export interface WorldJournalResponseDTO {
   ongoing: WorldJournalOngoingDTO[];
 }
 
+// --- World Chronicle ---
+
+export type ChronicleTriggerDTO = 'major_event' | 'max_interval';
+export type ChronicleClaimKindDTO = 'fact' | 'inference';
+export type ChronicleReferenceKindDTO = 'avatar' | 'sect' | 'region' | 'event';
+
+export interface ChronicleReferenceDTO {
+  id: string;
+  kind: ChronicleReferenceKindDTO;
+  label: string;
+  target_id: string | null;
+  claim_kind: ChronicleClaimKindDTO | null;
+  source_event_ids: string[];
+}
+
+export interface ChronicleSegmentDTO {
+  text: string;
+  reference: ChronicleReferenceDTO | null;
+}
+
+export interface ChronicleParagraphDTO {
+  segments: ChronicleSegmentDTO[];
+  source_event_ids: string[];
+}
+
+export interface ChronicleChapterDTO {
+  id: string;
+  start_month_stamp: number;
+  end_month_stamp: number;
+  trigger: ChronicleTriggerDTO;
+  title: string;
+  paragraphs: ChronicleParagraphDTO[];
+  source_event_ids: string[];
+  created_at: number;
+}
+
+export interface WorldChronicleResponseDTO {
+  chapters: ChronicleChapterDTO[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface ChronicleDossierResponseDTO {
+  chapter_id: string;
+  anchor: ChronicleReferenceDTO;
+  focal_event: EventDTO | null;
+  sequence: EventDTO[];
+  pruned_source_ids: string[];
+  truncated: boolean;
+}
+
+export interface FetchWorldChronicleParams {
+  cursor?: string | null;
+  limit?: number;
+}
+
+export interface FetchChronicleDossierParams {
+  depth?: number;
+  limit?: number;
+}
+
 // --- Causal "why" drill-down ---
 
 export type CausalRelationDTO =
