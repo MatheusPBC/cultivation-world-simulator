@@ -51,6 +51,7 @@ function createJournalI18n() {
               timeline: 'Linha do tempo',
               chronicle: 'Cronica',
               guide: 'Guia Vivo',
+              dao: 'Suplicas ao Dao',
             },
             periods: { one: 'Este mes', three: '3 meses', twelve: '1 ano' },
             important_changes: 'Mudancas importantes',
@@ -278,7 +279,7 @@ describe('WorldJournalPanel', () => {
     const wrapper = mountPanel()
     await settlePromises()
 
-    expect(wrapper.findAll('.journal-tab')).toHaveLength(6)
+    expect(wrapper.findAll('.journal-tab')).toHaveLength(7)
     await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
     await settlePromises()
 

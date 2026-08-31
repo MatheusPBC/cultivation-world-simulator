@@ -11,16 +11,19 @@ import type {
 } from '@/types/api'
 import type { useUiStore } from '@/stores/ui'
 import type { useWorldStore } from '@/stores/world'
+import type { useWorldJournalStore } from '@/stores/worldJournal'
 
 interface SocketRouterDeps {
   worldStore: ReturnType<typeof useWorldStore>
   uiStore: ReturnType<typeof useUiStore>
+  worldJournalStore: Pick<ReturnType<typeof useWorldJournalStore>, 'refreshAfterTick'>
 }
 
 const translate = i18n.global.t
 
 function handleTickMessage(payload: TickPayloadDTO, deps: SocketRouterDeps) {
   deps.worldStore.handleTick(payload)
+  deps.worldJournalStore.refreshAfterTick()
   if (deps.uiStore.selectedTarget) {
     deps.uiStore.refreshDetail()
   }
@@ -81,4 +84,3 @@ export function routeSocketMessage(data: SocketMessageDTO, deps: SocketRouterDep
       break
   }
 }
-

@@ -179,6 +179,13 @@ export const useWorldJournalStore = defineStore('worldJournal', () => {
     finally { respondingPetitionId.value = null }
   }
 
+  function refreshAfterTick() {
+    void refresh()
+    if (chronicle.value) void refreshChronicle()
+    if (liveGuide.value) void refreshLiveGuide()
+    if (daoPetitions.value) void refreshDaoPetitions()
+  }
+
   async function openChronicleDossier(chapterId: string, anchorId: string) {
     const currentRequestId = ++chronicleDossierRequestId
     chronicleDossierChapterId.value = chapterId
@@ -270,6 +277,7 @@ export const useWorldJournalStore = defineStore('worldJournal', () => {
     respondingPetitionId,
     refreshDaoPetitions,
     answerDaoPetition,
+    refreshAfterTick,
     chronicleDossier,
     chronicleDossierChapterId,
     chronicleDossierAnchorId,

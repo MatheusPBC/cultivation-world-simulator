@@ -5,16 +5,19 @@ const fetchChronicleMock = vi.fn()
 const fetchDossierMock = vi.fn()
 const fetchLiveGuideMock = vi.fn()
 const askLiveGuideMock = vi.fn()
+const fetchJournalMock = vi.fn()
+const fetchDaoPetitionsMock = vi.fn()
 
 vi.mock('@/api', () => ({
   eventApi: {
     fetchWorldChronicle: fetchChronicleMock,
     fetchChronicleDossier: fetchDossierMock,
-    fetchWorldJournal: vi.fn(),
+    fetchWorldJournal: fetchJournalMock,
     fetchEventCausalDetail: vi.fn(),
     fetchLiveGuide: fetchLiveGuideMock,
     askLiveGuide: askLiveGuideMock,
   },
+  worldApi: { fetchDaoPetitions: fetchDaoPetitionsMock },
 }))
 
 const page = (chapters: Array<{ id: string }>, next_cursor: string | null = null, has_more = false) => ({
@@ -30,6 +33,28 @@ describe('worldJournal Chronicle state', () => {
     fetchDossierMock.mockReset()
     fetchLiveGuideMock.mockReset()
     askLiveGuideMock.mockReset()
+    fetchJournalMock.mockReset()
+    fetchDaoPetitionsMock.mockReset()
+  })
+
+  it('refreshes cached Journal projections after a simulation tick', async () => {
+    fetchJournalMock.mockResolvedValue({ highlights: [], stories: [], ongoing: [] })
+    fetchChronicleMock.mockResolvedValue(page([]))
+    fetchLiveGuideMock.mockResolvedValue({ threads: [], people: [], source_event_ids: [] })
+    fetchDaoPetitionsMock.mockResolvedValue({ pending: [], history: [] })
+    const { useWorldJournalStore } = await import('@/stores/worldJournal')
+    const store = useWorldJournalStore()
+    store.chronicle = page([]) as any
+    store.liveGuide = { threads: [], people: [], source_event_ids: [] } as any
+    store.daoPetitions = { pending: [], history: [] }
+
+    store.refreshAfterTick()
+    await Promise.resolve()
+
+    expect(fetchJournalMock).toHaveBeenCalledWith(1)
+    expect(fetchChronicleMock).toHaveBeenCalledWith({ limit: 20 })
+    expect(fetchLiveGuideMock).toHaveBeenCalledOnce()
+    expect(fetchDaoPetitionsMock).toHaveBeenCalledOnce()
   })
 
   it('appends Chronicle pages without duplicate chapters', async () => {

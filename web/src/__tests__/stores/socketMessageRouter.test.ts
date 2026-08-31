@@ -27,6 +27,7 @@ describe('socketMessageRouter', () => {
     openSystemMenu: vi.fn(),
     setLlmConfigError: vi.fn(),
   }
+  const worldJournalStore = { refreshAfterTick: vi.fn() }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -37,17 +38,18 @@ describe('socketMessageRouter', () => {
     uiStore.selectedTarget = { type: 'avatar', id: 'a1' }
     routeSocketMessage(
       { type: 'tick', year: 1, month: 1, events: [], avatars: [] },
-      { worldStore: worldStore as any, uiStore: uiStore as any }
+      { worldStore: worldStore as any, uiStore: uiStore as any, worldJournalStore: worldJournalStore as any }
     )
 
     expect(worldStore.handleTick).toHaveBeenCalled()
+    expect(worldJournalStore.refreshAfterTick).toHaveBeenCalledOnce()
     expect(uiStore.refreshDetail).toHaveBeenCalled()
   })
 
   it('opens llm config menu on llm_config_required', () => {
     routeSocketMessage(
       { type: 'llm_config_required', error: 'LLM required' },
-      { worldStore: worldStore as any, uiStore: uiStore as any }
+      { worldStore: worldStore as any, uiStore: uiStore as any, worldJournalStore: worldJournalStore as any }
     )
 
     expect(uiStore.openSystemMenu).toHaveBeenCalledWith('llm', false)
@@ -59,7 +61,7 @@ describe('socketMessageRouter', () => {
     uiStore.selectedTarget = { type: 'avatar', id: 'a1' }
     routeSocketMessage(
       { type: 'avatar_delta', avatars: [{ id: 'a2', name: 'New' }], removed_avatar_ids: [], world_revision: 5 },
-      { worldStore: worldStore as any, uiStore: uiStore as any },
+      { worldStore: worldStore as any, uiStore: uiStore as any, worldJournalStore: worldJournalStore as any },
     )
 
     expect(worldStore.applyAvatarDelta).toHaveBeenCalledWith(expect.objectContaining({ world_revision: 5 }), {
@@ -72,7 +74,7 @@ describe('socketMessageRouter', () => {
     uiStore.selectedTarget = { type: 'avatar', id: 'a1' }
     routeSocketMessage(
       { type: 'avatar_delta', avatars: [], removed_avatar_ids: ['a1'], world_revision: 6 },
-      { worldStore: worldStore as any, uiStore: uiStore as any },
+      { worldStore: worldStore as any, uiStore: uiStore as any, worldJournalStore: worldJournalStore as any },
     )
 
     expect(uiStore.clearSelection).toHaveBeenCalled()
@@ -82,10 +84,9 @@ describe('socketMessageRouter', () => {
   it('shows toast without switching frontend locale', () => {
     routeSocketMessage(
       { type: 'toast', level: 'info', message: 'ok', language: 'en-US' },
-      { worldStore: worldStore as any, uiStore: uiStore as any }
+      { worldStore: worldStore as any, uiStore: uiStore as any, worldJournalStore: worldJournalStore as any }
     )
 
     expect(mockMessage.info).toHaveBeenCalledWith('ok')
   })
 })
-
