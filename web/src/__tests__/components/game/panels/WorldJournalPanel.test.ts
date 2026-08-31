@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import WorldJournalPanel from '@/components/game/panels/WorldJournalPanel.vue'
 
-const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock } = vi.hoisted(() => ({
+const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock, fetchLiveGuideMock, askLiveGuideMock } = vi.hoisted(() => ({
   fetchWorldJournalMock: vi.fn(),
   fetchEventCausalDetailMock: vi.fn(),
   fetchWorldChronicleMock: vi.fn(),
   fetchChronicleDossierMock: vi.fn(),
+  fetchLiveGuideMock: vi.fn(),
+  askLiveGuideMock: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
@@ -18,6 +20,8 @@ vi.mock('@/api', () => ({
     fetchEventCausalDetail: fetchEventCausalDetailMock,
     fetchWorldChronicle: fetchWorldChronicleMock,
     fetchChronicleDossier: fetchChronicleDossierMock,
+    fetchLiveGuide: fetchLiveGuideMock,
+    askLiveGuide: askLiveGuideMock,
   },
   avatarApi: {
     fetchDetailInfo: vi.fn(),
@@ -46,6 +50,7 @@ function createJournalI18n() {
               stories: 'Historias',
               timeline: 'Linha do tempo',
               chronicle: 'Cronica',
+              guide: 'Guia Vivo',
             },
             periods: { one: 'Este mes', three: '3 meses', twelve: '1 ano' },
             important_changes: 'Mudancas importantes',
@@ -110,7 +115,19 @@ function createJournalI18n() {
               sequence_empty: 'Nenhum evento',
               why: 'Por que?',
             },
+            guide: {
+              loading: 'Lendo...', error: 'Erro no guia', retry: 'Tentar novamente', date: 'Ano {year}, mes {month}',
+              world_in_one_sentence: 'O mundo em uma frase', no_headline: 'Sem manchete', sources: '{count} fontes',
+              happening: 'O que esta acontecendo', happening_hint: 'Fios importantes', empty: 'Sem fios',
+              understand_why: 'Entender por que', people: 'Quem importa agora', people_empty: 'Sem pessoas',
+              no_current_action: 'Sem acao', no_ambition: 'Sem ambicao', concept: 'Conceito em foco',
+              ask_eyebrow: 'Pergunte ao Cronista', ask_title: 'Tire uma duvida', grounded_note: 'Somente fatos',
+              question_label: 'Pergunta', question_placeholder: 'Pergunte', ask_button: 'Perguntar', answering: 'Consultando',
+              suggestion_people: 'Quem importa?', suggestion_conflict: 'Qual conflito?', suggestion_change: 'O que mudou?',
+              answer_error: 'Erro na resposta', answer_unavailable: 'Sem resposta', answer_sources: 'Fontes', source_number: 'Fonte {number}',
+            },
           },
+          world_info: { entries: { WORLD_INFO_BATTLE_NAME: 'Combate', WORLD_INFO_BATTLE_DESC: 'Conflitos entre cultivadores.' } },
           event_templates: {},
         },
       },
@@ -183,6 +200,19 @@ const baseJournal = {
   ],
 }
 
+const baseGuide = {
+  date: { month_stamp: 1204, year: 100, month: 5 },
+  headline: 'A fronteira entrou em guerra.',
+  source_event_ids: ['major-1'],
+  threads: [{
+    id: 'thread-1', title: 'Uma disputa mudou a fronteira', summary: 'Alice avancou e alterou o equilibrio local.',
+    severity: 'critical', primary_event_id: 'major-1', source_event_ids: ['major-1'],
+    subjects: [{ kind: 'avatar', id: 'a1', name: 'Alice' }],
+  }],
+  people: [{ avatar_id: 'a1', name: 'Alice', current_action: 'Cultivando', ambition: 'Ascender', event_count: 3 }],
+  concept: { term_key: 'WORLD_INFO_BATTLE', source_event_ids: ['major-1'] },
+}
+
 describe('WorldJournalPanel', () => {
   beforeEach(() => {
     vi.useRealTimers()
@@ -190,8 +220,12 @@ describe('WorldJournalPanel', () => {
     fetchEventCausalDetailMock.mockReset()
     fetchWorldChronicleMock.mockReset()
     fetchChronicleDossierMock.mockReset()
+    fetchLiveGuideMock.mockReset()
+    askLiveGuideMock.mockReset()
     fetchWorldJournalMock.mockResolvedValue(baseJournal)
     fetchWorldChronicleMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })
+    fetchLiveGuideMock.mockResolvedValue(baseGuide)
+    askLiveGuideMock.mockResolvedValue({ answer: 'Alice mudou o equilibrio local.', source_event_ids: ['major-1'], mode: 'generated' })
   })
 
   afterEach(() => {
@@ -240,16 +274,56 @@ describe('WorldJournalPanel', () => {
     expect(wrapper.get('[data-testid="journal-timeline"]').text()).toContain('Timeline existente')
   })
 
-  it('keeps the four existing tabs and loads the fifth Chronicle tab', async () => {
+  it('keeps the existing tabs and loads the Chronicle tab', async () => {
     const wrapper = mountPanel()
     await settlePromises()
 
-    expect(wrapper.findAll('.journal-tab')).toHaveLength(5)
+    expect(wrapper.findAll('.journal-tab')).toHaveLength(6)
     await wrapper.get('[data-testid="journal-tab-chronicle"]').trigger('click')
     await settlePromises()
 
     expect(fetchWorldChronicleMock).toHaveBeenCalledWith({ limit: 20 })
     expect(wrapper.get('[data-testid="journal-chronicle"]').exists()).toBe(true)
+  })
+
+  it('loads the Live Guide lazily and opens its source in the existing Why view', async () => {
+    fetchEventCausalDetailMock.mockResolvedValue({
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+    })
+    const wrapper = mountPanel()
+    await settlePromises()
+
+    await wrapper.get('[data-testid="journal-tab-guide"]').trigger('click')
+    await settlePromises()
+
+    expect(fetchLiveGuideMock).toHaveBeenCalledOnce()
+    expect(wrapper.get('[data-testid="journal-guide"]').text()).toContain('A fronteira entrou em guerra.')
+    expect(wrapper.get('[data-testid="journal-guide"]').text()).toContain('Alice')
+
+    await wrapper.get('[data-testid="guide-why-major-1"]').trigger('click')
+    await settlePromises()
+    expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('major-1')
+    expect(wrapper.get('[data-testid="why-overlay"]').exists()).toBe(true)
+  })
+
+  it('asks the Chronicler and keeps the answer citation clickable', async () => {
+    fetchEventCausalDetailMock.mockResolvedValue({
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+    })
+    const wrapper = mountPanel()
+    await settlePromises()
+    await wrapper.get('[data-testid="journal-tab-guide"]').trigger('click')
+    await settlePromises()
+
+    await wrapper.get('#live-guide-question').setValue('O que mudou?')
+    await wrapper.get('.chronicler-box form').trigger('submit')
+    await settlePromises()
+
+    expect(askLiveGuideMock).toHaveBeenCalledWith('O que mudou?')
+    expect(wrapper.get('[data-testid="guide-answer"]').text()).toContain('Alice mudou o equilibrio local.')
+    await wrapper.get('.answer-sources button').trigger('click')
+    await settlePromises()
+    expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('major-1')
   })
 
   it('keeps the Chronicle Why overlay above the dossier drawer', async () => {

@@ -26,8 +26,10 @@ const {
   summary,
   hasOverview,
   emperor,
+  imperialCrisis,
   effectLines,
   jumpToAvatar,
+  openCrisisEvidence,
 } = useDynastyOverviewModal(() => props.show)
 
 function handleShowChange(value: boolean) {
@@ -85,7 +87,45 @@ function handleShowChange(value: boolean) {
                 <div class="info-value">{{ overview.official_preference_label || t('common.none') }}</div>
               </div>
             </div>
-          </section>
+        </section>
+
+        <section v-if="imperialCrisis" class="section crisis-section">
+          <div class="section-title">
+            <span class="section-title-icon" :style="{ '--icon-url': `url(${scaleIcon})` }" aria-hidden="true"></span>
+            {{ t('game.dynasty.crisis.title') }}
+          </div>
+          <div class="crisis-status">{{ t(`game.dynasty.crisis.status.${imperialCrisis.status}`) }}</div>
+          <div class="crisis-contenders">
+            <button type="button" class="contender" @click="jumpToAvatar(imperialCrisis.emperor.id)">
+              <span>{{ t('game.dynasty.crisis.emperor') }}</span><strong>{{ imperialCrisis.emperor.name }}</strong>
+            </button>
+            <span class="crisis-versus" aria-hidden="true">↔</span>
+            <button type="button" class="contender" @click="jumpToAvatar(imperialCrisis.claimant.id)">
+              <span>{{ t('game.dynasty.crisis.claimant') }}</span><strong>{{ imperialCrisis.claimant.name }}</strong>
+            </button>
+          </div>
+          <p class="crisis-meta">{{ t('game.dynasty.crisis.support', { count: imperialCrisis.supportCount }) }}</p>
+          <div v-if="imperialCrisis.supporters.length" class="crisis-supporters">
+            <span class="crisis-supporters-label">{{ t('game.dynasty.crisis.supporters') }}</span>
+            <button
+              v-for="supporter in imperialCrisis.supporters"
+              :key="supporter.id"
+              type="button"
+              class="supporter"
+              @click="jumpToAvatar(supporter.id)"
+            >
+              {{ supporter.name }}
+            </button>
+          </div>
+          <div v-if="Object.keys(imperialCrisis.legitimacyFactors).length" class="legitimacy-factors">
+            <span v-for="factor in ['office', 'reputation', 'cultivation', 'support', 'celestial', 'worldly_total', 'total']" :key="factor" v-show="factor in imperialCrisis.legitimacyFactors">
+              {{ t(`game.dynasty.crisis.factors.${factor}`) }}: {{ imperialCrisis.legitimacyFactors[factor] > 0 ? '+' : '' }}{{ imperialCrisis.legitimacyFactors[factor] }}
+            </span>
+          </div>
+          <div v-if="imperialCrisis.evidenceEventIds.length" class="crisis-evidence">
+            <button v-for="eventId in imperialCrisis.evidenceEventIds" :key="eventId" type="button" @click="openCrisisEvidence(eventId)">{{ t('game.dynasty.crisis.evidence') }}</button>
+          </div>
+        </section>
 
         <section class="section">
             <div class="section-title">
@@ -93,10 +133,10 @@ function handleShowChange(value: boolean) {
               {{ t('game.dynasty.emperor.title') }}
             </div>
             <div v-if="emperor" class="info-grid">
-              <div class="info-card">
+              <button class="info-card emperor-row" type="button" @click="jumpToAvatar(emperor.id)">
                 <div class="info-label">{{ t('game.dynasty.emperor.name') }}</div>
                 <div class="info-value">{{ emperor.name }}</div>
-              </div>
+              </button>
               <div class="info-card">
                 <div class="info-label">{{ t('game.dynasty.emperor.age') }}</div>
                 <div class="info-value">{{ emperor.age }}</div>
@@ -336,6 +376,25 @@ function handleShowChange(value: boolean) {
   color: var(--panel-accent-strong);
 }
 
+.crisis-section { border-color: color-mix(in srgb, var(--panel-accent) 62%, var(--panel-border)); }
+.crisis-status { margin: 8px 0 12px; color: var(--panel-accent-strong); font-weight: 700; }
+.crisis-contenders { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.contender { min-height: 64px; padding: 10px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel-accent-soft); color: var(--panel-text-primary); text-align: left; cursor: pointer; }
+.contender span { display: block; margin-bottom: 5px; color: var(--panel-text-secondary); font-size: 12px; }
+.contender strong { display: block; overflow-wrap: anywhere; }
+.crisis-versus { color: var(--panel-accent-strong); }
+.crisis-meta { margin: 12px 0 0; color: var(--panel-text-secondary); font-size: 12px; }
+.crisis-supporters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.crisis-supporters-label { margin-right: 2px; color: var(--panel-text-secondary); font-size: 12px; }
+.supporter { min-height: 32px; padding: 4px 8px; border: 1px solid var(--panel-border); border-radius: 999px; background: var(--panel-accent-soft); color: var(--panel-text-primary); cursor: pointer; }
+.supporter:hover { border-color: var(--panel-accent); background: rgba(255, 255, 255, 0.06); }
+.supporter:focus-visible { outline: 2px solid var(--panel-accent-strong); outline-offset: 2px; }
+.legitimacy-factors { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.legitimacy-factors span { padding: 4px 7px; border: 1px solid var(--panel-border); border-radius: 999px; color: var(--panel-text-secondary); font-size: 11px; }
+.crisis-evidence { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.crisis-evidence button { min-height: 40px; border: 0; border-bottom: 1px solid var(--panel-accent-strong); background: transparent; color: var(--panel-accent-strong); cursor: pointer; }
+.contender:focus-visible { outline: 2px solid var(--panel-accent-strong); outline-offset: 2px; }
+
 .official-list {
   display: flex;
   flex-direction: column;
@@ -357,6 +416,10 @@ function handleShowChange(value: boolean) {
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
+
+.emperor-row { width: 100%; color: inherit; text-align: left; cursor: pointer; }
+.emperor-row:hover { border-color: var(--panel-accent); background: rgba(255, 255, 255, 0.06); }
+.emperor-row:focus-visible { outline: 2px solid var(--panel-accent-strong); outline-offset: 2px; }
 
 .official-row:hover {
   background: rgba(255, 255, 255, 0.06);

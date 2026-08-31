@@ -1,0 +1,66 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: cultivation-world-simulator 1.0\\n"
+"Language: zh_CN\\n"
+"Content-Type: text/plain; charset=UTF-8\\n"
+
+msgid "a call to restore rightful order"
+msgstr "这是重建正统秩序的召唤"
+
+msgid "a warning against excess and imbalance"
+msgstr "这是对过度与失衡的警示"
+
+msgid "a charge to protect those bearing the cost"
+msgstr "这是护佑承受代价之人的责任"
+
+msgid "a reminder that worldly claims are temporary"
+msgstr "这是对世俗名分终将消散的提醒"
+
+msgid "{sign}: {reading}"
+msgstr "{sign}：{reading}"
+
+msgid "A public omen"
+msgstr "一道公开的天道征兆"
+
+msgid "A {tradition} petition seeks the Dao's notice."
+msgstr "一份遵循 {tradition} 的祈愿请求天道垂察。"
+
+msgid "{avatar} asks the Dao to witness this {tradition} concern: {cause}"
+msgstr "{avatar}祈请天道见证这桩{tradition}之忧：{cause}"
+
+msgid "{avatar} sends a petition to the Celestial Dao."
+msgstr "{avatar}向天道递上了一份祈愿。"
+
+msgid "The Dao remains silent."
+msgstr "天道仍保持沉默。"
+
+msgid "The Dao has answered"
+msgstr "天道已作答"
+
+msgid "{answer} A limited opportunity is granted to the petitioner."
+msgstr "{answer}祈愿者因此获得一次有限的机缘。"
+
+msgid "{claimant} openly claims the imperial mandate."
+msgstr "{claimant}公开宣称帝统。"
+
+msgid "The imperial pretension is withdrawn."
+msgstr "这场帝统觊觎被撤回了。"
+
+msgid "{claimant} ascends after a legitimacy crisis."
+msgstr "{claimant}在正统危机后登基。"
+
+msgid "{claimant}'s imperial claim fails publicly."
+msgstr "{claimant}的帝统觊觎公开失势。"
+
+msgid "The legitimacy crisis remains unresolved."
+msgstr "这场正统危机仍未解决。"
+
+msgid "Too many pending Dao petitions"
+msgstr "待回应的天道祈愿过多。"
+
+msgid "Petition is not pending"
+msgstr "这份祈愿当前不可回应。"
+
+msgid "response must be silence, sign, or favor"
+msgstr "回应只能是沉默、降下征兆或赐予机缘。"

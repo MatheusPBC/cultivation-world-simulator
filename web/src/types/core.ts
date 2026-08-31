@@ -432,6 +432,7 @@ export interface RegionDetail extends EntityBase {
   formation?: RegionFormationInfo | null;
   regional_pressure?: RegionalPressureSummary | null;
   regional_capabilities?: RegionalCapability[];
+  dao_tradition?: 'mandate_and_order' | 'balance' | 'mercy' | 'transcendence';
 }
 
 // --- 天地灵机 ---
@@ -501,9 +502,8 @@ export interface DynastyOverview {
   official_preference_label: string;
   is_low_magic: boolean;
   current_emperor: {
+    id: string;
     name: string;
-    surname: string;
-    given_name: string;
     age: number;
     max_age: number;
     is_mortal: boolean;
@@ -527,6 +527,16 @@ export interface DynastyDetail {
     topOfficialRankName: string;
   };
   officials: DynastyOfficial[];
+  imperialCrisis: {
+    status: string;
+    openedMonth: number;
+    emperor: { id: string; name: string };
+    claimant: { id: string; name: string };
+    supportCount: number;
+    supporters: Array<{ id: string; name: string }>;
+    evidenceEventIds: string[];
+    legitimacyFactors: Record<string, number>;
+  } | null;
 }
 
 export interface AvatarOverviewSummary {

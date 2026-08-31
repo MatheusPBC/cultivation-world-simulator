@@ -6,7 +6,9 @@
       "now": "現在",
       "focus": "焦點",
       "stories": "故事",
-      "timeline": "時間軸"
+      "timeline": "時間軸",
+      "chronicle": "編年史",
+      "guide": "世界指南"
     },
     "periods": {
       "one": "本月",
@@ -48,6 +50,22 @@
     "why_truncated": "部分起因未顯示；開啟更接近源頭的事件可查看更多。",
     "why_considered_count": "當時考慮了 {count} 個選項",
     "why_rejected": "被放棄的選項",
+    "guide": {
+      "loading": "正在閱讀目前世界狀態...", "error": "無法建立世界指南。", "retry": "重試",
+      "date": "第 {year} 年，第 {month} 月", "world_in_one_sentence": "一句話看世界",
+      "no_headline": "這個世界的第一批故事仍在形成。", "sources": "{count} 個來源",
+      "happening": "正在發生什麼", "happening_hint": "此刻最重要的故事線",
+      "empty": "尚無足以形成故事線的重要事件。", "understand_why": "了解原因",
+      "people": "此刻的重要人物", "people_empty": "本階段尚無突出人物。",
+      "no_current_action": "沒有記錄目前行動", "no_ambition": "尚無已知志向", "concept": "目前概念",
+      "ask_eyebrow": "詢問編年史作者", "ask_title": "詢問這個世界",
+      "grounded_note": "回答僅限世界事實與可查來源", "question_label": "向編年史作者提問",
+      "question_placeholder": "這場爭端為何重要？誰能改變它的走向？", "ask_button": "提問",
+      "answering": "查閱中...", "suggestion_people": "誰正在改變世界？",
+      "suggestion_conflict": "哪場衝突值得關注？", "suggestion_change": "最近發生了什麼變化？",
+      "answer_error": "編年史作者暫時無法回答，請重試。", "answer_unavailable": "現有來源不足以回答。",
+      "answer_sources": "回答來源", "source_number": "來源 {number}"
+    },
     "why_relation": {
       "triggered_by": "觸發於",
       "enabled_by": "得益於",

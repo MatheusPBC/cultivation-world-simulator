@@ -29,6 +29,10 @@ class RegionRuntimeLoadSection:
                 if isinstance(region, CityRegion):
                     region.population = status.get("population", region.population)
                 conditions = status.get("conditions") or []
+                tradition = status.get("dao_tradition")
+                if tradition:
+                    from src.classes.celestial_dao import DaoTradition
+                    region.dao_tradition = DaoTradition(tradition)
                 if conditions:
                     from src.classes.environment.region_condition import RegionCondition
 

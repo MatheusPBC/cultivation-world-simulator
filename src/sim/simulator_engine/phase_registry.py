@@ -154,6 +154,13 @@ async def annual_maintenance(simulator, ctx):
     await annual.run_annual_maintenance(simulator, ctx)
 
 
+async def create_dao_petition(simulator, ctx):
+    from src.systems.celestial_dao_service import maybe_create_monthly_petition
+    event = await maybe_create_monthly_petition(simulator.world, ctx.events)
+    if event is not None:
+        ctx.add_events([event])
+
+
 async def generate_event_appraisals(_simulator, ctx):
     # 紧挨 finalizer 之前：此时本月所有事件都已经产生并进入 ctx.events，
     # 但还没有落库，所以解读可以直接挂到事件上，由 finalize_step 与事件
@@ -204,10 +211,11 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_dynasty_and_officials", 26, "update_dynasty_and_officials", update_dynasty_and_officials),
     SimulationPhase("handle_interactions_second", 27, "handle_interactions", handle_interactions),
     SimulationPhase("update_calculated_relations", 28, "update_calculated_relations", update_calculated_relations),
-    SimulationPhase("annual_maintenance", 29, "annual_maintenance", annual_maintenance),
-    SimulationPhase("generate_event_appraisals", 30, "generate_event_appraisals", generate_event_appraisals),
-    SimulationPhase("generate_chronicle", 31, "generate_chronicle", generate_chronicle),
-    SimulationPhase("finalize_step", 32, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("create_dao_petition", 29, "create_dao_petition", create_dao_petition),
+    SimulationPhase("annual_maintenance", 30, "annual_maintenance", annual_maintenance),
+    SimulationPhase("generate_event_appraisals", 31, "generate_event_appraisals", generate_event_appraisals),
+    SimulationPhase("generate_chronicle", 32, "generate_chronicle", generate_chronicle),
+    SimulationPhase("finalize_step", 33, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

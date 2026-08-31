@@ -6,7 +6,9 @@
       "now": "現在",
       "focus": "注目",
       "stories": "物語",
-      "timeline": "タイムライン"
+      "timeline": "タイムライン",
+      "chronicle": "年代記",
+      "guide": "生きた手引き"
     },
     "periods": {
       "one": "今月",
@@ -48,6 +50,22 @@
     "why_truncated": "一部の原因は表示されていません。より根源に近いイベントを開いてください。",
     "why_considered_count": "{count}件の選択肢が検討されました",
     "why_rejected": "却下された選択肢",
+    "guide": {
+      "loading": "現在の世界を読み解いています...", "error": "生きた手引きを作成できませんでした。", "retry": "再試行",
+      "date": "{year}年 {month}月", "world_in_one_sentence": "世界を一文で",
+      "no_headline": "世界最初の物語はまだ形作られている途中です。", "sources": "{count}件の出典",
+      "happening": "今、何が起きているか", "happening_hint": "現在もっとも重要な物語の流れ",
+      "empty": "物語の流れを作るほど重要な出来事はまだありません。", "understand_why": "理由を知る",
+      "people": "今、重要な人物", "people_empty": "この期間に際立った人物はいません。",
+      "no_current_action": "現在の行動記録なし", "no_ambition": "既知の志なし", "concept": "注目の概念",
+      "ask_eyebrow": "年代記者に聞く", "ask_title": "この世界について尋ねる",
+      "grounded_note": "回答は世界の事実と出典に限定されます", "question_label": "年代記者への質問",
+      "question_placeholder": "なぜこの争いは重要なのか？誰が流れを変えられるのか？", "ask_button": "質問する",
+      "answering": "調査中...", "suggestion_people": "誰が世界を変えている？",
+      "suggestion_conflict": "注目すべき争いは？", "suggestion_change": "最近何が変わった？",
+      "answer_error": "年代記者は今すぐ回答できません。再試行してください。", "answer_unavailable": "回答に十分な出典がありません。",
+      "answer_sources": "回答の出典", "source_number": "出典 {number}"
+    },
     "why_relation": {
       "triggered_by": "きっかけ",
       "enabled_by": "後押し",

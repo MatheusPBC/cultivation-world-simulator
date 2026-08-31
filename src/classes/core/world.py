@@ -21,6 +21,7 @@ from src.classes.ranking import RankingManager
 from src.classes.sect_diplomacy_state import SectDiplomacyState
 from src.classes.war import STATUS_PEACE, STATUS_WAR
 from src.systems.opportunity import OpportunityManager
+from src.classes.celestial_dao import DaoPetition
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -46,6 +47,7 @@ class World():
     current_phenomenon: Optional["CelestialPhenomenon"] = None
     # 当前王朝（凡人王朝）
     dynasty: Optional["Dynasty"] = None
+    dao_petitions: list[DaoPetition] = field(default_factory=list)
     # 天地灵机开始年份（用于计算持续时间）
     phenomenon_start_year: int = 0
     # 出世物品流通管理器

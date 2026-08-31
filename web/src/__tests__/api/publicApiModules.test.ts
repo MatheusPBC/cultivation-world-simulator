@@ -66,6 +66,22 @@ describe('public api module migration', () => {
     expect(result).toEqual(journal)
   })
 
+  it('eventApi reads the Live Guide and asks its grounded query endpoint', async () => {
+    const { eventApi } = await import('@/api/modules/event')
+    getMock.mockResolvedValue({ threads: [] })
+    postMock.mockResolvedValue({ answer: 'Fato', source_event_ids: ['e1'], mode: 'generated' })
+
+    await eventApi.fetchLiveGuide()
+    await eventApi.askLiveGuide('O que mudou?')
+
+    expect(getMock).toHaveBeenCalledWith('/api/v1/query/world/live-guide')
+    expect(postMock).toHaveBeenCalledWith(
+      '/api/v1/query/world/live-guide/ask',
+      { question: 'O que mudou?' },
+      { timeoutMs: 120_000 },
+    )
+  })
+
   it('eventApi fetches the first Chronicle page from the exact endpoint', async () => {
     const { eventApi } = await import('@/api/modules/event')
     getMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })

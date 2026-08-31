@@ -112,6 +112,7 @@ class WorldSection:
             "map_snapshot": serialize_map_snapshot(world.map),
             "existed_sect_ids": [sect.id for sect in context.existed_sects],
             "dynasty": world.dynasty.to_dict() if getattr(world, "dynasty", None) is not None else None,
+            "dao_petitions": [petition.to_dict() for petition in getattr(world, "dao_petitions", [])],
             "current_phenomenon_id": world.current_phenomenon.id if world.current_phenomenon else None,
             "phenomenon_start_year": world.phenomenon_start_year if hasattr(world, "phenomenon_start_year") else 0,
             "cultivate_regions_hosts": cultivate_regions_hosts,

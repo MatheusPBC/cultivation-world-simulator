@@ -191,7 +191,7 @@ async def perform_game_initialization(
     year_cls,
     month_enum,
     generate_dynasty: Callable[[], Any],
-    generate_emperor: Callable[[Any, int], Any],
+    generate_emperor_avatar: Callable[[Any, Any], Any],
     event_cls,
     translate: Callable[..., str],
     simulator_cls,
@@ -238,19 +238,8 @@ async def perform_game_initialization(
             )
             world.runtime = runtime
             world.dynasty = generate_dynasty()
-            world.dynasty.current_emperor = generate_emperor(world.dynasty, int(world.month_stamp))
-            world.event_manager.add_event(
-            event_cls(
-                month_stamp=world.month_stamp,
-                content=translate(
-                    "{dynasty_title} has enthroned a new ruler, and {emperor_name} ascends as emperor.",
-                    dynasty_title=world.dynasty.title,
-                    emperor_name=world.dynasty.current_emperor.name,
-                ),
-                is_major=True,
-            )
-            )
-
+            from src.systems.celestial_dao_service import assign_region_traditions
+            assign_region_traditions(world)
             sim = simulator_cls(world)
             sim.awakening_rate = run_config.npc_awakening_rate_per_month
             world.run_config_snapshot = model_to_dict(run_config)
@@ -278,6 +267,10 @@ async def perform_game_initialization(
             )
 
             world.avatar_manager.avatars.update(final_avatars)
+            emperor = generate_emperor_avatar(world, world.dynasty)
+            world.event_manager.add_event(event_cls(month_stamp=world.month_stamp, content=translate(
+                "{dynasty_title} has enthroned a new ruler, and {emperor_name} ascends as emperor.",
+                dynasty_title=world.dynasty.title, emperor_name=emperor.name), is_major=True))
             _resolve_initially_dead_avatars(world=world, avatars=final_avatars)
             world.existed_sects = existed_sects
             world.sect_context.from_existed_sects(existed_sects)

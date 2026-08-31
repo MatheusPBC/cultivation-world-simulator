@@ -10,6 +10,8 @@ import type {
   WorldJournalPeriodMonths,
   WorldJournalResponseDTO,
   WorldChronicleResponseDTO,
+  LiveGuideAnswerDTO,
+  LiveGuideResponseDTO,
 } from '../../types/api';
 import { normalizeEventCausalDetail, normalizeEventsResponse } from '../mappers/event';
 
@@ -31,6 +33,18 @@ export const eventApi = {
   fetchWorldJournal(periodMonths: WorldJournalPeriodMonths) {
     return httpClient.get<WorldJournalResponseDTO>(
       `/api/v1/query/world/journal?period_months=${periodMonths}`,
+    );
+  },
+
+  fetchLiveGuide() {
+    return httpClient.get<LiveGuideResponseDTO>('/api/v1/query/world/live-guide');
+  },
+
+  askLiveGuide(question: string) {
+    return httpClient.post<LiveGuideAnswerDTO>(
+      '/api/v1/query/world/live-guide/ask',
+      { question },
+      { timeoutMs: 120_000 },
     );
   },
 

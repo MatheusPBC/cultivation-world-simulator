@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 
-from src.classes.core.dynasty import Dynasty, Emperor, dynasties_by_id
+from src.classes.core.dynasty import Dynasty, dynasties_by_id
 from src.utils.df import game_configs, get_str
 
 
@@ -41,21 +41,23 @@ def _pick_emperor_given_name() -> str:
     return random.choice(candidates)
 
 
-def generate_emperor(dynasty: Dynasty, current_month_stamp: int) -> Emperor:
+def generate_emperor_avatar(world, dynasty: Dynasty):
+    """Create the sovereign through the normal Avatar lifecycle."""
     surname = str(getattr(dynasty, "royal_surname", "") or "")
     if not surname:
         raise ValueError("Dynasty royal surname is required before generating emperor")
 
-    max_age = random.randint(25, 90)
-    age_upper_bound = max(18, min(60, max_age - 1))
-    age_years = random.randint(18, age_upper_bound)
+    from src.classes.age import Age
+    from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
+    from src.sim.avatar_init import create_random_mortal
+    age_years = random.randint(30, 60)
     given_name = _pick_emperor_given_name()
-    return Emperor(
-        surname=surname,
-        given_name=given_name,
-        birth_month_stamp=int(current_month_stamp) - age_years * 12,
-        max_age=max_age,
-    )
+    avatar = create_random_mortal(world, world.month_stamp, f"{surname}{given_name}", Age(age_years), level=1)
+    avatar.official_rank = OFFICIAL_GRAND_COUNCILOR
+    avatar.court_reputation = max(700, int(getattr(avatar, "court_reputation", 0)))
+    world.avatar_manager.register_avatar(avatar)
+    dynasty.current_emperor_id = str(avatar.id)
+    return avatar
 
 
 def generate_dynasty() -> Dynasty:

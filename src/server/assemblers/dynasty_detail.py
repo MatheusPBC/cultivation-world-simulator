@@ -19,6 +19,7 @@ def _build_empty_dynasty_detail() -> Dict[str, Any]:
             "top_official_rank_name": "",
         },
         "officials": [],
+        "imperial_crisis": None,
     }
 
 
@@ -87,6 +88,33 @@ def build_dynasty_detail(world: Any) -> Dict[str, Any]:
     top_official_rank_name = (
         str(officials[0].get("official_rank_name", "") or "") if officials else ""
     )
+    crisis = getattr(world.dynasty, "imperial_crisis", None)
+    crisis_data = None
+    if crisis is not None:
+        get_avatar = world.avatar_manager.get_avatar
+        emperor = get_avatar(str(crisis.emperor_avatar_id))
+        claimant = get_avatar(str(crisis.claimant_avatar_id))
+        supporters = []
+        for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+            supporter = get_avatar(str(supporter_id))
+            if supporter is None:
+                continue
+            supporters.append(
+                {
+                    "id": str(getattr(supporter, "id", "") or ""),
+                    "name": str(getattr(supporter, "name", "") or ""),
+                }
+            )
+        crisis_data = {
+            "status": str(crisis.status),
+            "opened_month": int(crisis.opened_month),
+            "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
+            "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
+            "support_count": len(getattr(crisis, "support_avatar_ids", []) or []),
+            "supporters": supporters,
+            "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
+            "legitimacy_factors": dict(getattr(crisis, "legitimacy_factors", {}) or {}),
+        }
 
     return {
         "overview": overview,
@@ -95,4 +123,5 @@ def build_dynasty_detail(world: Any) -> Dict[str, Any]:
             "top_official_rank_name": top_official_rank_name,
         },
         "officials": officials,
+        "imperial_crisis": crisis_data,
     }

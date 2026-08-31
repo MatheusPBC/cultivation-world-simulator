@@ -6,7 +6,10 @@
       "now": "Agora",
       "focus": "Em foco",
       "stories": "Histórias",
-      "timeline": "Linha do tempo"
+      "timeline": "Linha do tempo",
+      "chronicle": "Crônica",
+      "guide": "Guia Vivo",
+      "dao": "Súplicas ao Dao"
     },
     "periods": {
       "one": "Este mês",
@@ -49,6 +52,75 @@
     "why_considered_count": "{count} opções consideradas",
     "why_rejected": "Opções rejeitadas",
     "why_decision_appraisals": "Memórias pessoais citadas",
+    "chronicle": {
+      "loading": "Carregando crônica...",
+      "error": "Não foi possível carregar a crônica.",
+      "empty": "Nenhum capítulo publicado ainda.",
+      "load_more": "Carregar capítulos anteriores",
+      "fact": "Fato",
+      "inference": "Interpretação da crônica",
+      "source_count": "{count} fontes",
+      "trigger": {
+        "major_event": "Acontecimento importante",
+        "max_interval": "Revisão de período"
+      },
+      "dossier": "Dossiê causal",
+      "close": "Fechar",
+      "dossier_error": "Não foi possível carregar o dossiê causal.",
+      "pruned": "{count} fontes foram removidas do histórico.",
+      "truncated": "A sequência causal foi limitada; algumas fontes não aparecem.",
+      "sequence": "Sequência causal",
+      "sequence_empty": "Nenhum acontecimento preservado para exibir.",
+      "why": "Por quê?"
+    },
+    "dao": {
+      "eyebrow": "Vontade celestial",
+      "title": "Súplicas ao Dao",
+      "description": "Você pode permanecer em silêncio, enviar um presságio ou conceder uma oportunidade limitada. Nenhuma resposta cumpre o objetivo de alguém automaticamente.",
+      "loading": "Ouvindo as súplicas...",
+      "retry": "Tentar novamente",
+      "empty": "Nenhuma súplica relevante aguarda sua atenção.",
+      "silence": "Silêncio",
+      "sign": "Presságio",
+      "favor": "Favor",
+      "initiator": {
+        "avatar": "Pessoa",
+        "sect": "Seita",
+        "court": "Corte"
+      }
+    },
+    "guide": {
+      "loading": "Lendo o estado atual do mundo...",
+      "error": "Não foi possível montar o Guia Vivo.",
+      "retry": "Tentar novamente",
+      "date": "Ano {year}, {month}º mês",
+      "world_in_one_sentence": "O mundo em uma frase",
+      "no_headline": "O mundo ainda está formando suas primeiras histórias.",
+      "sources": "{count} fontes",
+      "happening": "O que está acontecendo",
+      "happening_hint": "Os fios mais importantes da história agora",
+      "empty": "Ainda não há acontecimentos relevantes o bastante para formar um fio narrativo.",
+      "understand_why": "Entender por quê",
+      "people": "Quem importa agora",
+      "people_empty": "Nenhum personagem se destacou neste período.",
+      "no_current_action": "Sem ação atual registrada",
+      "no_ambition": "Sem ambição conhecida",
+      "concept": "Conceito em foco",
+      "ask_eyebrow": "Pergunte ao Cronista",
+      "ask_title": "Tire uma dúvida sobre este mundo",
+      "grounded_note": "Respostas limitadas aos fatos e às fontes do mundo",
+      "question_label": "Pergunta ao Cronista",
+      "question_placeholder": "Por que essa disputa importa? Quem pode mudar o rumo dela?",
+      "ask_button": "Perguntar",
+      "answering": "Consultando...",
+      "suggestion_people": "Quem está mudando o mundo?",
+      "suggestion_conflict": "Qual conflito merece atenção?",
+      "suggestion_change": "O que mudou recentemente?",
+      "answer_error": "O Cronista não conseguiu responder agora. Tente novamente.",
+      "answer_unavailable": "Ainda não há fontes suficientes para responder.",
+      "answer_sources": "Fontes da resposta",
+      "source_number": "Fonte {number}"
+    },
     "why_relation": {
       "triggered_by": "desencadeado por",
       "enabled_by": "possibilitado por",
@@ -408,6 +480,30 @@
       "court_reputation": "Reputação na corte",
       "sect": "Afiliação",
       "rogue": "Cultivador independente"
+    },
+    "crisis": {
+      "title": "Crise de Legitimidade",
+      "emperor": "Imperador",
+      "claimant": "Pretendente",
+      "support": "{count} apoios declarados",
+      "supporters": "Apoiadores declarados",
+      "evidence": "Abrir evidência causal",
+      "factors": {
+        "office": "Cargo",
+        "reputation": "Reputação na corte",
+        "cultivation": "Cultivo",
+        "support": "Apoio",
+        "celestial": "Sinal celestial",
+        "worldly_total": "Base mundana",
+        "total": "Diferença de legitimidade"
+      },
+      "status": {
+        "active": "Crise política em curso",
+        "ascended": "Pretendente ascendeu",
+        "failed": "Pretensão fracassou",
+        "withdrawn": "Pretensão retirada",
+        "stalemate": "Impasse de legitimidade"
+      }
     }
   },
   "avatar_overview": {
@@ -589,7 +685,13 @@
       "host_meta": "Proprietário",
       "no_host": "Sem proprietário",
       "price_meta": "{price} pedras espirituais",
-      "formation_remaining": "{months} meses restantes"
+      "formation_remaining": "{months} meses restantes",
+      "dao_traditions": {
+        "mandate_and_order": "Mandato e Ordem",
+        "balance": "Equilíbrio",
+        "mercy": "Misericórdia",
+        "transcendence": "Transcendência"
+      }
     },
     "sect": {
       "stats": {

@@ -628,6 +628,51 @@ def get_world_journal(
     }
 
 
+def get_live_guide(
+    runtime,
+    *,
+    serialize_events_for_client: Callable[[list[Any]], list[dict[str, Any]]],
+) -> dict[str, Any]:
+    """Project current facts and the latest Chronicle chapter into a guided view."""
+    from src.systems.live_guide_service import build_live_guide
+
+    world = _require_world(runtime)
+    journal = get_world_journal(
+        runtime,
+        serialize_events_for_client=serialize_events_for_client,
+        period_months=3,
+    )
+    return build_live_guide(
+        world,
+        journal=journal,
+        serialize_events_for_client=serialize_events_for_client,
+    )
+
+
+async def ask_live_guide(
+    runtime,
+    *,
+    serialize_events_for_client: Callable[[list[Any]], list[dict[str, Any]]],
+    question: str,
+) -> dict[str, Any]:
+    """Answer a read-only question using the exact evidence exposed by the guide."""
+    from src.systems.live_guide_service import answer_live_guide
+
+    normalized_question = str(question or "").strip()
+    if not normalized_question:
+        raise_public_error(
+            status_code=400,
+            code="LIVE_GUIDE_QUESTION_REQUIRED",
+            message="Live Guide question is required",
+        )
+    world = _require_world(runtime)
+    guide = get_live_guide(
+        runtime,
+        serialize_events_for_client=serialize_events_for_client,
+    )
+    return await answer_live_guide(world, question=normalized_question, guide=guide)
+
+
 def get_event_causal_detail(
     runtime,
     *,

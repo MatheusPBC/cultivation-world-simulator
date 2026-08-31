@@ -6,7 +6,9 @@
       "now": "Hiện tại",
       "focus": "Trọng tâm",
       "stories": "Câu chuyện",
-      "timeline": "Dòng thời gian"
+      "timeline": "Dòng thời gian",
+      "chronicle": "Biên niên sử",
+      "guide": "Cẩm nang Sống"
     },
     "periods": {
       "one": "Tháng này",
@@ -48,6 +50,22 @@
     "why_truncated": "Một số nguyên nhân chưa được hiển thị; hãy mở sự kiện gần nguồn hơn để xem thêm.",
     "why_considered_count": "Đã cân nhắc {count} lựa chọn",
     "why_rejected": "Các lựa chọn bị từ chối",
+    "guide": {
+      "loading": "Đang đọc trạng thái thế giới...", "error": "Không thể tạo Cẩm nang Sống.", "retry": "Thử lại",
+      "date": "Năm {year}, tháng {month}", "world_in_one_sentence": "Thế giới trong một câu",
+      "no_headline": "Những câu chuyện đầu tiên của thế giới vẫn đang thành hình.", "sources": "{count} nguồn",
+      "happening": "Điều gì đang xảy ra", "happening_hint": "Những mạch truyện quan trọng nhất lúc này",
+      "empty": "Chưa có sự kiện nào đủ quan trọng để tạo thành một mạch truyện.", "understand_why": "Hiểu nguyên nhân",
+      "people": "Ai quan trọng lúc này", "people_empty": "Không có nhân vật nào nổi bật trong giai đoạn này.",
+      "no_current_action": "Chưa ghi nhận hành động hiện tại", "no_ambition": "Chưa biết chí hướng", "concept": "Khái niệm trọng tâm",
+      "ask_eyebrow": "Hỏi Người chép sử", "ask_title": "Hỏi về thế giới này",
+      "grounded_note": "Câu trả lời chỉ dựa trên sự thật và nguồn của thế giới", "question_label": "Câu hỏi cho Người chép sử",
+      "question_placeholder": "Vì sao tranh chấp này quan trọng? Ai có thể đổi hướng nó?", "ask_button": "Hỏi",
+      "answering": "Đang tra cứu...", "suggestion_people": "Ai đang thay đổi thế giới?",
+      "suggestion_conflict": "Xung đột nào đáng chú ý?", "suggestion_change": "Gần đây có gì thay đổi?",
+      "answer_error": "Người chép sử chưa thể trả lời. Hãy thử lại.", "answer_unavailable": "Chưa có đủ nguồn để trả lời.",
+      "answer_sources": "Nguồn trả lời", "source_number": "Nguồn {number}"
+    },
     "why_relation": {
       "triggered_by": "được kích hoạt bởi",
       "enabled_by": "được cho phép bởi",

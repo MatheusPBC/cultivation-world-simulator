@@ -43,6 +43,10 @@ async def run_annual_maintenance(simulator, ctx) -> None:
 
     world = simulator.world
     world.ranking_manager.update_rankings_with_world(world, ctx.living_avatars)
+    from src.systems.imperial_crisis_service import resolve_imperial_crisis
+    crisis_event = resolve_imperial_crisis(world)
+    if crisis_event is not None:
+        ctx.events.append(crisis_event)
 
     sect_events = simulator.sect_manager.update_sects()
     if sect_events:

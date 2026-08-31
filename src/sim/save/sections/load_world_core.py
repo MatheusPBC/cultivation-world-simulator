@@ -41,6 +41,8 @@ class WorldCoreLoadSection:
         dynasty_data = world_data.get("dynasty")
         if dynasty_data is not None:
             world.dynasty = Dynasty.from_dict(dynasty_data)
+        from src.classes.celestial_dao import DaoPetition
+        world.dao_petitions = [DaoPetition.from_dict(item) for item in world_data.get("dao_petitions", [])]
 
         meta = context.save_data.get("meta", {})
         if "playthrough_id" in meta:

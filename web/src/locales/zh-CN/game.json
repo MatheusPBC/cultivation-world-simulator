@@ -7,7 +7,9 @@
       "focus": "关注",
       "stories": "故事",
       "timeline": "时间线",
-      "chronicle": "编年史"
+      "chronicle": "编年史",
+      "guide": "世界指南",
+      "dao": "天道请愿"
     },
     "periods": {
       "one": "本月",
@@ -70,6 +72,63 @@
       "sequence": "因果序列",
       "sequence_empty": "没有可显示的存留事件。",
       "why": "为什么？"
+    },
+    "guide": {
+      "loading": "正在阅读当前世界状态...",
+      "error": "无法生成世界指南。",
+      "retry": "重试",
+      "date": "第 {year} 年，第 {month} 月",
+      "world_in_one_sentence": "一句话看世界",
+      "no_headline": "这个世界的第一批故事仍在形成。",
+      "sources": "{count} 个来源",
+      "happening": "正在发生什么",
+      "happening_hint": "此刻最重要的故事线",
+      "empty": "尚无足以形成故事线的重要事件。",
+      "understand_why": "了解原因",
+      "people": "此刻的重要人物",
+      "people_empty": "本阶段尚无突出人物。",
+      "no_current_action": "没有记录当前行动",
+      "no_ambition": "尚无已知志向",
+      "concept": "当前概念",
+      "ask_eyebrow": "询问编年史作者",
+      "ask_title": "询问这个世界",
+      "grounded_note": "回答仅限世界事实与可查来源",
+      "question_label": "向编年史作者提问",
+      "question_placeholder": "这场争端为何重要？谁能改变它的走向？",
+      "ask_button": "提问",
+      "answering": "查阅中...",
+      "suggestion_people": "谁正在改变世界？",
+      "suggestion_conflict": "哪场冲突值得关注？",
+      "suggestion_change": "最近发生了什么变化？",
+      "answer_error": "编年史作者暂时无法回答，请重试。",
+      "answer_unavailable": "现有来源不足以回答。",
+      "answer_sources": "回答来源",
+      "source_number": "来源 {number}"
+    },
+    "dao": {
+      "eyebrow": "天道意志",
+      "title": "天道请愿",
+      "description": "你可以沉默、降下征兆，或赐予一次有限机会；任何回应都不会自动替人实现目标。",
+      "loading": "正在聆听请愿……",
+      "retry": "重试",
+      "empty": "没有值得回应的请愿。",
+      "history": "已回应的请愿",
+      "response": "天道回应",
+      "response_why": "查看天道回应的缘由",
+      "favor_until": "此机会持续至第 {month} 月",
+      "silence": "沉默",
+      "sign": "征兆",
+      "favor": "赐福",
+      "status": {
+        "silenced": "保持沉默",
+        "signed": "降下征兆",
+        "favored": "赐予机会"
+      },
+      "initiator": {
+        "avatar": "人物",
+        "sect": "宗门",
+        "court": "朝廷"
+      }
     },
     "why_relation": {
       "triggered_by": "触发于",
@@ -449,6 +508,30 @@
       "court_reputation": "朝廷威望",
       "sect": "所属",
       "rogue": "散修"
+    },
+    "crisis": {
+      "title": "正统危机",
+      "emperor": "皇帝",
+      "claimant": "觊觎者",
+      "support": "已获 {count} 人公开支持",
+      "supporters": "公开支持者",
+      "evidence": "查看因果凭据",
+      "factors": {
+        "office": "官职",
+        "reputation": "朝廷威望",
+        "cultivation": "修为",
+        "support": "支持",
+        "celestial": "天道征兆",
+        "worldly_total": "世俗根基",
+        "total": "正统差额"
+      },
+      "status": {
+        "active": "政治危机正在发酵",
+        "ascended": "觊觎者已登基",
+        "failed": "觊觎者公开失势",
+        "withdrawn": "觊觎已撤回",
+        "stalemate": "正统僵局"
+      }
     }
   },
   "avatar_overview": {
@@ -637,6 +720,13 @@
       "price_meta": "{price}灵石",
       "formation_remaining": "剩余 {months} 个月",
       "regional_context_title": "区域态势",
+      "dao_tradition": "天道诠释",
+      "dao_traditions": {
+        "mandate_and_order": "天命与秩序",
+        "balance": "均衡",
+        "mercy": "慈悲",
+        "transcendence": "超脱"
+      },
       "pressure": "当前压力",
       "capabilities": "可用能力",
       "causal_event": "因果事件"

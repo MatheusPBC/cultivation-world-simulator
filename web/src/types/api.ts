@@ -488,6 +488,80 @@ export interface WorldJournalResponseDTO {
   ongoing: WorldJournalOngoingDTO[];
 }
 
+// --- Live Guide ---
+
+export type LiveGuideSeverityDTO = 'critical' | 'major' | 'notable';
+export type LiveGuideSubjectKindDTO = 'avatar' | 'sect';
+
+export interface LiveGuideSubjectDTO {
+  kind: LiveGuideSubjectKindDTO;
+  id: string;
+  name: string;
+}
+
+export interface LiveGuideThreadDTO {
+  id: string;
+  title: string;
+  summary: string;
+  severity: LiveGuideSeverityDTO;
+  primary_event_id: string;
+  source_event_ids: string[];
+  subjects: LiveGuideSubjectDTO[];
+}
+
+export interface LiveGuidePersonDTO {
+  avatar_id: string;
+  name: string;
+  current_action: string;
+  ambition: string;
+  event_count: number;
+}
+
+export interface LiveGuideResponseDTO {
+  date: {
+    month_stamp: number;
+    year: number;
+    month: number;
+  };
+  headline: string;
+  source_event_ids: string[];
+  threads: LiveGuideThreadDTO[];
+  people: LiveGuidePersonDTO[];
+  concept: {
+    term_key: string;
+    source_event_ids: string[];
+  };
+}
+
+export interface LiveGuideAnswerDTO {
+  answer: string;
+  source_event_ids: string[];
+  mode: 'generated' | 'fallback' | 'unavailable';
+}
+
+export type DaoPetitionStatusDTO = 'pending' | 'silenced' | 'signed' | 'favored';
+
+export interface DaoPetitionDTO {
+  id: string;
+  initiator_kind: 'avatar' | 'sect' | 'court';
+  initiator_id: string;
+  initiator_name: string;
+  region_id: number;
+  tradition: string;
+  motivated_event_ids: string[];
+  content: string;
+  created_month: number;
+  status: DaoPetitionStatusDTO;
+  response_event_id: string;
+  response_content: string;
+  favor_expires_month: number | null;
+}
+
+export interface DaoPetitionsResponseDTO {
+  pending: DaoPetitionDTO[];
+  history: DaoPetitionDTO[];
+}
+
 // --- World Chronicle ---
 
 export type ChronicleTriggerDTO = 'major_event' | 'max_interval';
@@ -869,9 +943,8 @@ export interface DynastyOverviewResponseDTO {
   official_preference_label: string;
   is_low_magic: boolean;
   current_emperor?: {
+    id: string;
     name: string;
-    surname: string;
-    given_name: string;
     age: number;
     max_age: number;
     is_mortal: boolean;
@@ -895,6 +968,16 @@ export interface DynastyDetailResponseDTO {
     top_official_rank_name: string;
   };
   officials: DynastyOfficialDTO[];
+  imperial_crisis: {
+    status: string;
+    opened_month: number;
+    emperor: { id: string; name: string };
+    claimant: { id: string; name: string };
+    support_count: number;
+    supporters: Array<{ id: string; name: string }>;
+    evidence_event_ids: string[];
+    legitimacy_factors: Record<string, number>;
+  } | null;
 }
 
 // --- Deceased Characters ---

@@ -71,6 +71,56 @@ msgstr "在城市中为朝廷处理政务，获取朝廷威望与俸禄。"
 msgid "govern_requirements"
 msgstr "需身处城市，持续三个月。"
 
+# Action: ClaimImperialMandate
+msgid "claim_imperial_mandate_action_name"
+msgstr "宣称帝统"
+
+msgid "claim_imperial_mandate_description"
+msgstr "公开宣称自己承继帝统，开启一场由朝廷实力与民望决定的正统危机。"
+
+msgid "claim_imperial_mandate_requirements"
+msgstr "仅限活着的人族大辅政，朝廷威望至少 700，且当前没有进行中的正统危机。"
+
+msgid "A living claimant and emperor are required"
+msgstr "必须存在在世的觊觎者与皇帝。"
+
+msgid "The reigning emperor cannot claim against themself"
+msgstr "在位皇帝不能向自己宣称帝统。"
+
+msgid "An imperial crisis is already active"
+msgstr "当前已有一场正统危机正在进行。"
+
+msgid "Claimant is not eligible for an imperial claim"
+msgstr "此人不具备宣称帝统的资格。"
+
+# Action: SupportImperialClaim
+msgid "support_imperial_claim_action_name"
+msgstr "支持帝统觊觎者"
+
+msgid "support_imperial_claim_description"
+msgstr "公开支持当前正统危机中的觊觎者；此举会留下可追溯的政治事实。"
+
+msgid "support_imperial_claim_requirements"
+msgstr "需为在世人族朝廷官员，且当前存在尚未解决的正统危机。"
+
+msgid "There is no active imperial crisis to support"
+msgstr "当前没有可支持的正统危机。"
+
+msgid "A living human court official is required to offer support"
+msgstr "只有在世人族朝廷官员才能表态支持。"
+
+msgid "Only court officials can offer imperial support"
+msgstr "只有朝廷官员可以表态支持帝统觊觎者。"
+
+msgid "A contender cannot offer support in their own crisis"
+msgstr "危机中的竞争者不能支持自己。"
+
+msgid "This official has already declared support"
+msgstr "这位官员已经公开表态支持。"
+
+msgid "{official} publicly supports the imperial claimant."
+msgstr "{official}公开支持帝统觊觎者。"
+
 msgid "excellent progress"
 msgstr "进境颇佳"
 

@@ -6,9 +6,11 @@ import { useI18n } from 'vue-i18n'
 import EventPanel from '@/components/game/panels/EventPanel.vue'
 import ChronicleDossierDrawer from '@/components/game/panels/world-journal/ChronicleDossierDrawer.vue'
 import ChronicleView from '@/components/game/panels/world-journal/ChronicleView.vue'
+import LiveGuideView from '@/components/game/panels/world-journal/LiveGuideView.vue'
+import DaoPetitionsView from '@/components/game/panels/world-journal/DaoPetitionsView.vue'
 import { useUiStore } from '@/stores/ui'
 import { useWorldJournalStore, type WorldJournalTab } from '@/stores/worldJournal'
-import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, WorldJournalPeriodMonths } from '@/types/api'
+import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, LiveGuideSubjectDTO, WorldJournalPeriodMonths } from '@/types/api'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
@@ -22,6 +24,16 @@ const {
   chronicle,
   chronicleLoading,
   chronicleError,
+  liveGuide,
+  liveGuideLoading,
+  liveGuideError,
+  liveGuideAnswer,
+  liveGuideAnswerLoading,
+  liveGuideAnswerError,
+  daoPetitions,
+  daoLoading,
+  daoError,
+  respondingPetitionId,
   chronicleDossier,
   chronicleDossierChapterId,
   chronicleDossierLoading,
@@ -42,6 +54,8 @@ const tabs: Array<{
   { key: 'stories', labelKey: 'game.world_journal.tabs.stories' },
   { key: 'timeline', labelKey: 'game.world_journal.tabs.timeline' },
   { key: 'chronicle', labelKey: 'game.world_journal.tabs.chronicle' },
+  { key: 'guide', labelKey: 'game.world_journal.tabs.guide' },
+  { key: 'dao', labelKey: 'game.world_journal.tabs.dao' },
 ]
 
 const periods: Array<{ months: WorldJournalPeriodMonths; labelKey: string }> = [
@@ -53,6 +67,8 @@ const periods: Array<{ months: WorldJournalPeriodMonths; labelKey: string }> = [
 function selectTab(tab: WorldJournalTab) {
   journalStore.selectTab(tab)
   if (tab === 'chronicle' && !chronicle.value) void journalStore.refreshChronicle()
+  if (tab === 'guide') void journalStore.refreshLiveGuide()
+  if (tab === 'dao') void journalStore.refreshDaoPetitions()
 }
 
 function renderEventText(event: EventDTO) {
@@ -72,6 +88,14 @@ function selectSubject(subject: EventSubjectDTO) {
     return
   }
   uiStore.select('sect', String(subject.id))
+}
+
+function selectGuideSubject(subject: LiveGuideSubjectDTO) {
+  if (subject.kind === 'avatar') {
+    void uiStore.select('avatar', subject.id)
+    return
+  }
+  void uiStore.select('sect', subject.id)
 }
 
 function openWhy(eventId: string) {
@@ -105,6 +129,8 @@ function closeChronicleDossier() {
 
 onMounted(() => {
   void journalStore.refresh()
+  if (activeTab.value === 'chronicle' && !chronicle.value) void journalStore.refreshChronicle()
+  if (activeTab.value === 'guide' && !liveGuide.value) void journalStore.refreshLiveGuide()
 })
 </script>
 
@@ -278,6 +304,26 @@ onMounted(() => {
       </template>
     </div>
 
+    <div v-else-if="activeTab === 'guide'" class="journal-body journal-body--guide" data-testid="journal-guide">
+      <LiveGuideView
+        :guide="liveGuide"
+        :answer="liveGuideAnswer"
+        :loading="liveGuideLoading"
+        :error="liveGuideError"
+        :answer-loading="liveGuideAnswerLoading"
+        :answer-error="liveGuideAnswerError"
+        @ask="journalStore.askLiveGuide"
+        @retry="journalStore.refreshLiveGuide"
+        @open-why="openWhy"
+        @open-subject="selectGuideSubject"
+        @open-avatar="uiStore.select('avatar', $event)"
+      />
+    </div>
+
+    <div v-else-if="activeTab === 'dao'" class="journal-body journal-body--guide">
+      <DaoPetitionsView :petitions="daoPetitions" :loading="daoLoading" :error="daoError" :responding-id="respondingPetitionId" @retry="journalStore.refreshDaoPetitions" @answer="journalStore.answerDaoPetition" @why="openWhy" />
+    </div>
+
     <div v-else-if="activeTab === 'chronicle'" class="journal-body journal-body--chronicle" data-testid="journal-chronicle">
       <ChronicleView
         :chapters="chronicle?.chapters ?? []"
@@ -448,7 +494,7 @@ onMounted(() => {
 
 .journal-tabs {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
 .journal-tab {
@@ -478,6 +524,10 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 12px;
+}
+
+.journal-body--guide {
+  padding: 0;
 }
 
 .period-selector {
@@ -1001,6 +1051,14 @@ onMounted(() => {
   .journal-tab {
     min-height: 48px;
     font-size: 10px;
+  }
+
+  .journal-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .journal-body--guide {
+    padding: 0;
   }
 
   .period-button {

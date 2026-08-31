@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fetchChronicleMock = vi.fn()
 const fetchDossierMock = vi.fn()
+const fetchLiveGuideMock = vi.fn()
+const askLiveGuideMock = vi.fn()
 
 vi.mock('@/api', () => ({
   eventApi: {
@@ -10,6 +12,8 @@ vi.mock('@/api', () => ({
     fetchChronicleDossier: fetchDossierMock,
     fetchWorldJournal: vi.fn(),
     fetchEventCausalDetail: vi.fn(),
+    fetchLiveGuide: fetchLiveGuideMock,
+    askLiveGuide: askLiveGuideMock,
   },
 }))
 
@@ -24,6 +28,8 @@ describe('worldJournal Chronicle state', () => {
     setActivePinia(createPinia())
     fetchChronicleMock.mockReset()
     fetchDossierMock.mockReset()
+    fetchLiveGuideMock.mockReset()
+    askLiveGuideMock.mockReset()
   })
 
   it('appends Chronicle pages without duplicate chapters', async () => {
@@ -53,5 +59,19 @@ describe('worldJournal Chronicle state', () => {
     await first
 
     expect(store.chronicle?.chapters.map((chapter) => chapter.id)).toEqual(['new'])
+  })
+
+  it('loads the Live Guide and keeps a source-backed answer', async () => {
+    fetchLiveGuideMock.mockResolvedValue({ threads: [], people: [], source_event_ids: [] })
+    askLiveGuideMock.mockResolvedValue({ answer: 'Lin avançou.', source_event_ids: ['e1'], mode: 'generated' })
+    const { useWorldJournalStore } = await import('@/stores/worldJournal')
+    const store = useWorldJournalStore()
+
+    await store.refreshLiveGuide()
+    await store.askLiveGuide('  O que mudou?  ')
+
+    expect(fetchLiveGuideMock).toHaveBeenCalledOnce()
+    expect(askLiveGuideMock).toHaveBeenCalledWith('O que mudou?')
+    expect(store.liveGuideAnswer?.source_event_ids).toEqual(['e1'])
   })
 })

@@ -3,8 +3,13 @@ from __future__ import annotations
 from typing import Callable, Any, Literal
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 from src.server.services.public_api_contract import ok_response
+
+
+class LiveGuideQuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
 
 
 def create_public_query_router(
@@ -104,6 +109,14 @@ def create_public_query_router(
     @router.get("/api/v1/query/world/journal")
     def get_world_journal_v1(period_months: Literal["1", "3", "12"] = "1"):
         return ok_response(query_service.get_world_journal(period_months=int(period_months)))
+
+    @router.get("/api/v1/query/world/live-guide")
+    def get_live_guide_v1():
+        return ok_response(query_service.get_live_guide())
+
+    @router.post("/api/v1/query/world/live-guide/ask")
+    async def ask_live_guide_v1(request: LiveGuideQuestionRequest):
+        return ok_response(await query_service.ask_live_guide(question=request.question))
 
     @router.get("/api/v1/query/world/chronicle")
     def get_world_chronicle_v1(cursor: str | None = None, limit: int = 20):
@@ -211,6 +224,12 @@ def create_public_query_router(
         if query_service is not None:
             return ok_response(query_service.get_dynasty_detail())
         return ok_response(build_dynasty_detail())
+
+    @router.get("/api/v1/query/world/dao-petitions")
+    def get_dao_petitions_v1():
+        if query_service is None:
+            raise RuntimeError("query service is required")
+        return ok_response(query_service.get_dao_petitions())
 
     @router.get("/api/v1/query/avatars/overview")
     def get_avatar_overview_v1():

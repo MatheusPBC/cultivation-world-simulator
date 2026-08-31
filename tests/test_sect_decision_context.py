@@ -1,6 +1,8 @@
 import tempfile
+from copy import copy
 from pathlib import Path
 
+from src.classes.core.dynasty import Dynasty
 from src.classes.core.world import World
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.alignment import Alignment
@@ -11,6 +13,8 @@ from src.i18n import reload_translations
 from src.sim.managers.sect_manager import SectManager
 from src.systems.time import MonthStamp
 from src.systems.sect_decision_context import build_sect_decision_context, SectDecisionContext
+from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
+from src.systems.imperial_crisis_service import open_imperial_claim, support_imperial_claim
 
 
 def _create_world_with_sects(base_world: World) -> tuple[World, Sect, Sect]:
@@ -163,6 +167,35 @@ def test_build_sect_decision_context_relations(base_world):
     assert ctx.diplomacy_targets[0]["status"] in {"war", "peace"}
 
 
+def test_build_sect_decision_context_includes_public_imperial_crisis(base_world, dummy_avatar):
+    world, sect, _ = _create_world_with_sects(base_world)
+    emperor = dummy_avatar
+    emperor.official_rank = OFFICIAL_GRAND_COUNCILOR
+    emperor.court_reputation = 700
+    claimant = copy(emperor)
+    claimant.id = "claimant"
+    claimant.name = "Claimant"
+    supporter = copy(emperor)
+    supporter.id = "supporter"
+    supporter.name = "Supporter"
+    world.avatar_manager.register_avatar(emperor)
+    world.avatar_manager.register_avatar(claimant)
+    world.avatar_manager.register_avatar(supporter)
+    world.dynasty = Dynasty(id=1, name="Test", desc="", current_emperor_id=emperor.id)
+    open_imperial_claim(world, claimant.id)
+    support_imperial_claim(world, supporter.id)
+
+    storage = _create_event_storage_with_sect_events(sect.id)
+    try:
+        context = build_sect_decision_context(sect, world, storage, history_limit=0)
+    finally:
+        _cleanup_event_storage(storage)
+
+    assert context.imperial_crisis is not None
+    assert context.imperial_crisis["claimant"]["name"] == claimant.name
+    assert context.imperial_crisis["declared_supporters"] == [{"id": supporter.id, "name": supporter.name}]
+
+
 def test_build_sect_decision_context_localizes_runtime_notes(base_world):
     world, sect1, _ = _create_world_with_sects(base_world)
 
@@ -184,4 +217,3 @@ def test_build_sect_decision_context_localizes_runtime_notes(base_world):
     assert all("灵石" not in note for note in ctx.economy["action_cost_notes"])
     assert "spirit stones" in ctx.economy["action_cost_notes"][0]
     assert "[3] E3" in ctx.history["summary_text"]
-

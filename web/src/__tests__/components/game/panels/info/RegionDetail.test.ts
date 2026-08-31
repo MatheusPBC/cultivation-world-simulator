@@ -29,6 +29,11 @@ describe('RegionDetail', () => {
                   sect: '宗门说明',
                   normal: '普通区域说明',
                 },
+                dao_tradition: '天道诠释',
+                dao_traditions: {
+                  mandate_and_order: '天命与秩序',
+                },
+                regional_context_title: '区域态势',
               },
             },
           },
@@ -49,6 +54,7 @@ describe('RegionDetail', () => {
           lodes: [],
           population: 120,
           population_capacity: 200,
+          dao_tradition: 'mandate_and_order',
         }
       },
       global: {
@@ -64,5 +70,7 @@ describe('RegionDetail', () => {
     expect(wrapper.exists()).toBe(true)
     expect(wrapper.text()).toContain('人口')
     expect(wrapper.text()).toContain('120.0 / 200.0 万')
+    expect(wrapper.text()).toContain('天道诠释')
+    expect(wrapper.text()).toContain('天命与秩序')
   })
 })

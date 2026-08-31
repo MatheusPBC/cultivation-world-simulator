@@ -6,6 +6,50 @@ if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
 
 
+def _build_court_crisis_context(avatar: "Avatar") -> dict:
+    """Expose a public legitimacy crisis to its contenders and court officials.
+
+    This is observation-only prompt material.  Eligibility and any resulting
+    action remain validated by the imperial crisis service.
+    """
+    from src.classes.official_rank import OFFICIAL_NONE
+
+    world = avatar.world
+    dynasty = getattr(world, "dynasty", None)
+    crisis = getattr(dynasty, "imperial_crisis", None)
+    if crisis is None or str(getattr(crisis, "status", "")) != "active":
+        return {"active_imperial_crisis": None}
+
+    avatar_id = str(getattr(avatar, "id", ""))
+    contender_ids = {str(crisis.emperor_avatar_id), str(crisis.claimant_avatar_id)}
+    is_official = str(getattr(avatar, "official_rank", OFFICIAL_NONE) or OFFICIAL_NONE) != OFFICIAL_NONE
+    if not is_official and avatar_id not in contender_ids:
+        return {"active_imperial_crisis": None}
+
+    get_avatar = world.avatar_manager.get_avatar
+    emperor = get_avatar(str(crisis.emperor_avatar_id))
+    claimant = get_avatar(str(crisis.claimant_avatar_id))
+    supporters = []
+    for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+        supporter = get_avatar(str(supporter_id))
+        if supporter is not None:
+            supporters.append(str(getattr(supporter, "name", "") or ""))
+    role = "court_official"
+    if avatar_id == str(crisis.emperor_avatar_id):
+        role = "emperor"
+    elif avatar_id == str(crisis.claimant_avatar_id):
+        role = "claimant"
+    return {
+        "active_imperial_crisis": {
+            "role": role,
+            "emperor_name": str(getattr(emperor, "name", "") or ""),
+            "claimant_name": str(getattr(claimant, "name", "") or ""),
+            "declared_supporters": supporters,
+            "opened_month": int(getattr(crisis, "opened_month", 0) or 0),
+        }
+    }
+
+
 def build_avatar_prompt_context(
     avatar: "Avatar",
     co_region_avatars: Optional[list["Avatar"]] = None,
@@ -24,6 +68,7 @@ def build_avatar_prompt_context(
     world = avatar.world
     current_month = int(getattr(world, "month_stamp", 0))
     region = avatar.tile.region if avatar.tile is not None else None
+    from src.systems.celestial_dao_service import get_dao_context
     observed = []
     for other in (co_region_avatars or [])[:8]:
         observed.append(
@@ -106,9 +151,11 @@ def build_avatar_prompt_context(
             "world_secret_knowledge": _get_world_secret_knowledge_payload(avatar),
         },
         "sect_context": sect_context,
+        "court_context": _build_court_crisis_context(avatar),
         "local_world": {
             "region": region.get_info() if region is not None else t("None"),
             "nearby_avatars": observed,
+            "celestial_dao": get_dao_context(world, region_id=getattr(region, "id", None), initiator_id=str(avatar.id)),
         },
         "recent_memory": {
             "major_events": [str(getattr(ev, "content", "")) for ev in major_events],

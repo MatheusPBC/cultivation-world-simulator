@@ -133,6 +133,8 @@ class SectThinker:
             "member_candidates": list(ctx.member_candidates),
             "relations": list(ctx.relations),
             "relations_summary": ctx.relations_summary,
+            "celestial_dao": list(ctx.celestial_dao),
+            "imperial_crisis": dict(ctx.imperial_crisis) if ctx.imperial_crisis else None,
             "history": {
                 "summary_text": str(ctx.history.get("summary_text", "")),
                 "recent_events": recent,

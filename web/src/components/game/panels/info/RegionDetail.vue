@@ -79,8 +79,12 @@ const regionalCauseIds = computed(() => [
       </div>
     </div>
 
-    <div class="section regional-context" v-if="data.regional_pressure || regionalCapabilities.length">
+    <div class="section regional-context" v-if="data.dao_tradition || data.regional_pressure || regionalCapabilities.length">
       <div class="section-title">{{ t('game.info_panel.region.regional_context_title') }}</div>
+      <div v-if="data.dao_tradition" class="dao-tradition">
+        <span>{{ t('game.info_panel.region.dao_tradition') }}</span>
+        <strong>{{ t(`game.info_panel.region.dao_traditions.${data.dao_tradition}`) }}</strong>
+      </div>
       <div v-if="data.regional_pressure" class="pressure-line">
         <span>{{ t('game.info_panel.region.pressure') }}</span>
         <strong>{{ data.regional_pressure.level }}</strong>
@@ -276,6 +280,8 @@ const regionalCauseIds = computed(() => [
 }
 
 .regional-context { color: #c9d7e8; }
+.dao-tradition { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.dao-tradition strong { color: var(--panel-accent-strong); text-align: right; }
 .pressure-line, .compact-item, .causal-note { font-size: 12px; line-height: 1.45; }
 .pressure-line { display: flex; justify-content: space-between; }
 .pressure-line strong { color: #ffd666; }

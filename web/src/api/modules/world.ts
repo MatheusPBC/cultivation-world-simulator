@@ -14,6 +14,7 @@ import type {
   MapPresetsResponseDTO,
   WorldSecretMetaResponseDTO,
   WorldSecretOverviewResponseDTO,
+  DaoPetitionsResponseDTO,
 } from '../../types/api';
 import {
   normalizeInitialState,
@@ -96,5 +97,16 @@ export const worldApi = {
 
   fetchWorldSecretOverview() {
     return httpClient.get<WorldSecretOverviewResponseDTO>('/api/v1/query/world-secrets/overview');
+  },
+
+  fetchDaoPetitions() {
+    return httpClient.get<DaoPetitionsResponseDTO>('/api/v1/query/world/dao-petitions');
+  },
+
+  answerDaoPetition(petitionId: string, response: 'silence' | 'sign' | 'favor') {
+    return httpClient.post<{ event_id: string }>('/api/v1/command/world/dao-petitions/answer', {
+      petition_id: petitionId,
+      response,
+    });
   },
 };

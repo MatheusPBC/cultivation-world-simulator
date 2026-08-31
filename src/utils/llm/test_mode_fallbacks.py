@@ -90,6 +90,22 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
                 }],
             }],
         }
+    if task_name == "live_guide_ask":
+        facts = list(infos.get("facts", []))
+        if not facts:
+            return {"answer": "", "source_event_ids": []}
+        fact = facts[-1]
+        return {
+            "answer": str(fact.get("content", "")),
+            "source_event_ids": [str(fact.get("id", ""))],
+        }
+    if task_name == "dao_petition":
+        initiator = dict(infos.get("initiator", {}) or {})
+        cause = dict(infos.get("cause", {}) or {})
+        tradition = str(infos.get("tradition", ""))
+        return {
+            "content": f"{initiator.get('name', 'An agent')} petitions the Dao under {tradition}: {cause.get('content', '')}",
+        }
     if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:
         return {}
     if task_name.startswith("world_lore_"):
@@ -105,4 +121,5 @@ def registered_test_mode_tasks() -> frozenset[str]:
         "relation_resolver", "relation_delta", "single_choice", "sect_thinker", "sect_decider",
         "interaction_feedback", "fate_revelation", "random_minor_event", "event_appraisal",
         "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary", "chronicle_chapter",
+        "live_guide_ask", "dao_petition",
     })

@@ -26,6 +26,8 @@ llm:
     sect_thinker: "fast"
     event_appraisal: "fast"
     chronicle_chapter: "fast"
+    live_guide_ask: "fast"
+    dao_petition: "fast"
     world_lore_style_guide: "normal"
     world_lore_region_rewrite: "normal"
     world_lore_sect_group_rewrite: "normal"

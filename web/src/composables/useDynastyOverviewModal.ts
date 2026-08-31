@@ -2,10 +2,12 @@ import { computed, watch } from 'vue'
 import { SHARED_UI_COLORS, SYSTEM_PANEL_THEMES } from '@/constants/uiColors'
 import { useDynastyStore } from '@/stores/dynasty'
 import { useUiStore } from '@/stores/ui'
+import { useWorldJournalStore } from '@/stores/worldJournal'
 
 export function useDynastyOverviewModal(show: () => boolean) {
   const dynastyStore = useDynastyStore()
   const uiStore = useUiStore()
+  const journalStore = useWorldJournalStore()
   const dynastyTheme = SYSTEM_PANEL_THEMES.dynasty
   const panelStyleVars = {
     '--panel-accent': dynastyTheme.accent,
@@ -23,6 +25,7 @@ export function useDynastyOverviewModal(show: () => boolean) {
   const summary = computed(() => dynastyStore.summary)
   const hasOverview = computed(() => Boolean(overview.value.name))
   const emperor = computed(() => overview.value.current_emperor)
+  const imperialCrisis = computed(() => dynastyStore.detail.imperialCrisis)
   const effectLines = computed(() => {
     const text = overview.value.effect_desc || ''
     if (!text) return []
@@ -31,6 +34,10 @@ export function useDynastyOverviewModal(show: () => boolean) {
 
   function jumpToAvatar(id: string) {
     void uiStore.select('avatar', id)
+  }
+
+  function openCrisisEvidence(eventId: string) {
+    void journalStore.openCausalDetail(eventId)
   }
 
   watch(
@@ -51,7 +58,9 @@ export function useDynastyOverviewModal(show: () => boolean) {
     summary,
     hasOverview,
     emperor,
+    imperialCrisis,
     effectLines,
     jumpToAvatar,
+    openCrisisEvidence,
   }
 }

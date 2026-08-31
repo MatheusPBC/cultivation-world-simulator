@@ -1,17 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
 
-import { eventApi } from '@/api'
+import { eventApi, worldApi } from '@/api'
 import type {
   ChronicleDossierResponseDTO,
   EventCausalDetailDTO,
+  LiveGuideAnswerDTO,
+  LiveGuideResponseDTO,
+  DaoPetitionsResponseDTO,
   WorldChronicleResponseDTO,
   WorldJournalPeriodMonths,
   WorldJournalResponseDTO,
 } from '@/types/api'
 import { logError } from '@/utils/appError'
 
-export type WorldJournalTab = 'now' | 'focus' | 'stories' | 'timeline' | 'chronicle'
+export type WorldJournalTab = 'now' | 'focus' | 'stories' | 'timeline' | 'chronicle' | 'guide' | 'dao'
 
 export const useWorldJournalStore = defineStore('worldJournal', () => {
   const activeTab = ref<WorldJournalTab>('now')
@@ -25,6 +28,20 @@ export const useWorldJournalStore = defineStore('worldJournal', () => {
   const chronicleLoading = ref(false)
   const chronicleError = ref(false)
   let chronicleRequestId = 0
+
+  const liveGuide = shallowRef<LiveGuideResponseDTO | null>(null)
+  const liveGuideLoading = ref(false)
+  const liveGuideError = ref(false)
+  const liveGuideAnswer = shallowRef<LiveGuideAnswerDTO | null>(null)
+  const liveGuideAnswerLoading = ref(false)
+  const liveGuideAnswerError = ref(false)
+  let liveGuideRequestId = 0
+  let liveGuideAnswerRequestId = 0
+
+  const daoPetitions = shallowRef<DaoPetitionsResponseDTO | null>(null)
+  const daoLoading = ref(false)
+  const daoError = ref(false)
+  const respondingPetitionId = ref<string | null>(null)
 
   const chronicleDossier = shallowRef<ChronicleDossierResponseDTO | null>(null)
   const chronicleDossierChapterId = ref<string | null>(null)
@@ -107,6 +124,61 @@ export const useWorldJournalStore = defineStore('worldJournal', () => {
     }
   }
 
+  async function refreshLiveGuide() {
+    const currentRequestId = ++liveGuideRequestId
+    liveGuideLoading.value = true
+    liveGuideError.value = false
+    liveGuideAnswerRequestId += 1
+    liveGuideAnswer.value = null
+    liveGuideAnswerLoading.value = false
+    liveGuideAnswerError.value = false
+    try {
+      const result = await eventApi.fetchLiveGuide()
+      if (currentRequestId === liveGuideRequestId) liveGuide.value = result
+    } catch (error) {
+      if (currentRequestId === liveGuideRequestId) {
+        liveGuideError.value = true
+        logError('WorldJournalStore refreshLiveGuide', error)
+      }
+    } finally {
+      if (currentRequestId === liveGuideRequestId) liveGuideLoading.value = false
+    }
+  }
+
+  async function askLiveGuide(question: string) {
+    const normalized = question.trim()
+    if (!normalized || liveGuideAnswerLoading.value) return
+    const currentRequestId = ++liveGuideAnswerRequestId
+    liveGuideAnswer.value = null
+    liveGuideAnswerLoading.value = true
+    liveGuideAnswerError.value = false
+    try {
+      const result = await eventApi.askLiveGuide(normalized)
+      if (currentRequestId === liveGuideAnswerRequestId) liveGuideAnswer.value = result
+    } catch (error) {
+      if (currentRequestId === liveGuideAnswerRequestId) {
+        liveGuideAnswerError.value = true
+        logError('WorldJournalStore askLiveGuide', error)
+      }
+    } finally {
+      if (currentRequestId === liveGuideAnswerRequestId) liveGuideAnswerLoading.value = false
+    }
+  }
+
+  async function refreshDaoPetitions() {
+    daoLoading.value = true; daoError.value = false
+    try { daoPetitions.value = await worldApi.fetchDaoPetitions() }
+    catch (error) { daoError.value = true; logError('WorldJournalStore refreshDaoPetitions', error) }
+    finally { daoLoading.value = false }
+  }
+
+  async function answerDaoPetition(petitionId: string, response: 'silence' | 'sign' | 'favor') {
+    if (respondingPetitionId.value) return
+    respondingPetitionId.value = petitionId
+    try { await worldApi.answerDaoPetition(petitionId, response); await refreshDaoPetitions() }
+    finally { respondingPetitionId.value = null }
+  }
+
   async function openChronicleDossier(chapterId: string, anchorId: string) {
     const currentRequestId = ++chronicleDossierRequestId
     chronicleDossierChapterId.value = chapterId
@@ -184,6 +256,20 @@ export const useWorldJournalStore = defineStore('worldJournal', () => {
     chronicleError,
     refreshChronicle,
     loadMoreChronicle,
+    liveGuide,
+    liveGuideLoading,
+    liveGuideError,
+    liveGuideAnswer,
+    liveGuideAnswerLoading,
+    liveGuideAnswerError,
+    refreshLiveGuide,
+    askLiveGuide,
+    daoPetitions,
+    daoLoading,
+    daoError,
+    respondingPetitionId,
+    refreshDaoPetitions,
+    answerDaoPetition,
     chronicleDossier,
     chronicleDossierChapterId,
     chronicleDossierAnchorId,

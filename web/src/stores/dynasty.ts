@@ -27,6 +27,7 @@ function createEmptyDetail(): DynastyDetail {
       topOfficialRankName: '',
     },
     officials: [],
+    imperialCrisis: null,
   }
 }
 

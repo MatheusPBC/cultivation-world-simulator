@@ -95,6 +95,8 @@ class GameCommandService:
             run_resume_game=self.resume_game,
             run_cleanup_events=self.cleanup_events,
             run_set_phenomenon=self.set_phenomenon,
+            run_answer_dao_petition=self.answer_dao_petition,
+            run_open_imperial_claim=self.open_imperial_claim,
             run_create_avatar=self.create_avatar,
             run_delete_avatar=self.delete_avatar,
             run_update_avatar_adjustment=self.update_avatar_adjustment,
@@ -274,6 +276,30 @@ class GameCommandService:
             phenomenon_id=phenomenon_id,
             celestial_phenomena_by_id=self._deps.static_data.celestial_phenomena_by_id,
         )
+
+    async def answer_dao_petition(self, *, petition_id: str, response: str) -> dict:
+        from src.systems.celestial_dao_service import answer_petition
+
+        def mutate():
+            world = self._deps.runtime.get("world")
+            if world is None:
+                raise ValueError("A world is required to answer a Dao petition")
+            return answer_petition(world, petition_id, response)
+
+        event = await self._deps.runtime.run_mutation(mutate)
+        return {"event_id": event.id}
+
+    async def open_imperial_claim(self, *, avatar_id: str) -> dict:
+        from src.systems.imperial_crisis_service import open_imperial_claim
+
+        def mutate():
+            world = self._deps.runtime.get("world")
+            if world is None:
+                raise ValueError("A world is required to open an imperial claim")
+            return open_imperial_claim(world, avatar_id)
+
+        crisis = await self._deps.runtime.run_mutation(mutate)
+        return crisis.to_dict()
 
     async def cleanup_events(
         self,

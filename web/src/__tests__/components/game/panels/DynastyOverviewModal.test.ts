@@ -69,6 +69,16 @@ vi.mock('@/stores/dynasty', () => ({
           sectName: '',
         },
       ],
+      imperialCrisis: {
+        status: 'active',
+        openedMonth: 12,
+        emperor: { id: 'emperor-1', name: '司马承安' },
+        claimant: { id: 'claimant-1', name: '桓温' },
+        supportCount: 1,
+        supporters: [{ id: 'supporter-1', name: '王玄策' }],
+        evidenceEventIds: [],
+        legitimacyFactors: { support: 75, worldly_total: 75, total: 75 },
+      },
     },
     overview: {
       name: '晋',
@@ -110,6 +120,16 @@ vi.mock('@/stores/dynasty', () => ({
     summary: {
       officialCount: 2,
       topOfficialRankName: '州牧',
+    },
+    imperialCrisis: {
+      status: 'active',
+      openedMonth: 12,
+      emperor: { id: 'emperor-1', name: '司马承安' },
+      claimant: { id: 'claimant-1', name: '桓温' },
+      supportCount: 1,
+      supporters: [{ id: 'supporter-1', name: '王玄策' }],
+      evidenceEventIds: [],
+      legitimacyFactors: { support: 75, worldly_total: 75, total: 75 },
     },
     isLoading: false,
     isLoaded: true,
@@ -168,6 +188,11 @@ describe('DynastyOverviewModal', () => {
                 sect: '所属',
                 rogue: '散修',
               },
+              crisis: {
+                title: '正统危机', emperor: '皇帝', claimant: '觊觎者', support: '已获 {count} 人公开支持', supporters: '公开支持者', evidence: '查看因果凭据',
+                factors: { office: '官职', reputation: '朝廷威望', cultivation: '修为', support: '支持', celestial: '天道征兆', worldly_total: '世俗根基', total: '正统差额' },
+                status: { active: '政治危机正在发酵' },
+              },
             },
           },
           common: {
@@ -216,11 +241,20 @@ describe('DynastyOverviewModal', () => {
     expect(text).toContain('李观澜')
     expect(text).toContain('太一门')
     expect(text).toContain('散修')
+    expect(text).toContain('世俗根基')
   })
 
   it('jumps to avatar detail when clicking an official row', async () => {
     const wrapper = createWrapper(true)
     await wrapper.get('.official-row').trigger('click')
     expect(selectMock).toHaveBeenCalledWith('avatar', 'a-1')
+  })
+
+  it('shows declared supporters and opens their avatar detail', async () => {
+    const wrapper = createWrapper(true)
+    expect(wrapper.text()).toContain('公开支持者')
+    expect(wrapper.text()).toContain('王玄策')
+    await wrapper.get('.supporter').trigger('click')
+    expect(selectMock).toHaveBeenCalledWith('avatar', 'supporter-1')
   })
 })

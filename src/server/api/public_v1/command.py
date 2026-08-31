@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.config import RunConfig
-from src.server.services.public_api_contract import ok_response
+from src.server.services.public_api_contract import ok_response, raise_public_error
 
 
 class GameStartRequest(RunConfig):
@@ -69,6 +69,15 @@ class CreateCustomContentRequest(BaseModel):
 
 class SetPhenomenonRequest(BaseModel):
     id: int
+
+
+class AnswerDaoPetitionRequest(BaseModel):
+    petition_id: str
+    response: Literal["silence", "sign", "favor"]
+
+
+class OpenImperialClaimRequest(BaseModel):
+    avatar_id: str
 
 
 class SaveGameRequest(BaseModel):
@@ -246,6 +255,24 @@ def create_public_command_router(
         if command_service is not None:
             return ok_response(await command_service.set_phenomenon(phenomenon_id=req.id))
         return ok_response(await run_set_phenomenon(phenomenon_id=req.id))
+
+    @router.post("/api/v1/command/world/dao-petitions/answer")
+    async def answer_dao_petition_v1(req: AnswerDaoPetitionRequest):
+        if command_service is None:
+            raise RuntimeError("command service is required")
+        try:
+            return ok_response(await command_service.answer_dao_petition(petition_id=req.petition_id, response=req.response))
+        except ValueError as exc:
+            raise_public_error(status_code=422, code="DAO_PETITION_INVALID", message=str(exc))
+
+    @router.post("/api/v1/command/dynasty/imperial-claim")
+    async def open_imperial_claim_v1(req: OpenImperialClaimRequest):
+        if command_service is None:
+            raise RuntimeError("command service is required")
+        try:
+            return ok_response(await command_service.open_imperial_claim(avatar_id=req.avatar_id))
+        except ValueError as exc:
+            raise_public_error(status_code=422, code="IMPERIAL_CLAIM_INVALID", message=str(exc))
 
     @router.delete("/api/v1/command/events/cleanup")
     async def cleanup_events_v1(

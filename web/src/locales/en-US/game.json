@@ -6,7 +6,9 @@
       "now": "Now",
       "focus": "Focus",
       "stories": "Stories",
-      "timeline": "Timeline"
+      "timeline": "Timeline",
+      "chronicle": "Chronicle",
+      "guide": "Live Guide"
     },
     "periods": {
       "one": "This month",
@@ -49,6 +51,23 @@
     "why_considered_count": "{count} options considered",
     "why_rejected": "Rejected options",
     "why_decision_appraisals": "Personal memories cited",
+    "guide": {
+      "loading": "Reading the current world...", "error": "Couldn't build the Live Guide.", "retry": "Retry",
+      "date": "Year {year}, month {month}", "world_in_one_sentence": "The world in one sentence",
+      "no_headline": "The world's first stories are still taking shape.", "sources": "{count} sources",
+      "happening": "What is happening", "happening_hint": "The most important story threads right now",
+      "empty": "No event is relevant enough to form a story thread yet.", "understand_why": "Understand why",
+      "people": "Who matters now", "people_empty": "No character stood out in this period.",
+      "no_current_action": "No current action recorded", "no_ambition": "No known ambition", "concept": "Concept in focus",
+      "ask_eyebrow": "Ask the Chronicler", "ask_title": "Ask about this world",
+      "grounded_note": "Answers are limited to world facts and sources", "question_label": "Question for the Chronicler",
+      "question_placeholder": "Why does this dispute matter? Who could change its course?", "ask_button": "Ask",
+      "answering": "Consulting...", "suggestion_people": "Who is changing the world?",
+      "suggestion_conflict": "Which conflict deserves attention?", "suggestion_change": "What changed recently?",
+      "answer_error": "The Chronicler couldn't answer right now. Try again.",
+      "answer_unavailable": "There are not enough sources to answer yet.", "answer_sources": "Answer sources",
+      "source_number": "Source {number}"
+    },
     "why_relation": {
       "triggered_by": "triggered by",
       "enabled_by": "enabled by",

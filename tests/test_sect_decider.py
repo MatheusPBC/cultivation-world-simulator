@@ -15,6 +15,29 @@ from src.systems.sect_decision_context import SectDecisionContext
 from src.systems.time import Month, Year, create_month_stamp
 
 
+def test_sect_decider_serializes_celestial_context_as_non_command_evidence():
+    ctx = SectDecisionContext(
+        basic_structured={}, basic_text="", power={}, territory={}, self_assessment={}, economy={},
+        relations=[], relations_summary="", history={}, celestial_dao=[
+            {"kind": "omen", "tradition": "balance", "source_event_id": "omen-1"},
+        ],
+    )
+
+    serialized = SectDecider._serialize_context(ctx)
+
+    assert serialized["celestial_dao"] == ctx.celestial_dao
+
+
+def test_sect_decider_serializes_imperial_crisis_as_non_command_context():
+    crisis = {"emperor": {"id": "e", "name": "Emperor"}, "claimant": {"id": "c", "name": "Claimant"}}
+    ctx = SectDecisionContext(
+        basic_structured={}, basic_text="", power={}, territory={}, self_assessment={}, economy={},
+        relations=[], relations_summary="", history={}, imperial_crisis=crisis,
+    )
+
+    assert SectDecider._serialize_context(ctx)["imperial_crisis"] == crisis
+
+
 def _create_avatar(world, *, avatar_id: str, name: str, alignment: Alignment) -> Avatar:
     avatar = Avatar(
         world=world,

@@ -202,6 +202,22 @@ def test_sect_thinker_current_phenomenon_info_uses_i18n_fallback_text():
         reload_translations()
 
 
+def test_sect_thinker_serializes_celestial_context_without_turning_it_into_state():
+    ctx = _dummy_ctx()
+    ctx.celestial_dao = [{"kind": "omen", "tradition": "mercy", "source_event_id": "sign-event"}]
+
+    serialized = SectThinker._serialize_context(ctx)
+
+    assert serialized["celestial_dao"][0]["source_event_id"] == "sign-event"
+
+
+def test_sect_thinker_serializes_imperial_crisis_as_observation():
+    ctx = _dummy_ctx()
+    ctx.imperial_crisis = {"claimant": {"id": "c", "name": "Claimant"}, "declared_supporters": []}
+
+    assert SectThinker._serialize_context(ctx)["imperial_crisis"] == ctx.imperial_crisis
+
+
 @pytest.mark.parametrize(
     ("locale_code", "expected_snippet"),
     [

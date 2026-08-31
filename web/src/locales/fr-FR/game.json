@@ -6,7 +6,9 @@
       "now": "Maintenant",
       "focus": "À suivre",
       "stories": "Histoires",
-      "timeline": "Chronologie"
+      "timeline": "Chronologie",
+      "chronicle": "Chronique",
+      "guide": "Guide vivant"
     },
     "periods": {
       "one": "Ce mois-ci",
@@ -48,6 +50,23 @@
     "why_truncated": "Certaines causes ne sont pas affichées ; ouvrez un événement plus proche de la source pour en voir plus.",
     "why_considered_count": "{count} options envisagées",
     "why_rejected": "Options rejetées",
+    "guide": {
+      "loading": "Lecture du monde actuel...", "error": "Impossible de créer le Guide vivant.", "retry": "Réessayer",
+      "date": "An {year}, mois {month}", "world_in_one_sentence": "Le monde en une phrase",
+      "no_headline": "Les premières histoires du monde prennent encore forme.", "sources": "{count} sources",
+      "happening": "Ce qui se passe", "happening_hint": "Les fils narratifs les plus importants du moment",
+      "empty": "Aucun événement n'est encore assez important pour former un fil narratif.", "understand_why": "Comprendre pourquoi",
+      "people": "Qui compte maintenant", "people_empty": "Aucun personnage ne s'est distingué durant cette période.",
+      "no_current_action": "Aucune action actuelle enregistrée", "no_ambition": "Aucune ambition connue", "concept": "Concept à retenir",
+      "ask_eyebrow": "Demander au Chroniqueur", "ask_title": "Interroger ce monde",
+      "grounded_note": "Les réponses se limitent aux faits et aux sources du monde", "question_label": "Question au Chroniqueur",
+      "question_placeholder": "Pourquoi ce conflit compte-t-il ? Qui pourrait en changer le cours ?", "ask_button": "Demander",
+      "answering": "Consultation...", "suggestion_people": "Qui transforme le monde ?",
+      "suggestion_conflict": "Quel conflit mérite l'attention ?", "suggestion_change": "Qu'est-ce qui a changé récemment ?",
+      "answer_error": "Le Chroniqueur ne peut pas répondre maintenant. Réessayez.",
+      "answer_unavailable": "Les sources sont encore insuffisantes pour répondre.", "answer_sources": "Sources de la réponse",
+      "source_number": "Source {number}"
+    },
     "why_relation": {
       "triggered_by": "déclenché par",
       "enabled_by": "rendu possible par",

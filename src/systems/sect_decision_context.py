@@ -123,6 +123,10 @@ class SectDecisionContext:
     rule: Dict[str, Any] = field(default_factory=dict)
     recruitment_candidates: List[Dict[str, Any]] = field(default_factory=list)
     member_candidates: List[Dict[str, Any]] = field(default_factory=list)
+    # Celestial signals are context the sect may cite; they do not modify relations.
+    celestial_dao: List[Dict[str, Any]] = field(default_factory=list)
+    # A public court crisis may inform policy, but cannot change diplomacy itself.
+    imperial_crisis: Dict[str, Any] | None = None
 
 
 def build_sect_decision_context(
@@ -487,6 +491,30 @@ def build_sect_decision_context(
         "recent_events": recent_events,
         "summary_text": history_summary_text,
     }
+    from src.systems.celestial_dao_service import get_dao_context
+
+    crisis = getattr(getattr(world, "dynasty", None), "imperial_crisis", None)
+    imperial_crisis = None
+    if crisis is not None and str(getattr(crisis, "status", "")) == "active":
+        get_avatar = world.avatar_manager.get_avatar
+        emperor = get_avatar(str(crisis.emperor_avatar_id))
+        claimant = get_avatar(str(crisis.claimant_avatar_id))
+        supporters = []
+        for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+            supporter = get_avatar(str(supporter_id))
+            if supporter is not None:
+                supporters.append(
+                    {
+                        "id": str(getattr(supporter, "id", "") or ""),
+                        "name": str(getattr(supporter, "name", "") or ""),
+                    }
+                )
+        imperial_crisis = {
+            "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
+            "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
+            "declared_supporters": supporters,
+            "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
+        }
 
     return SectDecisionContext(
         basic_structured=basic_structured,
@@ -504,5 +532,6 @@ def build_sect_decision_context(
         relations=relations,
         relations_summary=relations_summary,
         history=history,
+        celestial_dao=get_dao_context(world),
+        imperial_crisis=imperial_crisis,
     )
-

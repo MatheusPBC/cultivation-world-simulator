@@ -47,6 +47,8 @@ from src.server.services.game_queries import (
     get_deceased_list,
     get_events_page,
     get_world_journal as get_world_journal_query,
+    get_live_guide as get_live_guide_query,
+    ask_live_guide as ask_live_guide_query,
     get_event_causal_detail as get_event_causal_detail_query,
     get_world_chronicle as get_world_chronicle_query,
     get_chronicle_dossier as get_chronicle_dossier_query,
@@ -95,7 +97,7 @@ from src.server.services.world_control import set_world_phenomenon
 from src.run.load_map import load_cultivation_world_map
 from src.run.map_presets import get_map_presets_query
 from src.sim.avatar_init import make_avatars as _new_make_random, create_avatar_from_request
-from src.systems.dynasty_generator import generate_dynasty, generate_emperor
+from src.systems.dynasty_generator import generate_dynasty, generate_emperor_avatar
 from src.utils.config import CONFIG
 from src.classes.appearance import get_appearance_by_level
 from src.systems.cultivation import REALM_ORDER, Realm
@@ -276,6 +278,8 @@ query_dependencies = GameQueryDependencies(
     get_runtime_status=get_runtime_status,
     get_events_page=get_events_page,
     get_world_journal_query=get_world_journal_query,
+    get_live_guide_query=get_live_guide_query,
+    ask_live_guide_query=ask_live_guide_query,
     get_event_causal_detail_query=get_event_causal_detail_query,
     get_world_chronicle_query=get_world_chronicle_query,
     get_chronicle_dossier_query=get_chronicle_dossier_query,
@@ -440,7 +444,7 @@ runtime_hooks = create_runtime_hooks(
     year_cls=Year,
     month_enum=Month,
     generate_dynasty=generate_dynasty,
-    generate_emperor=generate_emperor,
+    generate_emperor_avatar=generate_emperor_avatar,
     event_cls=Event,
     translate=t,
     simulator_cls=Simulator,
@@ -480,7 +484,7 @@ async def init_game_async():
         year_cls=Year,
         month_enum=Month,
         generate_dynasty=generate_dynasty,
-        generate_emperor=generate_emperor,
+        generate_emperor_avatar=generate_emperor_avatar,
         event_cls=Event,
         translate=t,
         simulator_cls=Simulator,

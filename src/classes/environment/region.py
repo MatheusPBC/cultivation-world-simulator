@@ -14,6 +14,7 @@ from src.classes.core.sect import sects_by_name
 from src.classes.items.store import StoreMixin
 from src.i18n import t
 from src.classes.environment.region_condition import RegionCondition
+from src.classes.celestial_dao import DaoTradition
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -34,6 +35,7 @@ class Region(ABC):
     # Persistent local state.  This is intentionally owned by Region rather
     # than by pressure/formation systems.
     conditions: list[RegionCondition] = field(default_factory=list)
+    dao_tradition: DaoTradition = DaoTradition.MANDATE_AND_ORDER
     
     # 计算字段
     center_loc: tuple[int, int] = field(init=False)
@@ -69,7 +71,7 @@ class Region(ABC):
         return [condition for condition in self.conditions if condition.is_active(current_month)]
 
     def to_runtime_dict(self) -> dict:
-        return {"conditions": [condition.to_dict() for condition in self.conditions]}
+        return {"conditions": [condition.to_dict() for condition in self.conditions], "dao_tradition": self.dao_tradition.value}
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -115,6 +117,7 @@ class Region(ABC):
             "type": self.get_region_type(),
             "type_name": t("Region"),
             "conditions": [condition.to_dict() for condition in self.conditions],
+            "dao_tradition": self.dao_tradition.value,
         }
 
 

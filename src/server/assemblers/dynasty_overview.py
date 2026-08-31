@@ -30,15 +30,15 @@ def build_dynasty_overview(world: Any) -> Dict[str, Any]:
             "current_emperor": None,
         }
 
-    emperor = getattr(dynasty, "current_emperor", None)
+    emperor = getattr(getattr(world, "avatar_manager", None), "get_avatar", lambda _id: None)(getattr(dynasty, "current_emperor_id", ""))
     emperor_data = None
     if emperor is not None:
+        age = getattr(emperor, "age", None)
         emperor_data = {
             "name": str(getattr(emperor, "name", "") or ""),
-            "surname": str(getattr(emperor, "surname", "") or ""),
-            "given_name": str(getattr(emperor, "given_name", "") or ""),
-            "age": int(emperor.get_age(current_month)),
-            "max_age": int(getattr(emperor, "max_age", 80) or 80),
+            "id": str(getattr(emperor, "id", "") or ""),
+            "age": int(getattr(age, "age", 0) or 0),
+            "max_age": int(getattr(age, "max_lifespan", 0) or 0),
             "is_mortal": True,
         }
 

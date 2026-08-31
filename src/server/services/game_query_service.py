@@ -24,6 +24,8 @@ class GameQueryDependencies:
     get_runtime_status: Any
     get_events_page: Any
     get_world_journal_query: Any
+    get_live_guide_query: Any
+    ask_live_guide_query: Any
     get_event_causal_detail_query: Any
     get_world_chronicle_query: Any
     get_chronicle_dossier_query: Any
@@ -80,6 +82,8 @@ class GameQueryService:
             build_public_current_run=self.get_current_run,
             build_public_events_page=self.get_events_page,
             build_public_world_journal=self.get_world_journal,
+            build_public_live_guide=self.get_live_guide,
+            build_public_live_guide_answer=self.ask_live_guide,
             build_public_event_causal_detail=self.get_event_causal_detail,
             build_public_world_chronicle=self.get_world_chronicle,
             build_public_chronicle_dossier=self.get_chronicle_dossier,
@@ -96,6 +100,7 @@ class GameQueryService:
             build_public_mortal_overview=self.get_mortal_overview,
             build_public_dynasty_overview=self.get_dynasty_overview,
             build_public_dynasty_detail=self.get_dynasty_detail,
+            build_public_dao_petitions=self.get_dao_petitions,
             build_public_avatar_overview=self.get_avatar_overview,
             build_public_deceased_list=self.get_deceased_list,
             build_public_roleplay_session=self.get_roleplay_session,
@@ -166,6 +171,19 @@ class GameQueryService:
             self._deps.runtime,
             serialize_events_for_client=self._deps.serialize_events_for_client,
             period_months=period_months,
+        )
+
+    def get_live_guide(self) -> dict:
+        return self._deps.get_live_guide_query(
+            self._deps.runtime,
+            serialize_events_for_client=self._deps.serialize_events_for_client,
+        )
+
+    async def ask_live_guide(self, *, question: str) -> dict:
+        return await self._deps.ask_live_guide_query(
+            self._deps.runtime,
+            serialize_events_for_client=self._deps.serialize_events_for_client,
+            question=question,
         )
 
     def get_event_causal_detail(self, *, event_id: str, depth: int, limit: int) -> dict:
@@ -258,6 +276,34 @@ class GameQueryService:
             self._deps.runtime,
             build_dynasty_detail=self._deps.build_dynasty_detail,
         )
+
+    def get_dao_petitions(self) -> dict:
+        world = self._deps.runtime.get("world")
+        petitions = list(getattr(world, "dao_petitions", []) or []) if world is not None else []
+
+        def serialize(petition):
+            data = petition.to_dict()
+            initiator_kind = str(getattr(petition, "initiator_kind", "") or "")
+            initiator_id = str(getattr(petition, "initiator_id", "") or "")
+            initiator_name = ""
+            if world is not None and initiator_kind == "avatar":
+                avatar = world.avatar_manager.get_avatar(initiator_id)
+                initiator_name = str(getattr(avatar, "name", "") or "")
+            elif world is not None and initiator_kind == "sect":
+                sect = next((item for item in getattr(world, "existed_sects", []) or [] if str(getattr(item, "id", "")) == initiator_id), None)
+                initiator_name = str(getattr(sect, "name", "") or "")
+            elif world is not None and initiator_kind == "court":
+                dynasty = getattr(world, "dynasty", None)
+                initiator_name = str(getattr(dynasty, "title", "") or getattr(dynasty, "name", "") or "")
+            data["initiator_name"] = initiator_name
+            response_event = world.event_manager.get_event_by_id(petition.response_event_id) if world is not None and petition.response_event_id else None
+            data["response_content"] = str(getattr(response_event, "content", "") or "")
+            return data
+
+        return {
+            "pending": [serialize(item) for item in petitions if item.status.value == "pending"],
+            "history": [serialize(item) for item in petitions if item.status.value != "pending"],
+        }
 
     def get_avatar_overview(self) -> dict:
         return self._deps.get_avatar_overview_query(self._deps.runtime)
