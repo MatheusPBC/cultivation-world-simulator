@@ -23,14 +23,26 @@ msgstr "{sign}：{reading}"
 msgid "A public omen"
 msgstr "一道公开的天道征兆"
 
-msgid "A {tradition} petition seeks the Dao's notice."
-msgstr "一份遵循 {tradition} 的祈愿请求天道垂察。"
+msgid "Only a sect patriarch or the imperial court may seek a Celestial Audience"
+msgstr "只有宗门掌门或朝廷可以求见天道。"
 
-msgid "{avatar} asks the Dao to witness this {tradition} concern: {cause}"
-msgstr "{avatar}祈请天道见证这桩{tradition}之忧：{cause}"
+msgid "A Celestial Audience is already awaiting an answer"
+msgstr "已有一场天道觐见正在等待回应。"
 
-msgid "{avatar} sends a petition to the Celestial Dao."
-msgstr "{avatar}向天道递上了一份祈愿。"
+msgid "An institution seeks a rare Celestial Audience."
+msgstr "一个势力正在求得罕见的天道觐见。"
+
+msgid "{institution} holds a public rite and claims the Dao witnesses its cause: {cause}"
+msgstr "{institution}举行公开仪式，并宣称天道见证其主张：{cause}"
+
+msgid "A mortal rite claims the Dao favors its cause; this is not a Dao response."
+msgstr "凡俗仪式声称天道偏向其主张；这并非天道回应。"
+
+msgid "After sustained {tradition} rites, {institution} seeks a rare audience concerning: {cause}"
+msgstr "在持续举行{tradition}仪式后，{institution}就此事求得罕见觐见：{cause}"
+
+msgid "{institution}'s accumulated rites reach a rare Celestial Audience."
+msgstr "{institution}积累的仪式终于抵达一次罕见天道觐见。"
 
 msgid "The Dao remains silent."
 msgstr "天道仍保持沉默。"
@@ -38,8 +50,8 @@ msgstr "天道仍保持沉默。"
 msgid "The Dao has answered"
 msgstr "天道已作答"
 
-msgid "{answer} A limited opportunity is granted to the petitioner."
-msgstr "{answer}祈愿者因此获得一次有限的机缘。"
+msgid "{answer} A limited opportunity is granted to the institution."
+msgstr "{answer}该势力因此获得一次有限的机缘。"
 
 msgid "{claimant} openly claims the imperial mandate."
 msgstr "{claimant}公开宣称帝统。"
@@ -56,11 +68,8 @@ msgstr "{claimant}的帝统觊觎公开失势。"
 msgid "The legitimacy crisis remains unresolved."
 msgstr "这场正统危机仍未解决。"
 
-msgid "Too many pending Dao petitions"
-msgstr "待回应的天道祈愿过多。"
-
-msgid "Petition is not pending"
-msgstr "这份祈愿当前不可回应。"
+msgid "Celestial Audience is not pending"
+msgstr "这场天道觐见当前不可回应。"
 
 msgid "response must be silence, sign, or favor"
 msgstr "回应只能是沉默、降下征兆或赐予机缘。"

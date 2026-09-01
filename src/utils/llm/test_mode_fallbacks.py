@@ -104,7 +104,7 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         cause = dict(infos.get("cause", {}) or {})
         tradition = str(infos.get("tradition", ""))
         return {
-            "content": f"{initiator.get('name', 'An agent')} petitions the Dao under {tradition}: {cause.get('content', '')}",
+            "content": f"{initiator.get('name', 'An institution')} seeks a rare audience after sustained {tradition} rites: {cause.get('content', '')}",
         }
     if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:
         return {}

@@ -549,6 +549,7 @@ export interface DaoPetitionDTO {
   region_id: number;
   tradition: string;
   motivated_event_ids: string[];
+  rite_event_ids: string[];
   content: string;
   created_month: number;
   status: DaoPetitionStatusDTO;

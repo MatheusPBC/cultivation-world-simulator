@@ -156,9 +156,7 @@ async def annual_maintenance(simulator, ctx):
 
 async def create_dao_petition(simulator, ctx):
     from src.systems.celestial_dao_service import maybe_create_monthly_petition
-    event = await maybe_create_monthly_petition(simulator.world, ctx.events)
-    if event is not None:
-        ctx.add_events([event])
+    ctx.add_events(await maybe_create_monthly_petition(simulator.world, ctx.events))
 
 
 async def generate_event_appraisals(_simulator, ctx):
