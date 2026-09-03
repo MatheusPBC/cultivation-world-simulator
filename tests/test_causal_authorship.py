@@ -98,13 +98,14 @@ def test_llm_and_story_events_cannot_carry_state_deltas(base_world) -> None:
         base_world.month_stamp,
         "interpretation",
         causal_origin=CausalOrigin.LLM_INTERPRETATION,
-        causal_payload={"deltas": [{"aspect": "population"}]},
     )
+    interpretation.causal_payload = {
+        "deltas": [{"event_id": interpretation.id, "aspect": "population"}]
+    }
     story = Event(
         base_world.month_stamp,
         "story",
         is_story=True,
-        causal_payload={"deltas": [{"aspect": "population"}]},
         causal_links=[
             CausalLink(
                 cause_event_id=fact.id,
@@ -112,6 +113,9 @@ def test_llm_and_story_events_cannot_carry_state_deltas(base_world) -> None:
             )
         ],
     )
+    story.causal_payload = {
+        "deltas": [{"event_id": story.id, "aspect": "population"}]
+    }
     ctx = SimulationStepContext.create(base_world)
 
     with pytest.raises(CausalIntegrityError, match="LLM interpretation"):
@@ -127,7 +131,6 @@ def test_actor_transition_requires_real_decision_cause(base_world) -> None:
         "mutated from rumor",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
-        causal_payload={"deltas": [{"aspect": "population"}]},
         causal_links=[
             CausalLink(
                 cause_event_id=non_decision.id,
@@ -135,10 +138,88 @@ def test_actor_transition_requires_real_decision_cause(base_world) -> None:
             )
         ],
     )
+    transition.causal_payload = {
+        "deltas": [{"event_id": transition.id, "aspect": "population"}]
+    }
     ctx = SimulationStepContext.create(base_world)
 
     with pytest.raises(CausalIntegrityError, match="real decision cause"):
         validate_causal_integrity(ctx, [non_decision, transition])
+
+
+def test_actor_occurrence_with_material_delta_requires_real_decision_cause(base_world) -> None:
+    occurrence = Event(
+        base_world.month_stamp,
+        "actor mutated state without an audited decision",
+        fact_kind=FactKind.OCCURRENCE,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+    )
+    occurrence.causal_payload = {
+        "deltas": [
+            {
+                "event_id": occurrence.id,
+                "owner_kind": "avatar",
+                "owner_id": "target",
+                "aspect": "hp",
+            }
+        ]
+    }
+    ctx = SimulationStepContext.create(base_world)
+
+    with pytest.raises(CausalIntegrityError, match="real decision cause"):
+        validate_causal_integrity(ctx, [occurrence])
+
+
+def test_state_delta_must_point_back_to_its_own_event(base_world) -> None:
+    event = Event(
+        base_world.month_stamp,
+        "mutation with detached evidence",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.DETERMINISTIC,
+    )
+    event.causal_payload = {
+        "deltas": [
+            {
+                "event_id": "",
+                "owner_kind": "avatar",
+                "owner_id": "target",
+                "aspect": "hp",
+            }
+        ]
+    }
+    ctx = SimulationStepContext.create(base_world)
+
+    with pytest.raises(CausalIntegrityError, match="must reference its owning event"):
+        validate_causal_integrity(ctx, [event])
+
+
+def test_avatar_cannot_have_two_death_transitions_in_one_step(base_world) -> None:
+    events = [
+        Event(
+            base_world.month_stamp,
+            f"death transition {index}",
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+        )
+        for index in range(2)
+    ]
+    for event in events:
+        event.causal_payload = {
+            "deltas": [
+                {
+                    "event_id": event.id,
+                    "owner_kind": "avatar",
+                    "owner_id": "same-avatar",
+                    "aspect": "life_status",
+                    "before": "alive",
+                    "after": "dead",
+                }
+            ]
+        }
+    ctx = SimulationStepContext.create(base_world)
+
+    with pytest.raises(CausalIntegrityError, match="duplicate death transitions"):
+        validate_causal_integrity(ctx, events)
 
 
 def test_audited_decision_can_author_actor_transition(base_world) -> None:
@@ -162,7 +243,6 @@ def test_audited_decision_can_author_actor_transition(base_world) -> None:
         "population moved",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
-        causal_payload={"deltas": [{"aspect": "population"}]},
         causal_links=[
             CausalLink(
                 cause_event_id=decision_event.id,
@@ -170,6 +250,9 @@ def test_audited_decision_can_author_actor_transition(base_world) -> None:
             )
         ],
     )
+    transition.causal_payload = {
+        "deltas": [{"event_id": transition.id, "aspect": "population"}]
+    }
     ctx = SimulationStepContext.create(base_world)
 
     validate_causal_integrity(ctx, [decision_event, transition])

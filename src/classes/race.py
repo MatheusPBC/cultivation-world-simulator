@@ -108,6 +108,13 @@ def is_yao_avatar(avatar: object | None) -> bool:
 
 def get_race_surname(race: Race | str | None) -> str:
     race_obj = race if isinstance(race, Race) else get_race(str(race or HUMAN_RACE_ID))
+    if not race_obj.is_yao:
+        return ""
+    from src.classes.language import language_manager
+    from src.i18n.locale_registry import uses_space_separated_names
+
+    if uses_space_separated_names(language_manager.current):
+        return str(race_obj)
     mapping = {
         "fox": "狐",
         "wolf": "狼",

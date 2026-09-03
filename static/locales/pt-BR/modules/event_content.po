@@ -122,3 +122,27 @@ msgstr "{avatar} descobriu um túmulo em {location}: {poi}"
 
 msgid "{avatar} discovered a point of interest at {location}: {poi}"
 msgstr "{avatar} descobriu um ponto de interesse em {location}: {poi}"
+
+msgid "People in {region} hold a popular rite and claim it answers local pressure."
+msgstr "As pessoas de {region} realizam um rito popular em resposta a uma condição regional ativa ou a um acontecimento material relevante, sem confirmar qualquer resposta do Dao."
+
+msgid "{avatar} — {reason}"
+msgstr "{avatar} — {reason}"
+
+msgid "Grave of {deceased}"
+msgstr "Túmulo de {deceased}"
+
+msgid "An old gravestone still carries a faint spiritual glow."
+msgstr "Uma lápide antiga ainda conserva um leve brilho espiritual."
+
+msgid "After defeating {loser}, {winner} found a {realm} {item_label} [{item_name}]."
+msgstr "Após derrotar {loser}, {winner} encontrou {item_label} de {realm} [{item_name}]."
+
+msgid "Looted {item_label} [{item_name}]. {result}"
+msgstr "Saqueou {item_label} [{item_name}]. {result}"
+
+msgid "{region} monthly {resource} balance changed stock by {amount}."
+msgstr "O saldo mensal de {resource} em {region} alterou o estoque em {amount}."
+
+msgid "The Dao considered an institutional petition."
+msgstr "O Dao considerou uma petição institucional."

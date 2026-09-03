@@ -33,36 +33,40 @@ def phase_update_regional_economy(
         if not isinstance(region, CityRegion):
             continue
         economy = region.economy
-        for resource_id, rate in sorted(economy.production_rates.items()):
+        resource_ids = sorted(
+            set(economy.production_rates) | set(economy.demand_rates)
+        )
+        for resource_id in resource_ids:
             if resource_id not in economy.stocks:
                 continue
-            amount = min(float(rate), _headroom(economy, resource_id))
-            if amount <= 0:
-                continue
-            events.append(_apply_flow(
-                world,
-                region,
-                resource_id,
-                amount,
-                flow_kind="production",
-                causal=causal,
-                invalidations=invalidations,
-            ))
+            before = float(economy.stocks[resource_id])
+            produced = min(
+                float(economy.production_rates.get(resource_id, 0.0)),
+                _headroom(economy, resource_id),
+            )
+            reserved = sum(
+                resources.get(resource_id, 0.0)
+                for resources in economy.reservations.values()
+            )
+            available_after_production = max(0.0, before + produced - reserved)
+            demand = float(economy.demand_rates.get(resource_id, 0.0))
+            consumed = min(demand, available_after_production)
+            after = before + produced - consumed
+            economy.set_stock(resource_id, after)
 
-        for resource_id, demand in sorted(economy.demand_rates.items()):
-            available = economy.available_stock(resource_id)
-            consumed = 0.0 if available is None else min(float(demand), available)
-            if consumed > 0:
-                events.append(_apply_flow(
+            if after != before:
+                events.append(_build_balance_event(
                     world,
                     region,
                     resource_id,
-                    -consumed,
-                    flow_kind="consumption",
+                    before=before,
+                    after=after,
+                    produced=produced,
+                    consumed=consumed,
                     causal=causal,
                     invalidations=invalidations,
                 ))
-            if consumed < float(demand):
+            if consumed < demand:
                 from src.systems.semantic_world.resolvers import resolve_metric
 
                 stock_reading = resolve_metric(
@@ -99,8 +103,8 @@ def phase_update_regional_economy(
                     render_params={
                         "region_id": str(region.id),
                         "resource_id": resource_id,
-                        "demand": float(demand),
-                            "available": available,
+                        "demand": demand,
+                        "available": available_after_production,
                     },
                 )
                 shortage.causal_links.extend(
@@ -178,36 +182,36 @@ def _headroom(economy: Any, resource_id: str) -> float:
     return max(0.0, float(capacity) - float(economy.stocks.get(resource_id, 0.0)))
 
 
-def _apply_flow(
+def _build_balance_event(
     world: Any,
     region: CityRegion,
     resource_id: str,
-    delta: float,
     *,
-    flow_kind: str,
+    before: float,
+    after: float,
+    produced: float,
+    consumed: float,
     causal: Any | None,
     invalidations: Any | None,
 ) -> Event:
-    economy = region.economy
-    before = float(economy.stocks.get(resource_id, 0.0))
-    after = economy.change_stock(resource_id, delta)
+    delta = after - before
     event = Event(
         world.month_stamp,
         t(
-            "{region} {flow_kind} changed {resource} stock by {amount}.",
+            "{region} monthly {resource} balance changed stock by {amount}.",
             region=region.name,
-            flow_kind=flow_kind,
             resource=resource_id,
-            amount=f"{abs(delta):.2f}",
+            amount=f"{delta:+.2f}",
         ),
-        event_type=f"regional_{flow_kind}",
+        event_type="regional_resource_balance",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.DETERMINISTIC,
         render_params={
             "region_id": str(region.id),
             "resource_id": resource_id,
-            "flow_kind": flow_kind,
-            "amount": abs(delta),
+            "produced": produced,
+            "consumed": consumed,
+            "net_amount": delta,
         },
     )
     state_delta = StateDelta(
@@ -217,7 +221,7 @@ def _apply_flow(
         aspect=f"resource_stock:{resource_id}",
         before=str(before),
         after=str(after),
-        magnitude=after - before,
+        magnitude=delta,
     )
     if causal is not None:
         causal.record_delta(event.id, state_delta)

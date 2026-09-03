@@ -1,10 +1,12 @@
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 
-from src.systems.fortune import try_trigger_fortune, try_trigger_misfortune, FortuneKind, MisfortuneKind
+from src.systems.fortune import try_trigger_fortune, try_trigger_misfortune
 from src.classes.core.avatar import Avatar
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
 from src.systems.cultivation import Realm
 from src.classes.action_runtime import ActionInstance
 from src.classes.action.respire import Respire
@@ -64,7 +66,14 @@ async def test_try_trigger_fortune(dummy_avatar: Avatar, mock_game_configs, mock
         
         assert len(events) == 2
         assert events[0].is_major is True
+        assert events[0].fact_kind is FactKind.STATE_TRANSITION
+        assert events[0].causal_origin is CausalOrigin.EXTERNAL_EVENT
+        assert all(
+            delta["event_id"] == events[0].id
+            for delta in events[0].causal_payload["deltas"]
+        )
         assert events[1].is_story is True
+        assert not (events[1].causal_payload or {}).get("deltas")
         assert events[1].content == "A generated story."
         
         # Check dynamic prompt
@@ -95,10 +104,44 @@ async def test_try_trigger_misfortune(dummy_avatar: Avatar, mock_game_configs, m
         
         assert len(events) == 2
         assert events[0].is_major is True
+        assert events[0].fact_kind is FactKind.STATE_TRANSITION
+        assert events[0].causal_origin is CausalOrigin.EXTERNAL_EVENT
+        assert all(
+            delta["event_id"] == events[0].id
+            for delta in events[0].causal_payload["deltas"]
+        )
         assert events[1].is_story is True
+        assert not (events[1].causal_payload or {}).get("deltas")
         assert events[1].content == "A generated story."
         
         assert dummy_avatar.magic_stone.value < 1000
+
+
+@pytest.mark.asyncio
+async def test_misfortune_injury_records_external_hp_delta(
+    dummy_avatar: Avatar, mock_game_configs, mock_story_teller
+):
+    with patch("random.choices") as mock_choices, patch("random.random", return_value=0.0), \
+        patch("random.uniform", return_value=0.1), patch("random.randint", return_value=10):
+        mock_choices.return_value = [{
+            "id": 2,
+            "kind": "injury",
+            "min_realm": "QI_REFINEMENT",
+            "max_realm": "NASCENT_SOUL",
+            "weight": 10,
+            "title_id": "misfortune_title_injury",
+        }]
+
+        events = await try_trigger_misfortune(dummy_avatar)
+
+    source = events[0]
+    hp_deltas = [
+        delta for delta in source.causal_payload["deltas"] if delta["aspect"] == "hp"
+    ]
+    assert len(hp_deltas) == 1
+    assert hp_deltas[0]["event_id"] == source.id
+    assert source.causal_origin is CausalOrigin.EXTERNAL_EVENT
+    assert not (events[1].causal_payload or {}).get("deltas")
 
 
 @pytest.mark.asyncio

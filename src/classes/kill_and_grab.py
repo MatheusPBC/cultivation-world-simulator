@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from dataclasses import dataclass
 import random
 
+from src.i18n import t
 from src.systems.single_choice import (
     ItemDisposition,
     ItemExchangeKind,
@@ -55,9 +56,16 @@ async def kill_and_grab(winner: Avatar, loser: Avatar) -> tuple[str, EquipmentTr
     loot_type, loot_item = random.choice(best_candidates)
     
     # 判定是否夺取
-    item_label = '兵器' if loot_type == 'weapon' else '辅助装备'
+    item_label = t("weapon") if loot_type == "weapon" else t("auxiliary")
     # 使用 str() 来触发 Realm 的 __str__ 方法进行 i18n 翻译。
-    context = f"战斗胜利，{loser.name} 身死道消，留下了一件{str(loot_item.realm)}{item_label}『{loot_item.name}』。"
+    context = t(
+        "After defeating {loser}, {winner} found a {realm} {item_label} [{item_name}].",
+        loser=loser.name,
+        winner=winner.name,
+        realm=str(loot_item.realm),
+        item_label=item_label,
+        item_name=loot_item.name,
+    )
     
     outcome = await resolve_item_exchange(
         ItemExchangeRequest(
@@ -79,7 +87,12 @@ async def kill_and_grab(winner: Avatar, loser: Avatar) -> tuple[str, EquipmentTr
         else:
             loser.change_auxiliary(None)
         
-        return f"缴获了{item_label}『{loot_item.name}』。{outcome.result_text}", EquipmentTransfer(
+        return t(
+            "Looted {item_label} [{item_name}]. {result}",
+            item_label=item_label,
+            item_name=loot_item.name,
+            result=outcome.result_text,
+        ), EquipmentTransfer(
             kind=loot_type,
             item_snapshot={"id": getattr(loot_item, "id", None), "name": loot_item.name, "realm": str(loot_item.realm)},
             loser_id=str(getattr(loser, "id", "")),

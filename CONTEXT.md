@@ -522,3 +522,10 @@ treasury to one living member who is currently present in the causally relevant
 region. The interpreter selects only among eligible member IDs; the deterministic
 Sect owner validates membership, location, treasury, and amount, then records
 both balance deltas and their causal sources.
+
+## Monthly Resource Balance
+
+Monthly Resource Balance is the net change to a region's canonical resource
+stock after its declared production and demand for one month are reconciled.
+Production and demand remain measurable flows, but when they cancel each other
+there is no stock transition fact to report.

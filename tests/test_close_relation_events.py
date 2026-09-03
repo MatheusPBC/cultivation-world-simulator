@@ -138,6 +138,16 @@ async def test_master_disciple_bond_propagates_memory_and_warmth(base_world):
     for event in events:
         base_world.event_manager.add_event(event)
 
+    fact = events[0]
+    relation_deltas = [
+        delta
+        for delta in fact.causal_payload["deltas"]
+        if delta["owner_kind"] == "relationship"
+        and delta["aspect"] == "identity_relations"
+    ]
+    assert fact.fact_kind.value == "state_transition"
+    assert len(relation_deltas) == 2
+    assert all(delta["event_id"] == fact.id for delta in relation_deltas)
     memories = base_world.event_manager.get_major_events_by_avatar(parent.id)
     assert any("你得知 Disciple 与 Master建立师徒关系。" in event.content for event in memories)
     assert parent.get_friendliness(master) >= 15

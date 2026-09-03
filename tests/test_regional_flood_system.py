@@ -9,6 +9,7 @@ from src.classes.environment.geography import GeographyLayer, WaterBody
 from src.classes.environment.map import Map
 from src.classes.environment.region import CityRegion
 from src.classes.environment.regional_flood import RegionalFloodOccurrence
+from src.systems.regional_hydrology import RegionalHydrologyProjection
 from src.classes.environment.tile import TileType
 from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
@@ -170,6 +171,51 @@ def test_two_low_risk_months_resolve_and_link_to_the_flood_start() -> None:
     assert {"dry-12", "dry-13"}.issubset(
         {link.cause_event_id for link in event.causal_links}
     )
+
+
+def test_resolution_requires_flooding_strictly_below_threshold(monkeypatch) -> None:
+    world = _world()
+    world.regional_flood_state.active_by_region["101"] = RegionalFloodOccurrence(
+        region_id="101",
+        started_month=8,
+        activation_risk=0.8,
+        source_event_ids=("rain-7", "rain-8"),
+        last_event_id="flood-start",
+    )
+    world.regional_flood_state.last_evaluated_month = 9
+
+    def projection_with_flooding(value: float):
+        return lambda _world, _region_id: RegionalHydrologyProjection(
+            region_id="101",
+            month=int(world.month_stamp),
+            precipitation=0.0,
+            soil_water=0.0,
+            drainage=0.0,
+            flooding=value,
+            state_refs=("climate:region:101:precipitation",),
+            source_event_ids=(f"weather-{int(world.month_stamp)}",),
+        )
+
+    monkeypatch.setattr(
+        "src.systems.regional_floods.project_regional_hydrology",
+        projection_with_flooding(0.45),
+    )
+    world.month_stamp = MonthStamp(10)
+    assert _advance(world)[0] == []
+    assert world.regional_flood_state.resolution_streaks == {}
+
+    monkeypatch.setattr(
+        "src.systems.regional_floods.project_regional_hydrology",
+        projection_with_flooding(0.44),
+    )
+    world.month_stamp = MonthStamp(11)
+    assert _advance(world)[0] == []
+    assert world.regional_flood_state.resolution_streaks == {"101": 1}
+
+    world.month_stamp = MonthStamp(12)
+    events, _ = _advance(world)
+    assert [event.event_type for event in events] == ["regional_flood_resolved"]
+    assert "101" not in world.regional_flood_state.active_by_region
 
 
 def test_unknown_hydrology_never_resolves_an_active_flood() -> None:

@@ -259,7 +259,7 @@ def advance_regional_floods(
             continue
 
         _clear_activation(state, key)
-        if projection.flooding > FLOOD_RESOLUTION_RISK:
+        if projection.flooding >= FLOOD_RESOLUTION_RISK:
             _clear_resolution(state, key)
             continue
         state.resolution_streaks[key] = state.resolution_streaks.get(key, 0) + 1

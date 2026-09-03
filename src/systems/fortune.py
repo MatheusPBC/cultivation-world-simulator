@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import random
 from enum import Enum
+import json
 from typing import Optional
 
 from src.utils.config import CONFIG
 from src.classes.core.avatar import Avatar
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
+from src.classes.causal_origin import CausalOrigin
+from src.classes.state_delta import StateDelta
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.classes.close_relation_event_service import (
     apply_positive_bond_warmth,
@@ -41,6 +44,40 @@ class FortuneKind(Enum):
     FIND_MASTER = "find_master"
     SPIRIT_STONE = "spirit_stone"   # 灵石奇遇
     CULTIVATION = "cultivation"     # 修为奇遇
+
+
+def _item_state(item: object | None) -> str | None:
+    if item is None:
+        return None
+    return str({
+        "id": getattr(item, "id", None),
+        "name": getattr(item, "name", str(item)),
+        "realm": str(getattr(item, "realm", "")),
+        "grade": str(getattr(item, "grade", "")),
+    })
+
+
+def _state_delta(
+    *, owner_id: str, aspect: str, before: object, after: object, magnitude: float | None = None
+) -> dict | None:
+    before_text = str(before) if before is not None else None
+    after_text = str(after) if after is not None else None
+    if before_text == after_text:
+        return None
+    return StateDelta(
+        owner_kind="avatar",
+        owner_id=owner_id,
+        aspect=aspect,
+        before=before_text,
+        after=after_text,
+        magnitude=magnitude,
+    ).to_dict()
+
+
+def _attach_external_deltas(event: Event, deltas: list[dict]) -> None:
+    for delta in deltas:
+        delta["event_id"] = event.id
+    event.causal_payload = {"deltas": deltas, "decision": None}
 
 
 
@@ -349,10 +386,13 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
         return []
         
     kind = FortuneKind(record["kind"].lower())
-    
+
     res_text: str = ""
     related_avatars = [avatar.id]
     actors_for_story = [avatar]  # 用于生成故事的角色列表
+    material_deltas: list[dict] = []
+    spirit_stones_before = int(avatar.magic_stone.value)
+    master_relation_before: tuple[Avatar, dict | None, dict | None] | None = None
 
     
     if kind == FortuneKind.WEAPON:
@@ -384,6 +424,16 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
                 weapon_name=weapon.name,
                 exchange_text=outcome.result_text,
             )
+            # The exchange outcome is the authoritative before/after pair;
+            # compare it directly because the avatar now holds the after item.
+            delta = _state_delta(
+                owner_id=str(avatar.id),
+                aspect="weapon",
+                before=_item_state(outcome.current_item_before),
+                after=_item_state(outcome.current_item_after),
+            )
+            if delta:
+                material_deltas.append(delta)
 
     elif kind == FortuneKind.AUXILIARY:
         auxiliary = _get_auxiliary_for_avatar(avatar)
@@ -414,6 +464,14 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
                 auxiliary_name=auxiliary.name,
                 exchange_text=outcome.result_text,
             )
+            delta = _state_delta(
+                owner_id=str(avatar.id),
+                aspect="auxiliary",
+                before=_item_state(outcome.current_item_before),
+                after=_item_state(outcome.current_item_after),
+            )
+            if delta:
+                material_deltas.append(delta)
 
     if kind == FortuneKind.TECHNIQUE:
         tech = _get_fortune_technique_for_avatar(avatar)
@@ -442,6 +500,14 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
             technique_name=tech.name,
             exchange_text=outcome.result_text,
         )
+        delta = _state_delta(
+            owner_id=str(avatar.id),
+            aspect="technique",
+            before=_item_state(outcome.current_item_before),
+            after=_item_state(outcome.current_item_after),
+        )
+        if delta:
+            material_deltas.append(delta)
 
     elif kind == FortuneKind.FIND_MASTER:
         master = _find_potential_master(avatar)
@@ -450,6 +516,13 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
             return []
         # 建立师徒关系：avatar 是徒弟，master 是师傅
         # avatar 视 master 为 MASTER，master 视 avatar 为 DISCIPLE（自动设置对偶）。
+        disciple_before = avatar.relations.get(master)
+        master_before = master.relations.get(avatar)
+        master_relation_before = (
+            master,
+            disciple_before.to_save_dict() if disciple_before is not None else None,
+            master_before.to_save_dict() if master_before is not None else None,
+        )
         avatar.acknowledge_master(master)
         from src.i18n import t
         res_text = t("{avatar_name} became disciple of {master_name}",
@@ -465,11 +538,26 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
                     avatar_name=avatar.name, amount=amount)
 
     elif kind == FortuneKind.CULTIVATION:
+        before_exp = int(avatar.cultivation_progress.exp)
         exp_gain = get_cultivation_exp_reward(avatar)
         avatar.cultivation_progress.add_exp(exp_gain)
         from src.i18n import t
         res_text = t("{avatar_name} gained {exp_gain} cultivation experience",
                     avatar_name=avatar.name, exp_gain=exp_gain)
+        delta = _state_delta(
+            owner_id=str(avatar.id), aspect="cultivation_exp",
+            before=before_exp, after=int(avatar.cultivation_progress.exp), magnitude=exp_gain,
+        )
+        if delta:
+            material_deltas.append(delta)
+
+    stone_delta = _state_delta(
+        owner_id=str(avatar.id), aspect="magic_stone",
+        before=spirit_stones_before, after=int(avatar.magic_stone.value),
+        magnitude=int(avatar.magic_stone.value) - spirit_stones_before,
+    )
+    if stone_delta:
+        material_deltas.append(stone_delta)
 
     # 提取角色正在进行的行为
     action_desc = t("wandering aimlessly")
@@ -498,13 +586,45 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
         related_avatars=related_avatars,
         is_major=True,
         event_type=event_type,
+        fact_kind=FactKind.OCCURRENCE,
+        causal_origin=CausalOrigin.EXTERNAL_EVENT,
     )
     if kind == FortuneKind.FIND_MASTER and len(actors_for_story) >= 2:
         disciple = avatar
         master = actors_for_story[1]
+        if master_relation_before is not None:
+            _master, disciple_before, master_before = master_relation_before
+            for owner_id, before, after in (
+                (
+                    f"{disciple.id}->{master.id}",
+                    disciple_before,
+                    disciple.relations[master].to_save_dict(),
+                ),
+                (
+                    f"{master.id}->{disciple.id}",
+                    master_before,
+                    master.relations[disciple].to_save_dict(),
+                ),
+            ):
+                material_deltas.append(
+                    StateDelta(
+                        owner_kind="relationship",
+                        owner_id=owner_id,
+                        aspect="identity_relations",
+                        before=(
+                            json.dumps(before, ensure_ascii=False, sort_keys=True)
+                            if before is not None
+                            else None
+                        ),
+                        after=json.dumps(after, ensure_ascii=False, sort_keys=True),
+                    ).to_dict()
+                )
         configure_positive_bond_event(base_event, avatar_a=disciple, avatar_b=master)
         apply_positive_bond_warmth(subject=disciple, other_party=master, event_type=event_type)
         apply_positive_bond_warmth(subject=master, other_party=disciple, event_type=event_type)
+    _attach_external_deltas(base_event, material_deltas)
+    if material_deltas:
+        base_event.fact_kind = FactKind.STATE_TRANSITION
 
     # 生成故事事件
     # 奇遇强制单人模式，不改变关系（因为关系已经在硬逻辑中处理了）
@@ -610,6 +730,10 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
         
     kind = MisfortuneKind(record["kind"].lower())
     res_text: str = ""
+    material_deltas: list[dict] = []
+    spirit_stones_before = int(avatar.magic_stone.value)
+    before_hp: int | None = None
+    before_exp: int | None = None
     
     from src.i18n import t
 
@@ -643,10 +767,27 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
         # 确保不扣到负数（或者允许负数？通常经验不为负）
         # 这里只扣减当前经验，不掉级
         current_exp = avatar.cultivation_progress.exp
+        before_exp = int(current_exp)
         actual_loss = min(current_exp, loss)
         avatar.cultivation_progress.exp -= actual_loss
         
         res_text = t("misfortune_result_backlash", name=avatar.name, amount=actual_loss)
+
+    stone_delta = _state_delta(
+        owner_id=str(avatar.id), aspect="magic_stone",
+        before=spirit_stones_before, after=int(avatar.magic_stone.value),
+        magnitude=int(avatar.magic_stone.value) - spirit_stones_before,
+    )
+    if stone_delta:
+        material_deltas.append(stone_delta)
+    if before_exp is not None:
+        exp_delta = _state_delta(
+            owner_id=str(avatar.id), aspect="cultivation_exp",
+            before=before_exp, after=int(avatar.cultivation_progress.exp),
+            magnitude=int(avatar.cultivation_progress.exp) - before_exp,
+        )
+        if exp_delta:
+            material_deltas.append(exp_delta)
         
     # 提取角色正在进行的行为
     action_desc = t("wandering aimlessly")
@@ -667,10 +808,21 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
                      result=res_text)
     
     month_at_finish = avatar.world.month_stamp
-    base_event = Event(month_at_finish, event_text, related_avatars=[avatar.id], is_major=True)
-    if kind == MisfortuneKind.INJURY:
+    base_event = Event(
+        month_at_finish,
+        event_text,
+        related_avatars=[avatar.id],
+        is_major=True,
+        event_type="world_misfortune",
+        fact_kind=FactKind.OCCURRENCE,
+        causal_origin=CausalOrigin.EXTERNAL_EVENT,
+    )
+    _attach_external_deltas(base_event, material_deltas)
+    if kind == MisfortuneKind.INJURY and before_hp is not None:
         from src.classes.individual_consequence import record_hp_change_from_event
         record_hp_change_from_event(avatar, base_event, before_hp)
+    if (base_event.causal_payload or {}).get("deltas"):
+        base_event.fact_kind = FactKind.STATE_TRANSITION
     
     story_event = await StoryEventService.maybe_create_story(
         kind=StoryEventKind.WORLD_MISFORTUNE,

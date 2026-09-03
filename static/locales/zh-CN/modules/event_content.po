@@ -105,6 +105,24 @@ msgstr "{avatar} 在 {location} 发现了一座墓碑：{poi}"
 msgid "{avatar} discovered a point of interest at {location}: {poi}"
 msgstr "{avatar} 在 {location} 发现了一个特殊地点：{poi}"
 
+msgid "{avatar} — {reason}"
+msgstr "{avatar}——{reason}"
+
+msgid "Grave of {deceased}"
+msgstr "{deceased}之墓"
+
+msgid "An old gravestone still carries a faint spiritual glow."
+msgstr "一方古旧墓碑，碑面仍残留淡淡灵光。"
+
+msgid "After defeating {loser}, {winner} found a {realm} {item_label} [{item_name}]."
+msgstr "{winner}击败{loser}后，发现了一件{realm}{item_label}《{item_name}》。"
+
+msgid "Looted {item_label} [{item_name}]. {result}"
+msgstr "缴获了{item_label}《{item_name}》。{result}"
+
+msgid "{region} monthly {resource} balance changed stock by {amount}."
+msgstr "{region}的{resource}月度结余使库存变化了{amount}。"
+
 msgid "{region} entered the condition {condition}."
 msgstr "{region}进入了「{condition}」状态。"
 

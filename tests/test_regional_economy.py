@@ -101,15 +101,31 @@ def test_explicit_production_and_demand_change_stock_with_causal_evidence(base_w
     queue = DomainInvalidationQueue()
     events = phase_update_regional_economy(base_world, invalidations=queue)
     assert city.economy.stocks["grain"] == 14
-    assert [event.event_type for event in events] == [
-        "regional_production",
-        "regional_consumption",
-    ]
+    assert [event.event_type for event in events] == ["regional_resource_balance"]
+    assert events[0].render_params == {
+        "region_id": str(city.id),
+        "resource_id": "grain",
+        "produced": 5.0,
+        "consumed": 3.0,
+        "net_amount": 2.0,
+    }
     assert all(event.causal_payload and event.causal_payload["deltas"] for event in events)
     invalidations = queue.drain(layer=DomainInvalidationLayer.MECHANICAL)
     assert invalidations
     assert all(item.reason is DomainInvalidationReason.RESOURCE_STOCK_CHANGED for item in invalidations)
     assert all(item.source_event_ids for item in invalidations)
+
+
+def test_equal_production_and_demand_do_not_emit_fake_stock_changes(base_world):
+    city = _city(base_world)
+    city.economy.demand_rates["grain"] = city.economy.production_rates["grain"]
+    queue = DomainInvalidationQueue()
+
+    events = phase_update_regional_economy(base_world, invalidations=queue)
+
+    assert city.economy.stocks["grain"] == 12
+    assert events == []
+    assert queue.drain(layer=DomainInvalidationLayer.MECHANICAL) == []
 
 
 def test_shortage_is_observable_but_does_not_invent_stock_or_route(base_world):

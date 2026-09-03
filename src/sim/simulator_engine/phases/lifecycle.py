@@ -27,6 +27,13 @@ def phase_resolve_death(world, living_avatars: list[Avatar]) -> list[Event]:
         # They may contain an already-dead avatar in the active collection,
         # which otherwise leaves an avatar portrait on the map with no grave.
         if avatar.is_dead:
+            # Actions can resolve and archive a death before this phase runs,
+            # while ``living_avatars`` is still the snapshot from step start.
+            # That death already has its factual transition; do not emit a
+            # second repair event for an avatar no longer in the active map.
+            if avatar.id not in world.avatar_manager.avatars:
+                dead_avatars.append(avatar)
+                continue
             death_event = build_death_event(
                 world,
                 avatar,
