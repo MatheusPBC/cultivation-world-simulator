@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Infrastructure site {site} changed physical condition."
+msgstr "O local de infraestrutura {site} teve sua condição física alterada."
+
+msgid "infrastructure_site_condition_changed"
+msgstr "A condição física de {site_name} foi alterada."
+
+msgid "Route {route} changed operational capacity."
+msgstr "A rota {route} teve sua capacidade operacional alterada."
+
+msgid "route_operational_capacity_changed"
+msgstr "A capacidade operacional da rota {route_id} foi alterada."
+
+msgid "infrastructure_site_restored"
+msgstr "{maintainer_kind}:{maintainer_id} restaurou a infraestrutura usando {spirit_stone_cost} pedras espirituais."

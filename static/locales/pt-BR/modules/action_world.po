@@ -41,6 +41,16 @@ msgstr "Ajude as pessoas na cidade, consumindo uma pequena quantia de Pedras Esp
 msgid "help_people_requirements"
 msgstr "Apenas em áreas urbanas e com Pedras Espirituais suficientes"
 
+# Action: SponsorDaoRite
+msgid "sponsor_dao_rite_action_name"
+msgstr "Patrocinar rito do Dao"
+
+msgid "sponsor_dao_rite_description"
+msgstr "Patrocine um rito popular conhecido na região atual em nome da corte ou da seita"
+
+msgid "sponsor_dao_rite_requirements"
+msgstr "Requer ser o imperador reinante ou um patriarca vivo, estar presente na região e patrocinar no máximo um rito por mês"
+
 # Action: Mine
 msgid "mine_action_name"
 msgstr "Minerar"

@@ -218,6 +218,7 @@ async def _resolve_opportunity(owner: "Avatar", record: OpportunityRecord, relat
         month_stamp=owner.world.month_stamp,
         start_text=record.hint_text,
         result_text=result_text,
+        source_event=base_event,
         actors=[owner, _resolve_target_avatar(owner.world, record.target_id) if record.target_type == OpportunityTargetType.AVATAR else None],
         related_avatar_ids=related_avatars,
         prompt=t("opportunity_story_prompt"),

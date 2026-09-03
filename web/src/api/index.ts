@@ -4,6 +4,7 @@ export { avatarApi, type HoverParams } from './modules/avatar';
 export { systemApi } from './modules/system';
 export { llmApi } from './modules/llm';
 export { eventApi } from './modules/event';
+export { institutionalPresenceApi } from './modules/institutionalPresence';
 
 export type { 
   AppSettingsDTO,
@@ -35,5 +36,6 @@ export type {
   ChronicleSegmentDTO,
   WorldChronicleResponseDTO,
   SectTerritoriesResponseDTO,
-  DynastyOverviewResponseDTO
+  DynastyOverviewResponseDTO,
+  InstitutionalPresenceResponseDTO
 } from '../types/api';

@@ -244,6 +244,8 @@ def test_reaction_receipts_are_idempotent_per_domain_and_round_trip():
         "condition-1",
         "population",
         "activation-event",
+        decision="act",
+        affordance_id="aff-population",
         decision_event_ids=("population-decision",),
         completed=True,
     )
@@ -251,6 +253,8 @@ def test_reaction_receipts_are_idempotent_per_domain_and_round_trip():
         "condition-1",
         "economy",
         "activation-event",
+        decision="act",
+        affordance_id="aff-economy",
         decision_event_ids=("economy-decision",),
         completed=True,
     )

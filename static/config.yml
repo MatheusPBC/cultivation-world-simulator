@@ -12,16 +12,13 @@ llm:
     nickname: "normal"
     single_choice: "normal"
     relation_resolver: "fast"
-    relation_delta: "fast"
+    relationship_impact: "fast"
     story_teller: "fast"
     interaction_feedback: "fast"
     history_influence: "normal"
     backstory: "fast"
     custom_content_generation: "normal"
     fate_revelation: "normal"
-    random_minor_event: "fast"
-    sect_random_event: "fast"
-    sect_random_event_reason: "fast"
     sect_decider: "normal"
     sect_thinker: "fast"
     event_appraisal: "fast"
@@ -81,7 +78,6 @@ world:
       empty: 20
       injury: 10
   fate_revelation_probability: 0.005
-  random_minor_event_prob: 0.01
   treasure:
     spawn_probability_per_month: 0.005
     max_active_count: 3
@@ -164,9 +160,6 @@ social:
       disliked: -25
       friend: 25
       best_friend: 60
-    llm_delta:
-      min: -6
-      max: 6
     identity_friendliness_floor:
       lovers: 20
       sworn_sibling: 20
@@ -177,7 +170,7 @@ social:
       gift: llm
       spar: llm
       gathering: llm
-      random_minor_event: llm
+      relationship_impact: llm
     fixed_deltas:
       confess:
         accepted:

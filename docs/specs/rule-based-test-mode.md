@@ -33,7 +33,7 @@
 
 ### 4.2 LLM task
 
-LLM task 是调用 `call_llm_with_task_name(task_name, ...)` 时的稳定任务名，例如 `action_decision`、`relation_delta`、`story_teller`。
+LLM task 是调用 `call_llm_with_task_name(task_name, ...)` 时的稳定任务名，例如 `action_decision`、`relationship_impact`、`story_teller`。
 
 ### 4.3 规则 fallback
 
@@ -263,13 +263,12 @@ def registered_test_mode_tasks() -> frozenset[str]: ...
 | `nickname` | 称号 | `{"nickname": "", "thinking": "", "reason": ""}`，不授予称号 |
 | `story_teller` | 小故事/采集故事 | `{"story": ""}`，事实事件保留，跳过故事扩写 |
 | `relation_resolver` | 关系变化判断 | `{"changed": false}` |
-| `relation_delta` | 双向关系数值 | `{"delta_a_to_b": 0, "delta_b_to_a": 0}` |
+| `relationship_impact` | 关系影响定性解释 | `{"valence": "ambivalent", "intensity": "low"}` |
 | `interaction_feedback` | 双人交互反馈 | 返回该调用方要求的“无额外影响”合法结构；实施前需按实际 parser 固化字段 |
 | `single_choice` | 宗门招募、物品交换、世界秘密等 | 不直接猜选项；应由 `single_choice` 的现有 fallback policy 解析合法 key。必要时让 registry 返回显式 fallback 标记，由 resolver 选择合法项 |
 | `sect_decider` | 年度宗门规划 | 返回调用方可解析的维持现状计划，不招募、不扩张、不进行资源转移 |
 | `sect_thinker` | 宗门年度思考 | 返回空或固定的短说明，且不改变决策结果 |
 | `fate_revelation` | 天机揭示 | 返回调用方可解析的“不触发/无效果”结构 |
-| `random_minor_event` | 随机小事件 | 返回调用方可解析的“不触发”结构 |
 | `world_lore_style_guide` | 世界观改写 | 由上层直接跳过整条世界观改写 pipeline；不应伪造 style guide |
 | `world_lore_region_rewrite` | 世界观区域改写 | 同上，跳过 |
 | `world_lore_sect_group_rewrite` | 世界观宗门改写 | 同上，跳过 |
@@ -386,7 +385,7 @@ TestModeLLMError
 测试模式不写真实 `log_llm_call()` 记录，避免测试结果被误统计为模型用量。可选地写低频结构化调试日志，例如：
 
 ```text
-[test-mode] resolved LLM task with rule fallback: relation_delta
+[test-mode] resolved LLM task with rule fallback: relationship_impact
 ```
 
 日志不得包含 API Key、完整 prompt 或用户敏感配置。

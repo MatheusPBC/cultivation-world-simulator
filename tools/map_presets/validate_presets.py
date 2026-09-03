@@ -10,15 +10,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.classes.environment.tile import TileType  # noqa: E402
 from src.run.load_map import load_cultivation_world_map  # noqa: E402
 from src.run.map_presets import list_map_presets  # noqa: E402
-from src.run.map_source import (  # noqa: E402
-    derive_tile_rows_from_region_rows,
-    load_region_tile_bindings,
-    read_map_source,
-)
+from src.run.map_source import read_map_source  # noqa: E402
 from tools.map_presets.quality_audit import audit_map_source, format_issues  # noqa: E402
+from tools.map_presets.infrastructure_sites import validate_infrastructure_sites  # noqa: E402
 
 
 CONFIG_DIR = PROJECT_ROOT / "static" / "game_configs"
@@ -150,12 +146,6 @@ def validate() -> None:
         raise AssertionError("No map presets found")
 
     known_region_ids = _metadata_region_ids()
-    explicit_bindings = load_region_tile_bindings()
-    normal_region_ids = {rid for rid in known_region_ids if _region_type(rid) == "normal"}
-    missing_normal_bindings = sorted(normal_region_ids - set(explicit_bindings))
-    if missing_normal_bindings:
-        raise AssertionError(f"Missing normal region tile bindings: {missing_normal_bindings}")
-
     expected_region_ids: set[int] | None = None
 
     for preset in presets:
@@ -168,16 +158,10 @@ def validate() -> None:
         if not source.region_rows:
             raise AssertionError(f"{preset.id}: empty region map")
 
-        try:
-            TileType(source.wilderness_tile)
-        except ValueError as exc:
-            raise AssertionError(f"{preset.id}: unknown wilderness tile {source.wilderness_tile}") from exc
-
-        tile_rows = derive_tile_rows_from_region_rows(
-            source.region_rows,
-            wilderness_tile=source.wilderness_tile,
-            bindings=explicit_bindings,
-        )
+        tile_rows = [
+            [tile.value if hasattr(tile, "value") else str(tile) for tile in row]
+            for row in source.geography.terrain_rows
+        ]
         _validate_visual_shape(preset.id, tile_rows)
 
         region_ids: set[int] = set()
@@ -206,6 +190,17 @@ def validate() -> None:
                 raise AssertionError(f"{preset.id}: region {rid} is too fragmented, components={component_count}")
 
         _validate_landmarks(preset.id, source, coords_by_region)
+        sites = getattr(source, "infrastructure_sites", ())
+        if not sites:
+            raise AssertionError(f"{preset.id}: at least one infrastructure site is required")
+        validate_infrastructure_sites(
+            sites,
+            width=source.width,
+            height=source.height,
+            region_rows=source.region_rows,
+            routes=getattr(source, "routes", ()),
+            water_bodies=source.geography.water_bodies,
+        )
         _validate_quality_audit(preset.id, source)
 
         game_map = load_cultivation_world_map(preset.id)

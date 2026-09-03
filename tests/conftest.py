@@ -255,7 +255,7 @@ def mock_llm_managers():
          patch("src.sim.simulator_engine.phases.lifecycle.process_avatar_backstory", new_callable=AsyncMock) as mock_backstory, \
          patch("src.sim.simulator_engine.phases.lifecycle.process_avatar_nickname", new_callable=AsyncMock) as mock_nick, \
          patch("src.classes.relation.relation_resolver.RelationResolver.run_batch", new_callable=AsyncMock) as mock_rr, \
-         patch("src.classes.relation.relation_delta_service.call_llm_with_task_name", new_callable=AsyncMock) as mock_relation_delta, \
+         patch("src.classes.relation.relation_delta_service.call_llm_with_task_name", new_callable=AsyncMock) as mock_relationship_impact, \
          patch("src.classes.world_lore.WorldLoreManager.apply_world_lore", new_callable=AsyncMock) as mock_hist, \
          patch("src.classes.story_teller.call_llm_with_task_name", new_callable=AsyncMock) as mock_call_llm_story, \
          patch("src.systems.chronicle_service.ChronicleService.maybe_generate_chapter", new_callable=AsyncMock) as mock_chronicle, \
@@ -266,7 +266,10 @@ def mock_llm_managers():
         mock_backstory.return_value = None
         mock_nick.return_value = None
         mock_rr.return_value = []
-        mock_relation_delta.return_value = {"delta_a_to_b": 0, "delta_b_to_a": 0}
+        mock_relationship_impact.return_value = {
+            "a_to_b": {"valence": "ambivalent", "intensity": "mild"},
+            "b_to_a": {"valence": "ambivalent", "intensity": "mild"},
+        }
         mock_hist.return_value = None
         mock_call_llm_story.return_value = {"story": "测试故事"}
         mock_chronicle.return_value = None
@@ -277,7 +280,7 @@ def mock_llm_managers():
             "backstory": mock_backstory,
             "nick": mock_nick,
             "rr": mock_rr,
-            "relation_delta": mock_relation_delta,
+            "relationship_impact": mock_relationship_impact,
             "hist": mock_hist,
             "story": mock_call_llm_story,
             "gathering_story": mock_call_llm_story,

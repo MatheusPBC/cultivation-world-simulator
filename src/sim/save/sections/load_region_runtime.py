@@ -15,14 +15,6 @@ class RegionRuntimeLoadSection:
         game_map = context.game_map
         all_avatars = context.all_avatars or {}
 
-        route_data = world_data.get("routes")
-        if route_data is not None:
-            from src.classes.environment.route import Route
-
-            if not isinstance(route_data, list):
-                raise ValueError("Saved routes must be a list")
-            game_map.set_routes(Route.from_dict(item) for item in route_data)
-
         for rid_str, avatar_id in world_data.get("cultivate_regions_hosts", {}).items():
             rid = int(rid_str)
             if rid in game_map.regions:

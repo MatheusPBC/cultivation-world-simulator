@@ -177,6 +177,81 @@ def _semantic_discovery(infos: Mapping[str, Any]) -> dict[str, Any]:
             "mechanic_proposals": [],
         }
 
+    infrastructure_site_capacity = next(
+        (
+            item
+            for item in sorted(
+                metrics,
+                key=lambda candidate: (
+                    str(candidate.get("concept_id", "")),
+                    repr(sorted(dict(candidate.get("qualifiers", {}) or {}).items())),
+                ),
+            )
+            if item.get("dimension") == "capacity"
+            and item.get("unit") == "site_equivalents"
+            and dict(item.get("qualifiers", {}) or {}).get("kind")
+            == "infrastructure_site"
+            and str(item.get("concept_id", "")).strip()
+            and str(item.get("availability", "measurable"))
+            not in {"unknown", "unmeasurable"}
+        ),
+        None,
+    )
+    if infrastructure_site_capacity is not None:
+        capability_id = str(infrastructure_site_capacity["concept_id"]).strip()
+        qualifiers = dict(infrastructure_site_capacity.get("qualifiers", {}) or {})
+        metric_id = _fit_semantic_id(
+            f"infrastructure_site_{capability_id}_capacity",
+            f"infrastructure-site:{capability_id}:{sorted(qualifiers.items())}",
+        )
+        condition_id = _fit_semantic_id(
+            f"operational_infrastructure_site_{capability_id}",
+            f"infrastructure-site-condition:{capability_id}:{sorted(qualifiers.items())}",
+        )
+        return {
+            "concepts": [
+                {
+                    "id": metric_id,
+                    "label": metric_id.replace("_", " "),
+                    "concept_kind": "derived_metric",
+                },
+                {
+                    "id": condition_id,
+                    "label": condition_id.replace("_", " "),
+                    "concept_kind": "condition",
+                },
+            ],
+            "derived_metrics": [{
+                "id": metric_id,
+                "concept_id": metric_id,
+                "dimension": "capacity",
+                "target_kind": "region",
+                "expression": {
+                    "op": "clamp",
+                    "min": 0.0,
+                    "max": 1.0,
+                    "value": {
+                        "op": "metric",
+                        "dimension": "capacity",
+                        "concept_id": capability_id,
+                        "qualifiers": qualifiers,
+                    },
+                },
+                "unit": "site_equivalents",
+            }],
+            "conditions": [{
+                "id": condition_id,
+                "concept_id": condition_id,
+                "target_kind": "region",
+                "metric_definition_id": metric_id,
+                "activate_above": 0.5,
+                "resolve_below": 0.2,
+                "activate_after_months": 1,
+                "resolve_after_months": 1,
+            }],
+            "mechanic_proposals": [],
+        }
+
     injury_burden = next(
         (
             item
@@ -373,67 +448,6 @@ def _action_decision(infos: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _city_interpreter(infos: Mapping[str, Any]) -> dict[str, Any]:
-    city = dict(infos.get("city", {}) or {})
-    governance = dict(city.get("governance", {}) or {})
-    try:
-        administrative_capacity = float(governance.get("administrative_capacity", 0))
-    except (TypeError, ValueError):
-        administrative_capacity = 0.0
-    project_kinds = {
-        str(item)
-        for item in infos.get("eligible_project_kinds", []) or []
-        if str(item).strip()
-    }
-    if administrative_capacity > 0 and "settlement_capacity_expansion" in project_kinds:
-        return {
-            "decision": "urban_capacity_project",
-            "reason": "Persistent settlement pressure can be answered by grounded urban expansion.",
-            "action_intent": {
-                "action_kind": "urban_capacity_project",
-                "project_kind": "settlement_capacity_expansion",
-            },
-        }
-    candidates = [
-        dict(asset)
-        for asset in infos.get("assets", []) or []
-        if isinstance(asset, Mapping)
-    ]
-    eligible = {
-        str(capability)
-        for capability in infos.get("eligible_capability_ids", []) or []
-        if str(capability).strip()
-    }
-    candidates = [
-        asset
-        for asset in candidates
-        if eligible.intersection(str(item) for item in asset.get("capability_ids", []) or [])
-    ]
-    candidates.sort(key=lambda asset: (
-        float(asset.get("effective_quality", 1.0)),
-        str(asset.get("id", "")),
-    ))
-    if administrative_capacity > 0 and candidates:
-        capability_ids = sorted({
-            str(capability)
-            for capability in candidates[0].get("capability_ids", []) or []
-            if str(capability).strip() and str(capability) in eligible
-        })
-        if capability_ids:
-            return {
-                "decision": "urban_maintenance",
-                "reason": "Administrative capacity can maintain the weakest grounded urban capability.",
-                "action_intent": {
-                    "action_kind": "urban_maintenance",
-                    "capability_id": capability_ids[0],
-                },
-            }
-    return {
-        "decision": "maintain",
-        "reason": "No grounded urban maintenance affordance is available.",
-    }
-
-
 def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str, Any]:
     """Return a deterministic, parser-safe result without loading prompts or networking."""
     if task_name == "action_decision":
@@ -448,8 +462,9 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         return {"story": ""}
     if task_name == "relation_resolver":
         return {"changed": False}
-    if task_name == "relation_delta":
-        return {"delta_a_to_b": 0, "delta_b_to_a": 0}
+    if task_name == "relationship_impact":
+        neutral = {"valence": "ambivalent", "intensity": "mild"}
+        return {"a_to_b": neutral, "b_to_a": neutral}
     if task_name == "single_choice":
         # The domain resolver turns an invalid choice into its configured legal fallback.
         return {"choice": "", "thinking": ""}
@@ -504,56 +519,7 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         }
     if task_name == "semantic_discovery":
         return _semantic_discovery(infos)
-    if task_name == "population_interpreter":
-        origin = dict(infos.get("origin", {}) or {})
-        try:
-            origin_ratio = float(origin["ratio"])
-        except (KeyError, TypeError, ValueError):
-            origin_ratio = 1.0
-        for candidate in infos.get("candidates", []) or []:
-            try:
-                has_capacity = float(candidate["capacity"]) > float(candidate["population"])
-                lower_load = float(candidate["ratio"]) < origin_ratio
-            except (KeyError, TypeError, ValueError):
-                continue
-            if lower_load and has_capacity:
-                return {
-                    "decision": "act",
-                    "reason": "A lower-load city has available capacity.",
-                    "action_intent": {
-                        "action_kind": "population_transfer",
-                        "preferences": ["lower_settlement_load", "available_capacity"],
-                    },
-                }
-        return {
-            "decision": "maintain",
-            "reason": "No lower-load city with available capacity was found.",
-        }
-    if task_name == "economy_interpreter":
-        destination = dict(infos.get("destination", {}) or {})
-        for candidate in infos.get("candidates", []) or []:
-            route = dict(candidate.get("route", {}) or {})
-            if (
-                route.get("available") is True
-                and float(candidate.get("stock", 0)) > 0
-                and float(candidate.get("source_access", 0)) > 0
-                and float(destination.get("access", 0)) > 0
-            ):
-                return {
-                    "decision": "act",
-                    "reason": "A grounded route connects a stocked source to the shortage.",
-                    "action_intent": {
-                        "action_kind": "resource_transfer",
-                        "preferences": ["available_supply", "higher_route_quality"],
-                    },
-                }
-        return {
-            "decision": "maintain",
-            "reason": "No grounded route can carry the resource this month.",
-        }
-    if task_name == "city_interpreter":
-        return _city_interpreter(infos)
-    if task_name in {"sect_decider", "interaction_feedback", "fate_revelation", "random_minor_event"}:
+    if task_name in {"sect_decider", "interaction_feedback", "fate_revelation"}:
         return {}
     if task_name.startswith("world_lore_"):
         raise TestModeLLMUnavailable("world_lore_rewrite")
@@ -565,8 +531,8 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
 def registered_test_mode_tasks() -> frozenset[str]:
     return frozenset({
         "action_decision", "backstory", "long_term_objective", "nickname", "story_teller",
-        "relation_resolver", "relation_delta", "single_choice", "sect_thinker", "sect_decider",
-        "interaction_feedback", "fate_revelation", "random_minor_event", "event_appraisal",
+        "relation_resolver", "relationship_impact", "single_choice", "sect_thinker", "sect_decider",
+        "interaction_feedback", "fate_revelation", "event_appraisal",
         "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary", "chronicle_chapter",
-        "live_guide_ask", "dao_petition", "semantic_discovery", "population_interpreter", "economy_interpreter", "city_interpreter",
+        "live_guide_ask", "dao_petition", "semantic_discovery",
     })

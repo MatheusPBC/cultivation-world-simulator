@@ -3,6 +3,7 @@ import { useWorldStore } from '@/stores/world'
 import { useAvatarStore } from '@/stores/avatar'
 import { useEventStore } from '@/stores/event'
 import { useMapStore } from '@/stores/map'
+import { useUiStore } from '@/stores/ui'
 import type { AvatarSummary, GameEvent } from '@/types/core'
 import type { TickPayloadDTO } from '@/types/api'
 
@@ -15,12 +16,15 @@ vi.mock('@/api', () => ({
     setPhenomenon: vi.fn(),
     fetchSectTerritories: vi.fn(),
   },
+  institutionalPresenceApi: {
+    fetch: vi.fn().mockResolvedValue([]),
+  },
   eventApi: {
     fetchEvents: vi.fn(),
   },
 }))
 
-import { worldApi, eventApi } from '@/api'
+import { worldApi, eventApi, institutionalPresenceApi } from '@/api'
 
 const createMockAvatar = (overrides: Partial<AvatarSummary> = {}): AvatarSummary => ({
   id: 'avatar-1',
@@ -103,6 +107,17 @@ describe('useWorldStore', () => {
   })
 
   describe('handleTick', () => {
+    it('refreshes institutional presence in the same tick as sect territories', () => {
+      store.isLoaded = true
+
+      store.handleTick({
+        type: 'tick', year: 101, month: 3, avatars: [], events: [],
+      })
+
+      expect(worldApi.fetchSectTerritories).toHaveBeenCalledTimes(1)
+      expect(institutionalPresenceApi.fetch).toHaveBeenCalledTimes(1)
+    })
+
     it('should do nothing if not loaded', () => {
       store.isLoaded = false
       const payload: TickPayloadDTO = {
@@ -136,6 +151,66 @@ describe('useWorldStore', () => {
       expect(store.year).toBe(101)
       expect(store.month).toBe(3)
       expect(store.elapsedMonths).toBe(14)
+    })
+
+    it('should apply infrastructure site updates from a tick without a map reload', () => {
+      store.isLoaded = true
+      mapStore.routes = [{
+        id: 'route-1', endpointRegionIds: [1, 2], mode: 'road', capacity: 10,
+        operationalCapacity: 8, quality: 0.8, enabled: true, allowedResourceIds: [],
+        dependencySiteIds: ['bridge-1'],
+      }]
+      mapStore.infrastructureSites = new Map([['bridge-1', {
+        id: 'bridge-1', name: 'Ponte', kind: 'bridge', cellRefs: [[0, 0]], regionIds: [1, 2],
+        routeIds: [], waterBodyIds: [], capabilityIds: [], ownerRef: null, maintainerRef: null,
+        integrity: 1, enabled: true, status: 'active', x: 0, y: 0, clickable: true, lastEventId: null,
+      }]])
+
+      store.handleTick({
+        type: 'tick', year: 101, month: 3, avatars: [], events: [],
+        site_updates: [{
+          op: 'upsert',
+          site: {
+            id: 'bridge-1', name: 'Ponte', kind: 'bridge', cell_refs: [[0, 0]], region_ids: [1, 2],
+            route_ids: [], water_body_ids: [], capability_ids: [], owner_ref: null, maintainer_ref: null,
+            integrity: 0.2, enabled: false, status: 'destroyed', x: 0, y: 0, clickable: true,
+            last_event_id: 'event-bridge',
+          },
+        }],
+        route_updates: [{
+          id: 'route-1', operational_capacity: 1.6, dependency_site_ids: ['bridge-1'],
+        }],
+      })
+
+      expect(mapStore.infrastructureSites.get('bridge-1')).toMatchObject({
+        status: 'destroyed', integrity: 0.2, enabled: false, lastEventId: 'event-bridge',
+      })
+      expect(mapStore.routes[0]).toMatchObject({
+        id: 'route-1', operationalCapacity: 1.6, dependencySiteIds: ['bridge-1'],
+      })
+    })
+
+    it('refreshes an open route detail only when that route changes', () => {
+      store.isLoaded = true
+      const uiStore = useUiStore()
+      uiStore.selectedTarget = { type: 'route', id: 'route-1' }
+      uiStore.refreshDetail = vi.fn().mockResolvedValue(undefined)
+
+      store.handleTick({
+        type: 'tick', year: 101, month: 3, avatars: [], events: [],
+        route_updates: [{
+          id: 'route-2', operational_capacity: 4, dependency_site_ids: [],
+        }],
+      })
+      expect(uiStore.refreshDetail).not.toHaveBeenCalled()
+
+      store.handleTick({
+        type: 'tick', year: 101, month: 4, avatars: [], events: [],
+        route_updates: [{
+          id: 'route-1', operational_capacity: 2, dependency_site_ids: ['bridge-1'],
+        }],
+      })
+      expect(uiStore.refreshDetail).toHaveBeenCalledTimes(1)
     })
 
     it('should merge avatar updates when loaded', () => {
@@ -372,6 +447,18 @@ describe('useWorldStore', () => {
       avatarStore.avatars = new Map([['a1', createMockAvatar()]])
       eventStore.events = [createMockEvent()]
       store.currentPhenomenon = { id: 1, name: 'Test', description: 'Test' }
+      mapStore.territoryRows = [[1]]
+      mapStore.routes = [{
+        id: 'route-1',
+        endpointRegionIds: [1, 2],
+        mode: 'road',
+        capacity: 10,
+        operationalCapacity: 8,
+        quality: 0.8,
+        enabled: true,
+        allowedResourceIds: ['grain'],
+        dependencySiteIds: [],
+      }]
 
       store.reset()
 
@@ -384,6 +471,8 @@ describe('useWorldStore', () => {
       expect(eventStore.events).toEqual([])
       expect(store.isLoaded).toBe(false)
       expect(store.currentPhenomenon).toBeNull()
+      expect(mapStore.territoryRows).toEqual([])
+      expect(mapStore.routes).toEqual([])
     })
   })
 
@@ -391,7 +480,24 @@ describe('useWorldStore', () => {
     it('should load map data and set isLoaded in mapStore', async () => {
       vi.mocked(worldApi.fetchMap).mockResolvedValue({
         data: [[{ type: 'grass' }]],
+        territoryRows: [[1]],
+        routes: [{
+          id: 'route-1',
+          endpointRegionIds: [1, 2],
+          mode: 'road',
+          capacity: 10,
+          operationalCapacity: 8,
+          quality: 0.8,
+          enabled: true,
+          allowedResourceIds: ['grain'],
+          dependencySiteIds: [],
+        }],
         regions: [{ id: 'r1', name: 'Region 1' }],
+        infrastructureSites: [],
+        geography: {
+          elevationRows: [[120]],
+          waterBodies: [],
+        },
         renderConfig: { water_speed: 'low', cloud_frequency: 'high' },
       } as any)
 
@@ -402,6 +508,19 @@ describe('useWorldStore', () => {
       expect(mapStore.regions.size).toBe(1)
       expect(mapStore.renderConfig.water_speed).toBe('low')
       expect(mapStore.renderConfig.cloud_frequency).toBe('high')
+      expect(mapStore.geography).toEqual({ elevationRows: [[120]], waterBodies: [] })
+      expect(mapStore.territoryRows).toEqual([[1]])
+      expect(mapStore.routes).toEqual([{
+        id: 'route-1',
+        endpointRegionIds: [1, 2],
+        mode: 'road',
+        capacity: 10,
+        operationalCapacity: 8,
+        quality: 0.8,
+        enabled: true,
+        allowedResourceIds: ['grain'],
+        dependencySiteIds: [],
+      }])
       // Note: store.isLoaded checks world loaded state, mapStore.isLoaded checks map loaded state.
       // preloadMap only affects mapStore.
       expect(mapStore.isLoaded).toBe(true) 
@@ -454,7 +573,11 @@ describe('useWorldStore', () => {
     it('should load map and state if map not loaded', async () => {
       vi.mocked(worldApi.fetchMap).mockResolvedValue({
         data: [[{ type: 'grass' }]],
+        territoryRows: [[1]],
+        routes: [],
+        geography: { elevationRows: [[0]], waterBodies: [] },
         regions: [{ id: 'r1', name: 'Region 1' }],
+        infrastructureSites: [],
         renderConfig: {},
       } as any)
       vi.mocked(worldApi.fetchInitialState).mockResolvedValue({
@@ -848,4 +971,3 @@ describe('useWorldStore', () => {
     })
   })
 })
-

@@ -2,9 +2,9 @@ import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';
 import { avatarApi } from '../api';
 import { mapDetailDTOToDomain } from '../api/mappers/detailMapper';
-import type { AvatarDetail, POIDetail, RegionDetail, SectDetail } from '../types/core';
+import type { AvatarDetail, InfrastructureSiteDetail, POIDetail, RegionDetail, RouteDetail, SectDetail } from '../types/core';
 
-export type SelectionType = 'avatar' | 'region' | 'sect' | 'poi';
+export type SelectionType = 'avatar' | 'region' | 'sect' | 'poi' | 'site' | 'route';
 
 export interface Selection {
   type: SelectionType;
@@ -35,7 +35,7 @@ export const useUiStore = defineStore('ui', () => {
   
   // 详情数据 (可能为空，或正在加载)
   // 使用 shallowRef 避免深层响应式转换带来的性能开销 (对于大型嵌套对象，如 AvatarDetail)
-  const detailData = shallowRef<AvatarDetail | RegionDetail | SectDetail | POIDetail | null>(null);
+  const detailData = shallowRef<AvatarDetail | RegionDetail | SectDetail | POIDetail | InfrastructureSiteDetail | RouteDetail | null>(null);
   const isLoadingDetail = ref(false);
   const detailError = ref<string | null>(null);
 
@@ -150,4 +150,3 @@ export const useUiStore = defineStore('ui', () => {
     refreshDetail
   };
 });
-

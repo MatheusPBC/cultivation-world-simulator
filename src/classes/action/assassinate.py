@@ -129,6 +129,7 @@ class Assassinate(InstantAction, TargetingMixin):
                 month_stamp=self.world.month_stamp,
                 start_text=self._start_event_content,
                 result_text=result_event.content,
+                source_event=result_event,
                 actors=[self.avatar, target],
                 related_avatar_ids=rel_ids,
                 prompt=self.get_story_prompt_success(),

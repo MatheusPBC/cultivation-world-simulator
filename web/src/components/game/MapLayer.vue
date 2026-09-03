@@ -1,20 +1,36 @@
 <script setup lang="ts">
 import { Rectangle } from 'pixi.js'
-import { useMapLayerRenderer } from './composables/useMapLayerRenderer'
+import { computed } from 'vue'
+import SectInfluenceLayer from './SectInfluenceLayer.vue'
+import InstitutionalPresenceLayer from './InstitutionalPresenceLayer.vue'
+import {
+  DEFAULT_MAP_LAYER_VISIBILITY,
+  MAP_LAYER_Z_INDEX,
+  useMapLayerRenderer,
+  type MapLayerVisibility,
+} from './composables/useMapLayerRenderer'
 import { estimateRegionLabelSize } from './utils/mapLabels'
+
+const props = withDefaults(defineProps<{ visibility?: MapLayerVisibility }>(), {
+  visibility: undefined,
+})
 
 const emit = defineEmits<{
   (e: 'mapLoaded', payload: { width: number, height: number }): void
   (e: 'regionSelected', payload: { type: 'region'; id: string; name?: string }): void
 }>()
 
-const {
-  mapContainer,
-  locale,
-  visibleRegionLabels,
-  getRegionTextStyle,
-  handleRegionSelect,
-} = useMapLayerRenderer(emit)
+const mapVisibility = computed(() => props.visibility)
+const resolvedVisibility = computed(() => props.visibility ?? DEFAULT_MAP_LAYER_VISIBILITY)
+const renderer = useMapLayerRenderer(emit, mapVisibility)
+
+// Keep the public bindings explicit: the labels are rendered by Vue, while
+// the physical/territorial layers are owned by the Pixi renderer.
+const mapContainer = renderer.mapContainer
+const locale = renderer.locale
+const visibleRegionLabels = renderer.visibleRegionLabels
+const getRegionTextStyle = renderer.getRegionTextStyle
+const handleRegionSelect = renderer.handleRegionSelect
 
 function getRegionLabelHitArea(label: string, type: string, locale: string) {
   const { width, height } = estimateRegionLabelSize(label, type, locale)
@@ -24,12 +40,22 @@ function getRegionLabelHitArea(label: string, type: string, locale: string) {
 </script>
 
 <template>
-  <container>
+  <container label="map-layers" sortable-children>
      <!-- Tile Layer -->
-     <container ref="mapContainer" />
+     <container ref="mapContainer" label="physical-map" :z-index="MAP_LAYER_Z_INDEX.physical" />
+
+     <SectInfluenceLayer
+       :visible="resolvedVisibility.sects"
+       :z-index="MAP_LAYER_Z_INDEX.sects"
+     />
+
+     <InstitutionalPresenceLayer
+       :visible="resolvedVisibility.institutionalPresence"
+       :z-index="MAP_LAYER_Z_INDEX.institutionalPresence"
+     />
      
      <!-- Region Labels Layer (Above tiles) -->
-     <container :z-index="200">
+     <container label="region-labels" :z-index="MAP_LAYER_Z_INDEX.labels">
         <!-- @vue-ignore -->
         <container
             v-for="r in visibleRegionLabels"

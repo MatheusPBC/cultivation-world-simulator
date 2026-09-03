@@ -106,7 +106,7 @@
 
 1. `roleplay_conversation_turn.txt`
 2. `roleplay_conversation_summary.txt`
-3. `relation_delta.txt`
+3. `relationship_impact.txt`
 4. `random_minor_event_pair.txt`
 5. `random_minor_event_solo.txt`
 
@@ -368,4 +368,3 @@
 
 1. 这条路径最能快速把“新功能只在中文完整可用”的问题压下去。
 2. 也最容易在测试和人工体验里看到实际收益。
-

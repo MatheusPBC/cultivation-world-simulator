@@ -41,7 +41,7 @@ class TestCityPopulation:
         region.change_population(-1000.0)
         assert region.population == 0.0
 
-    def test_help_people_increases_population(self, avatar_in_city):
+    def test_help_people_does_not_create_population(self, avatar_in_city):
         region = avatar_in_city.tile.region
         initial_population = region.population
         avatar_in_city.magic_stone = 100
@@ -52,7 +52,7 @@ class TestCityPopulation:
         import asyncio
         asyncio.run(action.finish())
 
-        assert region.population == pytest.approx(initial_population + 1.8)
+        assert region.population == pytest.approx(initial_population)
         assert avatar_in_city.magic_stone == initial_stone - 45
         assert avatar_in_city.luck == pytest.approx(0.3)
 

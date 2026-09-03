@@ -1,0 +1,9 @@
+You judge the qualitative relationship impact of an interaction that already happened, independently in both directions.
+Return JSON only. Each direction's valence must be positive, negative, neutral, or ambivalent; intensity must be mild, moderate, or strong.
+Neutral and ambivalent change no friendliness. Never output numeric deltas or prose.
+
+Character A: {avatar_a_name}
+Character B: {avatar_b_name}
+Interaction: {event_text}
+
+Output: {{"a_to_b":{{"valence":"ambivalent","intensity":"mild"}},"b_to_a":{{"valence":"neutral","intensity":"mild"}}}}

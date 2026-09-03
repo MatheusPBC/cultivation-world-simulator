@@ -1,10 +1,10 @@
 import pytest
 
 from src.classes.environment.region import CityRegion
+from src.classes.environment.infrastructure import InfrastructureSite
 from src.classes.environment.route import Route
 from src.classes.event import Event
 from src.classes.regional_economy import InfrastructureState, RegionalEconomyState
-from src.classes.domain_proposal import EconomyPreference
 from src.systems.resource_transfer import resolve_resource_transfer
 
 
@@ -64,10 +64,53 @@ def test_resource_transfer_uses_explicit_route_and_conserves_stock(base_world):
     )
 
     assert result.event_type == "regional_resource_transfer_completed"
-    assert result.causal_payload["affordance"]["route_id"] == "route-17"
-    assert result.causal_payload["affordance"]["amount"] == 2
+    assert result.causal_payload["execution"]["route_id"] == "route-17"
+    assert result.causal_payload["execution"]["amount"] == 2
     assert source.economy.stocks["grain"] + destination.economy.stocks["grain"] == 12
     assert result.causal_links[0].cause_event_id == decision.id
+
+
+def test_resource_transfer_respects_route_infrastructure_bottleneck(base_world):
+    source = _city(base_world, 302, (0, 0), 12, 0)
+    destination = _city(base_world, 305, (9, 9), 0, 5)
+    decision = _decision_event(base_world)
+    base_world.map.set_routes([
+        Route("route-17", (302, 305), "road", 10, 1.0, True),
+    ])
+    bridge = InfrastructureSite(
+        id="bridge-17",
+        kind="bridge",
+        name="Bridge 17",
+        cell_refs=((0, 0),),
+        region_ids=(302, 305),
+        route_ids=("route-17",),
+        integrity=0.2,
+        last_event_id="event:bridge-damaged",
+    )
+    base_world.map.infrastructure_sites = {bridge.id: bridge}
+
+    result = resolve_resource_transfer(
+        base_world,
+        destination=destination,
+        resource_id="grain",
+        decision_event_id=decision.id,
+    )
+
+    assert result.event_type == "regional_resource_transfer_completed"
+    assert result.causal_payload["execution"]["route_capacity"] == 10.0
+    assert result.causal_payload["execution"]["transport_capacity"] == 2.0
+    assert result.causal_payload["execution"]["amount"] == 2.0
+    assert result.causal_payload["execution"]["route_dependency_site_ids"] == [
+        "bridge-17"
+    ]
+    assert result.causal_payload["execution"]["route_source_event_ids"] == [
+        "event:bridge-damaged"
+    ]
+    assert any(
+        link.cause_event_id == "event:bridge-damaged"
+        and link.relation.value == "contributed_to"
+        for link in result.causal_links
+    )
 
 
 def test_route_quality_preference_uses_grounded_route_state_not_geometry(base_world):
@@ -85,14 +128,14 @@ def test_route_quality_preference_uses_grounded_route_state_not_geometry(base_wo
         destination=destination,
         resource_id="grain",
         decision_event_id=decision.id,
-        preferences=(EconomyPreference.HIGHER_ROUTE_QUALITY,),
+        preferences=("higher_route_quality",),
     )
 
-    assert result.causal_payload["affordance"]["source_region_id"] == "303"
-    assert result.causal_payload["affordance"]["route_id"] == "z-high-quality"
+    assert result.causal_payload["execution"]["source_region_id"] == "303"
+    assert result.causal_payload["execution"]["route_id"] == "z-high-quality"
     assert low_quality_source.economy.stocks["grain"] == 12
     assert high_quality_source.economy.stocks["grain"] == 9
-    assert "distance_manhattan" not in result.causal_payload["affordance"]
+    assert "distance_manhattan" not in result.causal_payload["execution"]
 
 
 @pytest.mark.parametrize(

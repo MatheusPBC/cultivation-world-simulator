@@ -15,6 +15,9 @@ class DomainInvalidationReason(StrEnum):
     INFRASTRUCTURE_CHANGED = "infrastructure_changed"
     URBAN_PROJECT_CHANGED = "urban_project_changed"
     POPULATION_CAPACITY_CHANGED = "population_capacity_changed"
+    CLIMATE_CHANGED = "climate_changed"
+    REGIONAL_HAZARD_CHANGED = "regional_hazard_changed"
+    ROUTE_CAPACITY_CHANGED = "route_capacity_changed"
     CONDITION_ACTIVATED = "condition_activated"
     CONDITION_RESOLVED = "condition_resolved"
 

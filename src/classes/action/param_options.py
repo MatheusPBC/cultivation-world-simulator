@@ -25,6 +25,8 @@ class ParamOptionSource(str, Enum):
     KNOWN_POI_ID = "known_poi_id"
     KNOWN_GRAVE_POI_ID = "known_grave_poi_id"
     KNOWN_TREASURE_POI_ID = "known_treasure_poi_id"
+    SPONSORABLE_DAO_RITE_EVENT_ID = "sponsorable_dao_rite_event_id"
+    ACTIVE_IMPERIAL_CLAIM_CANDIDATE_ID = "active_imperial_claim_candidate_id"
 
 
 def build_param_options(action_cls: type, avatar: "Avatar") -> dict[str, list[dict[str, Any]]]:
@@ -101,11 +103,84 @@ def _options_for_source(action_cls: type, avatar: "Avatar", source: ParamOptionS
         return _known_poi_options(avatar, kind="grave")
     if source == ParamOptionSource.KNOWN_TREASURE_POI_ID:
         return _known_poi_options(avatar, kind="treasure")
+    if source == ParamOptionSource.SPONSORABLE_DAO_RITE_EVENT_ID:
+        return _sponsorable_dao_rite_options(avatar)
+    if source == ParamOptionSource.ACTIVE_IMPERIAL_CLAIM_CANDIDATE_ID:
+        return _active_imperial_claim_options(action_cls, avatar)
     return []
 
 
 def _limit_options(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return options[:MAX_PARAM_OPTIONS]
+
+
+def _active_imperial_claim_options(
+    action_cls: type, avatar: "Avatar"
+) -> list[dict[str, Any]]:
+    from src.systems.imperial_crisis_service import (
+        get_imperial_opposition_blocker,
+        get_imperial_support_blocker,
+    )
+
+    crisis = getattr(getattr(avatar.world, "dynasty", None), "imperial_crisis", None)
+    if crisis is None or crisis.status != "active":
+        return []
+    blocker = (
+        get_imperial_support_blocker
+        if action_cls.__name__ == "SupportImperialClaim"
+        else get_imperial_opposition_blocker
+    )
+    options = []
+    for claim in sorted(crisis.claims, key=lambda item: str(item.candidate_id)):
+        if claim.status != "active" or blocker(
+            avatar.world, str(avatar.id), str(claim.candidate_id)
+        ) is not None:
+            continue
+        candidate = avatar.world.avatar_manager.get_avatar(str(claim.candidate_id))
+        options.append(
+            {
+                "value": str(claim.candidate_id),
+                "id": str(claim.candidate_id),
+                "name": str(getattr(candidate, "name", claim.candidate_id)),
+                "type": "imperial_claim",
+            }
+        )
+    return _limit_options(options)
+
+
+def _sponsorable_dao_rite_options(avatar: "Avatar") -> list[dict[str, Any]]:
+    """Return public popular rites whose event IDs the executor accepts."""
+    world = getattr(avatar, "world", None)
+    manager = getattr(world, "event_manager", None)
+    if manager is None:
+        return []
+    month = int(getattr(world, "month_stamp", 0))
+    try:
+        events = manager.get_events_between_months(month - 11, month)
+    except Exception:
+        return []
+    current_region = getattr(getattr(avatar, "tile", None), "region", None)
+    current_region_id = getattr(current_region, "id", None)
+    options: list[dict[str, Any]] = []
+    for event in sorted(events, key=lambda item: (int(getattr(item, "month_stamp", 0)), str(getattr(item, "id", "")))):
+        payload = dict((getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {})
+        region_id = payload.get("region_id")
+        if (
+            str(getattr(event, "event_type", "")) != "dao_rite"
+            or not bool(payload.get("is_popular"))
+            or current_region_id is None
+            or str(region_id) != str(current_region_id)
+        ):
+            continue
+        options.append({
+            "value": str(event.id),
+            "id": str(event.id),
+            "name": str(getattr(event, "content", "") or "popular Dao rite"),
+            "type": "dao_rite",
+            "region_id": str(region_id),
+            "month_stamp": int(getattr(event, "month_stamp", 0)),
+        })
+    return _limit_options(options)
 
 
 def _item_kind(item: object) -> str:

@@ -20,8 +20,6 @@ def _sect_runtime_source_label(source: str, language_manager: object) -> str:
 
     if key == "base":
         return t("Base effect")
-    if key == "sect_random_event":
-        return t("Sect random event")
     return source or t("Temporary effect")
 
 
@@ -193,4 +191,3 @@ def build_sect_detail(sect: "Sect", world: "World", language_manager: object) ->
     }
 
     return info
-

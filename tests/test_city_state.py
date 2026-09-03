@@ -393,7 +393,7 @@ def test_urban_capability_quality_is_discovered_from_assets_not_a_fixed_catalog(
         "black_lotus_healing",
     )
 
-    assert key in available_metric_keys(city)
+    assert key in available_metric_keys(None, city)
     reading = resolve_metric(base_world, key, target=city, calculated_month=12)
     assert reading.value == pytest.approx(0.4)
     assert reading.unit == "ratio"

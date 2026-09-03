@@ -988,6 +988,16 @@ msgstr "在城镇救济百姓，消耗少量灵石"
 msgid "help_people_requirements"
 msgstr "仅限城市区域，并且灵石足够"
 
+# Action: SponsorDaoRite
+msgid "sponsor_dao_rite_action_name"
+msgstr "赞助大道仪式"
+
+msgid "sponsor_dao_rite_description"
+msgstr "以朝廷或宗门名义赞助当前地区已知的民间仪式"
+
+msgid "sponsor_dao_rite_requirements"
+msgstr "需要是现任皇帝或在世掌门、身处该地区，并且每月最多赞助一次仪式"
+
 # Action: Mine
 msgid "mine_action_name"
 msgstr "挖矿"
@@ -1474,10 +1484,13 @@ msgid "A causal probe interrupted route {route}."
 msgstr "因果探针中断了路线{route}。"
 
 msgid "A causal probe injured {avatar} without killing them."
-msgstr ""
+msgstr "因果探针使{avatar}受伤，但没有致命。"
 
 msgid "A causal probe strained {service} service in {region}."
-msgstr ""
+msgstr "因果探针使{region}的{service}服务承受压力。"
+
+msgid "{actor} made a domain decision: {decision}."
+msgstr "{actor}作出了领域决策：{decision}。"
 
 msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
 msgstr ""
@@ -1497,7 +1510,7 @@ msgid "{avatar} committed to an action chain"
 msgstr ""
 
 msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
-msgstr ""
+msgstr "{name}在秘境{domain}中受伤，损失了{damage}点生命。"
 
 msgid "{official} publicly opposes the imperial claimant."
 msgstr ""
@@ -1591,6 +1604,21 @@ msgstr "这场天道觐见当前不可回应。"
 
 msgid "response must be silence, sign, or favor"
 msgstr "回应只能是沉默、降下征兆或赐予机缘。"
+
+msgid "Regional weather changed across {count} regions."
+msgstr "{count}个地区的天气发生了变化。"
+
+msgid "Persistent water pressure caused flooding in {region}."
+msgstr "持续的水压导致{region}发生洪灾。"
+
+msgid "Flood waters receded in {region}."
+msgstr "{region}的洪水退去了。"
+
+msgid "Active regional hazard: {hazard} (since month {month})."
+msgstr "当前地区灾害：{hazard}（自第{month}月起）。"
+
+msgid "regional_climate_updated"
+msgstr "{count}个地区的气候已更新。"
 
 msgid " (and sold old {item} at reduced price)"
 msgstr "（并将原有的{item}折价售出）"
@@ -2960,6 +2988,21 @@ msgstr "{name} 葬身于秘境【{domain}】。"
 msgid "{}: {}"
 msgstr "{}：{}"
 
+msgid "Infrastructure site {site} changed physical condition."
+msgstr "基础设施地点{site}的物理状态发生了变化。"
+
+msgid "infrastructure_site_condition_changed"
+msgstr "{site_name}的物理状态发生了变化。"
+
+msgid "Route {route} changed operational capacity."
+msgstr "路线{route}的通行能力发生了变化。"
+
+msgid "route_operational_capacity_changed"
+msgstr "路线{route_id}的通行能力发生了变化。"
+
+msgid "infrastructure_site_restored"
+msgstr "{maintainer_kind}:{maintainer_id}修复了基础设施，消耗{spirit_stone_cost}灵石。"
+
 msgid ""
 "The dynasty responded to {region}'s condition with {decision}: {reason}"
 msgstr "王朝针对{region}的状况作出{decision}决定：{reason}"
@@ -4223,6 +4266,9 @@ msgstr "同门"
 msgid "parent"
 msgstr "父母"
 
+msgid "Relationship impact for {action} was interpreted."
+msgstr "已解释行动{action}对关系的影响。"
+
 msgid "numeric_relation_archenemy"
 msgstr "憎恶"
 
@@ -4857,38 +4903,6 @@ msgid ""
 " Headquarters: {hq_name}){effect}"
 msgstr ""
 "{sect_name}（道统：{orthodoxy}，阵营：{alignment}，风格：{style}，驻地：{hq_name}）{effect}"
-
-msgid ""
-"Because {reason_fragment}, relations between {sect_a_name} and {sect_b_name}"
-" improved (+{value_int} for {duration_months} months)."
-msgstr ""
-"因{reason_fragment}，{sect_a_name}与{sect_b_name}关系改善（+{value_int}，持续{duration_months}个月）。"
-
-msgid ""
-"Because {reason_fragment}, relations between {sect_a_name} and {sect_b_name}"
-" worsened (-{value_int} for {duration_months} months)."
-msgstr ""
-"因{reason_fragment}，{sect_a_name}与{sect_b_name}关系恶化（-{value_int}，持续{duration_months}个月）。"
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} gained +{value_int} magic stones."
-msgstr "因{reason_fragment}，{sect_a_name}获得灵石+{value_int}。"
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} lost -{value_int} magic stones."
-msgstr "因{reason_fragment}，{sect_a_name}损失灵石-{value_int}。"
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} gained +{value} extra income per "
-"tile for {duration_months} months."
-msgstr ""
-"因{reason_fragment}，{sect_a_name}每地块年收入修正+{value}（持续{duration_months}个月）。"
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} suffered -{value} income per tile "
-"for {duration_months} months."
-msgstr ""
-"因{reason_fragment}，{sect_a_name}每地块年收入修正-{value}（持续{duration_months}个月）。"
 
 msgid "No current region is available."
 msgstr "当前没有可用的地区信息。"

@@ -12,14 +12,36 @@ Orthodoxy, sect, church, or temple system.
 
 ## Dao Petition
 
-A World-owned request from an Avatar, Sect, or court. It names its initiator,
-region, motivating facts, and response state.
+A World-owned rare audience opened only after explicit institutional
+sponsorship of grounded popular rites. It names its institution, region,
+motivating facts, sponsored rite events, and response state.
+
+## Royal House
+
+The Dynasty-owned set of living or historical Avatar IDs recognized as members
+of the ruling house. Marriage can add a spouse to the house. Royal blood is a
+separate Dynasty-owned ID set inherited through birth; marriage alone never
+creates royal blood. Personal kinship remains owned by Avatar relations.
 
 ## Imperial Crisis
 
-One active political contest between a reigning Avatar and an eligible Avatar
-claimant. It can change the dynasty's sovereign reference but does not create
-territorial war or delete either Avatar.
+A Dynasty-owned challenge or succession with an optional incumbent and several
+independent Imperial Claims. It can change the dynasty's sovereign reference
+but does not create territorial war or delete an Avatar.
+
+### Imperial Claim
+
+One candidate's pretension inside an Imperial Crisis. It owns that candidate's
+status, official positions, evaluations, evidence, and winner flag. An official
+may support at most one claim and may oppose several; neutrality is the absence
+of a recorded position.
+
+## Fact and Story
+
+A Fact records an occurrence, decision, derived condition, or owner-applied
+state transition. A Story is a non-mechanical interpretation of one or more
+Facts. A Story carries no StateDelta and cannot be the cause of a mutation; it
+points back to its factual source through a causal contribution link.
 
 ## Mechanical Language V1
 
@@ -139,23 +161,30 @@ It records the proposed meaning and why the proposal was made. A proposal is
 not an action, a fact, or permission to mutate the world. It requires explicit
 validation and acceptance before it can produce a reusable definition.
 
-### Action Intent
+### Domain Affordance
 
-An Action Intent is a proposed change expressed from a meaningful transition
-or situation. It states what could be pursued, but does not promise that the
-world will perform it.
-
-### Affordance
-
-An Affordance is a change the current world makes available to an actor or
-domain under the relevant conditions. Availability is not execution.
+A Domain Affordance is a transient, deterministic option that the current
+canonical state makes available to one collective-domain actor. It names an
+engine-owned action, current targets, engine-calculated parameters, urgency,
+and motivating fact IDs. It is recomputed before execution and never persisted.
+An interpreter may select its ID or maintain the current state; it may not
+invent the action, target, quantity, or delta.
 
 ## Domain Reaction
 
-A Domain Reaction is a typed interpretation of a causal transition by a
-collective domain. It may maintain the current state or propose an action
-intent; the owning domain decides whether the action is feasible and applies
+A Domain Reaction is a typed interpretation of all current Domain Affordances
+by a collective actor. It selects one offered ID or maintains the current
+state. The owning domain recomputes the options, rejects stale IDs, and applies
 any resulting change.
+
+### Relationship Impact
+
+A Relationship Impact is a qualitative interpretation of an interaction in
+each direction: positive, negative, neutral, or ambivalent, with mild,
+moderate, or strong intensity. The relationship owner maps intensity to the
+fixed magnitudes 2, 4, or 6 and limits allowed valences for the action outcome.
+Neutral and ambivalent interpretations change no friendliness. Generated prose
+is never parsed as a numeric relationship delta.
 
 ### Population Transfer
 
@@ -248,6 +277,149 @@ material, and administration can coordinate it without owning or consuming it.
 An Explicit Route is a map-owned connection between two regions with declared
 capacity, quality, enablement, mode, and resource permissions. Geographic
 proximity does not create a route.
+
+### Operational Route Capacity
+
+Operational Route Capacity is the usable transport capacity of an Explicit
+Route after its own quality and every explicitly linked Infrastructure Site
+are considered. The least available linked site is the bottleneck. It is a
+derived observation: the Route retains its nominal capacity and each site
+retains its own condition.
+
+## Infrastructure Site
+
+An Infrastructure Site is a stable, map-owned physical entity attached to
+explicit cells and Regions. It records spatial identity, condition, declared
+capabilities, and references to existing routes or water bodies. It does not
+own route throughput, regional stocks, production, urban services, or the
+effects that another domain may later derive from it.
+
+### Site Condition
+
+Site Condition is the canonical `integrity` and `enabled` state of one
+Infrastructure Site. A validated change produces an Event, StateDelta, causal
+source link, and domain invalidation. The site owner never directly alters a
+route, city, population, organization, or economy; a dependent owner may
+derive and record its own mechanically afforded consequence.
+
+### Operational Site Capacity
+
+Operational Site Capacity is a regional observation of how many fully intact
+site-equivalents currently declare one capability. Each enabled Infrastructure
+Site contributes its integrity; a disabled site contributes zero. This reading
+measures grounded operational presence only. It is not production, throughput,
+service capacity, stock, or permission to mutate another domain.
+
+## Institutional Presence
+
+**Urban Governance**:
+The explicit institution administratively responsible for a CityRegion,
+together with that city's ability to coordinate public action. It is not a
+claim over surrounding territory and is not implied by nearby sect influence.
+_Avoid_: Regional ownership, territorial sovereignty
+
+**Sect Spatial Influence**:
+The current reach of a Sect across physical space, derived from its grounded
+headquarters, members, power, and competition with other Sects. Influence does
+not by itself grant government, ownership, or permission to begin a war.
+_Avoid_: Sect ownership, automatic occupation
+
+**Regional Institutional Presence**:
+A read-only view of Urban Governance and Sect Spatial Influence within one
+Region. It exposes overlap between institutions without becoming another owner
+of either state.
+_Avoid_: Regional controller, political faction
+
+### Regional Semantic Evaluation
+
+Regional Semantic Evaluation is the deterministic application of an accepted
+region-scoped definition to any Region whose canonical evidence can answer the
+definition's metric questions. It is distinct from Semantic Discovery and from
+Domain Reaction. An unknown reading creates neither a Condition Instance nor
+evidence that the definition was reused in that Region.
+
+### Regional Semantic Discovery
+
+Regional Semantic Discovery is the controlled proposal of reusable vocabulary
+from an uncovered metric surface that is measurable in a canonical Region.
+The LLM receives metric schemas and provenance-backed target context, never
+authority to write values or effects. Equivalent surfaces share retry and
+deduplication state, and every proposal still passes deterministic validation
+before it can enter the world's semantic registry.
+
+## Physical Geography
+
+Physical Geography is the map-owned, map-local description of terrain,
+elevation, and water independent of which Region occupies the same space. It is
+static geographic truth, not a condition or a visual overlay.
+
+### Map Projection Layer
+
+A Map Projection Layer is a removable visual reading of canonical map or
+domain state. Terrain, elevation, water, regional boundaries, explicit routes,
+sect territories, and names can be shown or hidden without changing the world.
+An explicit route drawn between region anchors is topological evidence of a
+connection, not a claim about its exact cell-by-cell path.
+
+### Region Footprint
+
+A Region Footprint is the set of map cells occupied by one Region. It expresses
+semantic territory and may overlap many kinds of Physical Geography without
+changing them.
+
+### Terrain Cell
+
+A Terrain Cell is one map location's physical land or water surface. Cities,
+Sects, ruins, and other sites may occupy it, but they are not terrain kinds.
+
+### Water Body
+
+A Water Body is a map-owned river, lake, or sea attached to explicit cells. A
+river additionally has a stable flow direction so upstream and downstream
+relationships can be derived without relying on narrative text.
+
+## Regional Weather
+
+Regional Weather is the month-scoped physical precipitation and soil
+saturation owned by `World.climate_state` for one Region. It is deterministically
+grounded in the current month and physical geography; it does not own terrain,
+water bodies, infrastructure, or consequences.
+
+### Regional Hydrology Projection
+
+A Regional Hydrology Projection is a read-only interpretation of Regional
+Weather, map-owned geography, and real water-management Infrastructure Sites.
+It exposes grounded mechanical readings and never becomes a parallel state
+owner.
+
+### Flood Risk
+
+Flood Risk is a derived observation of hydrological exposure. It is not a flood
+occurrence and cannot damage assets, close routes, move population, or change
+another domain without a separately validated domain action.
+
+### Regional Flood Occurrence
+
+A Regional Flood Occurrence is active physical surface flooding in one Region,
+owned by `World.regional_flood_state`. It begins only after grounded Flood Risk
+remains high for the required persistence window and resolves only after a
+separate low-risk persistence window. The occurrence is a real world state and
+public causal fact, but it does not itself assert damage, disease, displacement,
+route closure, or any other downstream consequence.
+
+### Hazard Exposure
+
+Hazard Exposure is a read-only measurement of how strongly one material hazard
+reaches one canonical spatial target. It is derived from the hazard occurrence,
+the target's real location, physical geography, and grounded protective
+capabilities. Exposure is evidence, not damage.
+
+### Hazard Impact Proposal
+
+A Hazard Impact Proposal is a typed request for a target's canonical owner to
+apply one bounded effect. The proposal never mutates the world directly. Before
+acceptance, the engine recomputes the target's Hazard Exposure and the maximum
+afforded magnitude; the owner then validates and records the actual transition.
 
 ## Collective Health Projection
 

@@ -9,6 +9,7 @@ from src.classes.regional_economy import InfrastructureState, RegionalEconomySta
 from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
 from src.systems.economy_reactivity import process_economy_reactivity
 from src.utils.llm.runtime_mode import llm_test_mode_scope
+from tests.domain_reactivity_fixtures import select_first_affordance
 
 
 def _city(world, region_id: int, stock: float, demand: float) -> CityRegion:
@@ -46,14 +47,7 @@ async def test_economy_reactivity_executes_only_explicit_route_and_marks_both_re
         Route("route-17", (302, 305), "road", 2, 1.0, True),
     ])
     shortage = _shortage(base_world, destination)
-    interpreter = AsyncMock(return_value={
-        "decision": "act",
-        "reason": "The explicit route can carry grain.",
-        "action_intent": {
-            "action_kind": "resource_transfer",
-            "preferences": ["available_supply"],
-        },
-    })
+    interpreter = AsyncMock(side_effect=select_first_affordance)
     invalidations = DomainInvalidationQueue()
 
     events = await process_economy_reactivity(
@@ -74,18 +68,11 @@ async def test_economy_reactivity_executes_only_explicit_route_and_marks_both_re
 
 
 @pytest.mark.asyncio
-async def test_economy_reactivity_records_grounded_block_when_route_is_absent(base_world):
+async def test_economy_without_route_records_maintain_without_calling_llm(base_world):
     source = _city(base_world, 302, 12, 0)
     destination = _city(base_world, 305, 0, 3)
     shortage = _shortage(base_world, destination)
-    interpreter = AsyncMock(return_value={
-        "decision": "act",
-        "reason": "Attempt the supply action.",
-        "action_intent": {
-            "action_kind": "resource_transfer",
-            "preferences": ["available_supply"],
-        },
-    })
+    interpreter = AsyncMock(side_effect=AssertionError("no affordance means no LLM"))
 
     with llm_test_mode_scope(False):
         events = await process_economy_reactivity(
@@ -95,9 +82,13 @@ async def test_economy_reactivity_records_grounded_block_when_route_is_absent(ba
             llm_call=interpreter,
         )
 
-    blocked = events[-1]
-    assert blocked.event_type == "regional_resource_transfer_blocked"
-    assert blocked.render_params["reason"] == "route_unknown"
+    assert [event.event_type for event in events] == [
+        "economy_interpretation_decision"
+    ]
+    assert interpreter.await_count == 0
+    receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
+    assert receipt.decision == "maintain"
+    assert receipt.affordance_id is None
     assert source.economy.stocks["grain"] == 12
 
 

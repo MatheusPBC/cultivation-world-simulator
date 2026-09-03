@@ -6,6 +6,9 @@ msgstr ""
 msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
 msgstr "A leitura anual de legitimidade mantém a crise imperial sem resolução."
 
+msgid "{actor} made a domain decision: {decision}."
+msgstr "{actor} tomou uma decisão de domínio: {decision}."
+
 msgid "The annual legitimacy reading remains unresolved while the throne lacks its recorded emperor."
 msgstr "A leitura anual de legitimidade permanece inconclusiva enquanto o trono não possui um imperador registrado."
 

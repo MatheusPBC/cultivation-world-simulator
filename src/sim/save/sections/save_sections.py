@@ -117,13 +117,6 @@ class WorldSection:
             "month_stamp": int(world.month_stamp),
             "start_year": world.start_year,
             "map_snapshot": serialize_map_snapshot(world.map),
-            "routes": [
-                route.to_dict()
-                for route in sorted(
-                    (getattr(world.map, "routes", {}) or {}).values(),
-                    key=lambda item: item.id,
-                )
-            ],
             "existed_sect_ids": [sect.id for sect in context.existed_sects],
             "dynasty": world.dynasty.to_dict() if getattr(world, "dynasty", None) is not None else None,
             "dao_petitions": [petition.to_dict() for petition in getattr(world, "dao_petitions", [])],
@@ -144,6 +137,8 @@ class WorldSection:
             "sect_wars": list(getattr(world, "sect_wars", []) or []),
             "opportunities": serialize_opportunities(world),
             "mechanical_language": world.mechanical_language.to_dict(),
+            "climate_state": world.climate_state.to_dict(),
+            "regional_flood_state": world.regional_flood_state.to_dict(),
             "deceased_records": world.deceased_manager.to_save_list(),
             "pois": world.poi_manager.to_save_list(),
         }

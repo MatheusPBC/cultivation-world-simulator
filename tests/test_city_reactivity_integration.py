@@ -271,7 +271,7 @@ def test_city_reactivity_remains_available_to_unclaimed_city(base_world):
 
 
 @pytest.mark.asyncio
-async def test_blocked_city_maintenance_receipt_is_scheduled_for_next_month(base_world):
+async def test_city_without_material_option_records_maintain_for_next_month(base_world):
     _, trigger = _setup(base_world, integrity=1.0)
     base_world.run_config_snapshot = {"test_mode": True}
     queue = DomainInvalidationQueue()
@@ -284,9 +284,13 @@ async def test_blocked_city_maintenance_receipt_is_scheduled_for_next_month(base
         budget=CausalBudget.from_world(base_world),
     )
 
-    assert events[-1].event_type == "city_maintenance_blocked"
+    assert [event.event_type for event in events] == [
+        "city_interpretation_decision"
+    ]
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
     assert receipt.domain == "city"
+    assert receipt.decision == "maintain"
+    assert receipt.affordance_id is None
     assert receipt.completed is False
     assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
 

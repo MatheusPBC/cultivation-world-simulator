@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.agent_decision import AgentDecision
 from src.classes.celestial_dao import DaoPetition, DaoPetitionStatus, DaoTradition
 from src.classes.event import Event, FactKind
 from src.classes.causal_origin import CausalOrigin
@@ -15,7 +16,7 @@ from src.i18n import t
 from src.i18n.template_resolver import resolve_locale_template_path
 from src.run.log import get_logger
 from src.systems.sect_decision_context import find_living_patriarch
-from src.systems.semantic_world.context import region_semantic_relevance
+from src.classes.mechanical_language import EntityRef
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ProviderCallError
 
@@ -65,6 +66,169 @@ def _recent_rite_events(
         for event in [*stored, *(current_events or [])]
         if str(getattr(event, "event_type", "")) == "dao_rite"
     ]
+
+
+def _event_region_id(event: Event) -> int | None:
+    payload = getattr(event, "causal_payload", None) or {}
+    rite = payload.get("dao_rite", {}) or {}
+    params = getattr(event, "render_params", None) or {}
+    raw = params.get("region_id", rite.get("region_id"))
+    try:
+        return int(raw) if raw is not None and str(raw).strip() else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _institution_for_avatar(world: Any, avatar: Any) -> tuple[str, str, str] | None:
+    """Return the single institution whose public voice the avatar may use."""
+    dynasty = getattr(world, "dynasty", None)
+    if dynasty is not None and str(getattr(dynasty, "current_emperor_id", "")) == str(getattr(avatar, "id", "")):
+        return (
+            "court",
+            str(getattr(dynasty, "id", "")),
+            str(getattr(dynasty, "title", "") or getattr(dynasty, "name", "court")),
+        )
+
+    sect = getattr(avatar, "sect", None)
+    if sect is not None and find_living_patriarch(sect) is avatar:
+        return ("sect", str(getattr(sect, "id", "")), str(getattr(sect, "name", "sect")))
+    return None
+
+
+def _sponsorship_payload(event: Event) -> dict[str, Any]:
+    return dict((getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {})
+
+
+def _known_sponsorship_events(world: Any) -> list[Event]:
+    events = _recent_rite_events(world)
+    transient = getattr(world, "_dao_sponsorship_events_this_step", {}) or {}
+    return [*events, *transient.values()]
+
+
+def get_sponsor_dao_rite_blocker(
+    world: Any, avatar: Any, cause_event_id: str
+) -> str | None:
+    institution = _institution_for_avatar(world, avatar)
+    if institution is None:
+        return "Only the reigning emperor or a living sect patriarch may sponsor a Dao rite."
+
+    cause_id = str(cause_event_id or "").strip()
+    if not cause_id:
+        return "A public Dao rite must be selected."
+    cause = world.event_manager.get_event_by_id(cause_id)
+    if cause is None:
+        return "The sponsoring institution does not know this public Dao rite."
+    payload = _sponsorship_payload(cause)
+    if str(getattr(cause, "event_type", "")) != "dao_rite" or not bool(payload.get("is_popular")):
+        return "Only a popular regional Dao rite can be sponsored."
+    region_id = _event_region_id(cause)
+    current_region = _region_for_avatar(avatar)
+    if region_id is None or current_region is None or int(getattr(current_region, "id", -1)) != region_id:
+        return "The sponsor must be present in the rite's region."
+
+    month = int(world.month_stamp)
+    kind, institution_id, _name = institution
+    for event in _known_sponsorship_events(world):
+        existing = _sponsorship_payload(event)
+        if not bool(existing.get("is_sponsorship")):
+            continue
+        same_institution = (
+            str(existing.get("sponsor_kind", existing.get("initiator_kind", ""))) == kind
+            and str(existing.get("sponsor_id", existing.get("initiator_id", ""))) == institution_id
+        )
+        if not same_institution:
+            continue
+        if int(getattr(event, "month_stamp", -1)) == month:
+            return "This institution has already sponsored a Dao rite this month."
+        if str(existing.get("cause_event_id", "")) == cause_id:
+            return "This institution has already sponsored that Dao rite."
+    return None
+
+
+def can_sponsor_dao_rite(world: Any, avatar: Any) -> bool:
+    return _institution_for_avatar(world, avatar) is not None
+
+
+def sponsor_dao_rite(world: Any, avatar: Any, cause_event_id: str) -> Event:
+    blocker = get_sponsor_dao_rite_blocker(world, avatar, cause_event_id)
+    if blocker is not None:
+        raise ValueError(t(blocker))
+    institution = _institution_for_avatar(world, avatar)
+    assert institution is not None
+    cause = world.event_manager.get_event_by_id(str(cause_event_id))
+    assert cause is not None
+    region_id = _event_region_id(cause)
+    assert region_id is not None
+    region = world.map.regions[region_id]
+    kind, institution_id, institution_name = institution
+    decision_event_id = str(getattr(avatar, "current_decision_event_id", "") or "")
+    parent_payload = getattr(avatar, "_current_decision_payload", None) or {}
+    parent_decision = parent_payload.get("decision", {}) if isinstance(parent_payload, Mapping) else {}
+    decision_source = str(parent_decision.get("source", "") or "player")
+    audit = AgentDecision(
+        month_stamp=int(world.month_stamp),
+        subject_kind="avatar",
+        subject_id=str(avatar.id),
+        source=decision_source,
+        considered_count=1,
+        chosen_chain=[
+            {
+                "action_name": "SponsorDaoRite",
+                "params": {"cause_event_id": str(cause.id)},
+            }
+        ],
+    )
+    event = Event(
+        world.month_stamp,
+        t(
+            "{institution} sponsors the popular rite in {region}.",
+            institution=institution_name,
+            region=getattr(region, "name", str(region_id)),
+        ),
+        related_avatars=[str(avatar.id)],
+        related_sects=[int(institution_id)] if kind == "sect" else None,
+        fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        event_type="dao_rite",
+        render_params={"region_id": str(region_id), "cause_event_id": str(cause.id)},
+        causal_payload={
+            "deltas": [],
+            "decision": audit.to_dict(),
+            "dao_rite": {
+                "initiator_kind": kind,
+                "initiator_id": institution_id,
+                "sponsor_kind": kind,
+                "sponsor_id": institution_id,
+                "institution_name": institution_name,
+                "region_id": region_id,
+                "tradition": region.dao_tradition.value,
+                "cause_event_id": str(cause.id),
+                "is_confirmed": False,
+                "is_popular": False,
+                "is_sponsorship": True,
+                "month_stamp": int(world.month_stamp),
+            },
+            "decision_source": {
+                "kind": "avatar_action",
+                "action_name": "SponsorDaoRite",
+                "avatar_id": str(avatar.id),
+                "decision_event_id": decision_event_id or None,
+            },
+        },
+    )
+    event.causal_links.append(
+        CausalLink(event_id=event.id, cause_event_id=str(cause.id), relation=CausalRelation.MOTIVATED_BY)
+    )
+    if decision_event_id:
+        event.causal_links.append(
+            CausalLink(event_id=event.id, cause_event_id=decision_event_id, relation=CausalRelation.ENABLED_BY)
+        )
+    transient = getattr(world, "_dao_sponsorship_events_this_step", None)
+    if transient is None:
+        transient = {}
+        setattr(world, "_dao_sponsorship_events_this_step", transient)
+    transient[event.id] = event
+    return event
 
 
 def get_dao_context(
@@ -136,33 +300,6 @@ def get_dao_context(
     return context
 
 
-def create_petition(
-    world: Any,
-    *,
-    initiator_kind: str,
-    initiator_id: str,
-    region_id: int,
-    motivated_event_ids: list[str],
-    rite_event_ids: list[str] | None = None,
-    content: str = "",
-) -> DaoPetition:
-    resolved_target, resolved_evidence = _resolve_imperial_target(
-        world,
-        motivated_event_ids,
-    )
-    return _append_petition(
-        world,
-        initiator_kind=initiator_kind,
-        initiator_id=initiator_id,
-        region_id=region_id,
-        motivated_event_ids=motivated_event_ids,
-        rite_event_ids=rite_event_ids,
-        content=content,
-        target_avatar_id=resolved_target,
-        target_evidence_event_ids=resolved_evidence,
-    )
-
-
 def _append_petition(
     world: Any,
     *,
@@ -201,28 +338,6 @@ def _append_petition(
     return petition
 
 
-def _resolve_imperial_target(
-    world: Any,
-    event_ids: list[str],
-) -> tuple[str | None, list[str]]:
-    """Resolve a crisis target only from an unambiguous source fact.
-
-    A fact related to both contenders, to neither contender, or to different
-    contenders is intentionally ambiguous.  It remains usable as public Dao
-    context but cannot become imperial legitimacy evidence.
-    """
-    crisis = getattr(getattr(world, "dynasty", None), "imperial_crisis", None)
-    if crisis is None:
-        return None, []
-    events: list[Event] = []
-    for event_id in event_ids:
-        event = world.event_manager.get_event_by_id(str(event_id))
-        if event is None:
-            return None, []
-        events.append(event)
-    return _resolve_imperial_target_from_events(world, events)
-
-
 def _resolve_imperial_target_from_events(
     world: Any,
     events: list[Event],
@@ -231,8 +346,12 @@ def _resolve_imperial_target_from_events(
     if crisis is None:
         return None, []
     contender_ids = {
-        str(crisis.emperor_avatar_id),
-        str(crisis.claimant_avatar_id),
+        str(candidate_id)
+        for candidate_id in (
+            crisis.incumbent_id,
+            *(claim.candidate_id for claim in crisis.claims if claim.status == "active"),
+        )
+        if candidate_id is not None
     }
     targets: set[str] = set()
     evidence_ids: list[str] = []
@@ -282,111 +401,19 @@ def _region_for_avatar(avatar: Any) -> Any | None:
     return getattr(getattr(avatar, "tile", None), "region", None)
 
 
-def _institution_candidates(
-    world: Any, cause: Event
-) -> list[tuple[str, str, str, Any]]:
-    candidates: list[tuple[str, str, str, Any]] = []
-    related_avatar_ids = {
-        str(item) for item in getattr(cause, "related_avatars", None) or []
-    }
-    dynasty = getattr(world, "dynasty", None)
-    emperor = (
-        world.avatar_manager.get_avatar(
-            str(getattr(dynasty, "current_emperor_id", "") or "")
-        )
-        if dynasty
-        else None
-    )
-    crisis = getattr(dynasty, "imperial_crisis", None) if dynasty else None
-    court_ids = {str(getattr(emperor, "id", "") or "")}
-    if crisis is not None:
-        court_ids.add(str(getattr(crisis, "claimant_avatar_id", "") or ""))
-    court_region = _region_for_avatar(emperor)
-    if (
-        dynasty is not None
-        and court_region is not None
-        and related_avatar_ids & court_ids
-    ):
-        candidates.append(
-            (
-                "court",
-                str(dynasty.id),
-                str(getattr(dynasty, "title", "") or getattr(dynasty, "name", "")),
-                court_region,
-            )
-        )
-    sects_by_id = {
-        int(getattr(sect, "id", 0)): sect
-        for sect in getattr(world, "existed_sects", []) or []
-    }
-    for sect_id in getattr(cause, "related_sects", None) or []:
-        sect = sects_by_id.get(int(sect_id))
-        patriarch = find_living_patriarch(sect) if sect is not None else None
-        region = _region_for_avatar(patriarch)
-        if sect is not None and patriarch is not None and region is not None:
-            candidates.append(
-                ("sect", str(sect.id), str(getattr(sect, "name", "")), region)
-            )
-    return candidates
-
-
-def _rite_matches(event: Event, initiator_kind: str, initiator_id: str) -> bool:
-    payload = dict(
-        (getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {}
-    )
-    return (
-        str(payload.get("initiator_kind", "")) == initiator_kind
-        and str(payload.get("initiator_id", "")) == initiator_id
-    )
-
-
 def _is_institutional_rite(event: Event) -> bool:
-    payload = dict(
-        (getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {}
-    )
-    return (
-        str(payload.get("initiator_kind", "")) in {"sect", "court"}
-        and not bool(payload.get("is_popular", False))
-    )
+    payload = _sponsorship_payload(event)
+    return bool(payload.get("is_sponsorship"))
 
 
-def _build_rite(
-    world: Any, cause: Event, candidate: tuple[str, str, str, Any]
+def _build_popular_rite(
+    world: Any,
+    cause: Event,
+    region: Any,
+    *,
+    condition_id: str | None = None,
 ) -> Event:
-    initiator_kind, initiator_id, initiator_name, region = candidate
-    rite = Event(
-        world.month_stamp,
-        t(
-            "{institution} holds a public rite and claims the Dao witnesses its cause: {cause}",
-            institution=initiator_name,
-            cause=cause.content,
-        ),
-        related_sects=[int(initiator_id)] if initiator_kind == "sect" else None,
-        fact_kind=FactKind.DECISION,
-        causal_origin=CausalOrigin.ACTOR_DECISION,
-        event_type="dao_rite",
-        causal_payload={
-            "dao_rite": {
-                "initiator_kind": initiator_kind,
-                "initiator_id": initiator_id,
-                "region_id": int(region.id),
-                "tradition": region.dao_tradition.value,
-                "is_confirmed": False,
-            }
-        },
-    )
-    rite.causal_links = [
-        CausalLink(
-            event_id=rite.id,
-            cause_event_id=cause.id,
-            relation=CausalRelation.MOTIVATED_BY,
-        )
-    ]
-    return rite
-
-
-def _build_popular_rite(world: Any, cause: Event | None, region: Any) -> Event:
-    source_id = cause.id if cause is not None else None
+    source_id = cause.id
     rite = Event(
         world.month_stamp,
         t("People in {region} hold a popular rite and claim it answers local pressure.", region=region.name),
@@ -394,23 +421,72 @@ def _build_popular_rite(world: Any, cause: Event | None, region: Any) -> Event:
         fact_kind=FactKind.OCCURRENCE,
         causal_origin=CausalOrigin.DETERMINISTIC,
         event_type="dao_rite",
-        causal_payload={"dao_rite": {"initiator_kind": "people", "initiator_id": str(region.id), "region_id": int(region.id), "tradition": region.dao_tradition.value, "is_confirmed": False, "is_popular": True}},
+        causal_payload={
+            "dao_rite": {
+                "initiator_kind": "people",
+                "initiator_id": str(region.id),
+                "region_id": int(region.id),
+                "tradition": region.dao_tradition.value,
+                "is_confirmed": False,
+                "is_popular": True,
+                "cause_event_id": source_id,
+                "condition_id": condition_id,
+            }
+        },
     )
-    if source_id:
-        rite.causal_links = [CausalLink(event_id=rite.id, cause_event_id=source_id, relation=CausalRelation.MOTIVATED_BY)]
+    rite.causal_links = [CausalLink(event_id=rite.id, cause_event_id=source_id, relation=CausalRelation.MOTIVATED_BY)]
     return rite
 
 
-def _popular_rite_regions(world: Any) -> list[tuple[Any, Event | None]]:
-    regions = []
-    events = sorted(
-        [event for event in getattr(world.event_manager, "get_events_between_months", lambda *_: [])(int(world.month_stamp), int(world.month_stamp)) if getattr(event, "is_major", False)],
-        key=lambda event: (str(event.id), str(event.content)),
-    )
-    for region in sorted(getattr(getattr(world, "map", None), "regions", {}).values(), key=lambda item: int(getattr(item, "id", 0))):
-        if region_semantic_relevance(world, region) >= 0.60 or any(region.id in (getattr(event, "related_regions", []) or []) for event in events):
-            regions.append((region, events[0] if events else None))
-    return regions
+def _popular_rite_regions(
+    world: Any, *, current_events: list[Event] | None = None
+) -> list[tuple[Any, Event, str | None]]:
+    """Select deterministic regional causes that actually exist in the world.
+
+    A derived reading alone is not a cause.  A rite needs either an active
+    canonical regional condition (and its source event) or a current public
+    event carrying a region reference.
+    """
+    month = int(world.month_stamp)
+    state = getattr(world, "mechanical_language", None)
+    current_events = [
+        *list(
+        getattr(world.event_manager, "get_events_between_months", lambda *_: [])(month, month)
+        ),
+        *(current_events or []),
+    ]
+    current_events_by_id = {str(event.id): event for event in current_events}
+    candidates: dict[int, tuple[tuple[Any, ...], Any, Event, str | None]] = {}
+    for region in sorted(
+        getattr(getattr(world, "map", None), "regions", {}).values(),
+        key=lambda item: int(getattr(item, "id", 0)),
+    ):
+        region_id = int(getattr(region, "id", -1))
+        if region_id < 0:
+            continue
+        if state is not None:
+            conditions = state.get_active_conditions(EntityRef("region", str(region_id)), month)
+            for condition in conditions:
+                source = current_events_by_id.get(
+                    str(condition.cause_event_id)
+                ) or world.event_manager.get_event_by_id(str(condition.cause_event_id))
+                if not isinstance(source, Event):
+                    continue
+                key = (0, -float(getattr(condition, "intensity", 0.0)), str(condition.id))
+                candidates.setdefault(region_id, (key, region, source, str(condition.id)))
+
+        for event in current_events:
+            if str(getattr(event, "event_type", "")) == "dao_rite":
+                continue
+            if _event_region_id(event) != region_id:
+                continue
+            key = (1, -int(bool(getattr(event, "is_major", False))), str(event.id))
+            existing = candidates.get(region_id)
+            if existing is None or key < existing[0]:
+                candidates[region_id] = (key, region, event, None)
+
+    selected = sorted(candidates.values(), key=lambda item: (item[0], int(item[1].id)))[:2]
+    return [(region, cause, condition_id) for _key, region, cause, condition_id in selected]
 
 
 def _can_open_audience(world: Any) -> bool:
@@ -480,75 +556,79 @@ async def _render_petition_content(
         return _fallback_petition_content(initiator_name, tradition, cause)
 
 
-async def maybe_create_monthly_petition(world: Any, events: list[Event]) -> list[Event]:
-    """Record contested rites; only accumulated institutional rites open an audience."""
-    major_causes = sorted([event for event in events if getattr(event, "is_major", False)], key=lambda event: (str(event.id), str(event.content)))
-    rites: list[Event] = []
-    seen_institutions: set[tuple[str, str]] = set()
-    for cause in major_causes:
-        for candidate in _institution_candidates(world, cause):
-            key = (candidate[0], candidate[1])
-            if key not in seen_institutions:
-                seen_institutions.add(key)
-                rites.append(_build_rite(world, cause, candidate))
-    institutional_rites = list(rites)
-    # Popular rites are aggregated regional occurrences.  They are visible
-    # claims and never become petitions by themselves.
-    popular_rites: list[Event] = []
-    for region, cause in _popular_rite_regions(world):
-        popular_rites.append(_build_popular_rite(world, cause, region))
-    popular_rites = sorted(
-        popular_rites,
-        key=lambda event: (
-            str((event.causal_payload or {}).get("dao_rite", {}).get("initiator_id", "")),
-            str(event.id),
-        ),
-    )[:2]
-    rites = sorted(
-        [*institutional_rites, *popular_rites],
-        key=lambda event: (
-            str((event.causal_payload or {}).get("dao_rite", {}).get("initiator_kind", "")),
-            str((event.causal_payload or {}).get("dao_rite", {}).get("initiator_id", "")),
-            str(event.id),
-        ),
-    )
-    result: list[Event] = list(rites)
-    institutional_rites = [rite for rite in rites if _is_institutional_rite(rite)]
-    if not institutional_rites or not _can_open_audience(world):
+async def process_grounded_dao_rites(world: Any, events: list[Event]) -> list[Event]:
+    """Create popular claims and evaluate explicit institutional sponsorships.
+
+    Institutional rites are intentionally never synthesized here. The only
+    automatic rite produced here is a bounded popular regional claim.
+    A petition can be opened only by sponsorship events emitted by
+    ``SponsorDaoRite``.
+    """
+    result: list[Event] = []
+    for region, cause, condition_id in _popular_rite_regions(
+        world, current_events=events
+    ):
+        result.append(_build_popular_rite(world, cause, region, condition_id=condition_id))
+    if not _can_open_audience(world):
         return result
-    historical_rites = _recent_rite_events(world, current_events=rites)
-    for rite in institutional_rites:
-        claim = dict((rite.causal_payload or {}).get("dao_rite", {}))
-        initiator_kind, initiator_id = (
-            str(claim["initiator_kind"]),
-            str(claim["initiator_id"]),
+
+    historical_rites = _recent_rite_events(world, current_events=[*events, *result])
+    sponsorships = [item for item in historical_rites if _is_institutional_rite(item)]
+    by_institution: dict[tuple[str, str], list[Event]] = {}
+    for sponsorship in sponsorships:
+        payload = _sponsorship_payload(sponsorship)
+        key = (
+            str(payload.get("sponsor_kind", payload.get("initiator_kind", ""))),
+            str(payload.get("sponsor_id", payload.get("initiator_id", ""))),
         )
-        matching = [
-            item
-            for item in historical_rites
-            if _rite_matches(item, initiator_kind, initiator_id)
-        ]
+        by_institution.setdefault(key, []).append(sponsorship)
+
+    for (initiator_kind, initiator_id), matching in sorted(by_institution.items()):
+        matching.sort(key=lambda item: (int(item.month_stamp), str(item.id)))
         if len(matching) < RITES_REQUIRED_FOR_AUDIENCE:
             continue
-        cause = next(
-            event
-            for event in major_causes
-            if event.id == rite.causal_links[0].cause_event_id
-        )
-        candidate = next(
-            item
-            for item in _institution_candidates(world, cause)
-            if item[:2] == (initiator_kind, initiator_id)
-        )
-        region = candidate[3]
+        matching_ids = {str(item.id) for item in matching}
+        if any(
+            str(petition.initiator_kind) == initiator_kind
+            and str(petition.initiator_id) == initiator_id
+            and matching_ids.intersection(str(item) for item in petition.rite_event_ids)
+            for petition in getattr(world, "dao_petitions", [])
+        ):
+            continue
+        latest = matching[-1]
+        latest_payload = _sponsorship_payload(latest)
+        region = world.map.regions.get(_event_region_id(latest))
+        if region is None:
+            continue
+        cause_id = str(latest_payload.get("cause_event_id", ""))
+        cause = world.event_manager.get_event_by_id(cause_id)
+        if cause is None:
+            cause = next((item for item in [*events, *result] if item.id == cause_id), None)
+        if cause is None:
+            continue
+        # Retain the existing "major cause" gate, but follow the explicit
+        # sponsorship's public rite back to its source event.
+        source_ids = [str(link.cause_event_id) for link in cause.causal_links]
+        source_events = [
+            world.event_manager.get_event_by_id(source_id)
+            or next((item for item in events if item.id == source_id), None)
+            for source_id in source_ids
+        ]
+        source_events = [item for item in source_events if item is not None]
+        major_cause = next((item for item in source_events if item.is_major), None)
+        if major_cause is None and cause.is_major:
+            major_cause = cause
+        if major_cause is None:
+            continue
         rite_ids = [item.id for item in matching[-RITES_REQUIRED_FOR_AUDIENCE:]]
+        institution_name = str(latest_payload.get("institution_name", initiator_id))
         content = await _render_petition_content(
             world,
             initiator_kind=initiator_kind,
             initiator_id=initiator_id,
-            initiator_name=candidate[2],
+            initiator_name=institution_name,
             tradition=region.dao_tradition,
-            cause=cause,
+            cause=major_cause,
             rite_count=len(matching),
         )
         petition = _create_petition_from_events(
@@ -556,52 +636,40 @@ async def maybe_create_monthly_petition(world: Any, events: list[Event]) -> list
             initiator_kind=initiator_kind,
             initiator_id=initiator_id,
             region_id=int(region.id),
-            motivated_event_ids=[cause.id],
+            motivated_event_ids=[major_cause.id],
             rite_event_ids=rite_ids,
             content=content,
-            source_events=[cause],
+            source_events=[major_cause],
         )
         audience = Event(
             world.month_stamp,
             t(
-                "{institution}'s accumulated rites reach a rare Celestial Audience.",
-                institution=candidate[2],
+                "{institution}'s sponsored rites reach a rare Celestial Audience.",
+                institution=institution_name,
             ),
-            related_avatars=[petition.target_avatar_id]
-            if petition.target_avatar_id
-            else None,
+            related_avatars=[petition.target_avatar_id] if petition.target_avatar_id else None,
             related_sects=[int(initiator_id)] if initiator_kind == "sect" else None,
             fact_kind=FactKind.STATE_TRANSITION,
             event_type="celestial_audience",
             is_major=True,
             causal_payload={
-                "deltas": [
-                    StateDelta(
-                        owner_kind="dao_petition",
-                        owner_id=petition.id,
-                        aspect="created",
-                        before=None,
-                        after="pending",
-                    ).to_dict()
-                ],
+                "deltas": [StateDelta(
+                    owner_kind="dao_petition",
+                    owner_id=petition.id,
+                    aspect="created",
+                    before=None,
+                    after="pending",
+                ).to_dict()],
                 "target_avatar_id": petition.target_avatar_id,
                 "target_evidence_event_ids": list(petition.target_evidence_event_ids),
             },
         )
         audience.causal_links = [
-            CausalLink(
-                event_id=audience.id,
-                cause_event_id=event_id,
-                relation=CausalRelation.ENABLED_BY,
-            )
+            CausalLink(event_id=audience.id, cause_event_id=event_id, relation=CausalRelation.ENABLED_BY)
             for event_id in rite_ids
         ]
         audience.causal_links.append(
-            CausalLink(
-                event_id=audience.id,
-                cause_event_id=cause.id,
-                relation=CausalRelation.MOTIVATED_BY,
-            )
+            CausalLink(event_id=audience.id, cause_event_id=major_cause.id, relation=CausalRelation.MOTIVATED_BY)
         )
         result.append(audience)
         break

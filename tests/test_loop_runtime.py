@@ -1,11 +1,36 @@
 from types import SimpleNamespace
 
 from src.server.loop_runtime import (
+    _serialize_route_updates,
     build_auto_save_toast,
     build_avatar_updates,
     build_tick_state,
     should_trigger_auto_save,
 )
+from src.classes.environment.infrastructure import InfrastructureSite
+from src.classes.environment.map import Map
+from src.classes.environment.route import Route
+
+
+def test_route_updates_are_derived_from_pending_site_updates():
+    game_map = Map(1, 1)
+    game_map.set_routes([Route("route:1", (1, 2), "road", 10, 0.8, True)])
+    site = InfrastructureSite(
+        id="bridge:1",
+        kind="bridge",
+        name="Bridge",
+        cell_refs=((0, 0),),
+        region_ids=(1, 2),
+        route_ids=("route:1",),
+    )
+    game_map.infrastructure_sites = {site.id: site}
+    game_map.update_infrastructure_site_runtime(site.id, integrity=0.5)
+
+    assert _serialize_route_updates(SimpleNamespace(map=game_map)) == [{
+        "id": "route:1",
+        "operational_capacity": 4.0,
+        "dependency_site_ids": ["bridge:1"],
+    }]
 
 
 def test_build_avatar_updates_includes_birth_death_and_position_deltas():
@@ -23,6 +48,7 @@ def test_build_avatar_updates_includes_birth_death_and_position_deltas():
         id="live-1",
         pos_x=7,
         pos_y=8,
+        current_action_name="Cultivar",
         gender=SimpleNamespace(value="female"),
         cultivation_progress=SimpleNamespace(realm=SimpleNamespace(value="FOUNDATION_ESTABLISHMENT")),
     )
@@ -52,7 +78,7 @@ def test_build_avatar_updates_includes_birth_death_and_position_deltas():
         "id": "dead-1",
         "name": "Ancestor",
         "is_dead": True,
-        "action": "已故",
+        "action": "",
     }
     assert updates[2]["id"] == "live-1"
     assert updates[2]["x"] == 7
@@ -66,12 +92,23 @@ def test_build_avatar_updates_includes_birth_death_and_position_deltas():
 
 
 def test_build_tick_state_uses_serializer_hooks():
+    map_updates = [{
+        "op": "upsert",
+        "id": "mine:1",
+        "site": {
+            "id": "mine:1",
+            "cell_refs": [[2, 3]],
+            "integrity": 0.4,
+            "enabled": True,
+        },
+    }]
     world = SimpleNamespace(
         month_stamp=SimpleNamespace(
             get_year=lambda: 120,
             get_month=lambda: SimpleNamespace(value=6),
         ),
         current_phenomenon=SimpleNamespace(id=1),
+        map=SimpleNamespace(get_infrastructure_site_updates=lambda: map_updates),
     )
 
     state = build_tick_state(
@@ -94,6 +131,20 @@ def test_build_tick_state_uses_serializer_hooks():
         "removed_avatar_ids": [],
         "world_revision": 0,
         "poi_updates": [],
+        "site_updates": [{
+            "op": "upsert",
+            "site": {
+                "id": "mine:1",
+                "cell_refs": [[2, 3]],
+                "integrity": 0.4,
+                "enabled": True,
+                "status": "impaired",
+                "x": 2,
+                "y": 3,
+                "clickable": True,
+            },
+        }],
+        "route_updates": [],
         "phenomenon": {"id": 1},
         "active_domains": [{"id": "domain"}],
     }

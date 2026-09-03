@@ -8,6 +8,7 @@ from src.classes.items.auxiliary import (
     TEN_THOUSAND_SOULS_BANNER_MAX_SOULS,
     is_ten_thousand_souls_banner,
 )
+from src.classes.action.population_effects import apply_avatar_population_effect
 
 
 class DevourPeople(TimedAction):
@@ -59,7 +60,20 @@ class DevourPeople(TimedAction):
 
         population_loss = float(region.population) * self.POPULATION_LOSS_RATIO
         consumed_people = int(float(region.population) * 10000 * self.POPULATION_LOSS_RATIO)
-        region.change_population(-population_loss)
+        population_event = apply_avatar_population_effect(
+            self.world,
+            self.avatar,
+            region,
+            delta=-population_loss,
+            affected_quantity=consumed_people,
+            action_name=self.__class__.__name__,
+            content=t(
+                "{avatar} devoured {count} people in {city}.",
+                avatar=self.avatar.name,
+                count=consumed_people,
+                city=region.name,
+            ),
+        )
 
         current_souls = int(auxiliary.special_data.get("devoured_souls", 0) or 0)
         auxiliary.special_data["devoured_souls"] = min(
@@ -70,4 +84,4 @@ class DevourPeople(TimedAction):
             "effect_source_devour_people_karma",
             {"extra_luck": self.LUCK_DELTA},
         )
-        return []
+        return [population_event]

@@ -283,6 +283,7 @@ class SectMission(TimedAction):
             month_stamp=self.world.month_stamp,
             start_text=self._start_event_content,
             result_text=result_text,
+            source_event=result_event,
             actors=[self.avatar, self._resolve_issuer_avatar()],
             related_avatar_ids=related_avatar_ids,
             prompt=story_prompt,

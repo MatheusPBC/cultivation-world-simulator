@@ -13,35 +13,94 @@ from src.utils.df import game_configs, get_float, get_int, get_str
 
 
 @dataclass
-class ImperialCrisis:
-    emperor_avatar_id: str
-    claimant_avatar_id: str
+class ImperialClaim:
+    """One candidate's independent case inside an imperial crisis."""
+
+    candidate_id: str
     opened_month: int
+    position: str = "claimant"
     status: str = "active"
-    evidence_event_ids: list[str] = field(default_factory=list)
-    legitimacy_factors: dict[str, int] = field(default_factory=dict)
-    # Political positions are facts of this crisis, not a separate faction
-    # object.  Values are support, oppose, or neutral.
     political_positions: dict[str, str] = field(default_factory=dict)
+    evidence_event_ids: list[str] = field(default_factory=list)
     evaluations: list[dict[str, Any]] = field(default_factory=list)
+    winner: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        data = {"emperor_avatar_id": self.emperor_avatar_id, "claimant_avatar_id": self.claimant_avatar_id,
-                "opened_month": self.opened_month, "status": self.status,
-                "evidence_event_ids": list(self.evidence_event_ids),
-                "legitimacy_factors": dict(self.legitimacy_factors)}
-        data["political_positions"] = dict(self.political_positions)
-        data["evaluations"] = [dict(item) for item in self.evaluations]
-        return data
+        return {
+            "candidate_id": str(self.candidate_id),
+            "opened_month": int(self.opened_month),
+            "position": str(self.position),
+            "status": str(self.status),
+            "political_positions": dict(self.political_positions),
+            "evidence_event_ids": list(self.evidence_event_ids),
+            "evaluations": [dict(item) for item in self.evaluations],
+            "winner": bool(self.winner),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ImperialClaim":
+        required = {"candidate_id", "opened_month", "position", "status", "political_positions", "evidence_event_ids", "evaluations", "winner"}
+        missing = required.difference(data)
+        if missing:
+            raise ValueError(f"Imperial claim schema is missing fields: {sorted(missing)}")
+        return cls(
+            candidate_id=str(data["candidate_id"]),
+            opened_month=int(data["opened_month"]),
+            position=str(data["position"]),
+            status=str(data["status"]),
+            political_positions={str(key): str(value) for key, value in dict(data["political_positions"]).items()},
+            evidence_event_ids=[str(value) for value in data["evidence_event_ids"]],
+            evaluations=[dict(item) for item in data["evaluations"] if isinstance(item, dict)],
+            winner=bool(data["winner"]),
+        )
+
+
+@dataclass
+class ImperialCrisis:
+    kind: str
+    incumbent_id: str | None
+    opened_month: int
+    claims: list[ImperialClaim] = field(default_factory=list)
+    status: str = "active"
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"challenge", "succession"}:
+            raise ValueError("Imperial crisis kind must be challenge or succession")
+        if self.incumbent_id is not None:
+            self.incumbent_id = str(self.incumbent_id)
+        self.claims = list(self.claims)
+
+    def get_claim(self, candidate_id: str) -> ImperialClaim | None:
+        candidate_id = str(candidate_id)
+        return next((claim for claim in self.claims if str(claim.candidate_id) == candidate_id), None)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": str(self.kind),
+            "incumbent_id": self.incumbent_id,
+            "opened_month": int(self.opened_month),
+            "claims": [claim.to_dict() for claim in self.claims],
+            "status": str(self.status),
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ImperialCrisis":
-        return cls(emperor_avatar_id=str(data["emperor_avatar_id"]), claimant_avatar_id=str(data["claimant_avatar_id"]),
-                   opened_month=int(data["opened_month"]), status=str(data.get("status", "active")),
-                   evidence_event_ids=[str(x) for x in data.get("evidence_event_ids", [])],
-                   legitimacy_factors={str(key): int(value) for key, value in dict(data.get("legitimacy_factors", {}) or {}).items()},
-                   political_positions={str(key): str(value) for key, value in dict(data.get("political_positions", {}) or {}).items()},
-                   evaluations=[dict(item) for item in data.get("evaluations", []) if isinstance(item, dict)])
+        if "emperor_avatar_id" in data or "claimant_avatar_id" in data:
+            raise ValueError("Legacy imperial crisis schema is not supported")
+        required = {"kind", "incumbent_id", "opened_month", "claims", "status"}
+        missing = required.difference(data)
+        if missing:
+            raise ValueError(f"Imperial crisis schema is missing fields: {sorted(missing)}")
+        claims_data = data["claims"]
+        if not isinstance(claims_data, list):
+            raise ValueError("Imperial crisis claims must be a list")
+        return cls(
+            kind=str(data["kind"]),
+            incumbent_id=str(data["incumbent_id"]) if data["incumbent_id"] is not None else None,
+            opened_month=int(data["opened_month"]),
+            claims=[ImperialClaim.from_dict(item) for item in claims_data],
+            status=str(data["status"]),
+        )
 
 
 @dataclass
@@ -59,7 +118,25 @@ class Dynasty:
     weight: float = 1.0
     is_low_magic: bool = True
     current_emperor_id: str | None = None
+    royal_house_member_ids: list[str] = field(default_factory=list)
+    royal_blood_member_ids: list[str] = field(default_factory=list)
     imperial_crisis: ImperialCrisis | None = None
+
+    def add_royal_house_member(self, avatar_id: str, *, blood: bool = False) -> None:
+        avatar_id = str(avatar_id)
+        if avatar_id and avatar_id not in self.royal_house_member_ids:
+            self.royal_house_member_ids.append(avatar_id)
+        if blood and avatar_id and avatar_id not in self.royal_blood_member_ids:
+            self.royal_blood_member_ids.append(avatar_id)
+
+    def register_birth(self, child_id: str, parent_ids: list[str]) -> None:
+        if any(str(parent_id) in self.royal_blood_member_ids for parent_id in parent_ids):
+            self.add_royal_house_member(child_id, blood=True)
+
+    def register_marriage(self, spouse_ids: list[str]) -> None:
+        if any(str(spouse_id) in self.royal_house_member_ids for spouse_id in spouse_ids):
+            for spouse_id in spouse_ids:
+                self.add_royal_house_member(spouse_id)
 
     def _get_localized_template(self) -> "Dynasty | None":
         template = dynasties_by_id.get(int(self.id))
@@ -130,6 +207,8 @@ class Dynasty:
             weight=float(self.weight),
             is_low_magic=bool(self.is_low_magic),
             current_emperor_id=None,
+            royal_house_member_ids=[],
+            royal_blood_member_ids=[],
             imperial_crisis=None,
         )
 
@@ -148,11 +227,19 @@ class Dynasty:
             "weight": float(self.weight),
             "is_low_magic": bool(self.is_low_magic),
             "current_emperor_id": self.current_emperor_id,
+            "royal_house_member_ids": [str(value) for value in self.royal_house_member_ids],
+            "royal_blood_member_ids": [str(value) for value in self.royal_blood_member_ids],
             "imperial_crisis": self.imperial_crisis.to_dict() if self.imperial_crisis else None,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Dynasty":
+        required_membership = {"royal_house_member_ids", "royal_blood_member_ids"}
+        missing_membership = required_membership.difference(data)
+        if missing_membership:
+            raise ValueError(f"Dynasty schema is missing fields: {sorted(missing_membership)}")
+        if not isinstance(data["royal_house_member_ids"], list) or not isinstance(data["royal_blood_member_ids"], list):
+            raise ValueError("Dynasty membership fields must be lists")
         return cls(
             id=int(data["id"]),
             name=str(data.get("name", "") or ""),
@@ -167,6 +254,8 @@ class Dynasty:
             weight=float(data.get("weight", 1.0) or 1.0),
             is_low_magic=bool(data.get("is_low_magic", True)),
             current_emperor_id=str(data.get("current_emperor_id") or "") or None,
+            royal_house_member_ids=[str(value) for value in data.get("royal_house_member_ids", [])],
+            royal_blood_member_ids=[str(value) for value in data.get("royal_blood_member_ids", [])],
             imperial_crisis=ImperialCrisis.from_dict(data["imperial_crisis"]) if data.get("imperial_crisis") else None,
         )
 

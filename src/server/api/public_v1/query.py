@@ -213,6 +213,12 @@ def create_public_query_router(
             return ok_response(query_service.get_sect_territories())
         return ok_response(build_sect_territories())
 
+    @router.get("/api/v1/query/world/institutional-presence")
+    def get_institutional_presence_v1():
+        if query_service is not None:
+            return ok_response(query_service.get_institutional_presence())
+        return ok_response({"regions": []})
+
     @router.get("/api/v1/query/mortals/overview")
     def get_mortal_overview_v1():
         if query_service is not None:

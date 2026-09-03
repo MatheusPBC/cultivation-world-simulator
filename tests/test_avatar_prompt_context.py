@@ -22,17 +22,15 @@ def test_court_official_receives_active_imperial_crisis_as_observation(base_worl
     base_world.dynasty = Dynasty(id=1, name="Test", desc="", current_emperor_id=emperor.id)
 
     open_imperial_claim(base_world, claimant.id)
-    support_imperial_claim(base_world, supporter.id)
+    support_imperial_claim(base_world, supporter.id, claimant.id)
 
     context = build_avatar_prompt_context(supporter)
 
-    assert context["court_context"]["active_imperial_crisis"] == {
-        "role": "court_official",
-        "emperor_name": emperor.name,
-        "claimant_name": claimant.name,
-        "declared_supporters": [supporter.name],
-        "opened_month": base_world.month_stamp,
-    }
+    crisis = context["court_context"]["active_imperial_crisis"]
+    assert crisis["role"] == "court_official"
+    assert crisis["incumbent"] == {"id": emperor.id, "name": emperor.name}
+    assert crisis["claims"][0]["candidate_name"] == claimant.name
+    assert crisis["claims"][0]["positions"] == {supporter.id: "support"}
 
 
 def test_non_official_does_not_receive_court_crisis_context(base_world, dummy_avatar):

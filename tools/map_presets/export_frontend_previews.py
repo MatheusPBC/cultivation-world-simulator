@@ -9,7 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.run.map_presets import list_map_presets  # noqa: E402
-from src.run.map_source import derive_tile_rows_from_region_rows, read_map_source  # noqa: E402
+from src.run.map_source import read_map_source  # noqa: E402
 
 
 COLORS = {
@@ -36,6 +36,14 @@ COLORS = {
     "tundra": "#90a694",
     "marsh": "#587a62",
 }
+SITE_COLORS = {
+    "bridge": "#e0b448",
+    "port": "#48b0d6",
+    "farm": "#d2be4a",
+    "mine": "#9e9284",
+    "irrigation": "#48cab4",
+    "shrine": "#c67edc",
+}
 
 
 def _marker_color(kind: str) -> str:
@@ -54,7 +62,29 @@ def _marker_kind(asset: str) -> str:
     return "cultivate"
 
 
-def build_svg(tile_rows: list[list[str]], region_rows: list[list[int]], landmarks: dict[int, object]) -> str:
+def _site_value(site, key, default=None):
+    if isinstance(site, dict):
+        return site.get(key, default)
+    return getattr(site, key, default)
+
+
+def _site_status(site) -> str:
+    explicit = _site_value(site, "status")
+    if explicit:
+        return explicit
+    if _site_value(site, "integrity", 1.0) <= 0:
+        return "destroyed"
+    if not _site_value(site, "enabled", True) or _site_value(site, "integrity", 1.0) < 1.0:
+        return "impaired"
+    return "active"
+
+
+def build_svg(
+    tile_rows: list[list[str]],
+    region_rows: list[list[int]],
+    landmarks: dict[int, object],
+    infrastructure_sites: list[object] | tuple[object, ...] = (),
+) -> str:
     rows = len(tile_rows)
     cols = len(tile_rows[0]) if rows else 0
     cell = 2
@@ -103,6 +133,21 @@ def build_svg(tile_rows: list[list[str]], region_rows: list[list[int]], landmark
             f'<circle cx="{cx}" cy="{cy}" r="1.9" fill="{_marker_color(kind)}" stroke="#1b1b18" stroke-width="0.45"/>'
         )
 
+    for site in infrastructure_sites:
+        cells = _site_value(site, "cell_refs", ())
+        if not cells:
+            continue
+        x = round(sum(cell[0] for cell in cells) / len(cells))
+        y = round(sum(cell[1] for cell in cells) / len(cells))
+        color = SITE_COLORS.get(_site_value(site, "kind", ""), "#f2f2f2")
+        if _site_status(site) != "active":
+            color = "#777777"
+        cx = x * cell + cell
+        cy = y * cell + cell
+        parts.append(
+            f'<rect x="{cx - 1.5}" y="{cy - 1.5}" width="3" height="3" fill="{color}" stroke="#1b1b18" stroke-width="0.4"/>'
+        )
+
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
 
@@ -115,9 +160,20 @@ def export_previews() -> None:
         if preset.path is None:
             continue
         source = read_map_source(preset.path / "map.json")
-        tile_rows = derive_tile_rows_from_region_rows(source.region_rows, wilderness_tile=source.wilderness_tile)
+        tile_rows = [
+            [tile.value if hasattr(tile, "value") else str(tile) for tile in row]
+            for row in source.geography.terrain_rows
+        ]
         output = output_dir / f"{preset.id}.svg"
-        output.write_text(build_svg(tile_rows, source.region_rows, source.landmarks), encoding="utf-8")
+        output.write_text(
+            build_svg(
+                tile_rows,
+                source.region_rows,
+                source.landmarks,
+                getattr(source, "infrastructure_sites", ()),
+            ),
+            encoding="utf-8",
+        )
         print(output)
 
 

@@ -14,13 +14,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.run.map_presets import get_map_preset, list_map_presets  # noqa: E402
-from src.run.map_source import derive_tile_rows_from_region_rows, read_map_source  # noqa: E402
+from src.run.map_source import read_map_source  # noqa: E402
+from tools.map_presets.infrastructure_sites import validate_infrastructure_sites  # noqa: E402
 
 
 Coord = tuple[int, int]
 
-WATER_REGION_ID = 106
-SEA_REGION_ID = 105
 DEFAULT_SMALL_COMPONENT_LIMIT = 3
 DEFAULT_BLOCKY_AREA_THRESHOLD = 80
 DEFAULT_BLOCKY_FILL_THRESHOLD = 0.78
@@ -159,15 +158,15 @@ def boundary_distance(coords: set[Coord], target: Coord) -> int:
     return 0
 
 
-def count_region_touch_edges(region_rows: list[list[int]], a: int, b: int) -> int:
-    height = len(region_rows)
-    width = len(region_rows[0]) if height else 0
+def count_tile_touch_edges(tile_rows: list[list[str]], pair: set[str]) -> int:
+    height = len(tile_rows)
+    width = len(tile_rows[0]) if height else 0
     edges = 0
-    for y, row in enumerate(region_rows):
-        for x, region_id in enumerate(row):
-            if x + 1 < width and {int(region_id), int(row[x + 1])} == {a, b}:
+    for y, row in enumerate(tile_rows):
+        for x, tile_name in enumerate(row):
+            if x + 1 < width and {tile_name, row[x + 1]} == pair:
                 edges += 1
-            if y + 1 < height and {int(region_id), int(region_rows[y + 1][x])} == {a, b}:
+            if y + 1 < height and {tile_name, tile_rows[y + 1][x]} == pair:
                 edges += 1
     return edges
 
@@ -302,16 +301,15 @@ def audit_tile_components(
 
 def audit_water_region(
     map_id: str,
-    region_rows: list[list[int]],
+    tile_rows: list[list[str]],
 ) -> list[AuditIssue]:
-    water_coords = coords_by_region(region_rows).get(WATER_REGION_ID, set())
+    water_coords = coords_by_tile(tile_rows, {"water"})
     if not water_coords:
         return [
             AuditIssue(
                 map_id=map_id,
                 code="missing_water_region",
-                region_id=WATER_REGION_ID,
-                message="water region 106 is missing from the map",
+                message="physical terrain has no main water channel",
             )
         ]
 
@@ -322,33 +320,31 @@ def audit_water_region(
             AuditIssue(
                 map_id=map_id,
                 code="disconnected_water_region",
-                region_id=WATER_REGION_ID,
                 value=len(components),
                 threshold=1,
                 message=(
-                    f"region 106 has {len(components)} components; "
+                    f"physical water terrain has {len(components)} components; "
                     "classic and mountain_frontier should read as one continuous river"
                 ),
             )
         )
 
     if map_id in {"classic", "mountain_frontier"}:
-        sea_touch_edges = count_region_touch_edges(region_rows, WATER_REGION_ID, SEA_REGION_ID)
+        sea_touch_edges = count_tile_touch_edges(tile_rows, {"water", "sea"})
         if sea_touch_edges == 0:
             issues.append(
                 AuditIssue(
                     map_id=map_id,
                     code="water_region_no_sea_outlet",
-                    region_id=WATER_REGION_ID,
                     value=0,
                     threshold=">0",
-                    message="region 106 does not touch region 105; add a clear river mouth or sea outlet",
+                    message="physical water terrain does not touch the sea; add a clear river mouth or sea outlet",
                 )
             )
     return issues
 
 
-def audit_map_identity(map_id: str, source, tile_rows: list[list[str]]) -> list[AuditIssue]:
+def audit_map_identity(map_id: str, tile_rows: list[list[str]]) -> list[AuditIssue]:
     issues: list[AuditIssue] = []
     sea_fraction = tile_fraction(tile_rows, {"sea"})
     water_fraction = tile_fraction(tile_rows, {"water"})
@@ -359,16 +355,6 @@ def audit_map_identity(map_id: str, source, tile_rows: list[list[str]]) -> list[
     land_component_count = len(land_components)
 
     if map_id == "classic":
-        if str(source.wilderness_tile).lower() == "sea":
-            issues.append(
-                AuditIssue(
-                    map_id=map_id,
-                    code="map_identity_drift",
-                    value=source.wilderness_tile,
-                    threshold="not sea",
-                    message="classic should remain a continental map, not a sea-wilderness archipelago",
-                )
-            )
         if not 0.12 <= sea_fraction <= 0.35:
             issues.append(
                 AuditIssue(
@@ -391,16 +377,6 @@ def audit_map_identity(map_id: str, source, tile_rows: list[list[str]]) -> list[
             )
 
     if map_id == "island_seas":
-        if str(source.wilderness_tile).lower() != "sea":
-            issues.append(
-                AuditIssue(
-                    map_id=map_id,
-                    code="map_identity_drift",
-                    value=source.wilderness_tile,
-                    threshold="sea",
-                    message="island_seas should keep open sea wilderness as its base",
-                )
-            )
         if sea_fraction < 0.50:
             issues.append(
                 AuditIssue(
@@ -423,16 +399,6 @@ def audit_map_identity(map_id: str, source, tile_rows: list[list[str]]) -> list[
             )
 
     if map_id == "mountain_frontier":
-        if str(source.wilderness_tile).lower() == "sea":
-            issues.append(
-                AuditIssue(
-                    map_id=map_id,
-                    code="map_identity_drift",
-                    value=source.wilderness_tile,
-                    threshold="not sea",
-                    message="mountain_frontier should remain a land frontier, not a sea-wilderness map",
-                )
-            )
         if mountain_fraction < 0.25:
             issues.append(
                 AuditIssue(
@@ -515,17 +481,61 @@ def audit_landmarks(
     return issues
 
 
+def audit_infrastructure_sites(
+    map_id: str,
+    region_rows: list[list[int]],
+    sites: Iterable[object],
+    *,
+    width: int,
+    height: int,
+    routes: Iterable[object],
+    water_bodies: Iterable[object],
+) -> list[AuditIssue]:
+    """Return actionable quality issues for the declarative site catalog."""
+
+    try:
+        validate_infrastructure_sites(
+            sites,
+            width=width,
+            height=height,
+            region_rows=region_rows,
+            routes=routes,
+            water_bodies=water_bodies,
+        )
+    except (TypeError, ValueError) as exc:
+        return [
+            AuditIssue(
+                map_id=map_id,
+                code="invalid_infrastructure_site",
+                message=str(exc),
+                severity="error",
+            )
+        ]
+    return []
+
+
 def audit_map_source(map_id: str, source) -> list[AuditIssue]:
-    tile_rows = derive_tile_rows_from_region_rows(
-        source.region_rows,
-        wilderness_tile=source.wilderness_tile,
-    )
+    tile_rows = [
+        [tile.value if hasattr(tile, "value") else str(tile) for tile in row]
+        for row in source.geography.terrain_rows
+    ]
     issues: list[AuditIssue] = []
     issues.extend(audit_region_components(map_id, source.region_rows))
     issues.extend(audit_tile_components(map_id, tile_rows))
-    issues.extend(audit_water_region(map_id, source.region_rows))
-    issues.extend(audit_map_identity(map_id, source, tile_rows))
+    issues.extend(audit_water_region(map_id, tile_rows))
+    issues.extend(audit_map_identity(map_id, tile_rows))
     issues.extend(audit_landmarks(map_id, source.region_rows, source.landmarks))
+    issues.extend(
+        audit_infrastructure_sites(
+            map_id,
+            source.region_rows,
+            getattr(source, "infrastructure_sites", ()),
+            width=source.width,
+            height=source.height,
+            routes=getattr(source, "routes", ()),
+            water_bodies=getattr(source.geography, "water_bodies", ()),
+        )
+    )
     return issues
 
 

@@ -21,6 +21,8 @@ export function normalizeDynastyOverview(input: DynastyOverviewResponseDTO | nul
           is_mortal: Boolean(input.current_emperor.is_mortal ?? true),
         }
       : null,
+    royal_house_member_ids: (input?.royal_house_member_ids ?? []).map(String),
+    royal_blood_member_ids: (input?.royal_blood_member_ids ?? []).map(String),
   }
 }
 
@@ -41,17 +43,21 @@ export function normalizeDynastyDetail(input: DynastyDetailResponseDTO | null | 
       sectName: String(item?.sect_name ?? ''),
     })),
     imperialCrisis: input?.imperial_crisis ? {
+      kind: String(input.imperial_crisis.kind ?? ''),
       status: String(input.imperial_crisis.status ?? ''),
       openedMonth: Number(input.imperial_crisis.opened_month ?? 0),
-      emperor: { id: String(input.imperial_crisis.emperor?.id ?? ''), name: String(input.imperial_crisis.emperor?.name ?? '') },
-      claimant: { id: String(input.imperial_crisis.claimant?.id ?? ''), name: String(input.imperial_crisis.claimant?.name ?? '') },
-      supportCount: Number(input.imperial_crisis.support_count ?? 0),
-      supporters: (input.imperial_crisis.supporters ?? []).map((supporter) => ({
-        id: String(supporter?.id ?? ''),
-        name: String(supporter?.name ?? ''),
+      incumbent: input.imperial_crisis.incumbent ? { id: String(input.imperial_crisis.incumbent.id ?? ''), name: String(input.imperial_crisis.incumbent.name ?? '') } : null,
+      claims: (input.imperial_crisis.claims ?? []).map((claim) => ({
+        candidate: { id: String(claim.candidate?.id ?? ''), name: String(claim.candidate?.name ?? '') },
+        position: String(claim.position ?? ''),
+        status: String(claim.status ?? ''),
+        winner: Boolean(claim.winner),
+        supportCount: Number(claim.support_count ?? 0),
+        supporters: (claim.supporters ?? []).map((supporter) => ({ id: String(supporter?.id ?? ''), name: String(supporter?.name ?? '') })),
+        politicalPositions: claim.political_positions ?? {},
+        evaluations: claim.evaluations ?? [],
+        evidenceEventIds: claim.evidence_event_ids ?? [],
       })),
-      evidenceEventIds: input.imperial_crisis.evidence_event_ids ?? [],
-      legitimacyFactors: input.imperial_crisis.legitimacy_factors ?? {},
     } : null,
   }
 }

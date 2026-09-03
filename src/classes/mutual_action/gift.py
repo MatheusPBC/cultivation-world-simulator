@@ -7,7 +7,10 @@ from src.i18n import t
 from .mutual_action import InvitationAction
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.event import Event
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.utils.config import CONFIG
 
@@ -289,18 +292,36 @@ class Gift(InvitationAction):
                 related_avatars=[self.avatar.id, target.id]
             )
             events.append(result_event)
-            a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+            proposal = await RelationDeltaService.propose_relationship_impact(
                 action_key="gift",
                 avatar_a=self.avatar,
                 avatar_b=target,
                 event_text=result_text,
             )
-            RelationDeltaService.apply_bidirectional_delta(self.avatar, target, a_to_b, b_to_a)
+            allowed = frozenset(
+                {
+                    RelationshipValence.POSITIVE,
+                    RelationshipValence.NEUTRAL,
+                    RelationshipValence.AMBIVALENT,
+                }
+            )
+            events.append(
+                RelationDeltaService.apply_relationship_impact(
+                    self.avatar,
+                    target,
+                    proposal,
+                    source_event=result_event,
+                    action_key="gift_accepted",
+                    allowed_a_to_b=allowed,
+                    allowed_b_to_a=allowed,
+                )
+            )
             story_event = await StoryEventService.maybe_create_story(
                 kind=StoryEventKind.DAILY_SOCIAL,
                 month_stamp=self.world.month_stamp,
                 start_text=getattr(self, "_start_event_content", ""),
                 result_text=result_text,
+                source_event=result_event,
                 actors=[self.avatar, target],
                 related_avatar_ids=[self.avatar.id, target.id],
                 allow_relation_changes=False,
@@ -311,12 +332,35 @@ class Gift(InvitationAction):
             gift_desc = self._get_gift_description()
             result_text = t("{target} rejected {initiator}'s gift: {item}",
                           target=target.name, initiator=self.avatar.name, item=gift_desc)
-            a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+            result_event = Event(
+                self.world.month_stamp,
+                result_text,
+                related_avatars=[self.avatar.id, target.id],
+            )
+            events.append(result_event)
+            proposal = await RelationDeltaService.propose_relationship_impact(
                 action_key="gift",
                 avatar_a=self.avatar,
                 avatar_b=target,
                 event_text=result_text,
             )
-            RelationDeltaService.apply_bidirectional_delta(self.avatar, target, a_to_b, b_to_a)
+            allowed = frozenset(
+                {
+                    RelationshipValence.NEGATIVE,
+                    RelationshipValence.NEUTRAL,
+                    RelationshipValence.AMBIVALENT,
+                }
+            )
+            events.append(
+                RelationDeltaService.apply_relationship_impact(
+                    self.avatar,
+                    target,
+                    proposal,
+                    source_event=result_event,
+                    action_key="gift_rejected",
+                    allowed_a_to_b=allowed,
+                    allowed_b_to_a=allowed,
+                )
+            )
             
         return events

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 from src.i18n import t
 from src.classes.action import TimedAction
 from src.classes.event import Event
@@ -28,7 +27,6 @@ class Educate(TimedAction):
     BASE_EXP_TOTAL = 150 # 基准总经验 (50/月 * 3)
     MIN_POPULATION_FACTOR = 0.5
     MAX_POPULATION_FACTOR = 1.5
-    POPULATION_GAIN_ON_SUCCESS = 0.2
 
     def can_possibly_start(self) -> bool:
         if is_yao_avatar(self.avatar):
@@ -54,12 +52,8 @@ class Educate(TimedAction):
         realm = self.avatar.cultivation_progress.realm
         realm_multiplier = REALM_RANK.get(realm, 0) + 1
         
-        # 计算人口系数：半满城市为标准收益，满员城市上限 1.5 倍。
-        population_factor = self.MIN_POPULATION_FACTOR + region.population_ratio
-        population_factor = max(self.MIN_POPULATION_FACTOR, min(self.MAX_POPULATION_FACTOR, population_factor))
-        
-        # 计算基础经验
-        exp = int(self.BASE_EXP_TOTAL * realm_multiplier * population_factor)
+        # 教化只改变 Avatar 的修为；不会把社会叙事伪装成人口迁移。
+        exp = int(self.BASE_EXP_TOTAL * realm_multiplier)
         
         # 额外效率加成
         efficiency = float(self.avatar.effects.get("extra_educate_efficiency", 0.0))
@@ -68,16 +62,6 @@ class Educate(TimedAction):
             
         self.avatar.cultivation_progress.add_exp(exp)
         
-        # 副作用：小概率吸引人口流入城市
-        base_prob = 0.2
-        extra_prob = float(self.avatar.effects.get("extra_educate_population_prob", 0.0))
-        
-        if random.random() < (base_prob + extra_prob):
-            region.change_population(self.POPULATION_GAIN_ON_SUCCESS)
-            self._population_increased = True
-        else:
-            self._population_increased = False
-            
         self._last_exp = exp
 
     def can_start(self) -> tuple[bool, str]:
@@ -112,10 +96,4 @@ class Educate(TimedAction):
         
         events = [Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])]
         
-        if getattr(self, '_population_increased', False):
-            region = self.avatar.tile.region
-            extra_content = t("The population of {city} has increased due to {avatar}'s teachings.",
-                             city=region.name, avatar=self.avatar.name)
-            events.append(Event(self.world.month_stamp, extra_content, related_avatars=[self.avatar.id]))
-            
         return events

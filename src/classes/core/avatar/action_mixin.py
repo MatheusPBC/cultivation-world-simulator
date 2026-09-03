@@ -166,13 +166,23 @@ class ActionMixin:
                 # 允许 finish 直接返回事件（极少用），统一并入 pending
                 for e in finish_events:
                     self._pending_events.append(e)
+            source_event = next(
+                (
+                    event for event in reversed([*finish_events, *result.events])
+                    if getattr(event, "id", "") and getattr(event, "content", "")
+                ),
+                None,
+            )
             try:
+                if source_event is None:
+                    raise ValueError("completed action produced no source event")
                 from src.systems.background_npc import try_trigger_background_npc_action_echo
 
                 action_echo_events = try_trigger_background_npc_action_echo(
                     self.world,
                     self,
                     action.__class__.__name__,
+                    source_event_id=source_event.id,
                 )
                 for event in action_echo_events:
                     self._pending_events.append(event)
@@ -289,5 +299,4 @@ class ActionMixin:
         if self.current_action and self.current_action.action:
             return getattr(self.current_action.action, 'IS_MAJOR', False)
         return False
-
 

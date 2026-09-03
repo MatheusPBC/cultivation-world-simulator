@@ -4,7 +4,10 @@ import random
 from src.classes.gathering.gathering import Gathering, register_gathering
 from src.classes.event import Event
 from src.classes.story_event_service import StoryEventService
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.systems.time import Month
 from src.systems.cultivation import Realm
 from src.systems.battle import decide_battle, get_base_strength
@@ -114,13 +117,23 @@ class Tournament(Gathering):
                 related_avatars=[final_winner.id, final_loser.id]
             )
             events.append(final_battle_event)
-            a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+            proposal = await RelationDeltaService.propose_relationship_impact(
                 action_key="gathering",
                 avatar_a=final_winner,
                 avatar_b=final_loser,
                 event_text=final_battle_event.content,
             )
-            RelationDeltaService.apply_bidirectional_delta(final_winner, final_loser, a_to_b, b_to_a)
+            events.append(
+                RelationDeltaService.apply_relationship_impact(
+                    final_winner,
+                    final_loser,
+                    proposal,
+                    source_event=final_battle_event,
+                    action_key="gathering",
+                    allowed_a_to_b=frozenset(RelationshipValence),
+                    allowed_b_to_a=frozenset(RelationshipValence),
+                )
+            )
             
             event_end = Event(
                 world.month_stamp,
@@ -219,6 +232,7 @@ class Tournament(Gathering):
                     events_text=events_text,
                     details_text=details_text,
                     related_avatars=[target["winner"], target["loser"]],
+                    source_event=target["final_battle_event"],
                     prompt=t(self.STORY_PROMPT_ID),
                 )
                 if story_event is not None:

@@ -1,15 +1,19 @@
 import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';
-import type { MapMatrix, POISummary, RegionSummary } from '../types/core';
-import type { MapRenderConfigDTO, POIUpdateDTO } from '../types/api';
+import type { InfrastructureSiteSummary, MapMatrix, PhysicalGeographySnapshot, POISummary, RegionSummary, RouteSummary } from '../types/core';
+import type { InfrastructureSiteDTO, InfrastructureSiteUpdateDTO, MapRenderConfigDTO, POIUpdateDTO, RouteUpdateDTO } from '../types/api';
 import { worldApi } from '../api';
 import { normalizeMapRenderConfig } from '../api/mappers/world';
 import { logWarn } from '../utils/appError';
 
 export const useMapStore = defineStore('map', () => {
   const mapData = shallowRef<MapMatrix>([]);
+  const territoryRows = shallowRef<number[][]>([]);
+  const routes = shallowRef<RouteSummary[]>([]);
+  const geography = shallowRef<PhysicalGeographySnapshot>({ elevationRows: [], waterBodies: [] });
   const regions = shallowRef<Map<string | number, RegionSummary>>(new Map());
   const pois = shallowRef<Map<string, POISummary>>(new Map());
+  const infrastructureSites = shallowRef<Map<string, InfrastructureSiteSummary>>(new Map());
   const renderConfig = ref<MapRenderConfigDTO>(normalizeMapRenderConfig());
   const mapId = ref('classic');
   const mapName = ref('');
@@ -28,6 +32,9 @@ export const useMapStore = defineStore('map', () => {
       if (requestId !== preloadMapRequestId) return;
 
       mapData.value = mapRes.data;
+      territoryRows.value = mapRes.territoryRows;
+      routes.value = mapRes.routes;
+      geography.value = mapRes.geography;
       mapId.value = mapRes.mapId;
       mapName.value = mapRes.mapName;
       presetVersion.value = mapRes.presetVersion;
@@ -38,6 +45,9 @@ export const useMapStore = defineStore('map', () => {
       const poiMap = new Map<string, POISummary>();
       (mapRes.pois ?? []).forEach(p => poiMap.set(p.id, p));
       pois.value = poiMap;
+      const siteMap = new Map<string, InfrastructureSiteSummary>();
+      mapRes.infrastructureSites.forEach(site => siteMap.set(site.id, site));
+      infrastructureSites.value = siteMap;
       isLoaded.value = true;
     })()
       .catch((e) => {
@@ -64,8 +74,12 @@ export const useMapStore = defineStore('map', () => {
     preloadMapRequestId++;
     preloadMapPromise = null;
     mapData.value = [];
+    territoryRows.value = [];
+    routes.value = [];
+    geography.value = { elevationRows: [], waterBodies: [] };
     regions.value = new Map();
     pois.value = new Map();
+    infrastructureSites.value = new Map();
     renderConfig.value = normalizeMapRenderConfig();
     mapId.value = 'classic';
     mapName.value = '';
@@ -91,10 +105,60 @@ export const useMapStore = defineStore('map', () => {
     pois.value = next;
   }
 
+  function mapInfrastructureSite(site: InfrastructureSiteDTO): InfrastructureSiteSummary {
+    return {
+      id: String(site.id),
+      kind: site.kind,
+      name: site.name,
+      cellRefs: site.cell_refs.map(cell => [...cell] as [number, number]),
+      regionIds: [...site.region_ids],
+      routeIds: [...site.route_ids],
+      waterBodyIds: [...site.water_body_ids],
+      capabilityIds: [...site.capability_ids],
+      ownerRef: site.owner_ref ? { ...site.owner_ref } : null,
+      maintainerRef: site.maintainer_ref ? { ...site.maintainer_ref } : null,
+      integrity: site.integrity,
+      enabled: site.enabled,
+      status: site.status,
+      x: site.x,
+      y: site.y,
+      clickable: site.clickable,
+      lastEventId: site.last_event_id,
+    };
+  }
+
+  function applyInfrastructureSiteUpdates(updates: InfrastructureSiteUpdateDTO[] | undefined) {
+    if (!Array.isArray(updates) || updates.length === 0) return;
+    const next = new Map(infrastructureSites.value);
+    updates.forEach(update => {
+      if (update.op === 'remove') next.delete(String(update.id));
+      else next.set(String(update.site.id), mapInfrastructureSite(update.site));
+    });
+    infrastructureSites.value = next;
+  }
+
+  function applyRouteUpdates(updates: RouteUpdateDTO[] | undefined) {
+    if (!Array.isArray(updates) || updates.length === 0) return;
+    const updatesById = new Map(updates.map(update => [String(update.id), update]));
+    routes.value = routes.value.map((route) => {
+      const update = updatesById.get(route.id);
+      if (!update) return route;
+      return {
+        ...route,
+        operationalCapacity: update.operational_capacity,
+        dependencySiteIds: [...update.dependency_site_ids],
+      };
+    });
+  }
+
   return {
     mapData,
+    territoryRows,
+    routes,
+    geography,
     regions,
     pois,
+    infrastructureSites,
     renderConfig,
     mapId,
     mapName,
@@ -103,6 +167,8 @@ export const useMapStore = defineStore('map', () => {
     preloadMap,
     refreshPois,
     applyPoiUpdates,
+    applyInfrastructureSiteUpdates,
+    applyRouteUpdates,
     reset
   };
 });

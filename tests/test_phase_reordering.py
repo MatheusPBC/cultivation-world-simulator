@@ -1,21 +1,4 @@
-"""Task 6 residue fixes from docs/specs/causal-world-kernel.md section 6.4.
-
-Region claiming (`avatar.occupy_region`) used to run inside
-`phase_update_perception_and_knowledge`, before `phase_decide_actions`. That
-made it a non-idempotent, irreversible mutation sitting before the point
-where a required-decision failure can abort the month -- a retried month
-could claim the same region twice, or claim it for the wrong avatar after
-a partial, discarded run. It is now split into its own phase and moved
-after `decide_actions`, alongside `process_gatherings`.
-
-`long_term_objective_thinking` has the same hazard and was moved for the
-same reason during re-review: `process_avatar_long_term_objective` writes a
-real `avatar.long_term_objective` (replacing any existing one), and
-`can_generate_long_term_objective` treats "years since it was last set" as
-the guard -- so a version set during a failed, discarded step is never
-regenerated on the retry (`years_passed < 5`), even though its describing
-`Event` was thrown away with the rest of that failed batch.
-"""
+"""Causal phase ordering and the absence of autonomous territorial claims."""
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -26,7 +9,6 @@ from src.classes.environment.region import CultivateRegion, EssenceType
 from src.sim.simulator import Simulator
 from src.sim.simulator_engine.phase_registry import get_simulation_phases
 from src.sim.simulator_engine.phases.world import (
-    phase_claim_ownerless_regions,
     phase_update_perception_and_knowledge,
 )
 from src.sim.simulator_engine.phases.actions import RequiredDecisionFailed
@@ -40,13 +22,14 @@ def _phase_index(name: str) -> int:
     raise AssertionError(f"phase {name!r} not registered")
 
 
-def test_decide_actions_runs_before_region_claiming_and_gatherings():
+def test_no_autonomous_region_claim_phase_and_gatherings_follow_decision():
     decide_index = _phase_index("decide_actions")
-    claim_index = _phase_index("claim_ownerless_regions")
     gatherings_index = _phase_index("process_gatherings")
     commit_index = _phase_index("commit_next_plans")
 
-    assert decide_index < claim_index < commit_index
+    assert "claim_ownerless_regions" not in {
+        phase.name for phase in get_simulation_phases()
+    }
     assert decide_index < gatherings_index < commit_index
 
 
@@ -110,46 +93,3 @@ def test_perception_phase_no_longer_claims_regions(base_world, dummy_avatar):
     assert events == []
     assert region.host_avatar is None
     assert region.id in dummy_avatar.known_regions
-
-
-def test_claim_ownerless_regions_occupies_and_emits_event(base_world, dummy_avatar):
-    region = CultivateRegion(
-        id=2002,
-        name="Unclaimed Cave",
-        desc="test",
-        essence_type=EssenceType.GOLD,
-        essence_density=10,
-    )
-    base_world.map.regions[region.id] = region
-    base_world.map.get_tile(dummy_avatar.pos_x, dummy_avatar.pos_y).region = region
-    base_world.avatar_manager.register_avatar(dummy_avatar)
-
-    events = phase_claim_ownerless_regions(base_world, [dummy_avatar])
-
-    assert len(events) == 1
-    assert region.host_avatar is dummy_avatar
-
-
-def test_claim_ownerless_regions_is_safe_to_rerun_within_the_same_month(base_world, dummy_avatar):
-    """This is the actual retry scenario: a required-decision failure aborts
-    the month right after `decide_actions`, and the month is re-run from the
-    first phase. Region claiming, now positioned after `decide_actions`,
-    must not double-claim or emit a second event on that re-run."""
-    region = CultivateRegion(
-        id=2003,
-        name="Unclaimed Cave",
-        desc="test",
-        essence_type=EssenceType.GOLD,
-        essence_density=10,
-    )
-    base_world.map.regions[region.id] = region
-    base_world.map.get_tile(dummy_avatar.pos_x, dummy_avatar.pos_y).region = region
-    base_world.avatar_manager.register_avatar(dummy_avatar)
-
-    first_events = phase_claim_ownerless_regions(base_world, [dummy_avatar])
-    second_events = phase_claim_ownerless_regions(base_world, [dummy_avatar])
-
-    assert len(first_events) == 1
-    assert second_events == []
-    assert region.host_avatar is dummy_avatar
-    assert dummy_avatar.owned_regions.count(region) == 1

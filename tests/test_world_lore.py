@@ -147,7 +147,12 @@ def test_world_lore_planner_uses_current_map_and_overrides():
     region_jobs = [job for job in jobs if job.kind == "regions"]
 
     assert context.map_summary["map_id"] == "island_seas"
-    assert context.map_summary["wilderness_tile"] == "sea"
+    assert "wilderness_tile" not in context.map_summary
+    assert context.map_summary["terrain_distribution"]["plain"] > 0
+    assert context.map_summary["elevation_range"]["min"] <= context.map_summary["elevation_range"]["max"]
+    assert context.map_summary["water_bodies"]
+    assert context.map_summary["water_bodies"][0]["cell_count"] > 0
+    assert context.map_summary["water_bodies"][0]["bounds"] is not None
     assert region_jobs
     all_region_inputs = [entity for job in region_jobs for entity in job.entities]
     assert {entity["id"] for entity in all_region_inputs} <= set(world.map.regions)

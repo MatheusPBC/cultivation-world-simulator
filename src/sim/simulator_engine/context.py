@@ -41,6 +41,7 @@ class SimulationStepContext:
         # 桥接：部分 owner（如 Action）只能拿到 world，拿不到 ctx 本身，
         # 与 get_decision_boundary_gateway(world) 是同一种挂载方式。
         world.step_causal_recorder = ctx.causal
+        world.step_invalidations = ctx.invalidations
         return ctx
 
     @property

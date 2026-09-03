@@ -92,38 +92,34 @@ def build_dynasty_detail(world: Any) -> Dict[str, Any]:
     crisis_data = None
     if crisis is not None:
         get_avatar = world.avatar_manager.get_avatar
-        emperor = get_avatar(str(crisis.emperor_avatar_id))
-        claimant = get_avatar(str(crisis.claimant_avatar_id))
-        supporters = []
-        for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
-            if position != "support":
-                continue
-            supporter = get_avatar(str(supporter_id))
-            if supporter is None:
-                continue
-            supporters.append(
-                {
-                    "id": str(getattr(supporter, "id", "") or ""),
-                    "name": str(getattr(supporter, "name", "") or ""),
-                }
-            )
+        incumbent = get_avatar(str(crisis.incumbent_id)) if crisis.incumbent_id else None
+        claims = []
+        for claim in crisis.claims:
+            candidate = get_avatar(str(claim.candidate_id))
+            supporters = []
+            for supporter_id, position in claim.political_positions.items():
+                if position != "support":
+                    continue
+                supporter = get_avatar(str(supporter_id))
+                if supporter is not None:
+                    supporters.append({"id": str(supporter.id), "name": str(getattr(supporter, "name", "") or "")})
+            claims.append({
+                "candidate": {"id": str(claim.candidate_id), "name": str(getattr(candidate, "name", "") or "")},
+                "position": str(claim.position),
+                "status": str(claim.status),
+                "winner": bool(claim.winner),
+                "support_count": len(supporters),
+                "supporters": supporters,
+                "political_positions": dict(claim.political_positions),
+                "evaluations": [dict(item) for item in claim.evaluations],
+                "evidence_event_ids": list(claim.evidence_event_ids),
+            })
         crisis_data = {
+            "kind": str(crisis.kind),
             "status": str(crisis.status),
             "opened_month": int(crisis.opened_month),
-            "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
-            "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
-            "support_count": len(
-                [
-                    supporter_id
-                    for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items()
-                    if position == "support"
-                ]
-            ),
-            "supporters": supporters,
-            "political_positions": dict(getattr(crisis, "political_positions", {}) or {}),
-            "evaluations": [dict(item) for item in getattr(crisis, "evaluations", []) or []],
-            "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
-            "legitimacy_factors": dict(getattr(crisis, "legitimacy_factors", {}) or {}),
+            "incumbent": {"id": str(crisis.incumbent_id), "name": str(getattr(incumbent, "name", "") or "")} if incumbent is not None else None,
+            "claims": claims,
         }
 
     return {

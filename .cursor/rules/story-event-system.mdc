@@ -36,6 +36,7 @@ globs: src/classes/story_event_service.py, src/classes/action/**/*.py, src/class
   * 统一使用 `is_story=True`。
   * 不再把长篇故事正文记为 `is_major=True`。
 * `is_story=True` 事件仍会进入事件栏与分页接口，但不应当作为长期记忆事实去替代基础结果事件。
+* `StoryEventService` 必须接收真实基础 `Event` 锚点；故事只建立 `CONTRIBUTED_TO` 因果边，不携带 `StateDelta`。
 
 ## 5. 新增故事入口时的选择原则
 

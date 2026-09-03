@@ -114,6 +114,7 @@ class AutonomousCustomContentService:
             month_stamp=world.month_stamp,
             start_text=creation_event.content,
             result_text=" ".join(event.content for event in events),
+            source_event=creation_event,
             actors=[avatar],
             related_avatar_ids=[avatar.id],
             allow_relation_changes=False,

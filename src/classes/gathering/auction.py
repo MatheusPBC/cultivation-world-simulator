@@ -3,7 +3,10 @@ import asyncio
 from src.classes.gathering.gathering import Gathering, register_gathering
 from src.classes.event import Event
 from src.classes.story_event_service import StoryEventService
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.utils.config import CONFIG
 from src.utils.llm.client import call_llm_with_template
 from src.utils.llm.runtime_mode import is_test_mode_enabled
@@ -248,14 +251,14 @@ class Auction(Gathering):
         self,
         world: "World",
         deal_results: Dict["Item", tuple["Avatar", int]],
-        willing_prices: Dict["Item", Dict["Avatar", int]]
+        willing_prices: Dict["Item", Dict["Avatar", int]],
     ) -> List[Event]:
         """
         生成拍卖事件（合并成交与竞争信息）
         """
         from src.i18n import t
-        events = []
         month_stamp = world.month_stamp
+        events: List[Event] = []
         
         for item, (winner, deal_price) in deal_results.items():
             bids = willing_prices.get(item, {})
@@ -305,7 +308,9 @@ class Auction(Gathering):
         self,
         world: "World",
         deal_results: Dict["Item", tuple["Avatar", int]],
-        willing_prices: Dict["Item", Dict["Avatar", int]]
+        willing_prices: Dict["Item", Dict["Avatar", int]],
+        *,
+        source_event: Event | None,
     ) -> List[Event]:
         """
         生成故事 (StoryTeller)
@@ -313,6 +318,8 @@ class Auction(Gathering):
         让 LLM 自行选取切入点生成故事。
         """
         from src.i18n import t
+        if source_event is None:
+            return []
         events = []
         
         # 1. 收集所有相关事件文本
@@ -394,13 +401,13 @@ class Auction(Gathering):
             details_list.append(f"- {av.name}: {info}")
             
         details_text = "\n".join(details_list)
-        
         story_event = await StoryEventService.maybe_create_gathering_story(
             month_stamp=world.month_stamp,
             gathering_info=gathering_info,
             events_text=interaction_result,
             details_text=details_text,
             related_avatars=list(related_avatars),
+            source_event=source_event,
             prompt=self.get_story_prompt(),
         )
         if story_event is not None:
@@ -484,21 +491,38 @@ class Auction(Gathering):
         # 5. 生成基础事件（合并成交与竞争信息）
         auction_events = self._generate_auction_events(world, deal_results, willing_prices)
         events.extend(auction_events)
+        relation_events = []
         for event in auction_events:
             pair = getattr(event, "_relation_delta_pair", None)
             if pair is None:
                 continue
             winner_avatar, runner_up_avatar = pair
-            a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+            proposal = await RelationDeltaService.propose_relationship_impact(
                 action_key="gathering",
                 avatar_a=winner_avatar,
                 avatar_b=runner_up_avatar,
                 event_text=event.content,
             )
-            RelationDeltaService.apply_bidirectional_delta(winner_avatar, runner_up_avatar, a_to_b, b_to_a)
+            relation_events.append(
+                RelationDeltaService.apply_relationship_impact(
+                    winner_avatar,
+                    runner_up_avatar,
+                    proposal,
+                    source_event=event,
+                    action_key="gathering",
+                    allowed_a_to_b=frozenset(RelationshipValence),
+                    allowed_b_to_a=frozenset(RelationshipValence),
+                )
+            )
+        events.extend(relation_events)
 
         # 6. 生成故事 (StoryTeller)
-        story_events = await self._generate_story(world, deal_results, willing_prices)
+        story_events = await self._generate_story(
+            world,
+            deal_results,
+            willing_prices,
+            source_event=auction_events[-1] if auction_events else None,
+        )
         events.extend(story_events)
         
         return events

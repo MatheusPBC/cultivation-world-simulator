@@ -14,6 +14,8 @@ from src.systems.time import Month, Year, create_month_stamp
 from src.utils.id_generator import get_avatar_id
 from src.classes.core.world import World
 from src.classes.environment.map import Map
+from src.classes.environment.geography import GeographyLayer, WaterBody, WaterBodyKind
+from src.classes.environment.route import Route
 from src.classes.environment.tile import TileType
 import pytest
 
@@ -605,6 +607,100 @@ def test_v1_map_presets_accepts_ui_locale_without_switching_runtime_language():
         main.game_instance.clear()
         main.game_instance.update(original)
 
+
+def test_v1_world_map_exposes_physical_geography_without_region_fallback():
+    from src.server.services.game_queries import get_world_map
+
+    game_map = Map(width=2, height=2)
+    for x in range(2):
+        for y in range(2):
+            game_map.create_tile(x, y, TileType.CITY)
+    game_map.set_geography(
+        GeographyLayer(
+            width=2,
+            height=2,
+            terrain_rows=[[TileType.PLAIN, TileType.WATER], [TileType.MOUNTAIN, TileType.PLAIN]],
+            elevation_rows=[[10, 20.5], [30, 40]],
+            water_bodies=[
+                WaterBody(
+                    id="river-1",
+                    kind=WaterBodyKind.RIVER,
+                    cell_refs=((1, 0),),
+                    navigable=True,
+                    flow_direction=(1, 0),
+                )
+            ],
+        )
+    )
+    game_map.region_cors = {
+        101: [(0, 0), (1, 0)],
+        202: [(0, 1)],
+    }
+    game_map.set_routes(
+        [
+            Route(
+                id="route-zeta",
+                endpoint_region_ids=(202, 101),
+                mode="river",
+                capacity=25.5,
+                quality=0.75,
+                enabled=False,
+                allowed_resource_ids=("grain", "spirit_stone"),
+            ),
+            Route(
+                id="route-alpha",
+                endpoint_region_ids=(101, 202),
+                mode="road",
+                capacity=80,
+                quality=0.9,
+                enabled=True,
+                allowed_resource_ids=(),
+            ),
+        ]
+    )
+    mock_world = MagicMock()
+    mock_world.map = game_map
+
+    payload = get_world_map({"world": mock_world}, sects_by_id={}, render_config={})
+
+    assert payload["data"] == [["PLAIN", "WATER"], ["MOUNTAIN", "PLAIN"]]
+    assert payload["territory_rows"] == [[101, 101], [202, -1]]
+    assert payload["geography"] == {
+        "elevation_rows": [[10, 20.5], [30, 40]],
+        "water_bodies": [
+            {
+                "id": "river-1",
+                "kind": "river",
+                "cell_refs": [[1, 0]],
+                "navigable": True,
+                "flow_direction": [1, 0],
+            }
+        ],
+    }
+    assert payload["routes"] == [
+        {
+            "id": "route-alpha",
+            "endpoint_region_ids": [101, 202],
+            "mode": "road",
+            "capacity": 80.0,
+            "operational_capacity": 72.0,
+            "quality": 0.9,
+            "enabled": True,
+            "allowed_resource_ids": [],
+            "dependency_site_ids": [],
+        },
+        {
+            "id": "route-zeta",
+            "endpoint_region_ids": [202, 101],
+            "mode": "river",
+            "capacity": 25.5,
+            "operational_capacity": 0.0,
+            "quality": 0.75,
+            "enabled": False,
+            "allowed_resource_ids": ["grain", "spirit_stone"],
+            "dependency_site_ids": [],
+        },
+    ]
 
 def test_v1_update_avatar_adjustment_returns_ok_envelope(base_world):
     original = _reset_state()

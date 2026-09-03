@@ -12,6 +12,58 @@ from src.systems.cultivation_display import build_avatar_cultivation_display
 AVATAR_POSITION_UPDATE_LIMIT = 50
 
 
+def _serialize_infrastructure_site_updates(world) -> list[dict[str, Any]]:
+    game_map = getattr(world, "map", None)
+    if not hasattr(game_map, "get_infrastructure_site_updates"):
+        return []
+    serialized: list[dict[str, Any]] = []
+    for update in game_map.get_infrastructure_site_updates():
+        if update.get("op") == "remove":
+            serialized.append({"op": "remove", "id": str(update["id"])})
+            continue
+        site = dict(update.get("site") or {})
+        cell_refs = site.get("cell_refs") or []
+        if not cell_refs:
+            continue
+        integrity = float(site.get("integrity", 0.0))
+        enabled = bool(site.get("enabled", False))
+        status = "destroyed" if integrity <= 0 else "active" if enabled and integrity >= 1 else "impaired"
+        anchor_x, anchor_y = cell_refs[0]
+        serialized.append({
+            "op": "upsert",
+            "site": {
+                **site,
+                "status": status,
+                "x": int(anchor_x),
+                "y": int(anchor_y),
+                "clickable": True,
+            },
+        })
+    return serialized
+
+
+def _serialize_route_updates(world) -> list[dict[str, Any]]:
+    """Project routes affected by pending site updates without new state."""
+    game_map = getattr(world, "map", None)
+    if not hasattr(game_map, "get_infrastructure_site_updates"):
+        return []
+    route_ids: set[str] = set()
+    for update in game_map.get_infrastructure_site_updates():
+        site = update.get("site") or {}
+        route_ids.update(str(item) for item in site.get("route_ids", ()) if str(item))
+    return [
+        {
+            "id": route_id,
+            "operational_capacity": game_map.get_route_operational_capacity(route_id),
+            "dependency_site_ids": [
+                site.id for site in game_map.get_route_dependency_sites(route_id)
+            ],
+        }
+        for route_id in sorted(route_ids)
+        if route_id in game_map.routes
+    ]
+
+
 def build_avatar_updates(
     *,
     world,
@@ -109,6 +161,8 @@ def build_tick_state(
         ),
         "world_revision": world_revision,
         "poi_updates": world.poi_manager.pop_updates() if hasattr(world, "poi_manager") else [],
+        "site_updates": _serialize_infrastructure_site_updates(world),
+        "route_updates": _serialize_route_updates(world),
         "phenomenon": serialize_phenomenon(world.current_phenomenon),
         "active_domains": serialize_active_domains(world),
     }

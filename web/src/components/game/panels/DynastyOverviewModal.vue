@@ -95,35 +95,22 @@ function handleShowChange(value: boolean) {
             {{ t('game.dynasty.crisis.title') }}
           </div>
           <div class="crisis-status">{{ t(`game.dynasty.crisis.status.${imperialCrisis.status}`) }}</div>
-          <div class="crisis-contenders">
-            <button type="button" class="contender" @click="jumpToAvatar(imperialCrisis.emperor.id)">
-              <span>{{ t('game.dynasty.crisis.emperor') }}</span><strong>{{ imperialCrisis.emperor.name }}</strong>
-            </button>
-            <span class="crisis-versus" aria-hidden="true">↔</span>
-            <button type="button" class="contender" @click="jumpToAvatar(imperialCrisis.claimant.id)">
-              <span>{{ t('game.dynasty.crisis.claimant') }}</span><strong>{{ imperialCrisis.claimant.name }}</strong>
+          <div v-if="imperialCrisis.incumbent" class="crisis-contenders">
+            <button type="button" class="contender" @click="jumpToAvatar(imperialCrisis.incumbent.id)">
+              <span>{{ t('game.dynasty.crisis.emperor') }}</span><strong>{{ imperialCrisis.incumbent.name }}</strong>
             </button>
           </div>
-          <p class="crisis-meta">{{ t('game.dynasty.crisis.support', { count: imperialCrisis.supportCount }) }}</p>
-          <div v-if="imperialCrisis.supporters.length" class="crisis-supporters">
-            <span class="crisis-supporters-label">{{ t('game.dynasty.crisis.supporters') }}</span>
-            <button
-              v-for="supporter in imperialCrisis.supporters"
-              :key="supporter.id"
-              type="button"
-              class="supporter"
-              @click="jumpToAvatar(supporter.id)"
-            >
-              {{ supporter.name }}
+          <div v-for="claim in imperialCrisis.claims" :key="claim.candidate.id" class="crisis-contenders">
+            <button type="button" class="contender" @click="jumpToAvatar(claim.candidate.id)">
+              <span>{{ t('game.dynasty.crisis.claimant') }}</span><strong>{{ claim.candidate.name }}</strong>
             </button>
-          </div>
-          <div v-if="Object.keys(imperialCrisis.legitimacyFactors).length" class="legitimacy-factors">
-            <span v-for="factor in ['office', 'reputation', 'cultivation', 'support', 'celestial', 'worldly_total', 'total']" :key="factor" v-show="factor in imperialCrisis.legitimacyFactors">
-              {{ t(`game.dynasty.crisis.factors.${factor}`) }}: {{ imperialCrisis.legitimacyFactors[factor] > 0 ? '+' : '' }}{{ imperialCrisis.legitimacyFactors[factor] }}
-            </span>
-          </div>
-          <div v-if="imperialCrisis.evidenceEventIds.length" class="crisis-evidence">
-            <button v-for="eventId in imperialCrisis.evidenceEventIds" :key="eventId" type="button" @click="openCrisisEvidence(eventId)">{{ t('game.dynasty.crisis.evidence') }}</button>
+            <span class="crisis-meta">{{ t('game.dynasty.crisis.support', { count: claim.supportCount }) }}</span>
+            <div v-if="claim.supporters.length" class="crisis-supporters">
+              <button v-for="supporter in claim.supporters" :key="supporter.id" type="button" class="supporter" @click="jumpToAvatar(supporter.id)">{{ supporter.name }}</button>
+            </div>
+            <div v-if="claim.evidenceEventIds.length" class="crisis-evidence">
+              <button v-for="eventId in claim.evidenceEventIds" :key="eventId" type="button" @click="openCrisisEvidence(eventId)">{{ t('game.dynasty.crisis.evidence') }}</button>
+            </div>
           </div>
         </section>
 

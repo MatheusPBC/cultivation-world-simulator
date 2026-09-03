@@ -54,7 +54,8 @@
 2. 三个任务虽然并发，但每个任务 prompt 都很大，尤其 `world_lore_item` 会塞入完整 `technique.csv`、`weapon.csv`、`auxiliary.csv`。
 3. 世界观任务传入 `max_retries=3`，底层语义是初次调用加最多 3 次重试；单次 HTTP timeout 当前为 120 秒，最坏等待时间过长。
 4. prompt 要求输出 `thinking`，地图和物品模板还要求详细分析，增加输出 token 和 JSON 解析失败概率。
-5. 地图任务读取全局 region CSV，而不是当前 `world.map`，因此不能真正理解当前地图预设、`wilderness_tile`、`region_overrides`、landmarks 和当前 region 位置语义。
+5. A tarefa de mapa precisa ler o `world.map` atual para compreender o preset,
+   a geografia física, `region_overrides`, landmarks e a posição real das regiões.
 6. 失败粒度太粗，一个大任务卡住或解析失败会拖慢整个初始化阶段。
 7. 初始化状态只显示 `shaping_world_lore`，无法定位卡在地图、宗门、功法还是装备。
 
@@ -142,10 +143,12 @@ async def apply_world_lore(self, lore_text: str) -> None:
 3. `preset_version`
 4. `width`
 5. `height`
-6. `wilderness_tile`
-7. `landmarks`
-8. `region_overrides`
-9. 当前地图实际存在的 `regions`
+6. distribuição de terreno físico
+7. faixa de elevação
+8. corpos d'água
+9. `landmarks`
+10. `region_overrides`
+11. regiões realmente presentes no mapa
 
 每个 region 输入建议包含：
 
@@ -696,7 +699,8 @@ llm:
    - 验证 planner 从 `world.map.regions` 构建 region 输入。
    - 验证不读取全局 region CSV 作为地图 prompt 主输入。
 2. `test_world_lore_planner_includes_map_context`
-   - 验证 `map_id`、`map_name`、`wilderness_tile`、`region_overrides`、`landmarks` 进入 context。
+   - Verifica `map_id`, `map_name`, distribuição de terreno, faixa de elevação,
+     corpos d'água, `region_overrides` e `landmarks` no contexto.
 3. `test_world_lore_chunks_all_entities`
    - 验证所有 region、sect、technique、weapon、auxiliary 都被分配到 jobs。
 4. `test_world_lore_runner_uses_global_llm_entrypoint`
@@ -720,7 +724,9 @@ llm:
 13. `test_init_world_lore_timeout_does_not_abort_initialization`
     - 世界观超时不导致初始化失败。
 
-涉及地图上下文时，应结合 `docs/specs/region-first-map-system.md` 的约束，确保使用当前地图的 `region_rows` 派生结果、`wilderness_tile`、`landmarks` 和 `region_overrides`。
+Ao montar contexto geográfico, seguir `docs/specs/region-first-map-system.md`:
+usar a geografia física e as regiões do mapa atual, além de landmarks e
+overrides, sem inferir terreno pelo território.
 
 ## 实施完成标准
 

@@ -35,7 +35,7 @@ O estudo de produto que orientou o Diario do Mundo permanece em
 | Diario no backend | `src/server/services/game_queries.py`, `src/server/api/public_v1/query.py` |
 | Diario no frontend | `web/src/stores/worldJournal.ts`, `web/src/components/game/panels/WorldJournalPanel.vue` |
 | Shell mobile | `web/src/components/mobile/`, `web/src/composables/useIsMobile.ts` |
-| Mapas localizados | `src/run/map_source.py`, `src/run/map_snapshot.py`, `tools/migrate_map_snapshot_v2_to_v3.py` |
+| Mapas localizados | `src/run/map_source.py`, `src/run/map_snapshot.py`, `static/game_configs/maps/` |
 
 ## Limites de seguranca
 

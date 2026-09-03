@@ -5,6 +5,7 @@ from src.classes.action import TimedAction
 from src.classes.event import Event
 from src.classes.environment.region import CityRegion
 from src.classes.alignment import Alignment
+from src.classes.action.population_effects import apply_avatar_population_effect
 
 
 class PlunderPeople(TimedAction):
@@ -49,8 +50,22 @@ class PlunderPeople(TimedAction):
 
     async def finish(self) -> list[Event]:
         region = self.avatar.tile.region
+        events: list[Event] = []
         if isinstance(region, CityRegion):
-            region.change_population(-self.TOTAL_POPULATION_LOSS)
+            events.append(apply_avatar_population_effect(
+                self.world,
+                self.avatar,
+                region,
+                delta=-self.TOTAL_POPULATION_LOSS,
+                affected_quantity=self.TOTAL_POPULATION_LOSS,
+                action_name=self.__class__.__name__,
+                content=t(
+                    "{avatar} plundered {quantity} ten-thousand people in {city}.",
+                    avatar=self.avatar.name,
+                    quantity=self.TOTAL_POPULATION_LOSS,
+                    city=region.name,
+                ),
+            ))
 
         multiplier_raw = self.avatar.effects.get("extra_plunder_multiplier", 0.0)
         multiplier = 1.0 + float(multiplier_raw or 0.0)
@@ -60,4 +75,4 @@ class PlunderPeople(TimedAction):
             "effect_source_plunder_people_karma",
             {"extra_luck": self.LUCK_DELTA},
         )
-        return []
+        return events

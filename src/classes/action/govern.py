@@ -93,6 +93,7 @@ class Govern(TimedAction):
             )
             self.avatar.recalc_effects()
 
+        story_source_event = events[-1]
         story_event = await StoryEventService.maybe_create_story(
             kind=StoryEventKind.DAILY_SOCIAL,
             month_stamp=self.world.month_stamp,
@@ -101,6 +102,7 @@ class Govern(TimedAction):
                 "{avatar} completed a round of governance, and new ripples spread through court and countryside.",
                 avatar=self.avatar.name,
             ),
+            source_event=story_source_event,
             actors=[self.avatar],
             related_avatar_ids=[self.avatar.id],
             prompt=t("Focus on governance affairs, malevolent incidents, local strongmen, and political rivals creating obstacles."),

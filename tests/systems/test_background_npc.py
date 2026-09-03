@@ -195,7 +195,7 @@ def test_region_tick_creates_world_only_small_event(base_world, dummy_avatar):
         patch("src.systems.background_npc.service.random.choices", side_effect=lambda seq, weights, k: [seq[0]]),
     ):
         mock_config.world.background_npc = _config(avatar_witness_prob=0.0)
-        events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar])
+        events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar], source_event_id="source-event")
 
     assert len(events) == 1
     event = events[0]
@@ -207,6 +207,8 @@ def test_region_tick_creates_world_only_small_event(base_world, dummy_avatar):
     assert "药材商" in event.content
     assert event.render_params["region_name"] == "青云城"
     assert event.render_params["trigger_kind"] == "region_tick"
+    assert event.causal_links[0].cause_event_id == "source-event"
+    assert str(event.causal_links[0].relation) == "contributed_to"
 
 
 def test_avatar_witness_filters_by_yao_race(base_world, dummy_avatar):
@@ -220,9 +222,9 @@ def test_avatar_witness_filters_by_yao_race(base_world, dummy_avatar):
         patch("src.systems.background_npc.service.random.choices", side_effect=lambda seq, weights, k: [seq[0]]),
     ):
         mock_config.world.background_npc = _config(region_tick_prob=0.0, max_avatar_witness_per_month=1)
-        human_events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar])
+        human_events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar], source_event_id="source-event")
         dummy_avatar.race = "fox"
-        yao_events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar])
+        yao_events = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar], source_event_id="source-event")
 
     assert len(human_events) == 1
     assert "青云城" in human_events[0].content
@@ -244,8 +246,8 @@ def test_action_echo_matches_action_key(base_world, dummy_avatar):
         patch("src.systems.background_npc.service.random.choices", side_effect=lambda seq, weights, k: [seq[0]]),
     ):
         mock_config.world.background_npc = _config()
-        no_match = BackgroundNpcService.create_action_echo_events(base_world, dummy_avatar, "Sell")
-        matched = BackgroundNpcService.create_action_echo_events(base_world, dummy_avatar, "Buy")
+        no_match = BackgroundNpcService.create_action_echo_events(base_world, dummy_avatar, "Sell", source_event_id="source-event")
+        matched = BackgroundNpcService.create_action_echo_events(base_world, dummy_avatar, "Buy", source_event_id="source-event")
 
     assert no_match == []
     assert len(matched) == 1
@@ -274,26 +276,12 @@ def test_avatar_filters_support_alignment_and_realm(base_world, dummy_avatar):
         mock_config.world.background_npc = _config(region_tick_prob=0.0)
         dummy_avatar.alignment = Alignment.EVIL
         dummy_avatar.cultivation_progress = CultivationProgress(31)
-        matched = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar])
+        matched = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar], source_event_id="source-event")
         dummy_avatar.cultivation_progress = CultivationProgress(1)
-        too_low = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar])
+        too_low = BackgroundNpcService.create_monthly_events(base_world, [dummy_avatar], source_event_id="source-event")
 
     assert len(matched) == 1
     assert too_low == []
-
-
-def test_phase_background_npc_events_delegates(base_world, dummy_avatar):
-    from src.sim.simulator_engine.phases.world import phase_background_npc_events
-
-    event = SimpleNamespace(content="凡人场景")
-    with patch(
-        "src.sim.simulator_engine.phases.world.try_trigger_background_npc_events",
-        return_value=[event],
-    ) as mock_trigger:
-        events = phase_background_npc_events(base_world, [dummy_avatar])
-
-    assert events == [event]
-    mock_trigger.assert_called_once_with(base_world, [dummy_avatar])
 
 
 class _CompletedAction(InstantAction):
@@ -317,5 +305,5 @@ async def test_avatar_tick_action_appends_background_npc_action_echo(dummy_avata
     ) as mock_echo:
         events = await dummy_avatar.tick_action()
 
-    assert echo_event in events
-    mock_echo.assert_called_once_with(dummy_avatar.world, dummy_avatar, "_CompletedAction")
+    assert echo_event not in events
+    mock_echo.assert_not_called()

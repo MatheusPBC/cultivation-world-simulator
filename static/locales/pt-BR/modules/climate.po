@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Regional weather changed across {count} regions."
+msgstr "O clima regional mudou em {count} regiões."
+
+msgid "Persistent water pressure caused flooding in {region}."
+msgstr "A pressão persistente da água causou uma enchente em {region}."
+
+msgid "Flood waters receded in {region}."
+msgstr "As águas da enchente recuaram em {region}."
+
+msgid "Active regional hazard: {hazard} (since month {month})."
+msgstr "Perigo regional ativo: {hazard} (desde o mês {month})."
+
+msgid "regional_climate_updated"
+msgstr "O clima regional foi atualizado em {count} regiões."

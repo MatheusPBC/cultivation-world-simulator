@@ -130,6 +130,8 @@ class SectDecisionContext:
     imperial_crisis: Dict[str, Any] | None = None
     # Read-only semantic observations for this sect's canonical regions.
     regional_semantics: List[Dict[str, Any]] = field(default_factory=list)
+    # Read-only administrative and spatial sect presence for influenced regions.
+    institutional_presence: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def build_sect_decision_context(
@@ -156,6 +158,20 @@ def build_sect_decision_context(
     active_sects = snapshot.active_sects
     tile_owners = snapshot.tile_owners
     sect_centers = snapshot.sect_centers
+
+    from src.systems.regional_institutional_presence import (
+        project_regional_institutional_presence,
+    )
+
+    institutional_presence = [
+        item
+        for item in project_regional_institutional_presence(world.map, snapshot)["regions"]
+        if any(
+            int(influence["sect_id"]) == int(sect.id)
+            and int(influence["owned_tile_count"]) > 0
+            for influence in item["sect_influences"]
+        )
+    ]
 
     # 统计当前本宗占据的格子数与冲突格子数
     tile_count = len(snapshot.owned_tiles_by_sect.get(int(sect.id), []))
@@ -500,26 +516,32 @@ def build_sect_decision_context(
     imperial_crisis = None
     if crisis is not None and str(getattr(crisis, "status", "")) == "active":
         get_avatar = world.avatar_manager.get_avatar
-        emperor = get_avatar(str(crisis.emperor_avatar_id))
-        claimant = get_avatar(str(crisis.claimant_avatar_id))
-        supporters = []
-        for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
-            if position != "support":
-                continue
-            supporter = get_avatar(str(supporter_id))
-            if supporter is not None:
-                supporters.append(
-                    {
-                        "id": str(getattr(supporter, "id", "") or ""),
-                        "name": str(getattr(supporter, "name", "") or ""),
-                    }
-                )
+        incumbent = get_avatar(str(crisis.incumbent_id)) if crisis.incumbent_id else None
         imperial_crisis = {
-            "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
-            "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
-            "declared_supporters": supporters,
-            "political_positions": dict(getattr(crisis, "political_positions", {}) or {}),
-            "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
+            "kind": str(crisis.kind),
+            "incumbent": (
+                {
+                    "id": str(crisis.incumbent_id),
+                    "name": str(getattr(incumbent, "name", "") or ""),
+                }
+                if crisis.incumbent_id
+                else None
+            ),
+            "claims": [
+                {
+                    "candidate": {
+                        "id": str(claim.candidate_id),
+                        "name": str(
+                            getattr(get_avatar(str(claim.candidate_id)), "name", "")
+                            or ""
+                        ),
+                    },
+                    "status": str(claim.status),
+                    "positions": dict(claim.political_positions),
+                    "evidence_event_ids": list(claim.evidence_event_ids),
+                }
+                for claim in crisis.claims
+            ],
         }
 
     return SectDecisionContext(
@@ -541,4 +563,5 @@ def build_sect_decision_context(
         celestial_dao=get_dao_context(world),
         imperial_crisis=imperial_crisis,
         regional_semantics=build_sect_semantic_context(world, sect),
+        institutional_presence=institutional_presence,
     )

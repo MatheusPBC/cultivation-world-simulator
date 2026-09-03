@@ -36,15 +36,18 @@ def test_court_official_can_take_one_causal_opposition(base_world, dummy_avatar)
 
     assert "OpposeImperialClaim" in get_action_infos(official)
     official.load_decide_result_chain(
-        [("OpposeImperialClaim", {})], "Public position", "Court policy"
+        [("OpposeImperialClaim", {"candidate_id": "claimant"})],
+        "Public position",
+        "Court policy",
     )
     position_event = official.commit_next_plan()
 
-    assert crisis.political_positions[official.id] == "oppose"
+    claim = crisis.get_claim("claimant")
+    assert claim.political_positions[official.id] == "oppose"
     event = position_event
     assert event is not None
     assert base_world.event_manager.get_event_by_id(event.id) is None
-    assert event.causal_links[0].cause_event_id == crisis.evidence_event_ids[0]
+    assert event.causal_links[1].cause_event_id == claim.evidence_event_ids[0]
     assert event.causal_payload["deltas"][0]["after"] == "oppose"
     assert "OpposeImperialClaim" not in get_action_infos(official)
 
@@ -61,7 +64,8 @@ def test_only_claimant_can_withdraw_and_end_active_pretension(base_world, dummy_
     )
     withdrawal_event = claimant.commit_next_plan()
 
-    assert crisis.status == "withdrawn"
+    assert crisis.status == "active"
+    assert crisis.get_claim(claimant.id).status == "withdrawn"
     event = withdrawal_event
     assert event is not None
     assert base_world.event_manager.get_event_by_id(event.id) is None
@@ -75,7 +79,9 @@ def test_imperial_action_event_uses_step_pipeline_before_persistence(
 ):
     crisis, _, official = _active_crisis(base_world, dummy_avatar)
     official.load_decide_result_chain(
-        [("OpposeImperialClaim", {})], "I oppose the claim.", "Defend the throne"
+        [("OpposeImperialClaim", {"candidate_id": "claimant"})],
+        "I oppose the claim.",
+        "Defend the throne",
     )
 
     ctx = SimulationStepContext.create(base_world)
@@ -83,7 +89,7 @@ def test_imperial_action_event_uses_step_pipeline_before_persistence(
 
     assert len(events) == 1
     event = events[0]
-    assert event.id == crisis.evidence_event_ids[-1]
+    assert event.id == crisis.get_claim("claimant").evidence_event_ids[-1]
     assert base_world.event_manager.get_event_by_id(event.id) is None
 
     ctx.events.extend(events)

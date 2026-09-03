@@ -92,7 +92,8 @@ msgstr ""
             name_id = item.get("name_id")
             if name_id:
                 ref_text = item.get("name", "")
-                entries.append(generate_pot_entry(name_id, f"{filename}: {ref_text}"))
+                comment = f"{filename}: {ref_text}" if ref_text else f"{filename}:"
+                entries.append(generate_pot_entry(name_id, comment))
                 count += 1
             
             # Check for desc_id
@@ -102,7 +103,8 @@ msgstr ""
                 # Truncate long descriptions in comments
                 if len(ref_text) > 50:
                     ref_text = ref_text[:47] + "..."
-                entries.append(generate_pot_entry(desc_id, f"{filename}: {ref_text}"))
+                comment = f"{filename}: {ref_text}" if ref_text else f"{filename}:"
+                entries.append(generate_pot_entry(desc_id, comment))
                 count += 1
 
     with open(POT_FILE, "w", encoding="utf-8") as f:

@@ -120,6 +120,7 @@ class SwearBrotherhood(InvitationAction):
             month_stamp=self.world.month_stamp,
             start_text=start_text,
             result_text=result_event.content,
+            source_event=result_event,
             actors=[self.avatar, target],
             related_avatar_ids=[self.avatar.id, target.id],
             prompt=self.get_story_prompt(),

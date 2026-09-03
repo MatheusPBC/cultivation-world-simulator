@@ -36,6 +36,10 @@
 3. 调用 `StoryEventService.maybe_create_story(...)`
 4. 命中则追加故事事件，未命中则跳过
 
+故事服务必须接收一个已经生成的基础 `Event` 作为 `source_event`。没有事实锚点
+时不得生成故事；故事事件只通过 `CONTRIBUTED_TO` 因果边指向该锚点，不携带
+`StateDelta`，也不直接改变任何领域状态。
+
 ### 2. 统一入口，避免散落
 
 所有故事生成统一通过 `StoryEventService`：

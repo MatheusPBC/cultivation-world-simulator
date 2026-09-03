@@ -41,6 +41,16 @@ msgstr "在城镇救济百姓，消耗少量灵石"
 msgid "help_people_requirements"
 msgstr "仅限城市区域，并且灵石足够"
 
+# Action: SponsorDaoRite
+msgid "sponsor_dao_rite_action_name"
+msgstr "赞助大道仪式"
+
+msgid "sponsor_dao_rite_description"
+msgstr "以朝廷或宗门名义赞助当前地区已知的民间仪式"
+
+msgid "sponsor_dao_rite_requirements"
+msgstr "需要是现任皇帝或在世掌门、身处该地区，并且每月最多赞助一次仪式"
+
 # Action: Mine
 msgid "mine_action_name"
 msgstr "挖矿"

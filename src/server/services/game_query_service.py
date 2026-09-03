@@ -94,6 +94,7 @@ class GameQueryService:
             build_public_avatar_list=self.get_avatar_list,
             build_public_phenomena=self.get_phenomena,
             build_public_sect_territories=self.get_sect_territories,
+            build_public_institutional_presence=self.get_institutional_presence,
             build_public_saves=self.get_saves,
             build_public_rankings=self.get_rankings,
             build_public_sect_relations=self.get_sect_relations,
@@ -263,6 +264,27 @@ class GameQueryService:
 
     def get_sect_territories(self) -> dict:
         return self._deps.get_sect_territories_summary_query(self._deps.runtime)
+
+    def get_institutional_presence(self) -> dict:
+        """Return the current read-only institutional presence by region."""
+        runtime = self._deps.runtime
+        world = runtime.get("world")
+        if world is None or getattr(world, "map", None) is None:
+            return {"regions": []}
+
+        from src.sim.managers.sect_manager import SectManager
+        from src.systems.regional_institutional_presence import (
+            project_regional_institutional_presence,
+        )
+
+        sim = runtime.get("sim")
+        sect_manager = getattr(sim, "sect_manager", None)
+        if sect_manager is None:
+            sect_manager = SectManager(world)
+        return project_regional_institutional_presence(
+            world.map,
+            sect_manager.get_snapshot(),
+        )
 
     def get_mortal_overview(self) -> dict:
         return self._deps.get_mortal_overview_query(

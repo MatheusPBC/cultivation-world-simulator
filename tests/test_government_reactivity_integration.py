@@ -11,14 +11,14 @@ from src.systems.government_reactivity import (
     enqueue_unreacted_government_conditions,
     process_government_reactivity,
 )
-from tests.test_government_interpreter import _setup
+from tests.domain_reactivity_fixtures import setup_government_condition
 
 
 @pytest.mark.asyncio
-async def test_government_reactivity_executes_once_and_persists_government_receipt(
+async def test_government_reactivity_executes_bounded_maintenance_and_persists_receipt(
     base_world,
 ):
-    city, trigger, condition = _setup(base_world)
+    city, trigger, condition = setup_government_condition(base_world)
     base_world.run_config_snapshot = {"test_mode": True}
     queue = DomainInvalidationQueue()
 
@@ -43,7 +43,8 @@ async def test_government_reactivity_executes_once_and_persists_government_recei
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
     assert receipt.domain == "government:1"
     assert receipt.trigger_revision == trigger.id
-    assert receipt.completed is True
+    assert receipt.completed is False
+    assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
     assert receipt.condition_instance_id == condition.id
     assert (
         await process_government_reactivity(
@@ -57,7 +58,10 @@ async def test_government_reactivity_executes_once_and_persists_government_recei
 
 
 def test_government_reactivity_requires_matching_controller(base_world):
-    _, trigger, _ = _setup(base_world, controller_id="other-dynasty")
+    _, trigger, _ = setup_government_condition(
+        base_world,
+        controller_id="other-dynasty",
+    )
     queue = DomainInvalidationQueue()
 
     enqueue_government_transitions(base_world, [trigger], queue)
@@ -69,7 +73,7 @@ def test_government_reactivity_requires_matching_controller(base_world):
 
 @pytest.mark.asyncio
 async def test_government_budget_zero_preserves_trigger(base_world):
-    _, trigger, _ = _setup(base_world)
+    _, trigger, _ = setup_government_condition(base_world)
     base_world.run_config_snapshot = {
         "test_mode": True,
         "government_reaction_evaluation_budget_per_month": 0,
@@ -93,10 +97,10 @@ async def test_government_budget_zero_preserves_trigger(base_world):
 
 
 @pytest.mark.asyncio
-async def test_government_blocked_maintenance_retries_without_repeating_decision(
+async def test_government_without_material_option_records_conservative_receipt(
     base_world,
 ):
-    _, trigger, condition = _setup(base_world, integrity=1.0)
+    _, trigger, condition = setup_government_condition(base_world, integrity=1.0)
     base_world.run_config_snapshot = {"test_mode": True}
     queue = DomainInvalidationQueue()
     enqueue_government_transitions(base_world, [trigger], queue)
@@ -108,9 +112,13 @@ async def test_government_blocked_maintenance_retries_without_repeating_decision
         budget=CausalBudget.from_world(base_world),
     )
 
-    assert events[-1].event_type == "city_maintenance_blocked"
+    assert [event.event_type for event in events] == [
+        "government_interpretation_decision"
+    ]
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
     assert receipt.domain == "government:1"
+    assert receipt.decision == "maintain"
+    assert receipt.affordance_id is None
     assert receipt.completed is False
     assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
     assert receipt.condition_instance_id == condition.id
@@ -118,7 +126,7 @@ async def test_government_blocked_maintenance_retries_without_repeating_decision
 
 @pytest.mark.asyncio
 async def test_government_unreacted_enqueue_skips_completed_receipt(base_world):
-    _, trigger, condition = _setup(base_world)
+    _, trigger, condition = setup_government_condition(base_world)
     base_world.run_config_snapshot = {"test_mode": True}
     queue = DomainInvalidationQueue()
     enqueue_government_transitions(base_world, [trigger], queue)

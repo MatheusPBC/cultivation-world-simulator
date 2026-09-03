@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.run.map_presets import get_map_preset, list_map_presets  # noqa: E402
-from src.run.map_source import derive_tile_rows_from_region_rows, read_map_source  # noqa: E402
+from src.run.map_source import read_map_source  # noqa: E402
 
 
 COLORS = {
@@ -33,6 +33,31 @@ COLORS = {
     "gobi": (188, 155, 104),
     "tundra": (144, 166, 148),
 }
+SITE_COLORS = {
+    "bridge": (224, 180, 72),
+    "port": (72, 176, 214),
+    "farm": (210, 190, 74),
+    "mine": (158, 146, 132),
+    "irrigation": (72, 202, 180),
+    "shrine": (198, 126, 220),
+}
+
+
+def _site_value(site, key, default=None):
+    if isinstance(site, dict):
+        return site.get(key, default)
+    return getattr(site, key, default)
+
+
+def _site_status(site) -> str:
+    explicit = _site_value(site, "status")
+    if explicit:
+        return explicit
+    if _site_value(site, "integrity", 1.0) <= 0:
+        return "destroyed"
+    if not _site_value(site, "enabled", True) or _site_value(site, "integrity", 1.0) < 1.0:
+        return "impaired"
+    return "active"
 
 
 def render_preview(map_id: str, *, cell_size: int = 10) -> Path:
@@ -46,10 +71,10 @@ def render_preview(map_id: str, *, cell_size: int = 10) -> Path:
         raise SystemExit(f"Preset path not found: {map_id}")
 
     source = read_map_source(preset.path / "map.json")
-    tile_rows = derive_tile_rows_from_region_rows(
-        source.region_rows,
-        wilderness_tile=source.wilderness_tile,
-    )
+    tile_rows = [
+        [tile.value if hasattr(tile, "value") else str(tile) for tile in row]
+        for row in source.geography.terrain_rows
+    ]
     rows = source.height
     cols = source.width
 
@@ -106,6 +131,26 @@ def render_preview(map_id: str, *, cell_size: int = 10) -> Path:
             width=2,
         )
         draw.text((px + 1, py + 1), str(rid), fill=(255, 245, 120), font=font)
+
+    for site in getattr(source, "infrastructure_sites", ()):
+        cells = _site_value(site, "cell_refs", ())
+        if not cells:
+            continue
+        x = round(sum(cell[0] for cell in cells) / len(cells))
+        y = round(sum(cell[1] for cell in cells) / len(cells))
+        kind = _site_value(site, "kind", "")
+        status = _site_status(site)
+        color = SITE_COLORS.get(kind, (242, 242, 242))
+        if status != "active":
+            color = (120, 120, 120)
+        px = x * cell_size + cell_size // 2
+        py = y * cell_size + top_bar + cell_size // 2
+        draw.ellipse(
+            (px - cell_size // 2, py - cell_size // 2, px + cell_size // 2, py + cell_size // 2),
+            fill=color,
+            outline=(22, 22, 22),
+            width=1,
+        )
 
     output_dir = PROJECT_ROOT / "tmp" / "map_previews"
     output_dir.mkdir(parents=True, exist_ok=True)

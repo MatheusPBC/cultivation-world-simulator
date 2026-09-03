@@ -7,7 +7,10 @@ from src.i18n import t
 from src.classes.mutual_action.mutual_action import InvitationAction
 from src.systems.battle import decide_battle
 from src.classes.event import Event
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.classes.action.cooldown import cooldown_action
 
@@ -68,6 +71,7 @@ class Spar(InvitationAction):
             result_text, 
             related_avatars=[self.avatar.id, target_avatar.id]
         )
+        self._last_result_event = event
         
         # 使用 EventHelper.push_pair 确保只推送一次到 Global EventManager（通过 to_sidebar_once=True）
         # 此时 Self(Initiator) 获得 to_sidebar=True, Target 获得 to_sidebar=False
@@ -82,13 +86,22 @@ class Spar(InvitationAction):
 
         winner, loser, w_gain, l_gain = self._last_result
         result_text = getattr(self, "_last_result_text", t("{winner} defeated {loser}", winner=winner.name, loser=loser.name))
-        a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+        proposal = await RelationDeltaService.propose_relationship_impact(
             action_key="spar",
             avatar_a=self.avatar,
             avatar_b=target,
             event_text=result_text,
         )
-        RelationDeltaService.apply_bidirectional_delta(self.avatar, target, a_to_b, b_to_a)
+        allowed = frozenset(RelationshipValence)
+        relation_event = RelationDeltaService.apply_relationship_impact(
+            self.avatar,
+            target,
+            proposal,
+            source_event=self._last_result_event,
+            action_key="spar",
+            allowed_a_to_b=allowed,
+            allowed_b_to_a=allowed,
+        )
         
         # 构造故事输入
         start_text = t("{initiator} challenges {target} to spar",
@@ -100,10 +113,11 @@ class Spar(InvitationAction):
             month_stamp=self.world.month_stamp,
             start_text=start_text,
             result_text=result_text,
+            source_event=self._last_result_event,
             actors=[self.avatar, target],
             related_avatar_ids=[self.avatar.id, target.id],
             prompt=self.get_story_prompt(),
             allow_relation_changes=True,
         )
 
-        return [story_event] if story_event is not None else []
+        return [relation_event, *([story_event] if story_event is not None else [])]

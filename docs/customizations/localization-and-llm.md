@@ -79,5 +79,6 @@ O teste principal e `tests/test_llm_codex_cli.py`. A obrigatoriedade de API key 
 
 Nomes e descricoes de regioes usam `map_regions.po`. Os mapas oficiais guardam overrides
 localizaveis e o snapshot atual evita transformar uma traducao em dado canonico do mapa.
-`tools/migrate_map_snapshot_v2_to_v3.py` converte snapshots anteriores quando necessario;
+Snapshots antigos de mapa não são aceitos; a campanha deve usar o contrato
+canônico atual ao ser recriada.
 sempre trabalhe sobre copia do save.

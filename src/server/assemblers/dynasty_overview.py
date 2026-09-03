@@ -28,6 +28,8 @@ def build_dynasty_overview(world: Any) -> Dict[str, Any]:
             "official_preference_label": "",
             "is_low_magic": True,
             "current_emperor": None,
+            "royal_house_member_ids": [],
+            "royal_blood_member_ids": [],
         }
 
     emperor = getattr(getattr(world, "avatar_manager", None), "get_avatar", lambda _id: None)(getattr(dynasty, "current_emperor_id", ""))
@@ -55,4 +57,6 @@ def build_dynasty_overview(world: Any) -> Dict[str, Any]:
         "official_preference_label": get_dynasty_preference_label(dynasty),
         "is_low_magic": bool(getattr(dynasty, "is_low_magic", True)),
         "current_emperor": emperor_data,
+        "royal_house_member_ids": [str(value) for value in getattr(dynasty, "royal_house_member_ids", [])],
+        "royal_blood_member_ids": [str(value) for value in getattr(dynasty, "royal_blood_member_ids", [])],
     }
