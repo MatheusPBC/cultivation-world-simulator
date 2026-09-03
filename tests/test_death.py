@@ -1,10 +1,7 @@
 import pytest
-from unittest.mock import MagicMock
-
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.death import handle_death
-from src.classes.relation.relation import Relation, get_relations_strs
-from src.classes.event import Event
+from src.classes.relation.relation import get_relations_strs
 
 def test_death_reason_str():
     """测试死因的字符串格式化"""
@@ -44,6 +41,14 @@ def test_handle_death(base_world, dummy_avatar):
     assert grave.source_event_id == death_event.id
     assert death_event.event_type == "death"
     assert death_event.causal_payload["deltas"][0]["aspect"] == "life_status"
+    life_deltas = [
+        delta for delta in death_event.causal_payload["deltas"]
+        if delta["aspect"] == "life_status"
+    ]
+    assert len(life_deltas) == 1
+    assert life_deltas[0]["event_id"] == death_event.id
+    assert life_deltas[0]["before"] == "alive"
+    assert life_deltas[0]["after"] == "dead"
     
     # 2. 验证管理器状态（已归档）
     assert dummy_avatar.id not in base_world.avatar_manager.avatars
@@ -244,3 +249,16 @@ def test_death_phase_repairs_previously_marked_dead_avatar(base_world, dummy_ava
     graves = base_world.poi_manager.get_all_active(int(base_world.month_stamp))
     assert len(graves) == 1
     assert graves[0].deceased_avatar_id == dummy_avatar.id
+
+
+def test_death_already_archived_by_action_is_not_emitted_again(base_world, dummy_avatar):
+    from src.sim.simulator_engine.phases.lifecycle import phase_resolve_death
+
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+    death_event = handle_death(base_world, dummy_avatar, DeathReason(DeathType.BATTLE))
+    living_snapshot = [dummy_avatar]
+
+    assert phase_resolve_death(base_world, living_snapshot) == []
+    assert living_snapshot == []
+    assert death_event.causal_payload["deltas"][0]["before"] == "alive"
+    assert death_event.causal_payload["deltas"][0]["after"] == "dead"

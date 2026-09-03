@@ -14,6 +14,12 @@ from src.classes.technique import TechniqueAttribute
 from src.classes.death_reason import DeathType
 from src.classes.hp import HP
 from src.classes.individual_consequence import IndividualConsequenceState
+from src.classes.causal_origin import CausalOrigin
+from src.classes.causal_link import CausalRelation
+from src.classes.agent_decision import AgentDecision
+from src.classes.event import Event, FactKind
+from src.sim.simulator_engine.context import SimulationStepContext
+from src.sim.simulator_engine.finalizer import validate_causal_integrity
 
 # Helper to create a mock avatar
 def create_mock_avatar(level, realm=None, stage=None, effects=None, technique_attr=None):
@@ -152,6 +158,69 @@ class TestCombatMechanics:
         assert diff == pytest.approx(expected_diff)
 
 class TestBattleResolution:
+    @pytest.mark.asyncio
+    async def test_material_battle_result_uses_real_actor_decision_and_owns_deltas(
+        self, dummy_avatar
+    ):
+        attacker = dummy_avatar
+        attacker.id = "attacker"
+        attacker.name = "Attacker"
+        attacker.hp = HP(100, 50)
+        decision = AgentDecision(
+            month_stamp=int(attacker.world.month_stamp),
+            subject_id=attacker.id,
+            source="test",
+            considered_count=1,
+            chosen_chain=[{"action_name": "Attack", "params": {}}],
+        )
+        decision_event = Event(
+            attacker.world.month_stamp,
+            "Attacker chose battle",
+            fact_kind=FactKind.DECISION,
+            causal_payload={"deltas": [], "decision": decision.to_dict()},
+        )
+        attacker.current_decision_event_id = decision_event.id
+
+        target = copy(attacker)
+        target.id = "target"
+        target.name = "Target"
+        target.hp = HP(100, 40)
+        target.individual_consequences = IndividualConsequenceState()
+
+        async def outcome_text(*_args):
+            return "A nonfatal battle"
+
+        with patch(
+            "src.classes.story_event_service.StoryEventService.maybe_create_story",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            events = await handle_battle_finish(
+                attacker.world,
+                attacker,
+                target,
+                (attacker, target, 30, 20),
+                "Battle start",
+                "Story prompt",
+                outcome_text_func=outcome_text,
+            )
+
+        result = events[0]
+        assert result.fact_kind is FactKind.STATE_TRANSITION
+        assert result.causal_origin is CausalOrigin.ACTOR_DECISION
+        assert any(
+            link.cause_event_id == decision_event.id
+            and link.relation is CausalRelation.MOTIVATED_BY
+            for link in result.causal_links
+        )
+        assert all(
+            delta["event_id"] == result.id
+            for delta in result.causal_payload["deltas"]
+        )
+        validate_causal_integrity(
+            SimulationStepContext.create(attacker.world), [decision_event, result]
+        )
+
     @pytest.mark.asyncio
     async def test_nonfatal_battle_attaches_one_hp_and_injury_delta_per_avatar(
         self, dummy_avatar

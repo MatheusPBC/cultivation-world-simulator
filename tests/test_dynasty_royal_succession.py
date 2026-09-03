@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.classes.core.dynasty import Dynasty, ImperialClaim, ImperialCrisis
+from src.classes.relation.relation import Relation
 from src.server.assemblers.dynasty_detail import build_dynasty_detail
 from src.server.assemblers.dynasty_overview import build_dynasty_overview
 from src.systems.imperial_crisis_service import (
@@ -12,6 +13,7 @@ from src.systems.imperial_crisis_service import (
     open_imperial_claim,
     oppose_imperial_claim,
     resolve_imperial_crisis,
+    sync_royal_membership,
     support_imperial_claim,
 )
 
@@ -212,6 +214,60 @@ def test_birth_enters_bloodline_but_marriage_enters_house_only():
     assert spouse.id not in dynasty.royal_blood_member_ids
     assert child.id in dynasty.royal_house_member_ids
     assert child.id in dynasty.royal_blood_member_ids
+
+
+def test_yeqinglian_consort_and_children_sync_to_distinct_membership_sets():
+    emperor = _Avatar("emperor")
+    ye_qinglian = _Avatar("YeQinglian")
+    child_one = _Avatar("YeChildOne")
+    child_two = _Avatar("YeChildTwo")
+    dynasty = Dynasty(
+        1,
+        "Test",
+        "",
+        current_emperor_id=emperor.id,
+        royal_house_member_ids=[emperor.id],
+        royal_blood_member_ids=[emperor.id],
+    )
+
+    lover_state = SimpleNamespace(identity_relations={Relation.IS_LOVER_OF}, blood_relation=None)
+    child_state = SimpleNamespace(identity_relations=set(), blood_relation=Relation.IS_CHILD_OF)
+    parent_state = SimpleNamespace(identity_relations=set(), blood_relation=Relation.IS_PARENT_OF)
+    emperor.relations = {ye_qinglian: lover_state, child_one: child_state, child_two: child_state}
+    ye_qinglian.relations = {emperor: lover_state, child_one: child_state, child_two: child_state}
+    child_one.relations = {
+        emperor: parent_state,
+        ye_qinglian: parent_state,
+    }
+    child_two.relations = {
+        emperor: parent_state,
+        ye_qinglian: parent_state,
+    }
+    world = _world([emperor, ye_qinglian, child_one, child_two], dynasty)
+
+    sync_royal_membership(world)
+    restored = Dynasty.from_dict(dynasty.to_dict())
+
+    assert ye_qinglian.id in restored.royal_house_member_ids
+    assert ye_qinglian.id not in restored.royal_blood_member_ids
+    assert {child_one.id, child_two.id}.issubset(restored.royal_blood_member_ids)
+    assert {child_one.id, child_two.id}.issubset(restored.royal_house_member_ids)
+
+
+def test_sync_does_not_promote_a_non_blood_emperor_into_the_royal_bloodline():
+    appointed_emperor = _Avatar("appointed-emperor")
+    dynasty = Dynasty(
+        1,
+        "Test",
+        "",
+        current_emperor_id=appointed_emperor.id,
+    )
+    world = _world([appointed_emperor], dynasty)
+
+    sync_royal_membership(world)
+
+    assert dynasty.royal_house_member_ids == [appointed_emperor.id]
+    assert dynasty.royal_blood_member_ids == []
 
 
 def test_positions_require_canonical_candidate_id():

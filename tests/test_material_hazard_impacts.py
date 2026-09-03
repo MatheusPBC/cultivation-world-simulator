@@ -202,6 +202,21 @@ def test_only_mechanically_afforded_site_is_damaged_through_its_owner() -> None:
     ) == []
 
 
+def test_flood_without_an_infrastructure_site_in_the_region_creates_no_impact() -> None:
+    world, source, _ = _world_and_flood()
+    world.map.infrastructure_sites.clear()
+
+    assert project_flood_site_exposures(
+        world,
+        world.regional_flood_state.active_by_region["101"],
+    ) == []
+    assert process_material_hazard_impacts(
+        world,
+        current_events=[source],
+        invalidations=DomainInvalidationQueue(),
+    ) == []
+
+
 def test_forged_magnitude_is_rejected_before_owner_mutation() -> None:
     world, source, occurrence = _world_and_flood()
     expected = propose_hazard_impacts(

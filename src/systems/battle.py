@@ -5,6 +5,9 @@ import random
 from typing import Tuple, TYPE_CHECKING, Callable, Awaitable, Optional
 
 from src.classes.story_event_service import StoryEventKind, StoryEventService
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
 from src.classes.close_relation_event_service import (
     append_close_relation_major_observations,
     apply_kill_hatred,
@@ -41,6 +44,37 @@ _BASE_DAMAGE_LOW: int = 24                   # 基础伤害下限（按 defender
 _BASE_DAMAGE_HIGH: int = 36                  # 基础伤害上限（按 defender.maxHP/100 缩放）
 _MIN_RATIO: float = 1.05                     # 最小相对优势比，确保赢家伤害严格更低
 _PAIR_BIAS: float = 1.1                     # 成对偏置：让败者再多一点、赢家再少一点
+
+
+def _current_decision_event_id(actor: "Avatar") -> str:
+    """Return an actual runtime decision id, never a mock/empty sentinel."""
+    value = getattr(actor, "current_decision_event_id", "")
+    return value if isinstance(value, str) else ""
+
+
+def attach_actor_decision_causality(event: "Event", actor: "Avatar") -> "Event":
+    """Mark a material combat result with the actor decision that motivated it."""
+    event.causal_origin = CausalOrigin.ACTOR_DECISION
+    decision_event_id = _current_decision_event_id(actor)
+    if not decision_event_id:
+        return event
+
+    event.causal_links.append(
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=decision_event_id,
+            relation=CausalRelation.MOTIVATED_BY,
+        )
+    )
+    payload = dict(event.causal_payload or {})
+    payload.setdefault("deltas", [])
+    payload["decision_source"] = {
+        "kind": "avatar_action",
+        "avatar_id": str(actor.id),
+        "decision_event_id": decision_event_id,
+    }
+    event.causal_payload = payload
+    return event
 
 
 def get_base_strength(self_avatar: "Avatar") -> float:
@@ -313,6 +347,7 @@ async def handle_battle_finish(
         related_avatars=rel_ids,
         is_major=True,
         event_type=event_type,
+        fact_kind=FactKind.STATE_TRANSITION,
         render_params={
             "killer_id": str(winner.id),
             "killer_name": winner.name,
@@ -321,6 +356,7 @@ async def handle_battle_finish(
             "subject_name": loser.name,
         },
     )
+    attach_actor_decision_causality(result_event, attacker)
     from src.classes.individual_consequence import record_hp_change_from_event
     record_hp_change_from_event(loser, result_event, _hp_before_damage(loser, loser_damage))
     record_hp_change_from_event(winner, result_event, _hp_before_damage(winner, winner_damage))
@@ -328,8 +364,8 @@ async def handle_battle_finish(
         from src.classes.state_delta import StateDelta
         payload = result_event.causal_payload or {"deltas": [], "decision": None}
         payload["deltas"].extend([
-            StateDelta(owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
-            StateDelta(owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
+            StateDelta(event_id=result_event.id, owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
+            StateDelta(event_id=result_event.id, owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
         ])
         result_event.causal_payload = payload
     

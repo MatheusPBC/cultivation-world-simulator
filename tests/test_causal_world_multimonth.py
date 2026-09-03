@@ -132,8 +132,7 @@ async def test_two_year_causal_cycle_survives_save_load_without_real_llm(
             event_types.extend(event.event_type for event in await loaded_simulator.step())
 
     assert provider.await_count == 0
-    assert "regional_production" in event_types
-    assert "regional_consumption" in event_types
+    assert "regional_resource_balance" in event_types
     assert "semantic_condition_activated" in event_types
     assert "city_interpretation_decision" in event_types
     assert "city_maintenance_completed" in event_types

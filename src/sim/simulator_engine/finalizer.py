@@ -45,9 +45,27 @@ def validate_causal_integrity(
     """Reject inverted authorship before the event-store transaction begins."""
     current = {event.id: event for event in events}
     required_decision_fields = set(AgentDecision().to_dict())
+    terminal_life_transitions: set[tuple[str, str, str]] = set()
     for event in events:
         deltas = _deltas(event)
         payload = event.causal_payload
+        for delta in deltas:
+            if str(delta.get("event_id", "")) != str(event.id):
+                raise CausalIntegrityError(
+                    f"StateDelta on event {event.id} must reference its owning event"
+                )
+            terminal_key = (
+                str(delta.get("owner_kind", "")),
+                str(delta.get("owner_id", "")),
+                str(delta.get("aspect", "")),
+            )
+            if terminal_key[0] == "avatar" and terminal_key[2] == "life_status":
+                if str(delta.get("after", "")) == "dead":
+                    if terminal_key in terminal_life_transitions:
+                        raise CausalIntegrityError(
+                            f"avatar {terminal_key[1]} has duplicate death transitions"
+                        )
+                    terminal_life_transitions.add(terminal_key)
         if event.fact_kind is FactKind.DECISION:
             if not isinstance(payload, Mapping) or not isinstance(
                 payload.get("decision"), Mapping
@@ -102,11 +120,7 @@ def validate_causal_integrity(
                     raise CausalIntegrityError(
                         f"story event {cause.id} cannot cause mutation {event.id}"
                     )
-        if (
-            event.fact_kind is FactKind.STATE_TRANSITION
-            and event.causal_origin is CausalOrigin.ACTOR_DECISION
-            and deltas
-        ):
+        if event.causal_origin is CausalOrigin.ACTOR_DECISION and deltas:
             has_decision = any(
                 (cause := _event_by_id(ctx, current, link.cause_event_id)) is not None
                 and cause.fact_kind is FactKind.DECISION

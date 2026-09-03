@@ -7,7 +7,7 @@ from src.classes.action.action import can_take_risk
 from src.classes.action.cooldown import cooldown_action
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.action.targeting_mixin import TargetingMixin
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.systems.battle import decide_battle, get_assassination_success_rate
 from src.classes.death import handle_death
@@ -108,7 +108,16 @@ class Assassinate(InstantAction, TargetingMixin):
             loot_text, transfer = await kill_and_grab(self.avatar, target)
             result_text += loot_text
             
-            result_event = Event(self.world.month_stamp, result_text, related_avatars=rel_ids, is_major=True)
+            result_event = Event(
+                self.world.month_stamp,
+                result_text,
+                related_avatars=rel_ids,
+                is_major=True,
+                event_type="assassination",
+                fact_kind=FactKind.STATE_TRANSITION,
+            )
+            from src.systems.battle import attach_actor_decision_causality
+            attach_actor_decision_causality(result_event, self.avatar)
             from src.classes.individual_consequence import record_hp_change_from_event
             record_hp_change_from_event(
                 target,
@@ -119,8 +128,8 @@ class Assassinate(InstantAction, TargetingMixin):
                 from src.classes.state_delta import StateDelta
                 payload = result_event.causal_payload or {"deltas": [], "decision": None}
                 payload["deltas"].extend([
-                    StateDelta(owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
-                    StateDelta(owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
+                    StateDelta(event_id=result_event.id, owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
+                    StateDelta(event_id=result_event.id, owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
                 ])
                 result_event.causal_payload = payload
             

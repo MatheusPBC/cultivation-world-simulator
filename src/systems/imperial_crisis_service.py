@@ -55,13 +55,21 @@ def sync_royal_membership(world) -> None:
     if dynasty is None:
         return
     if dynasty.current_emperor_id:
-        dynasty.add_royal_house_member(dynasty.current_emperor_id, blood=True)
+        # The reigning office is a house membership, not proof of descent.
+        # Initial blood membership is seeded by the dynasty generator and new
+        # blood membership is earned only through a birth from a blood parent.
+        dynasty.add_royal_house_member(dynasty.current_emperor_id)
     for avatar in world.avatar_manager.get_living_avatars():
         for other, state in (getattr(avatar, "relations", {}) or {}).items():
+            other_id = getattr(other, "id", other)
+            if not other_id:
+                continue
             if Relation.IS_LOVER_OF in getattr(state, "identity_relations", set()):
-                dynasty.register_marriage([str(avatar.id), str(other.id)])
+                dynasty.register_marriage([str(avatar.id), str(other_id)])
             if getattr(state, "blood_relation", None) is Relation.IS_PARENT_OF:
-                dynasty.register_birth(str(other.id), [str(avatar.id)])
+                # Relation names describe the *other* person from avatar's
+                # perspective: IS_PARENT_OF means avatar is the child.
+                dynasty.register_birth(str(avatar.id), [str(other_id)])
 
 
 def ensure_succession_crisis(world) -> ImperialCrisis | None:
@@ -208,8 +216,19 @@ def open_imperial_claim(
         t("{claimant} openly claims the imperial mandate.", claimant=_get_avatar(world, candidate_id).name),
         related_avatars=related, fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
         is_major=True,
-        causal_payload={"deltas": [StateDelta(owner_kind="dynasty", owner_id=str(dynasty.id), aspect="imperial_claims", before=str(before_claims), after=str([item.candidate_id for item in crisis.claims])).to_dict()]},
     )
+    event.causal_payload = {
+        "deltas": [
+            StateDelta(
+                event_id=event.id,
+                owner_kind="dynasty",
+                owner_id=str(dynasty.id),
+                aspect="imperial_claims",
+                before=str(before_claims),
+                after=str([item.candidate_id for item in crisis.claims]),
+            ).to_dict()
+        ]
+    }
     event.causal_links = [
         CausalLink(
             event_id=event.id,
@@ -274,8 +293,19 @@ def _record_position(world, supporter_id: str, candidate_id: str, position: str)
         t("{official} publicly takes a position on the imperial candidate.", official=supporter.name),
         related_avatars=[str(supporter.id), str(candidate_id)], fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION, is_major=True,
-        causal_payload={"deltas": [StateDelta(owner_kind="imperial_claim", owner_id=str(candidate_id), aspect="political_positions", before=None, after=position).to_dict()]},
     )
+    event.causal_payload = {
+        "deltas": [
+            StateDelta(
+                event_id=event.id,
+                owner_kind="imperial_claim",
+                owner_id=str(candidate_id),
+                aspect="political_positions",
+                before=None,
+                after=position,
+            ).to_dict()
+        ]
+    }
     event.causal_links = [
         CausalLink(
             event_id=event.id,
@@ -313,17 +343,6 @@ def withdraw_imperial_claim(world, candidate_id: str) -> Event:
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
         is_major=True,
-        causal_payload={
-            "deltas": [
-                StateDelta(
-                    owner_kind="imperial_claim",
-                    owner_id=str(candidate_id),
-                    aspect="status",
-                    before="active",
-                    after="withdrawn",
-                ).to_dict()
-            ]
-        },
         causal_links=[
             CausalLink(
                 cause_event_id=decision_event_id,
@@ -331,6 +350,18 @@ def withdraw_imperial_claim(world, candidate_id: str) -> Event:
             )
         ],
     )
+    event.causal_payload = {
+        "deltas": [
+            StateDelta(
+                event_id=event.id,
+                owner_kind="imperial_claim",
+                owner_id=str(candidate_id),
+                aspect="status",
+                before="active",
+                after="withdrawn",
+            ).to_dict()
+        ]
+    }
     event.causal_links[0].event_id = event.id
     claim.evidence_event_ids.append(event.id)
     return event

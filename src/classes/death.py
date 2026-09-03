@@ -6,6 +6,7 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.death_reason import DeathReason
 from src.classes.event import Event, FactKind
 from src.classes.state_delta import StateDelta
+from src.i18n import t
 
 if TYPE_CHECKING:
     from src.classes.core.world import World
@@ -16,7 +17,7 @@ def build_death_event(world: World, avatar: Avatar, reason: Union[str, DeathReas
     region = getattr(getattr(avatar, "tile", None), "region", None)
     event = Event(
         world.month_stamp,
-        f"{avatar.name}{reason_str}",
+        t("{avatar} — {reason}", avatar=avatar.name, reason=reason_str),
         related_avatars=[str(avatar.id)],
         is_major=True,
         event_type="death",
@@ -65,13 +66,25 @@ def _complete_death_event(event: Event, avatar: Avatar) -> Event:
     event.causal_origin = CausalOrigin.DETERMINISTIC
     payload = dict(event.causal_payload or {})
     deltas = list(payload.get("deltas", []))
-    if not any(
-        item.get("owner_kind") == "avatar"
-        and item.get("owner_id") == str(avatar.id)
-        and item.get("aspect") == "life_status"
-        for item in deltas
-        if isinstance(item, dict)
-    ):
+    normalized_deltas: list[dict] = []
+    life_status_seen = False
+    for item in deltas:
+        if not isinstance(item, dict):
+            continue
+        is_life_status = (
+            item.get("owner_kind") == "avatar"
+            and item.get("owner_id") == str(avatar.id)
+            and item.get("aspect") == "life_status"
+        )
+        if is_life_status:
+            if life_status_seen:
+                continue
+            item = dict(item)
+            item["event_id"] = event.id
+            life_status_seen = True
+        normalized_deltas.append(item)
+    deltas = normalized_deltas
+    if not life_status_seen:
         deltas.append(
             StateDelta(
                 event_id=event.id,

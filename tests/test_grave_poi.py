@@ -38,6 +38,31 @@ def test_death_creates_grave_poi_with_equipment_snapshot(base_world, dummy_avata
     assert not hasattr(grave, "technique_payload")
 
 
+def test_pt_br_death_and_grave_text_are_not_concatenated_or_chinese(
+    base_world, dummy_avatar
+):
+    from src.classes.language import language_manager
+
+    original_lang = str(language_manager)
+    try:
+        language_manager.set_language("pt-BR")
+        base_world.avatar_manager.register_avatar(dummy_avatar)
+
+        death_event = handle_death(
+            base_world,
+            dummy_avatar,
+            DeathReason(DeathType.BATTLE, killer_name="Taixu"),
+        )
+        grave = next(iter(base_world.poi_manager.pois.values()))
+
+        assert death_event.content == f"{dummy_avatar.name} — Morto por Taixu"
+        assert grave.name == f"Túmulo de {dummy_avatar.name}"
+        assert grave.desc == "Uma lápide antiga ainda conserva um leve brilho espiritual."
+        assert "之墓" not in grave.name
+    finally:
+        language_manager.set_language(original_lang)
+
+
 def test_initially_expired_avatar_is_archived_as_a_grave(base_world, dummy_avatar):
     dummy_avatar.set_dead(str(DeathReason(DeathType.OLD_AGE)), base_world.month_stamp)
     base_world.avatar_manager.avatars[dummy_avatar.id] = dummy_avatar

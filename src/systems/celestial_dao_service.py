@@ -32,6 +32,31 @@ RITE_WINDOW_MONTHS = 12
 RITES_REQUIRED_FOR_AUDIENCE = 3
 AUDIENCE_COOLDOWN_MONTHS = 12
 
+# These are regular bookkeeping facts, not regional pressure that would make
+# a public rite meaningful.  Keep the exclusion explicit: a positive monthly
+# flow must not become a ritual merely because it changed a stock.
+_ROUTINE_REGIONAL_EVENT_TYPES = frozenset(
+    {
+        "regional_production",
+        "regional_consumption",
+        "regional_resource_balance",
+        "regional_climate_updated",
+        "regional_resource_transfer_completed",
+        "regional_resource_transfer_blocked",
+    }
+)
+_MATERIAL_REGIONAL_EVENT_TYPES = frozenset(
+    {
+        "regional_resource_shortage",
+        "regional_flood_started",
+        "regional_flood_resolved",
+        "avatar_population_change",
+        "population_transfer_completed",
+        "population_transfer_blocked",
+        "route_operational_capacity_changed",
+    }
+)
+
 
 class DaoPetitionDraftError(ValueError):
     """The rare-audience narration was missing or unusable."""
@@ -77,6 +102,40 @@ def _event_region_id(event: Event) -> int | None:
         return int(raw) if raw is not None and str(raw).strip() else None
     except (TypeError, ValueError):
         return None
+
+
+def _has_nonzero_material_delta(event: Event) -> bool:
+    """Return whether an event records a meaningful domain state change."""
+    payload = getattr(event, "causal_payload", None) or {}
+    for raw_delta in payload.get("deltas", ()) or ():
+        if not isinstance(raw_delta, Mapping):
+            continue
+        owner_kind = str(raw_delta.get("owner_kind", ""))
+        if owner_kind not in {"region", "route", "city", "regional_flood"}:
+            continue
+        try:
+            magnitude = float(raw_delta.get("magnitude", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if magnitude != 0.0:
+            return True
+    return False
+
+
+def _is_eligible_regional_event(event: Event) -> bool:
+    """Accept only a real regional pressure signal for a popular rite.
+
+    Major events are meaningful by definition, while non-major material facts
+    need either an explicitly material event type or a non-zero canonical
+    domain delta.  Routine economy/climate bookkeeping is excluded first so a
+    normal production or weather tick cannot satisfy either branch.
+    """
+    event_type = str(getattr(event, "event_type", "") or "")
+    if event_type in _ROUTINE_REGIONAL_EVENT_TYPES or bool(getattr(event, "is_story", False)):
+        return False
+    if bool(getattr(event, "is_major", False)):
+        return True
+    return event_type in _MATERIAL_REGIONAL_EVENT_TYPES or _has_nonzero_material_delta(event)
 
 
 def _institution_for_avatar(world: Any, avatar: Any) -> tuple[str, str, str] | None:
@@ -438,6 +497,41 @@ def _build_popular_rite(
     return rite
 
 
+def _used_popular_rite_source_keys(
+    world: Any,
+    *,
+    current_events: list[Event],
+) -> set[str]:
+    """Return canonical causes that have already received a popular rite.
+
+    One condition instance or material event can motivate one aggregate public
+    rite.  A persistent condition may motivate a later rite only after it
+    resolves and a new condition instance is created.
+    """
+    month = int(world.month_stamp)
+    persisted = list(
+        getattr(world.event_manager, "get_events_between_months", lambda *_: [])(
+            -(2**63), month
+        )
+    )
+    keys: set[str] = set()
+    for event in (*persisted, *current_events):
+        if str(getattr(event, "event_type", "")) != "dao_rite":
+            continue
+        payload = dict(
+            (getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {}
+        )
+        if not bool(payload.get("is_popular")) or bool(payload.get("is_sponsorship")):
+            continue
+        condition_id = str(payload.get("condition_id") or "")
+        cause_event_id = str(payload.get("cause_event_id") or "")
+        if condition_id:
+            keys.add(f"condition:{condition_id}")
+        if cause_event_id:
+            keys.add(f"event:{cause_event_id}")
+    return keys
+
+
 def _popular_rite_regions(
     world: Any, *, current_events: list[Event] | None = None
 ) -> list[tuple[Any, Event, str | None]]:
@@ -456,6 +550,10 @@ def _popular_rite_regions(
         *(current_events or []),
     ]
     current_events_by_id = {str(event.id): event for event in current_events}
+    used_source_keys = _used_popular_rite_source_keys(
+        world,
+        current_events=current_events,
+    )
     candidates: dict[int, tuple[tuple[Any, ...], Any, Event, str | None]] = {}
     for region in sorted(
         getattr(getattr(world, "map", None), "regions", {}).values(),
@@ -467,10 +565,14 @@ def _popular_rite_regions(
         if state is not None:
             conditions = state.get_active_conditions(EntityRef("region", str(region_id)), month)
             for condition in conditions:
+                if f"condition:{condition.id}" in used_source_keys:
+                    continue
                 source = current_events_by_id.get(
                     str(condition.cause_event_id)
                 ) or world.event_manager.get_event_by_id(str(condition.cause_event_id))
                 if not isinstance(source, Event):
+                    continue
+                if f"event:{source.id}" in used_source_keys:
                     continue
                 key = (0, -float(getattr(condition, "intensity", 0.0)), str(condition.id))
                 candidates.setdefault(region_id, (key, region, source, str(condition.id)))
@@ -479,6 +581,10 @@ def _popular_rite_regions(
             if str(getattr(event, "event_type", "")) == "dao_rite":
                 continue
             if _event_region_id(event) != region_id:
+                continue
+            if not _is_eligible_regional_event(event):
+                continue
+            if f"event:{event.id}" in used_source_keys:
                 continue
             key = (1, -int(bool(getattr(event, "is_major", False))), str(event.id))
             existing = candidates.get(region_id)
@@ -653,17 +759,21 @@ async def process_grounded_dao_rites(world: Any, events: list[Event]) -> list[Ev
             event_type="celestial_audience",
             is_major=True,
             causal_payload={
-                "deltas": [StateDelta(
-                    owner_kind="dao_petition",
-                    owner_id=petition.id,
-                    aspect="created",
-                    before=None,
-                    after="pending",
-                ).to_dict()],
+                "deltas": [],
                 "target_avatar_id": petition.target_avatar_id,
                 "target_evidence_event_ids": list(petition.target_evidence_event_ids),
             },
         )
+        audience.causal_payload["deltas"] = [
+            StateDelta(
+                event_id=audience.id,
+                owner_kind="dao_petition",
+                owner_id=petition.id,
+                aspect="created",
+                before=None,
+                after="pending",
+            ).to_dict()
+        ]
         audience.causal_links = [
             CausalLink(event_id=audience.id, cause_event_id=event_id, relation=CausalRelation.ENABLED_BY)
             for event_id in rite_ids
@@ -687,6 +797,33 @@ def answer_petition(world: Any, petition_id: str, response: str) -> Event:
         "sign": DaoPetitionStatus.SIGNED,
         "favor": DaoPetitionStatus.FAVORED,
     }[response]
+    decision = AgentDecision(
+        month_stamp=int(world.month_stamp),
+        subject_kind="player",
+        subject_id=str(petition.target_avatar_id or "celestial_dao"),
+        source="api",
+        considered_count=3,
+        chosen_chain=[
+            {
+                "action_name": "AnswerDaoPetition",
+                "params": {"petition_id": petition.id, "response": response},
+            }
+        ],
+    )
+    decision_event = Event(
+        world.month_stamp,
+        t("The Dao considered an institutional petition."),
+        related_avatars=[petition.target_avatar_id]
+        if petition.target_avatar_id
+        else None,
+        related_sects=[int(petition.initiator_id)]
+        if petition.initiator_kind == "sect"
+        else None,
+        fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        event_type="dao_petition_decision",
+        causal_payload={"deltas": [], "decision": decision.to_dict()},
+    )
     petition.status = status
     if status == DaoPetitionStatus.FAVORED:
         petition.favor_expires_month = int(world.month_stamp) + 12
@@ -710,26 +847,36 @@ def answer_petition(world: Any, petition_id: str, response: str) -> Event:
         else None,
         fact_kind=FactKind.STATE_TRANSITION,
         is_major=True,
-        causal_payload={
-            "deltas": [
-                StateDelta(
-                    owner_kind="dao_petition",
-                    owner_id=petition.id,
-                    aspect="status",
-                    before="pending",
-                    after=status.value,
-                ).to_dict()
-            ]
-        },
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        event_type="dao_petition_answer",
+        causal_payload={"deltas": []},
     )
+    event.causal_payload["deltas"] = [
+        StateDelta(
+            event_id=event.id,
+            owner_kind="dao_petition",
+            owner_id=petition.id,
+            aspect="status",
+            before="pending",
+            after=status.value,
+        ).to_dict()
+    ]
     event.causal_links = [
         CausalLink(
             event_id=event.id,
-            cause_event_id=event_id,
+            cause_event_id=decision_event.id,
             relation=CausalRelation.TRIGGERED_BY,
+        ),
+        *[
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=event_id,
+            relation=CausalRelation.ENABLED_BY,
         )
         for event_id in [*petition.rite_event_ids, *petition.motivated_event_ids]
+        ],
     ]
     petition.response_event_id = event.id
+    world.event_manager.add_event(decision_event)
     world.event_manager.add_event(event)
     return event

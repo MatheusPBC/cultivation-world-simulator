@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.celestial_dao import DaoPetition, DaoTradition
+from src.classes.event import FactKind
 from src.classes.core.dynasty import Dynasty
 from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
 from src.server.services.game_command_service import GameCommandService
@@ -58,10 +60,28 @@ async def test_dao_public_services_query_and_serialize_mutation(
     assert result["event_id"]
     assert runtime.mutations == 1
 
+    response_event = base_world.event_manager.get_event_by_id(result["event_id"])
+    decision_events = [
+        event
+        for event in base_world.event_manager.get_recent_events(
+            limit=100, include_decisions=True
+        )
+        if event.fact_kind is FactKind.DECISION
+        and event.event_type == "dao_petition_decision"
+    ]
+    assert len(decision_events) == 1
+    assert decision_events[0].causal_payload["decision"]["source"] == "api"
+    assert response_event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert response_event.causal_payload["deltas"][0]["event_id"] == response_event.id
+    assert any(
+        link.cause_event_id == decision_events[0].id
+        for link in response_event.causal_links
+    )
+
     history_data = _service(GameQueryService, runtime).get_dao_petitions()["history"]
     assert (
         history_data[0]["response_content"]
-        == base_world.event_manager.get_event_by_id(result["event_id"]).content
+        == response_event.content
     )
 
 

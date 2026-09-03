@@ -13,7 +13,7 @@ Coverage:
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
 
-from src.systems.cultivation import Realm, Stage, CultivationProgress
+from src.systems.cultivation import Realm, CultivationProgress
 from src.classes.items.weapon import weapons_by_id, Weapon
 from src.classes.items.auxiliary import auxiliaries_by_id
 from src.classes.items.elixir import elixirs_by_id
@@ -212,6 +212,37 @@ async def test_kill_and_grab_context_shows_translated_realm():
             assert raw_value not in context_intro, (
                 f"kill_and_grab context contains raw enum value '{raw_value}': {context_intro}"
             )
+
+
+@pytest.mark.asyncio
+async def test_kill_and_grab_uses_pt_br_instead_of_hard_coded_chinese():
+    from src.classes.language import language_manager
+
+    original_lang = str(language_manager)
+    try:
+        language_manager.set_language("pt-BR")
+        weapon = get_real_weapon()
+        winner = MockAvatarForKillAndGrab("Vencedor")
+        loser = MockAvatarForKillAndGrab("Perdedor", weapon=weapon)
+
+        with patch(
+            "src.classes.kill_and_grab.resolve_item_exchange",
+            new_callable=AsyncMock,
+        ) as mock_exchange:
+            mock_exchange.return_value = Mock(
+                accepted=True,
+                result_text="equipou o item",
+                action=ItemDisposition.AUTO_ACCEPTED,
+            )
+
+            result, _transfer = await kill_and_grab(winner, loser)
+            intro = mock_exchange.call_args.args[0].scene_intro
+
+        assert intro.startswith("Após derrotar Perdedor")
+        assert result.startswith("Saqueou arma")
+        assert "缴获" not in result
+    finally:
+        language_manager.set_language(original_lang)
 
 
 # ==================== fortune.py coverage ====================

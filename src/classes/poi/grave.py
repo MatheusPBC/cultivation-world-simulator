@@ -6,6 +6,7 @@ from typing import Any
 
 from src.classes.poi.poi import PointOfInterest
 from src.classes.poi.item_payload import build_equipment_payload, restore_equipment_item
+from src.i18n import t
 
 GRAVE_RETENTION_YEARS = 50
 GRAVE_ICON_IDS = tuple(f"grave_{idx:02d}" for idx in range(1, 10))
@@ -57,8 +58,8 @@ class GravePOI(PointOfInterest):
             kind="grave",
             x=x,
             y=y,
-            name=f"{deceased_name}之墓",
-            desc="一方古旧墓碑，碑面仍残留淡淡灵光。",
+            name=t("Grave of {deceased}", deceased=deceased_name),
+            desc=t("An old gravestone still carries a faint spiritual glow."),
             created_month=int(current_month),
             expires_month=int(current_month) + GRAVE_RETENTION_YEARS * 12,
             source_event_id=str(source_event_id),

@@ -50,6 +50,9 @@ msgstr "天道仍保持沉默。"
 msgid "The Dao has answered"
 msgstr "天道已作答"
 
+msgid "The Dao considered an institutional petition."
+msgstr "天道审视了一份宗门或朝廷请愿。"
+
 msgid "{answer} A limited opportunity is granted to the institution."
 msgstr "{answer}该势力因此获得一次有限的机缘。"
 

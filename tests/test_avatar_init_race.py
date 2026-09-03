@@ -69,6 +69,24 @@ def test_yao_random_name_uses_race_surname(base_world):
     assert avatar.name.startswith("蛇")
 
 
+def test_yao_random_name_uses_localized_race_surname_in_pt_br(base_world):
+    from src.classes.language import language_manager
+
+    original_lang = str(language_manager)
+    try:
+        language_manager.set_language("pt-BR")
+        avatar = create_avatar_from_request(
+            base_world,
+            MonthStamp(100 * 12),
+            race="snake",
+        )
+
+        assert avatar.name.startswith("Yao Serpente ")
+        assert "蛇" not in avatar.name
+    finally:
+        language_manager.set_language(original_lang)
+
+
 def test_avatar_factory_build_from_plan_applies_race(base_world):
     plan = MortalPlan(race=get_race("turtle"))
 
