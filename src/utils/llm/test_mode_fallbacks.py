@@ -43,6 +43,58 @@ def _semantic_discovery(infos: Mapping[str, Any]) -> dict[str, Any]:
         for item in metrics
         if dict(item.get("qualifiers", {}) or {}).get("kind") == "urban_service"
     ]
+    spiritual_anchor_ratio = next(
+        (
+            item
+            for item in metrics
+            if item.get("dimension") == "quality"
+            and item.get("concept_id") == "grounded_spiritual_anchor_ratio"
+            and dict(item.get("qualifiers", {}) or {})
+            == {"kind": "spiritual_anchor_ratio"}
+            and item.get("unit") == "ratio"
+        ),
+        None,
+    )
+    if spiritual_anchor_ratio is not None:
+        spiritual_qualifiers = dict(spiritual_anchor_ratio["qualifiers"])
+        return {
+            "concepts": [
+                {
+                    "id": "grounded_spiritual_activity",
+                    "label": "grounded spiritual activity",
+                    "concept_kind": "derived_metric",
+                },
+                {
+                    "id": "observed_spiritual_activity",
+                    "label": "observed spiritual activity",
+                    "concept_kind": "condition",
+                },
+            ],
+            "derived_metrics": [{
+                "id": "grounded_spiritual_activity",
+                "concept_id": "grounded_spiritual_activity",
+                "dimension": "quality",
+                "target_kind": "region",
+                "expression": {
+                    "op": "metric",
+                    "dimension": "quality",
+                    "concept_id": "grounded_spiritual_anchor_ratio",
+                    "qualifiers": spiritual_qualifiers,
+                },
+                "unit": "ratio",
+            }],
+            "conditions": [{
+                "id": "observed_spiritual_activity",
+                "concept_id": "observed_spiritual_activity",
+                "target_kind": "region",
+                "metric_definition_id": "grounded_spiritual_activity",
+                "activate_above": 0.5,
+                "resolve_below": 0.25,
+                "activate_after_months": 2,
+                "resolve_after_months": 2,
+            }],
+            "mechanic_proposals": [],
+        }
     for load in urban_service_metrics:
         if load.get("dimension") != "load":
             continue

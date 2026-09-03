@@ -4,7 +4,7 @@ import random
 from src.i18n import t
 from src.classes.action import TimedAction
 from src.classes.action.cooldown import cooldown_action
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.event import Event
 from src.classes.story_event_service import StoryEventKind, StoryEventService
@@ -79,6 +79,7 @@ class Retreat(TimedAction):
         is_success = random.random() < success_rate
         
         events = []
+        death_event = None
         current_month = int(self.world.month_stamp)
         
         if is_success:
@@ -125,10 +126,16 @@ class Retreat(TimedAction):
             )
             is_dead = self.avatar.age.age >= self.avatar.age.max_lifespan
             if is_dead and not self.avatar.is_dead:
+                death_event = build_death_event(
+                    self.world,
+                    self.avatar,
+                    DeathReason(DeathType.OLD_AGE),
+                )
                 handle_death(
                     self.world,
                     self.avatar,
                     DeathReason(DeathType.OLD_AGE),
+                    death_event=death_event,
                 )
             
             result_text = t("retreat_fail", reduce_years=reduce_years)
@@ -139,6 +146,8 @@ class Retreat(TimedAction):
             
             prompt = t("retreat_story_prompt_fail")
             events.append(Event(self.world.month_stamp, core_text, related_avatars=[self.avatar.id], is_major=True))
+            if death_event is not None:
+                events.append(death_event)
             story_event = await StoryEventService.maybe_create_story(
                 kind=StoryEventKind.CULTIVATION_MAJOR,
                 month_stamp=self.world.month_stamp,

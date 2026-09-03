@@ -1511,6 +1511,12 @@ msgstr ""
 msgid "Unhealed injuries prevent high-risk actions."
 msgstr "伤势未愈，无法进行高风险行动"
 
+msgid "The {formation} formation in {region} expired."
+msgstr ""
+
+msgid "The grave of {name} weathered away."
+msgstr ""
+
 msgid "a call to restore rightful order"
 msgstr "这是重建正统秩序的召唤"
 

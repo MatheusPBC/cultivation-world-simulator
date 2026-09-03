@@ -274,6 +274,26 @@ Spiritual Ecology Projection is a read-only view of existing cultivation
 essence, formations, graves, treasures, and celestial context associated with a
 region. It does not invent manifestations or spiritual danger.
 
+### Regional Essence Profile
+
+Regional Essence Profile is the five-element essence distribution owned by a
+CultivateRegion. A region without that canonical substrate has an unknown
+profile; absence of data is not zero essence.
+
+### Grounded Spiritual Anchor
+
+A Grounded Spiritual Anchor is an existing grave, treasure, or active formation
+whose origin is linked to a real event. Its presence may be measured and used as
+context, but does not by itself assert a ghost, curse, blessing, danger, or any
+other manifestation.
+
+### Spiritual Activity Condition
+
+A Spiritual Activity Condition is an observational condition derived from
+measurable regional essence and Grounded Spiritual Anchors. It describes a
+persistent concentration of known spiritual evidence. It never creates an
+entity, causes damage, changes essence, or grants an effect directly.
+
 ## Causal Origin
 
 Causal Origin is the explicit, finite authorship category persisted alongside

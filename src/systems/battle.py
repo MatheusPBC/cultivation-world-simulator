@@ -357,8 +357,17 @@ async def handle_battle_finish(
             propagation_kind="close_relation_killed",
         )
         apply_kill_hatred(victim=loser, killer=winner)
-        handle_death(world, loser, DeathReason(DeathType.BATTLE, killer_name=winner.name))
+        death_event = handle_death(
+            world,
+            loser,
+            DeathReason(DeathType.BATTLE, killer_name=winner.name),
+            cause_event_ids=(result_event.id,),
+        )
+    else:
+        death_event = None
     events = [result_event]
+    if death_event is not None:
+        events.append(death_event)
     if story_event is not None:
         events.append(story_event)
     return events

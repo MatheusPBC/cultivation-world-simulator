@@ -18,6 +18,21 @@ from src.classes.mechanical_language.models import (
     ReadingKind,
 )
 from src.systems.collective_health import project_collective_health
+from src.systems.spiritual_ecology import (
+    SPIRITUAL_ANCHOR_CONCEPT,
+    SPIRITUAL_ANCHOR_QUALIFIERS,
+    SPIRITUAL_ANCHOR_RATIO_CONCEPT,
+    SPIRITUAL_ANCHOR_RATIO_QUALIFIERS,
+    SPIRITUAL_ESSENCE_CONCEPT,
+    SPIRITUAL_FORMATION_CONCEPT,
+    SPIRITUAL_FORMATION_QUALIFIERS,
+    SPIRITUAL_GRAVE_CONCEPT,
+    SPIRITUAL_GRAVE_QUALIFIERS,
+    SPIRITUAL_TREASURE_CONCEPT,
+    SPIRITUAL_TREASURE_QUALIFIERS,
+    resolve_spiritual_metric,
+    spiritual_essence_qualifiers,
+)
 
 
 def _settlement_value(
@@ -308,6 +323,48 @@ def _urban_service_keys(dimension: PrimitiveDimension):
 
 
 _COLLECTIVE_HEALTH_QUALIFIERS = (("kind", "collective_health"),)
+
+
+def _spiritual_essence_keys(element: str):
+    qualifiers = spiritual_essence_qualifiers(element)
+
+    def enumerate_keys(subject: Any):
+        if getattr(subject, "essence", None) is not None:
+            yield MetricKey(
+                PrimitiveDimension.STOCK,
+                "region",
+                str(subject.id),
+                SPIRITUAL_ESSENCE_CONCEPT,
+                qualifiers=qualifiers,
+            )
+
+    return enumerate_keys
+
+
+def _spiritual_value(
+    world: Any,
+    key: MetricKey,
+    subject: Any,
+    month: int,
+) -> MetricReading | None:
+    return resolve_spiritual_metric(world, key, subject, month)
+
+
+def _spiritual_essence_bindings() -> list[GroundedMetricBinding]:
+    return [
+        GroundedMetricBinding(
+            id=f"region.spiritual.essence.{element.lower()}",
+            subject_kind="region",
+            dimension=PrimitiveDimension.STOCK,
+            concept_pattern=SPIRITUAL_ESSENCE_CONCEPT,
+            unit="essence_density",
+            resolver=_spiritual_value,
+            enumerate_keys=_spiritual_essence_keys(element),
+            required_qualifiers=spiritual_essence_qualifiers(element),
+            exact_qualifiers=True,
+        )
+        for element in ("GOLD", "WOOD", "WATER", "FIRE", "EARTH")
+    ]
 
 
 def _collective_health_value(
@@ -644,6 +701,57 @@ DEFAULT_METRIC_RESOLVERS = MetricResolverRegistry(
                 "injury_burden",
             ),
             required_qualifiers=_COLLECTIVE_HEALTH_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        *_spiritual_essence_bindings(),
+        GroundedMetricBinding(
+            id="region.spiritual.grave_presence",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=SPIRITUAL_GRAVE_CONCEPT,
+            unit="graves",
+            resolver=_spiritual_value,
+            required_qualifiers=SPIRITUAL_GRAVE_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.spiritual.formation_presence",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=SPIRITUAL_FORMATION_CONCEPT,
+            unit="formations",
+            resolver=_spiritual_value,
+            required_qualifiers=SPIRITUAL_FORMATION_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.spiritual.anchor_load",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=SPIRITUAL_ANCHOR_CONCEPT,
+            unit="anchors",
+            resolver=_spiritual_value,
+            required_qualifiers=SPIRITUAL_ANCHOR_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.spiritual.anchor_ratio",
+            subject_kind="region",
+            dimension=PrimitiveDimension.QUALITY,
+            concept_pattern=SPIRITUAL_ANCHOR_RATIO_CONCEPT,
+            unit="ratio",
+            resolver=_spiritual_value,
+            required_qualifiers=SPIRITUAL_ANCHOR_RATIO_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.spiritual.treasure_presence",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=SPIRITUAL_TREASURE_CONCEPT,
+            unit="treasures",
+            resolver=_spiritual_value,
+            required_qualifiers=SPIRITUAL_TREASURE_QUALIFIERS,
             exact_qualifiers=True,
         ),
         GroundedMetricBinding(

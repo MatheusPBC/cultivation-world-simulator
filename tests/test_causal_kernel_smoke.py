@@ -61,6 +61,7 @@ async def test_bounded_multi_month_smoke_with_real_decisions(base_world, mock_ll
     start_month = int(base_world.month_stamp)
     total_events = 0
     decision_events = 0
+    tracked_avatar_ids = {str(avatar.id) for avatar in avatars}
 
     # This test invokes Simulator directly, outside the server loop that normally
     # propagates RunConfig.test_mode into the LLM runtime context. Keep every LLM
@@ -70,12 +71,20 @@ async def test_bounded_multi_month_smoke_with_real_decisions(base_world, mock_ll
         for _ in range(months_to_run):
             events = await sim.step()
             total_events += len(events)
-            decision_events += sum(1 for e in events if e.fact_kind == FactKind.DECISION)
+            decision_events += sum(
+                1
+                for event in events
+                if event.fact_kind == FactKind.DECISION
+                and tracked_avatar_ids.intersection(
+                    str(avatar_id) for avatar_id in (event.related_avatars or [])
+                )
+            )
 
     assert int(base_world.month_stamp) == start_month + months_to_run
-    # Every avatar starts idle and `MoveToDirection` takes 6 months, so each
-    # of the 3 avatars decides exactly once across this run -- the decision
-    # event count must reflect that real activity, not be zero.
+    # Every tracked avatar starts idle and `MoveToDirection` takes 6 months,
+    # so each decides exactly once. The world may legitimately awaken other
+    # avatars during the smoke window; their decisions are outside this
+    # assertion's scope.
     assert decision_events == len(avatars), (
         f"expected exactly {len(avatars)} decision events (one per avatar "
         f"deciding once), got {decision_events}"

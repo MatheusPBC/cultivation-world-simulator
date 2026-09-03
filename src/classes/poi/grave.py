@@ -39,7 +39,13 @@ class GravePOI(PointOfInterest):
         return payload
 
     @classmethod
-    def from_avatar(cls, avatar: Any, current_month: int) -> "GravePOI":
+    def from_avatar(
+        cls,
+        avatar: Any,
+        current_month: int,
+        *,
+        source_event_id: str = "",
+    ) -> "GravePOI":
         death_info = getattr(avatar, "death_info", None) or {}
         death_location = death_info.get("location") or (getattr(avatar, "pos_x", 0), getattr(avatar, "pos_y", 0))
         x, y = int(death_location[0]), int(death_location[1])
@@ -55,6 +61,7 @@ class GravePOI(PointOfInterest):
             desc="一方古旧墓碑，碑面仍残留淡淡灵光。",
             created_month=int(current_month),
             expires_month=int(current_month) + GRAVE_RETENTION_YEARS * 12,
+            source_event_id=str(source_event_id),
             icon_key=icon_id,
             grave_icon_id=icon_id,
             deceased_avatar_id=str(getattr(avatar, "id", "")),
@@ -80,6 +87,7 @@ class GravePOI(PointOfInterest):
             desc=str(data.get("desc", "")),
             created_month=int(data.get("created_month", 0) or 0),
             expires_month=int(data["expires_month"]) if data.get("expires_month") is not None else None,
+            source_event_id=str(data.get("source_event_id", "")),
             discovered_by={str(item) for item in data.get("discovered_by", []) or []},
             icon_key=str(data.get("icon_key") or data.get("grave_icon_id") or "grave_01"),
             is_clickable=bool(data.get("is_clickable", True)),
@@ -143,6 +151,7 @@ class GravePOI(PointOfInterest):
             "x": int(self.x),
             "y": int(self.y),
             "icon_key": self.icon_key,
+            "source_event_id": self.source_event_id,
             "deceased": self._deceased_payload(world),
             "grave_goods": {
                 "weapon": None if self.weapon_looted else self.weapon_payload,

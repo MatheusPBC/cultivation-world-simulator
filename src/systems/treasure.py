@@ -6,10 +6,14 @@ from collections.abc import Mapping
 from typing import Any
 
 from src.classes.event import Event
+from src.classes.event import FactKind
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.items.auxiliary import get_random_auxiliary_by_realm
 from src.classes.items.weapon import get_random_weapon_by_realm
 from src.classes.poi import TreasurePOI, build_equipment_payload
 from src.classes.poi.treasure import TREASURE_ICON_IDS
+from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.systems.cultivation import Realm
 from src.utils.config import CONFIG
@@ -96,6 +100,13 @@ def _pick_coordinate(world: Any) -> tuple[int, int] | None:
     return random.choice(candidates) if candidates else None
 
 
+def _treasure_region_id(world: Any, treasure: TreasurePOI) -> str:
+    tile = getattr(getattr(world, "map", None), "tiles", {}).get(
+        (int(treasure.x), int(treasure.y))
+    )
+    return str(getattr(getattr(tile, "region", None), "id", ""))
+
+
 def try_spawn_treasure(world: Any) -> TreasurePOI | None:
     manager = getattr(world, "poi_manager", None)
     if manager is None:
@@ -137,17 +148,58 @@ def phase_treasure_lifecycle(world: Any) -> list[Event]:
     events: list[Event] = []
     current_month = int(world.month_stamp)
     for treasure in manager.pop_expired(current_month, kind="treasure"):
-        events.append(Event(
+        event = Event(
             world.month_stamp,
             t("The spiritual radiance of a treasure faded away before anyone could claim it."),
             is_major=False,
-        ))
+            event_type="treasure_expired",
+            render_params={
+                "poi_id": str(treasure.id),
+                "region_id": _treasure_region_id(world, treasure),
+            },
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+        )
+        delta = StateDelta(
+            event_id=event.id,
+            owner_kind="poi",
+            owner_id=str(treasure.id),
+            aspect="active_treasure",
+            before=str(treasure.to_save_dict()),
+            after=None,
+        )
+        event.causal_payload = {"deltas": [delta.to_dict()]}
+        if treasure.source_event_id:
+            event.causal_links.append(CausalLink(
+                event_id=event.id,
+                cause_event_id=treasure.source_event_id,
+                relation=CausalRelation.RESOLVES,
+            ))
+        events.append(event)
 
     treasure = try_spawn_treasure(world)
     if treasure is not None:
-        events.append(Event(
+        event = Event(
             world.month_stamp,
             t("A strange spiritual radiance appeared somewhere in the world. A {realm} treasure seems to have emerged.", realm=str(Realm.from_str(treasure.treasure_realm))),
             is_major=False,
-        ))
+            event_type="treasure_spawned",
+            render_params={
+                "poi_id": str(treasure.id),
+                "region_id": _treasure_region_id(world, treasure),
+            },
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+        )
+        treasure.source_event_id = event.id
+        delta = StateDelta(
+            event_id=event.id,
+            owner_kind="poi",
+            owner_id=str(treasure.id),
+            aspect="active_treasure",
+            before=None,
+            after=str(treasure.to_save_dict()),
+        )
+        event.causal_payload = {"deltas": [delta.to_dict()]}
+        events.append(event)
     return events

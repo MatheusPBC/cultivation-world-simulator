@@ -42,7 +42,10 @@ class AvatarManager:
 
             death_info = getattr(avatar, "death_info", None) or {}
             reason = death_info.get("reason") or DeathReason(DeathType.OLD_AGE)
-            handle_death(avatar.world, avatar, reason)
+            death_event = handle_death(avatar.world, avatar, reason)
+            event_manager = getattr(avatar.world, "event_manager", None)
+            if event_manager is None or not event_manager.add_event(death_event):
+                raise RuntimeError("initial avatar death event could not be persisted")
             return
 
         self.avatars[aid] = avatar

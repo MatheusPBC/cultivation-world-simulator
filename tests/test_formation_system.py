@@ -16,6 +16,7 @@ from src.classes.root import Root
 from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
 from src.sim.simulator import Simulator
+from src.run.load_map import load_cultivation_world_map
 from src.systems.battle import get_effective_strength
 from src.systems.cultivation import Realm
 from src.systems.formation import (
@@ -106,6 +107,7 @@ def test_set_formation_places_and_replaces_region_formation(dummy_avatar, base_w
     assert first["formation_type"] == FORMATION_SPIRIT_GATHERING
     assert first["duration"] == 26
     assert first["effects"]["extra_respire_exp_multiplier"] == 0.216
+    assert first["source_event_id"]
     assert int(dummy_avatar.magic_stone) == 844
 
     with patch("random.randint", return_value=0):
@@ -159,11 +161,36 @@ def test_cleanup_expired_region_formations(dummy_avatar, base_world):
         "start_month": 0,
         "duration": 1,
         "effects": {},
+        "source_event_id": "formation-source",
     }
 
-    cleanup_expired_region_formations(base_world, 1)
+    events = cleanup_expired_region_formations(base_world, 1)
 
     assert base_world.map.region_formations == {}
+    assert len(events) == 1
+    event = events[0]
+    assert event.fact_kind.value == "state_transition"
+    assert event.causal_payload["formation_expiration"]["source_event_id"] == "formation-source"
+    assert event.causal_payload["deltas"][0]["after"] is None
+    assert event.causal_links[0].cause_event_id == "formation-source"
+
+
+def test_reading_expired_formation_does_not_mutate_or_emit(dummy_avatar, base_world):
+    region = CultivateRegion(id=301, name="青云洞府", desc="", cors=[(0, 0)])
+    _place_avatar_in_region(base_world, dummy_avatar, region, tile_type=TileType.CAVE)
+    formation = {
+        "formation_type": FORMATION_SPIRIT_GATHERING,
+        "start_month": 0,
+        "duration": 1,
+        "effects": {},
+        "source_event_id": "formation-source",
+    }
+    base_world.map.region_formations[301] = formation
+
+    from src.systems.formation import get_active_region_formation
+
+    assert get_active_region_formation(base_world, 301) is None
+    assert base_world.map.region_formations[301] == formation
 
 
 def test_region_formations_affect_gather_and_battle(dummy_avatar, base_world):
@@ -228,9 +255,15 @@ def test_healing_formation_affects_passive_hp_recovery(dummy_avatar, base_world)
 
 
 def test_region_formations_are_saved_and_loaded(dummy_avatar, base_world, tmp_path):
-    region_id = 201
-    region = CultivateRegion(id=region_id, name="青云洞府", desc="", cors=[(0, 0)])
-    _place_avatar_in_region(base_world, dummy_avatar, region, tile_type=TileType.CAVE)
+    base_world.map = load_cultivation_world_map("classic")
+    region = next(
+        item for item in base_world.map.regions.values()
+        if isinstance(item, CultivateRegion)
+    )
+    region_id = int(region.id)
+    tile = base_world.map.get_tile(*region.cors[0])
+    dummy_avatar.tile = tile
+    dummy_avatar.pos_x, dummy_avatar.pos_y = region.cors[0]
     dummy_avatar.weapon = None
     dummy_avatar.auxiliary = None
     base_world.avatar_manager.register_avatar(dummy_avatar)
@@ -242,6 +275,7 @@ def test_region_formations_are_saved_and_loaded(dummy_avatar, base_world, tmp_pa
         "duration": 12,
         "effects": {"extra_breakthrough_success_rate": 0.03},
         "cost": 104,
+        "source_event_id": "event-formation",
     }
     base_world.run_config_snapshot = {
         "content_locale": "zh-CN",
@@ -259,6 +293,8 @@ def test_region_formations_are_saved_and_loaded(dummy_avatar, base_world, tmp_pa
     with open(save_path, "r", encoding="utf-8") as f:
         save_data = json.load(f)
     assert save_data["world"]["region_formations"][str(region_id)]["formation_type"] == FORMATION_CLARITY
+    assert save_data["world"]["region_formations"][str(region_id)]["source_event_id"] == "event-formation"
 
     loaded_world, _, _ = load_game(save_path)
     assert loaded_world.map.region_formations[region_id]["formation_type"] == FORMATION_CLARITY
+    assert loaded_world.map.region_formations[region_id]["source_event_id"] == "event-formation"

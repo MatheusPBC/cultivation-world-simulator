@@ -130,7 +130,7 @@ async def test_sect_mission_finish_failure_can_kill(sect_mission_avatar):
          patch("src.classes.story_event_service.StoryEventService.should_trigger", return_value=False):
         events = await action.finish()
 
-    assert len(events) == 1
+    assert len(events) == 2
     assert sect_mission_avatar.is_dead is True
     assert sect_mission_avatar.id in sect_mission_avatar.world.avatar_manager.dead_avatars
     assert "殒命" in events[0].content

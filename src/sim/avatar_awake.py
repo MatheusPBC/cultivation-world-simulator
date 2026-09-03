@@ -11,7 +11,7 @@ from src.classes.relation.relation import Relation
 from src.classes.root import Root
 from src.classes.items.magic_stone import MagicStone
 from src.classes.death_reason import DeathReason, DeathType
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.event import Event
 from src.utils.id_generator import get_avatar_id
 from src.classes.technique import attribute_to_root
@@ -29,7 +29,7 @@ BLOODLINE_AWAKENING_RATE = 0.05 # 每个符合条件的凡人每月的觉醒概�
 WILD_AWAKENING_RATE_BASE = 0.1 # 基础野生觉醒率 (如果没有配置)
 
 
-def _register_avatar_and_resolve_lifespan(world: World, avatar: Avatar) -> None:
+def _register_avatar_and_resolve_lifespan(world: World, avatar: Avatar) -> Event | None:
     """Register a newly awakened avatar, then resolve an immediately expired lifespan.
 
     Registration must happen before death resolution so the usual death path
@@ -37,7 +37,15 @@ def _register_avatar_and_resolve_lifespan(world: World, avatar: Avatar) -> None:
     """
     world.avatar_manager.register_avatar(avatar, is_newly_born=True)
     if avatar.age.age >= avatar.age.max_lifespan:
-        handle_death(world, avatar, DeathReason(DeathType.OLD_AGE))
+        death_event = build_death_event(world, avatar, DeathReason(DeathType.OLD_AGE))
+        handle_death(
+            world,
+            avatar,
+            DeathReason(DeathType.OLD_AGE),
+            death_event=death_event,
+        )
+        return death_event
+    return None
 
 def process_awakening(world: World) -> List[Event]:
     events = []
@@ -73,7 +81,7 @@ def _process_bloodline_awakening(world: World) -> List[Event]:
             avatar = _promote_mortal_to_avatar(world, mortal)
             sync_avatar_public_world_secret_knowledge(world, avatar)
 
-            _register_avatar_and_resolve_lifespan(world, avatar)
+            death_event = _register_avatar_and_resolve_lifespan(world, avatar)
 
             # 移除 Mortal
             world.mortal_manager.remove_mortal(mortal.id)
@@ -84,6 +92,8 @@ def _process_bloodline_awakening(world: World) -> List[Event]:
                 desc = t("{name} has awakened their spiritual roots and embarked on the path of cultivation.", name=avatar.name)
             event = Event(world.month_stamp, desc, related_avatars=[avatar.id])
             events.append(event)
+            if death_event is not None:
+                events.append(death_event)
             
     return events
 
@@ -101,13 +111,15 @@ def _process_wild_awakening(world: World) -> Optional[Event]:
     avatar = _create_simple_avatar(world, name, gender, age_val, parents=[], born_region_id=born_id, race=race)
     sync_avatar_public_world_secret_knowledge(world, avatar)
     
-    _register_avatar_and_resolve_lifespan(world, avatar)
+    death_event = _register_avatar_and_resolve_lifespan(world, avatar)
 
     if avatar.is_dead:
         desc = t("A rogue cultivator {name} appeared, but their lifespan was already exhausted.", name=avatar.name)
     else:
         desc = t("A rogue cultivator {name} has appeared in the world.", name=avatar.name)
     event = Event(world.month_stamp, desc, related_avatars=[avatar.id])
+    if death_event is not None:
+        return death_event
     return event
 
 def _promote_mortal_to_avatar(world: World, mortal: Mortal) -> Avatar:

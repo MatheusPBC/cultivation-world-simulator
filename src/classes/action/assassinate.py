@@ -136,9 +136,15 @@ class Assassinate(InstantAction, TargetingMixin):
             )
             
             # 死亡清理
-            handle_death(self.world, target, DeathReason(DeathType.BATTLE, killer_name=self.avatar.name))
+            death_event = handle_death(
+                self.world,
+                target,
+                DeathReason(DeathType.BATTLE, killer_name=self.avatar.name),
+                cause_event_ids=(result_event.id,),
+            )
             
             events = [result_event]
+            events.append(death_event)
             if story_event is not None:
                 events.append(story_event)
             return events

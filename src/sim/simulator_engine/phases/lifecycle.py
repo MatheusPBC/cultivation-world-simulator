@@ -5,7 +5,7 @@ import asyncio
 from src.classes.backstory import process_avatar_backstory
 from src.classes.birth import process_births
 from src.classes.core.avatar import Avatar
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.event import Event, FactKind
 from src.classes.causal_link import CausalLink, CausalRelation
@@ -27,11 +27,18 @@ def phase_resolve_death(world, living_avatars: list[Avatar]) -> list[Event]:
         # They may contain an already-dead avatar in the active collection,
         # which otherwise leaves an avatar portrait on the map with no grave.
         if avatar.is_dead:
-            handle_death(
+            death_event = build_death_event(
                 world,
                 avatar,
                 str((getattr(avatar, "death_info", None) or {}).get("reason") or DeathReason(DeathType.OLD_AGE)),
             )
+            handle_death(
+                world,
+                avatar,
+                str((getattr(avatar, "death_info", None) or {}).get("reason") or DeathReason(DeathType.OLD_AGE)),
+                death_event=death_event,
+            )
+            events.append(death_event)
             dead_avatars.append(avatar)
             continue
 
@@ -46,17 +53,9 @@ def phase_resolve_death(world, living_avatars: list[Avatar]) -> list[Event]:
             death_reason = DeathReason(DeathType.OLD_AGE)
 
         if is_dead and death_reason:
-            events.append(
-                Event(
-                    world.month_stamp,
-                    f"{avatar.name}{death_reason}",
-                    related_avatars=[avatar.id],
-                    is_major=True,
-                    event_type="death",
-                    render_params={"subject_name": avatar.name},
-                )
-            )
-            handle_death(world, avatar, death_reason)
+            death_event = build_death_event(world, avatar, death_reason)
+            handle_death(world, avatar, death_reason, death_event=death_event)
+            events.append(death_event)
             dead_avatars.append(avatar)
 
     # 统一在循环后移除，避免边遍历边修改列表。

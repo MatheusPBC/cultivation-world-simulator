@@ -29,3 +29,9 @@ msgstr "A população de {region} mudou de {before} para {after}"
 
 msgid "Unhealed injuries prevent high-risk actions."
 msgstr "Ferimentos ainda não curados impedem ações de alto risco."
+
+msgid "The {formation} formation in {region} expired."
+msgstr "A formação {formation} em {region} expirou."
+
+msgid "The grave of {name} weathered away."
+msgstr "O túmulo de {name} se desfez com o tempo."

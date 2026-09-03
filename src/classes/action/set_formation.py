@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from src.classes.action import InstantAction
 from src.classes.action.param_options import ParamOptionSource
+from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.event import Event, FactKind
 from src.classes.state_delta import StateDelta
 from src.i18n import t
@@ -46,6 +47,8 @@ class SetFormation(InstantAction):
         self._last_formation_type = ""
         self._last_replaced = False
         self._last_cost = 0
+        self._last_event: Event | None = None
+        self._last_condition_attached = False
 
     def can_possibly_start(self) -> bool:
         if not has_formation_permission(self.avatar):
@@ -106,6 +109,8 @@ class SetFormation(InstantAction):
         self._last_formation_type = normalize_formation_type(formation_type)
         self._last_replaced = False
         self._last_cost = 0
+        self._last_event = None
+        self._last_condition_attached = False
 
         if self._last_region is None:
             return
@@ -120,101 +125,147 @@ class SetFormation(InstantAction):
         if stone < cost:
             return
 
-        self.avatar.magic_stone -= cost
-        formation = build_formation_record(self.avatar, self._last_formation_type, self._last_region, disk_cfg)
-        formation["cost"] = cost
-        old = place_region_formation(self.world, int(self._last_region.id), formation)
-        self._last_cost = cost
-        self._last_replaced = old is not None
-
-    async def finish(self, formation_type: str) -> list[Event]:
-        region = self._last_region or getattr(getattr(self.avatar, "tile", None), "region", None)
-        if region is None:
-            return []
-        formation_name = get_formation_type_name(self._last_formation_type or formation_type)
-        if self._last_replaced:
+        region_name = getattr(self._last_region, "name", t("Current region"))
+        formation_name = get_formation_type_name(self._last_formation_type)
+        old = getattr(self.world.map, "region_formations", {}).get(int(self._last_region.id))
+        if old is not None:
             content = t(
                 "{avatar} set {formation} in {region}; the original formation in this region was replaced.",
                 avatar=self.avatar.name,
                 formation=formation_name,
-                region=region.name,
+                region=region_name,
             )
         else:
             content = t(
                 "{avatar} set {formation} in {region}.",
                 avatar=self.avatar.name,
                 formation=formation_name,
-                region=region.name,
+                region=region_name,
             )
         event = Event(
             self.world.month_stamp,
             content,
             related_avatars=[self.avatar.id],
             is_major=True,
-            fact_kind=FactKind.DERIVED_CONDITION,
+            event_type="formation_set",
+            render_params={
+                "region_id": str(self._last_region.id),
+                "formation_type": self._last_formation_type,
+            },
+            fact_kind=FactKind.STATE_TRANSITION,
         )
 
-        # A formation is an existing, domain-owned regional effect.  Mirror it
-        # as a semantic condition so world interpreters consume one stable
-        # representation, while keeping the formation registry as the owner of
-        # formation mechanics.  The event id is assigned before the condition
-        # is built, making the causal origin navigable from the region state.
-        formation = getattr(self.world.map, "region_formations", {}).get(int(region.id))
-        if formation:
-            from src.classes.mechanical_language import ConditionInstance
+        stone_before = stone
+        self.avatar.magic_stone -= cost
+        formation = build_formation_record(
+            self.avatar,
+            self._last_formation_type,
+            self._last_region,
+            disk_cfg,
+            source_event_id=event.id,
+        )
+        formation["cost"] = cost
+        old = place_region_formation(self.world, int(self._last_region.id), formation)
+        self._last_cost = cost
+        self._last_replaced = old is not None
+        self._last_event = event
+        event.causal_payload = {
+            "deltas": [
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="avatar",
+                    owner_id=str(self.avatar.id),
+                    aspect="magic_stone",
+                    before=str(stone_before),
+                    after=str(stone_before - cost),
+                    magnitude=-float(cost),
+                ).to_dict(),
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="region",
+                    owner_id=str(self._last_region.id),
+                    aspect="formation",
+                    before=(
+                        json.dumps(old, ensure_ascii=False, sort_keys=True)
+                        if old is not None else None
+                    ),
+                    after=json.dumps(formation, ensure_ascii=False, sort_keys=True),
+                ).to_dict(),
+            ]
+        }
+        old_source_event_id = str((old or {}).get("source_event_id", "") or "")
+        if old_source_event_id:
+            event.causal_links.append(CausalLink(
+                event_id=event.id,
+                cause_event_id=old_source_event_id,
+                relation=CausalRelation.RESOLVES,
+            ))
 
-            kind = f"{self._last_formation_type or formation_type}_formation"
-            started_month = int(formation.get("start_month", self.world.month_stamp))
-            duration = int(formation.get("duration", 0))
-            expires_month = started_month + duration if duration > 0 else None
-            from src.classes.mechanical_language import EntityRef
+    def _attach_semantic_condition(self, event: Event, formation: dict) -> None:
+        """Mirror the map-owned formation as a causal semantic condition."""
+        region = self._last_region
+        if region is None:
+            return
 
-            semantic_state = self.world.mechanical_language
-            active_conditions = semantic_state.get_active_conditions(
-                EntityRef("region", str(region.id)),
-                int(self.world.month_stamp),
-            )
-            previous = next(
-                (item for item in active_conditions
-                 if item.definition_id == f"formation:{kind}"),
-                None,
-            )
-            # Map owns the formation record, while the world semantic registry
-            # owns condition instances. Replacing a formation retires every
-            # active formation condition without creating a second owner.
-            for old_condition in active_conditions:
-                if old_condition.definition_id.startswith("formation:"):
-                    semantic_state.replace_condition_instance(replace(
-                        old_condition,
-                        resolved_month=int(self.world.month_stamp),
-                        resolution_event_id=event.id,
-                    ))
+        from src.classes.mechanical_language import ConditionInstance, EntityRef
 
-            condition = ConditionInstance(
-                id=f"formation:{region.id}:{event.id}",
-                definition_id=f"formation:{kind}",
-                target_kind="region",
-                target_id=str(region.id),
-                label=kind,
-                intensity=1.0,
-                started_month=started_month,
-                expires_month=expires_month,
-                cause_event_id=event.id,
-            )
-            semantic_state.add_condition_instance(condition)
+        formation_type = normalize_formation_type(str(formation.get("formation_type", "")))
+        kind = f"{formation_type}_formation"
+        started_month = int(formation.get("start_month", self.world.month_stamp))
+        duration = int(formation.get("duration", 0))
+        expires_month = started_month + duration if duration > 0 else None
+        semantic_state = self.world.mechanical_language
+        target = EntityRef("region", str(region.id))
+        active_conditions = semantic_state.get_active_conditions(
+            target,
+            int(self.world.month_stamp),
+        )
+        previous = next(
+            (item for item in active_conditions if item.definition_id == f"formation:{kind}"),
+            None,
+        )
+        # Map owns the formation record, while the world semantic registry
+        # owns condition instances. Replacing a formation retires every
+        # active formation condition without creating a second owner.
+        for old_condition in active_conditions:
+            if old_condition.definition_id.startswith("formation:"):
+                semantic_state.replace_condition_instance(replace(
+                    old_condition,
+                    resolved_month=int(self.world.month_stamp),
+                    resolution_event_id=event.id,
+                ))
 
-            before = previous.to_dict() if previous is not None else None
-            event.causal_payload = {
-                "deltas": [
-                    StateDelta(
-                        event_id=event.id,
-                        owner_kind="region",
-                        owner_id=str(region.id),
-                        aspect=f"condition:{kind}",
-                        before=json.dumps(before, ensure_ascii=False, sort_keys=True) if before is not None else None,
-                        after=json.dumps(condition.to_dict(), ensure_ascii=False, sort_keys=True),
-                    ).to_dict()
-                ]
-            }
+        condition = ConditionInstance(
+            id=f"formation:{region.id}:{event.id}",
+            definition_id=f"formation:{kind}",
+            target_kind="region",
+            target_id=str(region.id),
+            label=kind,
+            intensity=1.0,
+            started_month=started_month,
+            expires_month=expires_month,
+            cause_event_id=event.id,
+        )
+        semantic_state.add_condition_instance(condition)
 
-        return [event]
+        before = previous.to_dict() if previous is not None else None
+        payload = event.causal_payload or {"deltas": []}
+        payload["deltas"].append(StateDelta(
+            event_id=event.id,
+            owner_kind="region",
+            owner_id=str(region.id),
+            aspect=f"condition:{kind}",
+            before=json.dumps(before, ensure_ascii=False, sort_keys=True) if before is not None else None,
+            after=json.dumps(condition.to_dict(), ensure_ascii=False, sort_keys=True),
+        ).to_dict())
+        event.causal_payload = payload
+
+    async def finish(self, formation_type: str) -> list[Event]:
+        if self._last_event is not None and not self._last_condition_attached:
+            formation = getattr(self.world.map, "region_formations", {}).get(
+                int(self._last_region.id),
+            ) if self._last_region is not None else None
+            if formation is not None:
+                self._attach_semantic_condition(self._last_event, formation)
+            self._last_condition_attached = True
+        return [self._last_event] if self._last_event is not None else []

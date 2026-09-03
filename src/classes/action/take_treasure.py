@@ -6,8 +6,10 @@ from src.classes.action import InstantAction
 from src.classes.action.action import can_take_risk
 from src.classes.action.param_options import ParamOptionSource
 from src.classes.action_runtime import ActionResult, ActionStatus
-from src.classes.event import Event
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.event import Event, FactKind
 from src.classes.poi import TreasurePOI, restore_equipment_item
+from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.systems.cultivation import Realm
 from src.systems.single_choice import (
@@ -58,6 +60,15 @@ class TakeTreasure(InstantAction):
     def _success_rate(self, treasure: TreasurePOI) -> float:
         return max(0.05, min(0.95, 0.45 + self._realm_delta(treasure) * 0.15))
 
+    @staticmethod
+    def _link_origin(event: Event, treasure: TreasurePOI) -> None:
+        if treasure.source_event_id:
+            event.causal_links.append(CausalLink(
+                event_id=event.id,
+                cause_event_id=treasure.source_event_id,
+                relation=CausalRelation.ENABLED_BY,
+            ))
+
     def can_start(self, poi_id: str) -> tuple[bool, str]:
         ok, reason = can_take_risk(self.avatar)
         if not ok:
@@ -94,6 +105,7 @@ class TakeTreasure(InstantAction):
                 t("{avatar} found that the treasure at {treasure} had decayed beyond use.", avatar=self.avatar.name, treasure=treasure.name),
                 related_avatars=[self.avatar.id],
             )
+            self._link_origin(self._last_event, treasure)
             return
 
         content = t("{avatar} failed to claim {treasure}.", avatar=self.avatar.name, treasure=treasure.name)
@@ -108,6 +120,7 @@ class TakeTreasure(InstantAction):
                 damage=damage,
             )
         self._last_event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=False)
+        self._link_origin(self._last_event, treasure)
         if "damage" in locals():
             from src.classes.individual_consequence import record_hp_change_from_event
             record_hp_change_from_event(self.avatar, self._last_event, before_hp)
@@ -137,14 +150,37 @@ class TakeTreasure(InstantAction):
             auto_accept_when_empty=True,
         ))
         accepted_actions = {ItemDisposition.AUTO_ACCEPTED, ItemDisposition.REPLACED_OLD}
-        if outcome.accepted and outcome.action in accepted_actions:
+        removed = outcome.accepted and outcome.action in accepted_actions
+        before = treasure.to_save_dict() if removed else None
+        if removed:
             self.world.poi_manager.remove(treasure.id)
-        return [Event(
+        event = Event(
             self.world.month_stamp,
             t("{avatar} claimed {item} from {treasure}. {result}", avatar=self.avatar.name, item=self._pending_item.name, treasure=treasure.name, result=outcome.result_text),
             related_avatars=[self.avatar.id],
             is_major=outcome.accepted,
-        )]
+            event_type="treasure_claimed" if removed else "treasure_claim_attempted",
+            render_params={
+                "poi_id": str(treasure.id),
+                "region_id": str(getattr(
+                    getattr(getattr(self.world.map, "tiles", {}).get((treasure.x, treasure.y)), "region", None),
+                    "id",
+                    "",
+                )),
+            },
+            fact_kind=FactKind.STATE_TRANSITION if removed else FactKind.OCCURRENCE,
+        )
+        self._link_origin(event, treasure)
+        if removed:
+            event.causal_payload = {"deltas": [StateDelta(
+                event_id=event.id,
+                owner_kind="poi",
+                owner_id=str(treasure.id),
+                aspect="active_treasure",
+                before=str(before),
+                after=None,
+            ).to_dict()]}
+        return [event]
 
     def can_possibly_start(self) -> bool:
         manager = getattr(self.world, "poi_manager", None)

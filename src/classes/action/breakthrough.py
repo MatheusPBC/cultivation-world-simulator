@@ -5,7 +5,7 @@ from src.i18n import t
 from src.classes.action import TimedAction
 from src.classes.action.cooldown import cooldown_action
 from src.classes.causal_link import CausalLink, CausalRelation
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.event import Event
 from src.classes.state_delta import StateDelta
@@ -92,10 +92,16 @@ class Breakthrough(TimedAction):
                 {"extra_max_lifespan": -int(reduce_years)},
             )
             if self.avatar.age.age >= self.avatar.age.max_lifespan and not self.avatar.is_dead:
+                self._death_event = build_death_event(
+                    self.world,
+                    self.avatar,
+                    DeathReason(DeathType.OLD_AGE),
+                )
                 handle_death(
                     self.world,
                     self.avatar,
                     DeathReason(DeathType.OLD_AGE),
+                    death_event=self._death_event,
                 )
             # 记录结果用于 finish 事件
             self._last_result = ("fail", int(reduce_years))
@@ -125,6 +131,7 @@ class Breakthrough(TimedAction):
         self._last_result = None
         self._success_rate_cached = None
         self._start_event_id = None
+        self._death_event = None
         # 预判是否生成故事与选择劫难
         old_realm = self.avatar.cultivation_progress.realm
         self._gen_story = old_realm in ALLOW_STORY_FROM_REALMS
@@ -198,7 +205,10 @@ class Breakthrough(TimedAction):
                          avatar=self.avatar.name, result=result_text)
             core_event = Event(self.world.month_stamp, core_text, related_avatars=[self.avatar.id], is_major=True)
             self._record_causality(core_event)
-            return [core_event]
+            events = [core_event]
+            if self._death_event is not None:
+                events.append(self._death_event)
+            return events
 
         calamity = self._calamity
         calamity_display = TribulationSelector.get_display_name(str(calamity))
@@ -214,6 +224,8 @@ class Breakthrough(TimedAction):
         core_event = Event(self.world.month_stamp, core_text, related_avatars=rel_ids, is_major=True)
         self._record_causality(core_event)
         events: list[Event] = [core_event]
+        if self._death_event is not None:
+            events.append(self._death_event)
 
         # 故事参与者：本体 +（可选）相关角色
         prompt = TribulationSelector.get_story_prompt(str(calamity))

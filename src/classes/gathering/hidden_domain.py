@@ -217,8 +217,6 @@ class HiddenDomain(Gathering):
                 if av.hp.cur <= 0:
                     # 死亡结算
                     reason = DeathReason(DeathType.HIDDEN_DOMAIN)
-                    handle_death(world, av, reason)
-                    
                     event_content = t("{name} perished in the hidden domain {domain}.", name=av.name, domain=domain.name)
                     event = Event(
                         month_stamp,
@@ -228,6 +226,7 @@ class HiddenDomain(Gathering):
                         event_type="death",
                         render_params={"subject_name": av.name},
                     )
+                    handle_death(world, av, reason, death_event=event)
                     events.append(event)
                     
                     event_texts.append(event_content)

@@ -80,8 +80,18 @@ class POIManager:
             self.remove(poi.id)
         return expired
 
-    def create_grave_from_avatar(self, avatar: Any, current_month: int) -> GravePOI:
-        grave = GravePOI.from_avatar(avatar, current_month)
+    def create_grave_from_avatar(
+        self,
+        avatar: Any,
+        current_month: int,
+        *,
+        source_event_id: str = "",
+    ) -> GravePOI:
+        grave = GravePOI.from_avatar(
+            avatar,
+            current_month,
+            source_event_id=source_event_id,
+        )
         self.add(grave)
         return grave
 

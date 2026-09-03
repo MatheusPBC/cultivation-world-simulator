@@ -39,6 +39,7 @@ def _make_treasure(base_world, dummy_avatar, *, realm=Realm.Foundation_Establish
 def test_treasure_poi_save_load_and_known_param_option(base_world, dummy_avatar):
     dummy_avatar.world = base_world
     treasure = _make_treasure(base_world, dummy_avatar)
+    treasure.source_event_id = "event-treasure-spawned"
 
     saved = base_world.poi_manager.to_save_list()
     base_world.poi_manager.load_from_list(saved)
@@ -47,6 +48,7 @@ def test_treasure_poi_save_load_and_known_param_option(base_world, dummy_avatar)
     assert isinstance(loaded, TreasurePOI)
     assert loaded.treasure_source == "meteorite_relic"
     assert loaded.treasure_payload == treasure.treasure_payload
+    assert loaded.source_event_id == treasure.source_event_id
     options = build_param_options(TakeTreasure, dummy_avatar)["poi_id"]
     assert options[0]["value"] == treasure.id
 
@@ -72,6 +74,7 @@ async def test_take_treasure_accept_removes_poi(monkeypatch, base_world, dummy_a
     dummy_avatar.weapon = None
     dummy_avatar.cultivation_progress.realm = Realm.Foundation_Establishment
     treasure = _make_treasure(base_world, dummy_avatar)
+    treasure.source_event_id = "event-treasure-spawned"
     monkeypatch.setattr("src.classes.action.take_treasure.random.random", lambda: 0.0)
 
     action = TakeTreasure(dummy_avatar, base_world)
@@ -81,6 +84,9 @@ async def test_take_treasure_accept_removes_poi(monkeypatch, base_world, dummy_a
     assert base_world.poi_manager.get(treasure.id) is None
     assert dummy_avatar.weapon is not None
     assert events[0].is_major is True
+    assert events[0].event_type == "treasure_claimed"
+    assert events[0].causal_links[0].cause_event_id == "event-treasure-spawned"
+    assert events[0].causal_payload["deltas"][0]["after"] is None
 
 
 @pytest.mark.asyncio
@@ -143,3 +149,36 @@ def test_spawned_treasure_is_limited_to_equipment_realms(monkeypatch, base_world
     }
     assert treasure.treasure_payload["kind"] in {"weapon", "auxiliary"}
     assert treasure.expires_month == int(base_world.month_stamp) + 240
+
+
+def test_treasure_lifecycle_links_canonical_poi_to_spawn_and_expiry_events(monkeypatch, base_world):
+    monkeypatch.setattr("src.systems.treasure.random.random", lambda: 0.0)
+
+    spawned_events = phase_treasure_lifecycle(base_world)
+    assert len(spawned_events) == 1
+    spawned = spawned_events[0]
+    treasure = next(
+        poi for poi in base_world.poi_manager.pois.values()
+        if isinstance(poi, TreasurePOI)
+    )
+
+    assert spawned.event_type == "treasure_spawned"
+    assert treasure.source_event_id == spawned.id
+    assert spawned.causal_payload["deltas"][0]["owner_id"] == treasure.id
+
+    saved = base_world.poi_manager.to_save_list()
+    base_world.poi_manager.load_from_list(saved)
+    loaded = base_world.poi_manager.get(treasure.id)
+    assert isinstance(loaded, TreasurePOI)
+    assert loaded.source_event_id == spawned.id
+
+    loaded.expires_month = int(base_world.month_stamp)
+    monkeypatch.setattr("src.systems.treasure.try_spawn_treasure", lambda world: None)
+    expired_events = phase_treasure_lifecycle(base_world)
+
+    assert len(expired_events) == 1
+    expired = expired_events[0]
+    assert expired.event_type == "treasure_expired"
+    assert expired.causal_links[0].cause_event_id == spawned.id
+    assert expired.causal_links[0].relation == "resolves"
+    assert expired.causal_payload["deltas"][0]["after"] is None

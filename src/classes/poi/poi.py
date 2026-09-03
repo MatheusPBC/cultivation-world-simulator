@@ -15,6 +15,7 @@ class PointOfInterest(ABC):
     desc: str = ""
     created_month: int = 0
     expires_month: int | None = None
+    source_event_id: str = ""
     discovered_by: set[str] = field(default_factory=set)
     icon_key: str = ""
     is_clickable: bool = True
@@ -61,6 +62,7 @@ class PointOfInterest(ABC):
             "desc": self.desc,
             "created_month": int(self.created_month),
             "expires_month": int(self.expires_month) if self.expires_month is not None else None,
+            "source_event_id": self.source_event_id,
             "discovered_by": sorted(self.discovered_by),
             "icon_key": self.icon_key,
             "is_clickable": bool(self.is_clickable),

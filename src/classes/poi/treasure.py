@@ -32,6 +32,7 @@ class TreasurePOI(PointOfInterest):
             desc=str(data.get("desc", "")),
             created_month=int(data.get("created_month", 0) or 0),
             expires_month=int(data["expires_month"]) if data.get("expires_month") is not None else None,
+            source_event_id=str(data.get("source_event_id", "")),
             discovered_by={str(item) for item in data.get("discovered_by", []) or []},
             icon_key=icon_key,
             is_clickable=bool(data.get("is_clickable", True)),
@@ -52,6 +53,7 @@ class TreasurePOI(PointOfInterest):
             "x": int(self.x),
             "y": int(self.y),
             "icon_key": self.icon_key,
+            "source_event_id": self.source_event_id,
             "treasure": {
                 "source": self.treasure_source,
                 "source_label": t(f"treasure_source_{self.treasure_source}"),

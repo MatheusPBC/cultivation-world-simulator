@@ -14,6 +14,43 @@ from typing import Any
 
 from src.classes.essence import EssenceType
 from src.classes.mechanical_language import EntityRef
+from src.classes.mechanical_language.models import (
+    MeasurementAvailability,
+    MetricKey,
+    MetricReading,
+    PrimitiveDimension,
+    ReadingKind,
+)
+
+
+SPIRITUAL_ESSENCE_CONCEPT = "essence"
+SPIRITUAL_GRAVE_CONCEPT = "grave_presence"
+SPIRITUAL_FORMATION_CONCEPT = "formation_presence"
+SPIRITUAL_TREASURE_CONCEPT = "treasure_presence"
+SPIRITUAL_ANCHOR_CONCEPT = "grounded_spiritual_anchors"
+SPIRITUAL_ANCHOR_RATIO_CONCEPT = "grounded_spiritual_anchor_ratio"
+SPIRITUAL_ESSENCE_QUALIFIER = "spiritual_essence"
+SPIRITUAL_GRAVE_QUALIFIER = "spiritual_grave_presence"
+SPIRITUAL_FORMATION_QUALIFIER = "spiritual_formation_presence"
+SPIRITUAL_TREASURE_QUALIFIER = "spiritual_treasure_presence"
+SPIRITUAL_ANCHOR_QUALIFIER = "spiritual_anchors"
+SPIRITUAL_ANCHOR_RATIO_QUALIFIER = "spiritual_anchor_ratio"
+
+
+def _qualifier(kind: str, **extra: str) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted({"kind": kind, **extra}.items()))
+
+
+SPIRITUAL_GRAVE_QUALIFIERS = _qualifier(SPIRITUAL_GRAVE_QUALIFIER)
+SPIRITUAL_FORMATION_QUALIFIERS = _qualifier(SPIRITUAL_FORMATION_QUALIFIER)
+SPIRITUAL_TREASURE_QUALIFIERS = _qualifier(SPIRITUAL_TREASURE_QUALIFIER)
+SPIRITUAL_ANCHOR_QUALIFIERS = _qualifier(SPIRITUAL_ANCHOR_QUALIFIER)
+SPIRITUAL_ANCHOR_RATIO_QUALIFIERS = _qualifier(SPIRITUAL_ANCHOR_RATIO_QUALIFIER)
+
+
+def spiritual_essence_qualifiers(element: str) -> tuple[tuple[str, str], ...]:
+    """Return the exact qualifier set for one canonical essence element."""
+    return _qualifier(SPIRITUAL_ESSENCE_QUALIFIER, element=str(element))
 
 
 def _sorted_unique(values: list[str] | tuple[str, ...] | set[str]) -> tuple[str, ...]:
@@ -333,6 +370,7 @@ def _essence_observation(region: Any, region_id: int) -> EssenceObservation | No
         density=int(getattr(region, "essence_density", 0)),
         densities=tuple(densities),
         state_refs=(f"region:{region_id}", f"region:{region_id}:essence"),
+        source_event_ids=_explicit_event_ids(region),
     )
 
 
@@ -432,6 +470,231 @@ def project_spiritual_ecology(world: Any, region_id: int | str) -> SpiritualEcol
     )
 
 
+def spiritual_metric_keys(world: Any, region_id: int | str) -> tuple[MetricKey, ...]:
+    """Return addressable spiritual keys whose substrate exists this month.
+
+    The projection is the only place that knows whether graves and formations
+    are present.  Keeping this enumeration beside the projection prevents a
+    second spiritual state registry from becoming authoritative.
+    """
+    view = project_spiritual_ecology(world, region_id)
+    subject_id = str(view.region_id)
+    keys: list[MetricKey] = []
+    if view.essence is not None:
+        for element, _density in view.essence.densities:
+            keys.append(
+                MetricKey(
+                    PrimitiveDimension.STOCK,
+                    "region",
+                    subject_id,
+                    SPIRITUAL_ESSENCE_CONCEPT,
+                    qualifiers=spiritual_essence_qualifiers(element),
+                )
+            )
+    if view.graves:
+        keys.append(
+            MetricKey(
+                PrimitiveDimension.LOAD,
+                "region",
+                subject_id,
+                SPIRITUAL_GRAVE_CONCEPT,
+                qualifiers=SPIRITUAL_GRAVE_QUALIFIERS,
+            )
+        )
+    if view.formations:
+        keys.append(
+            MetricKey(
+                PrimitiveDimension.LOAD,
+                "region",
+                subject_id,
+                SPIRITUAL_FORMATION_CONCEPT,
+                qualifiers=SPIRITUAL_FORMATION_QUALIFIERS,
+            )
+        )
+    if view.treasures:
+        keys.append(
+            MetricKey(
+                PrimitiveDimension.LOAD,
+                "region",
+                subject_id,
+                SPIRITUAL_TREASURE_CONCEPT,
+                qualifiers=SPIRITUAL_TREASURE_QUALIFIERS,
+            )
+        )
+    grounded_anchors = any(
+        fact.source_event_ids
+        for fact in (*view.graves, *view.treasures, *view.formations)
+    )
+    if _spiritual_registries_available(world) and grounded_anchors:
+        keys.append(
+            MetricKey(
+                PrimitiveDimension.LOAD,
+                "region",
+                subject_id,
+                SPIRITUAL_ANCHOR_CONCEPT,
+                qualifiers=SPIRITUAL_ANCHOR_QUALIFIERS,
+            )
+        )
+        keys.append(
+            MetricKey(
+                PrimitiveDimension.QUALITY,
+                "region",
+                subject_id,
+                SPIRITUAL_ANCHOR_RATIO_CONCEPT,
+                qualifiers=SPIRITUAL_ANCHOR_RATIO_QUALIFIERS,
+            )
+        )
+    return tuple(keys)
+
+
+def _spiritual_registries_available(world: Any) -> bool:
+    game_map = getattr(world, "map", None)
+    poi_manager = getattr(world, "poi_manager", None)
+    return (
+        isinstance(getattr(game_map, "region_formations", None), dict)
+        and isinstance(getattr(poi_manager, "pois", None), dict)
+    )
+
+
+def resolve_spiritual_metric(
+    world: Any,
+    key: MetricKey,
+    subject: Any,
+    calculated_month: int,
+) -> MetricReading | None:
+    """Resolve one spiritual key from the read-only canonical projection."""
+    if getattr(subject, "id", None) is None or key.subject_kind != "region":
+        return None
+    if str(getattr(subject, "id")) != key.subject_id:
+        return None
+    view = project_spiritual_ecology(world, subject.id)
+    source_facts = tuple(
+        fact
+        for fact in (*view.graves, *view.treasures, *view.formations)
+        if fact.source_event_ids
+    )
+    if not source_facts and view.essence is not None:
+        source_refs = list(view.essence.state_refs)
+        source_event_ids = list(view.essence.source_event_ids)
+    else:
+        source_refs = [ref for fact in source_facts for ref in fact.state_refs]
+        source_event_ids = [event_id for fact in source_facts for event_id in fact.source_event_ids]
+
+    if key.dimension is PrimitiveDimension.STOCK and key.concept_id == SPIRITUAL_ESSENCE_CONCEPT:
+        if key.qualifier("kind") != SPIRITUAL_ESSENCE_QUALIFIER:
+            return None
+        element = key.qualifier("element")
+        if element is None or key.qualifiers != spiritual_essence_qualifiers(element):
+            return None
+        if view.essence is None:
+            return None
+        density = dict(view.essence.densities).get(element)
+        if density is None:
+            return None
+        return MetricReading(
+            key=key,
+            value=float(density),
+            unit="essence_density",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.EXACT,
+            calculated_month=calculated_month,
+            state_refs=[f"region:{subject.id}:essence", f"region:{subject.id}:essence:{element}"],
+            source_event_ids=list(view.essence.source_event_ids),
+        )
+
+    if key.dimension is PrimitiveDimension.LOAD and key.concept_id == SPIRITUAL_GRAVE_CONCEPT:
+        if key.qualifiers != SPIRITUAL_GRAVE_QUALIFIERS or not view.graves:
+            return None
+        return MetricReading(
+            key=key,
+            value=float(len(view.graves)),
+            unit="graves",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=calculated_month,
+            state_refs=list(dict.fromkeys(ref for grave in view.graves for ref in grave.state_refs)),
+            source_event_ids=list(dict.fromkeys(event_id for grave in view.graves for event_id in grave.source_event_ids)),
+        )
+
+    if key.dimension is PrimitiveDimension.LOAD and key.concept_id == SPIRITUAL_FORMATION_CONCEPT:
+        if key.qualifiers != SPIRITUAL_FORMATION_QUALIFIERS or not view.formations:
+            return None
+        return MetricReading(
+            key=key,
+            value=float(len(view.formations)),
+            unit="formations",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=calculated_month,
+            state_refs=list(dict.fromkeys(ref for formation in view.formations for ref in formation.state_refs)),
+            source_event_ids=list(dict.fromkeys(event_id for formation in view.formations for event_id in formation.source_event_ids)),
+        )
+
+    if key.dimension is PrimitiveDimension.LOAD and key.concept_id == SPIRITUAL_TREASURE_CONCEPT:
+        if key.qualifiers != SPIRITUAL_TREASURE_QUALIFIERS or not view.treasures:
+            return None
+        return MetricReading(
+            key=key,
+            value=float(len(view.treasures)),
+            unit="treasures",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=calculated_month,
+            state_refs=list(dict.fromkeys(ref for treasure in view.treasures for ref in treasure.state_refs)),
+            source_event_ids=list(dict.fromkeys(event_id for treasure in view.treasures for event_id in treasure.source_event_ids)),
+        )
+
+    if key.dimension is PrimitiveDimension.LOAD and key.concept_id == SPIRITUAL_ANCHOR_CONCEPT:
+        if key.qualifiers != SPIRITUAL_ANCHOR_QUALIFIERS or not _spiritual_registries_available(world):
+            return None
+        return MetricReading(
+            key=key,
+            value=float(len(source_facts)),
+            unit="anchors",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=calculated_month,
+            state_refs=list(dict.fromkeys((
+                f"region:{subject.id}:spiritual_anchors",
+                "world:poi_registry",
+                "map:region_formations",
+                *source_refs,
+            ))),
+            source_event_ids=list(dict.fromkeys(source_event_ids)),
+        )
+
+    if key.dimension is PrimitiveDimension.QUALITY and key.concept_id == SPIRITUAL_ANCHOR_RATIO_CONCEPT:
+        if key.qualifiers != SPIRITUAL_ANCHOR_RATIO_QUALIFIERS or not _spiritual_registries_available(world):
+            return None
+        anchor_key = MetricKey(
+            PrimitiveDimension.LOAD,
+            "region",
+            str(subject.id),
+            SPIRITUAL_ANCHOR_CONCEPT,
+            qualifiers=SPIRITUAL_ANCHOR_QUALIFIERS,
+        )
+        anchor_reading = resolve_spiritual_metric(
+            world,
+            anchor_key,
+            subject,
+            calculated_month,
+        )
+        if anchor_reading is None or anchor_reading.value is None:
+            return None
+        return MetricReading(
+            key=key,
+            value=1.0 if anchor_reading.value > 0 else 0.0,
+            unit="ratio",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=calculated_month,
+            derived_from=[anchor_key.to_dict()],
+            state_refs=list(anchor_reading.state_refs),
+            source_event_ids=list(anchor_reading.source_event_ids),
+        )
+    return None
+
+
 # Public aliases keep the projection discoverable without introducing a
 # second implementation or another state owner.
 build_spiritual_ecology_view = project_spiritual_ecology
@@ -443,8 +706,28 @@ __all__ = [
     "EssenceObservation",
     "FormationObservation",
     "POIObservation",
+    "SPIRITUAL_ESSENCE_CONCEPT",
+    "SPIRITUAL_ESSENCE_QUALIFIER",
+    "SPIRITUAL_ANCHOR_CONCEPT",
+    "SPIRITUAL_ANCHOR_QUALIFIERS",
+    "SPIRITUAL_ANCHOR_QUALIFIER",
+    "SPIRITUAL_ANCHOR_RATIO_CONCEPT",
+    "SPIRITUAL_ANCHOR_RATIO_QUALIFIERS",
+    "SPIRITUAL_ANCHOR_RATIO_QUALIFIER",
+    "SPIRITUAL_FORMATION_CONCEPT",
+    "SPIRITUAL_FORMATION_QUALIFIERS",
+    "SPIRITUAL_FORMATION_QUALIFIER",
+    "SPIRITUAL_GRAVE_CONCEPT",
+    "SPIRITUAL_GRAVE_QUALIFIERS",
+    "SPIRITUAL_GRAVE_QUALIFIER",
+    "SPIRITUAL_TREASURE_CONCEPT",
+    "SPIRITUAL_TREASURE_QUALIFIERS",
+    "SPIRITUAL_TREASURE_QUALIFIER",
     "SpiritualEcologyView",
     "build_spiritual_ecology_view",
     "get_spiritual_ecology_view",
     "project_spiritual_ecology",
+    "resolve_spiritual_metric",
+    "spiritual_essence_qualifiers",
+    "spiritual_metric_keys",
 ]

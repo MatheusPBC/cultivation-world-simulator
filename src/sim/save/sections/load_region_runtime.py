@@ -8,7 +8,7 @@ class RegionRuntimeLoadSection:
 
     def load(self, context: LoadContext) -> None:
         from src.classes.environment.region import CityRegion, CultivateRegion
-        from src.systems.formation import cleanup_expired_region_formations
+        from src.systems.formation import filter_expired_region_formations
 
         world = context.world
         world_data = context.world_data or {}
@@ -62,4 +62,4 @@ class RegionRuntimeLoadSection:
                 continue
             region_formations[rid] = dict(formation)
         game_map.region_formations = region_formations
-        cleanup_expired_region_formations(world, int(world.month_stamp))
+        filter_expired_region_formations(world, int(world.month_stamp))

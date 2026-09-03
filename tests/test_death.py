@@ -33,13 +33,17 @@ def test_handle_death(base_world, dummy_avatar):
     assert dummy_avatar.id in base_world.avatar_manager.avatars
     
     # 执行死亡处理
-    handle_death(base_world, dummy_avatar, reason)
+    death_event = handle_death(base_world, dummy_avatar, reason)
     
     # 1. 验证对象状态
     assert dummy_avatar.is_dead is True
     assert dummy_avatar.death_info is not None
     assert dummy_avatar.death_info["reason"] == "被李四杀害"
     assert dummy_avatar.death_info["time"] == int(base_world.month_stamp)
+    grave = next(iter(base_world.poi_manager.pois.values()))
+    assert grave.source_event_id == death_event.id
+    assert death_event.event_type == "death"
+    assert death_event.causal_payload["deltas"][0]["aspect"] == "life_status"
     
     # 2. 验证管理器状态（已归档）
     assert dummy_avatar.id not in base_world.avatar_manager.avatars
@@ -233,7 +237,8 @@ def test_death_phase_repairs_previously_marked_dead_avatar(base_world, dummy_ava
 
     events = phase_resolve_death(base_world, [dummy_avatar])
 
-    assert events == []
+    assert len(events) == 1
+    assert events[0].event_type == "death"
     assert dummy_avatar.id not in base_world.avatar_manager.avatars
     assert dummy_avatar.id in base_world.avatar_manager.dead_avatars
     graves = base_world.poi_manager.get_all_active(int(base_world.month_stamp))

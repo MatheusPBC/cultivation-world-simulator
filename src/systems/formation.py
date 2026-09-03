@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import random
 from typing import TYPE_CHECKING, Any
 
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.effect import format_effects_to_text, load_effect_from_str
+from src.classes.event import Event, FactKind
+from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.utils.df import game_configs, get_int, get_str
 
@@ -169,29 +174,136 @@ def ensure_region_formations(world: "World") -> dict[int, dict[str, Any]]:
     return formations
 
 
-def cleanup_expired_region_formations(world: "World", current_month: int | None = None) -> None:
+def _expired_region_formations(
+    world: "World",
+    current_month: int | None = None,
+) -> tuple[dict[int, dict[str, Any]], int, list[tuple[int, dict[str, Any]]]]:
     formations = ensure_region_formations(world)
     month = int(current_month if current_month is not None else getattr(world, "month_stamp", 0))
-    expired: list[int] = []
+    expired: list[tuple[int, dict[str, Any]]] = []
     for region_id, formation in formations.items():
         start = _int_or_default(formation.get("start_month"), month)
         duration = _int_or_default(formation.get("duration"), 0)
         if duration <= 0 or month >= start + duration:
-            expired.append(region_id)
-    for region_id in expired:
+            expired.append((int(region_id), dict(formation)))
+    return formations, month, expired
+
+
+def filter_expired_region_formations(world: "World", current_month: int | None = None) -> None:
+    """Discard expired map records while loading a save.
+
+    Loading is not a simulation step, so it must not manufacture an event or
+    resolve a semantic condition. Normal expirations are handled by the monthly
+    phase before a save; this only rejects stale records from inconsistent data.
+    """
+    formations, _, expired = _expired_region_formations(world, current_month)
+    for region_id, _ in expired:
         formations.pop(region_id, None)
+
+
+def cleanup_expired_region_formations(
+    world: "World",
+    current_month: int | None = None,
+) -> list[Event]:
+    """Remove expired formations and return their causal expiration events.
+
+    The map remains the sole owner of the material formation record.  Cleanup
+    therefore removes only that record and marks the mirrored semantic
+    condition as resolved; the returned event is the durable evidence a caller
+    can append to the current simulation batch.
+    """
+    formations, month, expired = _expired_region_formations(world, current_month)
+
+    events: list[Event] = []
+    for region_id, formation in expired:
+        region = getattr(world.map, "regions", {}).get(region_id)
+        region_name = getattr(region, "name", str(region_id))
+        formation_type = normalize_formation_type(str(formation.get("formation_type", "formation")))
+        source_event_id = str(formation.get("source_event_id", "") or "")
+        caster_id = str(formation.get("caster_id", "") or "")
+        event = Event(
+            month_stamp=world.month_stamp,
+            content=t(
+                "The {formation} formation in {region} expired.",
+                formation=get_formation_type_name(formation_type),
+                region=region_name,
+            ),
+            related_avatars=[caster_id] if caster_id else None,
+            is_major=True,
+            event_type="formation_expired",
+            render_params={
+                "region_id": str(region_id),
+                "formation_type": formation_type,
+            },
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+        )
+        event.causal_payload = {
+            "formation_expiration": {
+                "region_id": region_id,
+                "formation_type": formation_type,
+                "source_event_id": source_event_id,
+            },
+            "deltas": [
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="region",
+                    owner_id=str(region_id),
+                    aspect=f"formation:{formation_type}",
+                    before=json.dumps(formation, ensure_ascii=False, sort_keys=True),
+                    after=None,
+                ).to_dict()
+            ],
+        }
+        if source_event_id:
+            event.causal_links.append(
+                CausalLink(
+                    event_id=event.id,
+                    cause_event_id=source_event_id,
+                    relation=CausalRelation.RESOLVES,
+                )
+            )
+
+        semantic_state = getattr(world, "mechanical_language", None)
+        if semantic_state is not None:
+            from dataclasses import replace
+            from src.classes.mechanical_language import EntityRef
+
+            target = EntityRef("region", str(region_id))
+            for condition in semantic_state.get_conditions_for_target(target):
+                if (
+                    condition.definition_id == f"formation:{formation_type}_formation"
+                    and condition.resolved_month is None
+                ):
+                    semantic_state.replace_condition_instance(
+                        replace(
+                            condition,
+                            resolved_month=month,
+                            resolution_event_id=event.id,
+                        )
+                    )
+
+        events.append(event)
+        formations.pop(region_id, None)
+    return events
 
 
 def get_active_region_formation(world: "World", region_id: int | str | None) -> dict[str, Any] | None:
     if region_id is None:
         return None
-    cleanup_expired_region_formations(world)
     try:
         normalized_region_id = int(region_id)
     except (TypeError, ValueError):
         return None
-    formation = ensure_region_formations(world).get(normalized_region_id)
+    game_map = getattr(world, "map", None)
+    formations = getattr(game_map, "region_formations", {}) or {}
+    formation = formations.get(normalized_region_id)
     if not formation:
+        return None
+    start = _int_or_default(formation.get("start_month"), int(getattr(world, "month_stamp", 0)))
+    duration = _int_or_default(formation.get("duration"), 0)
+    current_month = int(getattr(world, "month_stamp", 0))
+    if duration <= 0 or current_month >= start + duration:
         return None
     return formation
 
@@ -327,6 +439,8 @@ def build_formation_record(
     formation_type: str,
     region: "Region",
     disk_cfg: FormationDiskConfig,
+    *,
+    source_event_id: str = "",
 ) -> dict[str, Any]:
     key = normalize_formation_type(formation_type)
     cost = compute_formation_cost(avatar, key, region, disk_cfg)
@@ -338,10 +452,14 @@ def build_formation_record(
         "duration": compute_formation_duration(avatar, key),
         "effects": build_formation_effects(avatar, key, disk_cfg),
         "cost": cost,
+        "source_event_id": str(source_event_id),
     }
 
 
 def place_region_formation(world: "World", region_id: int, formation: dict[str, Any]) -> dict[str, Any] | None:
+    source_event_id = str(formation.get("source_event_id", "") or "")
+    if not source_event_id:
+        raise ValueError("region formations require source_event_id")
     formations = ensure_region_formations(world)
     old = formations.get(int(region_id))
     formations[int(region_id)] = formation

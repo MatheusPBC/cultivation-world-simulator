@@ -35,6 +35,11 @@ from src.systems.semantic_world.resolvers import (
     resolve_derived_metric,
 )
 from src.systems.collective_health import project_collective_health
+from src.systems.spiritual_ecology import (
+    SPIRITUAL_ANCHOR_RATIO_CONCEPT,
+    project_spiritual_ecology,
+    spiritual_metric_keys,
+)
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ParseError, ProviderCallError
 from src.utils.llm.runtime_mode import is_test_mode_enabled, is_world_test_mode
@@ -52,6 +57,7 @@ async def evaluate_semantic_world(
     llm_call: Callable[..., Awaitable[dict[str, Any]]] | None = None,
     source_event_ids_by_target: dict[str, list[str]] | None = None,
     health_source_event_ids_by_target: dict[str, list[str]] | None = None,
+    spiritual_source_event_ids_by_target: dict[str, list[str]] | None = None,
     budget: Any | None = None,
 ) -> list[Event]:
     """Discover reusable observations, then evaluate them deterministically.
@@ -157,6 +163,12 @@ async def evaluate_semantic_world(
     for target_ref, source_ids in (health_source_event_ids_by_target or {}).items():
         pending = affinity_sources_by_target.setdefault(target_ref, {}).setdefault(
             "collective_health",
+            [],
+        )
+        pending.extend(source_id for source_id in source_ids if source_id not in pending)
+    for target_ref, source_ids in (spiritual_source_event_ids_by_target or {}).items():
+        pending = affinity_sources_by_target.setdefault(target_ref, {}).setdefault(
+            "spiritual_ecology",
             [],
         )
         pending.extend(source_id for source_id in source_ids if source_id not in pending)
@@ -639,6 +651,14 @@ def _definition_source_affinities(
         kind = dict(leaf.get("qualifiers", {})).get("kind")
         if kind == "collective_health":
             affinities.add("collective_health")
+        elif kind in {
+            "spiritual_anchor_ratio",
+            "spiritual_anchors",
+            "spiritual_grave_presence",
+            "spiritual_formation_presence",
+            "spiritual_treasure_presence",
+        }:
+            affinities.add("spiritual_ecology")
         elif kind == "urban_service":
             concept_id = str(leaf.get("concept_id", "")).strip()
             if concept_id:
@@ -713,9 +733,15 @@ def _uncovered_metric_keys(
         health_view.active_wounded_count.value is not None
         and health_view.active_wounded_count.value > 0
     )
+    keys = [*available_metric_keys(city)]
+    keys.extend(
+        key
+        for key in spiritual_metric_keys(world, city.id)
+        if key.concept_id == SPIRITUAL_ANCHOR_RATIO_CONCEPT
+    )
     return [
         key
-        for key in available_metric_keys(city)
+        for key in keys
         if (
             key.dimension,
             key.concept_id,
@@ -778,6 +804,7 @@ def _evaluation_key(definition_id: str, region: CityRegion) -> str:
 
 
 def _fingerprint(world: Any, region: CityRegion) -> str:
+    spiritual = project_spiritual_ecology(world, region.id)
     payload = {
         "population": region.population,
         "population_capacity": region.population_capacity,
@@ -785,6 +812,11 @@ def _fingerprint(world: Any, region: CityRegion) -> str:
         "infrastructure": region.infrastructure.to_dict(),
         "city_state": region.city_state.to_dict(),
         "collective_health": project_collective_health(world, region.id).to_dict(),
+        "spiritual_anchors": {
+            "formations": [item.to_dict() for item in spiritual.formations],
+            "graves": [item.to_dict() for item in spiritual.graves],
+            "treasures": [item.to_dict() for item in spiritual.treasures],
+        },
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 

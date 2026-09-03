@@ -1,7 +1,7 @@
 from __future__ import annotations
 import random
 from typing import Any, TYPE_CHECKING
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.event import Event
 from src.classes.items.auxiliary import Auxiliary, get_random_auxiliary_by_realm
@@ -159,7 +159,6 @@ def _apply_injury(owner: "Avatar") -> tuple[str, bool]:
     owner._last_opportunity_injury_before_hp = owner.hp.cur
     owner.hp.reduce(damage)
     if owner.hp.cur <= 0:
-        handle_death(owner.world, owner, DeathReason(DeathType.SERIOUS_INJURY))
         return t(
             "{avatar_name} followed the opportunity, but suffered backlash and perished.",
             avatar_name=owner.name,
@@ -191,6 +190,20 @@ async def _resolve_opportunity(owner: "Avatar", record: OpportunityRecord, relat
         is_major=is_major,
         source_event_ids=record.source_event_ids,
     )
+    death_event = None
+    if outcome == OpportunityOutcome.INJURY and not getattr(owner, "is_dead", False) and owner.hp.cur <= 0:
+        death_event = build_death_event(
+            owner.world,
+            owner,
+            DeathReason(DeathType.SERIOUS_INJURY),
+        )
+        handle_death(
+            owner.world,
+            owner,
+            DeathReason(DeathType.SERIOUS_INJURY),
+            death_event=death_event,
+            cause_event_ids=(base_event.id,),
+        )
     if outcome == OpportunityOutcome.INJURY and not getattr(owner, "is_dead", False):
         damage = int(getattr(owner, "_last_opportunity_injury_damage", 0) or 0)
         if damage:
@@ -211,6 +224,8 @@ async def _resolve_opportunity(owner: "Avatar", record: OpportunityRecord, relat
         allow_relation_changes=False,
     )
     events = [base_event]
+    if death_event is not None:
+        events.append(death_event)
     if story_event is not None:
         events.append(story_event)
     return events

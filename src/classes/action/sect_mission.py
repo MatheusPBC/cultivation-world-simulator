@@ -6,7 +6,7 @@ from typing import Optional
 
 from src.classes.action import TimedAction
 from src.classes.action.action import can_take_risk
-from src.classes.death import handle_death
+from src.classes.death import build_death_event, handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.environment.sect_region import SectRegion
 from src.classes.event import Event
@@ -249,7 +249,6 @@ class SectMission(TimedAction):
                 max=self.avatar.hp.max,
             )
             if is_dead:
-                handle_death(self.world, self.avatar, DeathReason(DeathType.SERIOUS_INJURY))
                 result_text += t("sect_mission_result_fail_death_append")
             result_event = Event(
                 month_stamp=self.world.month_stamp,
@@ -258,9 +257,25 @@ class SectMission(TimedAction):
                 related_sects=related_sect_ids,
                 is_major=False,
             )
+            death_event = None
+            if is_dead:
+                death_event = build_death_event(
+                    self.world,
+                    self.avatar,
+                    DeathReason(DeathType.SERIOUS_INJURY),
+                )
+                handle_death(
+                    self.world,
+                    self.avatar,
+                    DeathReason(DeathType.SERIOUS_INJURY),
+                    death_event=death_event,
+                    cause_event_ids=(result_event.id,),
+                )
             from src.classes.individual_consequence import record_hp_change_from_event
             record_hp_change_from_event(self.avatar, result_event, before_hp)
             events.append(result_event)
+            if death_event is not None:
+                events.append(death_event)
             story_prompt = t("sect_mission_story_prompt_fail")
 
         story_event = await StoryEventService.maybe_create_story(

@@ -19,6 +19,21 @@ class SimulationPhase:
     reset_check_after: bool = True
 
 
+def expire_region_formations(_simulator, ctx):
+    from src.systems.formation import cleanup_expired_region_formations
+
+    ctx.add_events(
+        cleanup_expired_region_formations(
+            ctx.world,
+            int(ctx.month_stamp or ctx.world.month_stamp),
+        )
+    )
+
+
+def expire_graves(_simulator, ctx):
+    ctx.add_events(poi.phase_expire_graves(ctx.world))
+
+
 def update_perception_and_knowledge(simulator, ctx):
     ctx.add_events(world_phases.phase_update_perception_and_knowledge(simulator.world, ctx.living_avatars))
 
@@ -201,11 +216,28 @@ async def evaluate_semantic_world(simulator, ctx):
                 [],
             ).append(source_event_id)
     health_sources_by_target: dict[str, list[str]] = {}
+    spiritual_sources_by_target: dict[str, list[str]] = {}
     avatars_by_id = {
         str(avatar.id): avatar
         for avatar in simulator.world.avatar_manager.get_living_avatars()
     }
     for event in ctx.events:
+        if event.event_type in {
+            "death",
+            "formation_set",
+            "formation_expired",
+            "grave_expired",
+            "treasure_spawned",
+            "treasure_expired",
+            "treasure_claimed",
+        }:
+            params = event.render_params if isinstance(event.render_params, dict) else {}
+            region_id = str(params.get("region_id", "")).strip()
+            if region_id:
+                target_ref = f"region:{region_id}"
+                pending = spiritual_sources_by_target.setdefault(target_ref, [])
+                if event.id not in pending:
+                    pending.append(event.id)
         payload = event.causal_payload if isinstance(event.causal_payload, dict) else {}
         for delta in payload.get("deltas", []):
             if not isinstance(delta, dict):
@@ -228,6 +260,7 @@ async def evaluate_semantic_world(simulator, ctx):
         simulator.world,
         source_event_ids_by_target=sources_by_target,
         health_source_event_ids_by_target=health_sources_by_target,
+        spiritual_source_event_ids_by_target=spiritual_sources_by_target,
         budget=ctx.causal_budget,
     )
     enqueue_government_transitions(simulator.world, events, ctx.invalidations)
@@ -364,48 +397,50 @@ def finalize_step_phase(_simulator, ctx):
 
 SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_perception_and_knowledge", 1, "update_perception_and_knowledge", update_perception_and_knowledge),
-    SimulationPhase("decide_actions", 2, "decide_actions", decide_actions),
-    SimulationPhase("long_term_objective_thinking", 3, "long_term_objective_thinking", long_term_objective_thinking),
-    SimulationPhase("claim_ownerless_regions", 4, "claim_ownerless_regions", claim_ownerless_regions),
-    SimulationPhase("process_gatherings", 5, "process_gatherings", process_gatherings),
-    SimulationPhase("commit_next_plans", 6, "commit_next_plans", commit_next_plans),
-    SimulationPhase("execute_actions", 7, "execute_actions", execute_actions),
-    SimulationPhase("check_opportunities", 8, "check_opportunities", check_opportunities),
-    SimulationPhase("world_secret_discovery", 9, "world_secret_discovery", world_secret_discovery),
-    SimulationPhase("handle_interactions_first", 10, "handle_interactions", handle_interactions),
-    SimulationPhase("evolve_relations", 11, "evolve_relations", evolve_relations),
-    SimulationPhase("resolve_death", 12, "resolve_death", resolve_death),
-    SimulationPhase("treasure_lifecycle", 13, "treasure_lifecycle", treasure_lifecycle),
-    SimulationPhase("discover_pois", 14, "discover_pois", discover_pois),
-    SimulationPhase("update_age_and_birth", 15, "update_age_and_birth", update_age_and_birth),
-    SimulationPhase("backstory_generation", 16, "backstory_generation", backstory_generation),
-    SimulationPhase("passive_effects", 17, "passive_effects", passive_effects),
-    SimulationPhase("resolve_individual_consequences", 18, "resolve_individual_consequences", resolve_individual_consequences),
-    SimulationPhase("autonomous_custom_creation", 19, "autonomous_custom_creation", autonomous_custom_creation),
-    SimulationPhase("random_minor_events", 20, "random_minor_events", random_minor_events),
-    SimulationPhase("background_npc_events", 21, "background_npc_events", background_npc_events),
-    SimulationPhase("sect_random_event", 22, "sect_random_event", sect_random_event),
-    SimulationPhase("sect_wars", 23, "sect_wars", sect_wars),
-    SimulationPhase("nickname_generation", 24, "nickname_generation", nickname_generation),
-    SimulationPhase("update_celestial_phenomenon", 25, "update_celestial_phenomenon", update_celestial_phenomenon),
-    SimulationPhase("update_city_population", 26, "update_city_population", update_city_population),
-    SimulationPhase("update_regional_economy", 27, "update_regional_economy", update_regional_economy),
-    SimulationPhase("react_economy", 28, "react_economy", react_economy),
-    SimulationPhase("advance_urban_capacity_projects", 29, "advance_urban_capacity_projects", advance_urban_capacity_projects),
-    SimulationPhase("update_dynasty_and_officials", 30, "update_dynasty_and_officials", update_dynasty_and_officials),
-    SimulationPhase("handle_interactions_second", 31, "handle_interactions", handle_interactions),
-    SimulationPhase("update_calculated_relations", 32, "update_calculated_relations", update_calculated_relations),
-    SimulationPhase("create_dao_petition", 33, "create_dao_petition", create_dao_petition),
-    SimulationPhase("annual_maintenance", 34, "annual_maintenance", annual_maintenance),
-    SimulationPhase("evaluate_semantic_world", 35, "evaluate_semantic_world", evaluate_semantic_world),
-    SimulationPhase("react_government", 36, "react_government", react_government),
-    SimulationPhase("react_organization", 37, "react_organization", react_organization),
-    SimulationPhase("react_city", 38, "react_city", react_city),
-    SimulationPhase("react_population", 39, "react_population", react_population),
-    SimulationPhase("carry_forward_mechanical_invalidations", 40, "carry_forward_mechanical_invalidations", carry_forward_mechanical_invalidations),
-    SimulationPhase("generate_event_appraisals", 41, "generate_event_appraisals", generate_event_appraisals),
-    SimulationPhase("generate_chronicle", 42, "generate_chronicle", generate_chronicle),
-    SimulationPhase("finalize_step", 43, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("expire_region_formations", 2, "expire_region_formations", expire_region_formations),
+    SimulationPhase("expire_graves", 3, "expire_graves", expire_graves),
+    SimulationPhase("decide_actions", 4, "decide_actions", decide_actions),
+    SimulationPhase("long_term_objective_thinking", 5, "long_term_objective_thinking", long_term_objective_thinking),
+    SimulationPhase("claim_ownerless_regions", 6, "claim_ownerless_regions", claim_ownerless_regions),
+    SimulationPhase("process_gatherings", 7, "process_gatherings", process_gatherings),
+    SimulationPhase("commit_next_plans", 8, "commit_next_plans", commit_next_plans),
+    SimulationPhase("execute_actions", 9, "execute_actions", execute_actions),
+    SimulationPhase("check_opportunities", 10, "check_opportunities", check_opportunities),
+    SimulationPhase("world_secret_discovery", 11, "world_secret_discovery", world_secret_discovery),
+    SimulationPhase("handle_interactions_first", 12, "handle_interactions", handle_interactions),
+    SimulationPhase("evolve_relations", 13, "evolve_relations", evolve_relations),
+    SimulationPhase("resolve_death", 14, "resolve_death", resolve_death),
+    SimulationPhase("treasure_lifecycle", 15, "treasure_lifecycle", treasure_lifecycle),
+    SimulationPhase("discover_pois", 16, "discover_pois", discover_pois),
+    SimulationPhase("update_age_and_birth", 17, "update_age_and_birth", update_age_and_birth),
+    SimulationPhase("backstory_generation", 18, "backstory_generation", backstory_generation),
+    SimulationPhase("passive_effects", 19, "passive_effects", passive_effects),
+    SimulationPhase("resolve_individual_consequences", 20, "resolve_individual_consequences", resolve_individual_consequences),
+    SimulationPhase("autonomous_custom_creation", 21, "autonomous_custom_creation", autonomous_custom_creation),
+    SimulationPhase("random_minor_events", 22, "random_minor_events", random_minor_events),
+    SimulationPhase("background_npc_events", 23, "background_npc_events", background_npc_events),
+    SimulationPhase("sect_random_event", 24, "sect_random_event", sect_random_event),
+    SimulationPhase("sect_wars", 25, "sect_wars", sect_wars),
+    SimulationPhase("nickname_generation", 26, "nickname_generation", nickname_generation),
+    SimulationPhase("update_celestial_phenomenon", 27, "update_celestial_phenomenon", update_celestial_phenomenon),
+    SimulationPhase("update_city_population", 28, "update_city_population", update_city_population),
+    SimulationPhase("update_regional_economy", 29, "update_regional_economy", update_regional_economy),
+    SimulationPhase("react_economy", 30, "react_economy", react_economy),
+    SimulationPhase("advance_urban_capacity_projects", 31, "advance_urban_capacity_projects", advance_urban_capacity_projects),
+    SimulationPhase("update_dynasty_and_officials", 32, "update_dynasty_and_officials", update_dynasty_and_officials),
+    SimulationPhase("handle_interactions_second", 33, "handle_interactions", handle_interactions),
+    SimulationPhase("update_calculated_relations", 34, "update_calculated_relations", update_calculated_relations),
+    SimulationPhase("create_dao_petition", 35, "create_dao_petition", create_dao_petition),
+    SimulationPhase("annual_maintenance", 36, "annual_maintenance", annual_maintenance),
+    SimulationPhase("evaluate_semantic_world", 37, "evaluate_semantic_world", evaluate_semantic_world),
+    SimulationPhase("react_government", 38, "react_government", react_government),
+    SimulationPhase("react_organization", 39, "react_organization", react_organization),
+    SimulationPhase("react_city", 40, "react_city", react_city),
+    SimulationPhase("react_population", 41, "react_population", react_population),
+    SimulationPhase("carry_forward_mechanical_invalidations", 42, "carry_forward_mechanical_invalidations", carry_forward_mechanical_invalidations),
+    SimulationPhase("generate_event_appraisals", 43, "generate_event_appraisals", generate_event_appraisals),
+    SimulationPhase("generate_chronicle", 44, "generate_chronicle", generate_chronicle),
+    SimulationPhase("finalize_step", 45, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

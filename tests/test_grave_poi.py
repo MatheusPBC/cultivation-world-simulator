@@ -4,6 +4,7 @@ from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.poi import GravePOI
 from src.server.init_flow import _resolve_initially_dead_avatars
+from src.sim.simulator_engine.phases.poi import phase_expire_graves
 from src.systems.time import Month, Year, create_month_stamp
 
 
@@ -16,12 +17,13 @@ def test_death_creates_grave_poi_with_equipment_snapshot(base_world, dummy_avata
     dummy_avatar.tile = base_world.map.get_tile(2, 3)
     base_world.avatar_manager.register_avatar(dummy_avatar)
 
-    handle_death(base_world, dummy_avatar, DeathReason(DeathType.SERIOUS_INJURY))
+    death_event = handle_death(base_world, dummy_avatar, DeathReason(DeathType.SERIOUS_INJURY))
 
     graves = base_world.poi_manager.get_all_active(int(base_world.month_stamp))
     assert len(graves) == 1
     grave = graves[0]
     assert isinstance(grave, GravePOI)
+    assert grave.source_event_id == death_event.id
     assert grave.x == 2
     assert grave.y == 3
     assert grave.expires_month == int(base_world.month_stamp) + 50 * 12
@@ -56,7 +58,7 @@ def test_initially_expired_avatar_is_archived_as_a_grave(base_world, dummy_avata
 def test_grave_poi_save_load_and_cleanup(base_world, dummy_avatar, mock_item_data):
     dummy_avatar.weapon = mock_item_data["obj_weapon"]
     base_world.avatar_manager.register_avatar(dummy_avatar)
-    handle_death(base_world, dummy_avatar, "test death")
+    death_event = handle_death(base_world, dummy_avatar, "test death")
     grave = next(iter(base_world.poi_manager.pois.values()))
     grave.discover(dummy_avatar)
 
@@ -67,6 +69,7 @@ def test_grave_poi_save_load_and_cleanup(base_world, dummy_avatar, mock_item_dat
     assert isinstance(loaded, GravePOI)
     assert loaded.id == grave.id
     assert loaded.weapon_payload["item_id"] == mock_item_data["obj_weapon"].id
+    assert loaded.source_event_id == death_event.id
     assert loaded.is_known_by(dummy_avatar)
 
     before_expiry = create_month_stamp(Year(50), Month.DECEMBER)
@@ -76,6 +79,27 @@ def test_grave_poi_save_load_and_cleanup(base_world, dummy_avatar, mock_item_dat
     at_expiry = create_month_stamp(Year(51), Month.JANUARY)
     assert base_world.poi_manager.cleanup_expired(int(at_expiry)) == 1
     assert loaded.id not in base_world.poi_manager.pois
+
+
+def test_grave_expiration_records_state_delta_and_resolves_death_event(base_world, dummy_avatar):
+    dummy_avatar.tile = base_world.map.get_tile(0, 0)
+    dummy_avatar.pos_x = 0
+    dummy_avatar.pos_y = 0
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+    death_event = handle_death(base_world, dummy_avatar, "test death")
+    grave = next(iter(base_world.poi_manager.pois.values()))
+    grave.expires_month = int(base_world.month_stamp)
+
+    events = phase_expire_graves(base_world)
+
+    assert base_world.poi_manager.get(grave.id) is None
+    assert len(events) == 1
+    event = events[0]
+    assert event.event_type == "grave_expired"
+    assert event.causal_links[0].cause_event_id == death_event.id
+    assert event.causal_links[0].relation == "resolves"
+    assert event.causal_payload["deltas"][0]["owner_id"] == grave.id
+    assert event.causal_payload["deltas"][0]["after"] is None
 
 
 def test_deceased_records_cleanup_uses_fifty_year_threshold(base_world, dummy_avatar):

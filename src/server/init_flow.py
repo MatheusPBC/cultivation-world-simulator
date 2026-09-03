@@ -93,7 +93,13 @@ def _resolve_initially_dead_avatars(*, world, avatars: dict[Any, Any]) -> None:
 
     for avatar in avatars.values():
         if getattr(avatar, "is_dead", False):
-            handle_death(world, avatar, DeathReason(DeathType.OLD_AGE))
+            death_event = handle_death(
+                world,
+                avatar,
+                DeathReason(DeathType.OLD_AGE),
+            )
+            if not world.event_manager.add_event(death_event):
+                raise RuntimeError("initial avatar death event could not be persisted")
 
 
 async def _prepare_initial_character_profiles(*, world) -> None:
