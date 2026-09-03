@@ -19,7 +19,6 @@ from src.classes.mechanical_language import (
     ReadingKind,
 )
 from src.classes.state_delta import StateDelta
-from src.classes.domain_proposal import PopulationPreference
 from src.i18n import t
 
 
@@ -76,7 +75,7 @@ def _blocked_event(
     event.causal_payload = {
         "outcome": "blocked",
         "reason": reason,
-        "affordance": {
+        "execution": {
             "kind": "population_transfer",
             "condition_id": condition.id,
             "condition_definition_id": condition_definition.id,
@@ -103,9 +102,9 @@ def resolve_population_transfer(
     condition_definition: ConditionDefinition,
     decision_event_id: str,
     max_fraction: float = 0.20,
-    preferences: tuple[PopulationPreference, ...] = (
-        PopulationPreference.LOWER_SETTLEMENT_LOAD,
-        PopulationPreference.AVAILABLE_CAPACITY,
+    preferences: tuple[str, ...] = (
+        "lower_settlement_load",
+        "available_capacity",
     ),
 ) -> Event:
     """Resolve an overcrowding condition by moving population deterministically.
@@ -214,7 +213,8 @@ def resolve_population_transfer(
         if not math.isfinite(ratio):
             continue
         if (
-            PopulationPreference.LOWER_SETTLEMENT_LOAD in preferences
+            "lower_settlement_load"
+            in {str(getattr(item, "value", item)) for item in preferences}
             and ratio >= population / capacity
         ):
             continue
@@ -313,7 +313,7 @@ def resolve_population_transfer(
     event.causal_payload = {
         "outcome": "completed",
         "reason": "transfer_applied",
-        "affordance": {
+        "execution": {
             "kind": "population_transfer",
             "condition_id": condition.id,
             "condition_definition_id": condition_definition.id,
@@ -323,7 +323,7 @@ def resolve_population_transfer(
             "route_mode": selected_route.mode,
             "route_quality": selected_route.quality,
             "decision_event_id": decision_event_id,
-            "preferences": [item.value for item in preferences],
+            "preferences": [str(getattr(item, "value", item)) for item in preferences],
             "amount": amount,
             "required_amount": required,
             "max_fraction": fraction,

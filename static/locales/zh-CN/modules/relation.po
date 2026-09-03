@@ -31,6 +31,9 @@ msgstr "同门"
 msgid "parent"
 msgstr "父母"
 
+msgid "Relationship impact for {action} was interpreted."
+msgstr "已解释行动{action}对关系的影响。"
+
 msgid "numeric_relation_archenemy"
 msgstr "憎恶"
 

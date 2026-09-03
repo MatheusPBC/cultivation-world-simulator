@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
-from src.classes.domain_proposal import PopulationDecisionKind
+from src.classes.domain_affordance import DomainDecisionKind
 from src.classes.mechanical_language import DomainReactionReceipt, EntityRef
 from src.classes.environment.region import CityRegion
 from src.classes.event import Event
@@ -12,10 +12,16 @@ from src.sim.simulator_engine.domain_invalidation import (
     DomainInvalidationQueue,
     DomainInvalidationReason,
 )
-from src.systems.population_interpreter import interpret_population_transition
-from src.systems.population_transfer import resolve_population_transfer
+from src.systems.population_interpreter import (
+    interpret_population_transition,
+    population_affordance_context,
+)
 from src.systems.semantic_world.service import evaluate_semantic_world
-from src.systems.semantic_world.condition_semantics import is_settlement_pressure
+from src.systems.domain_affordance_registry import (
+    DOMAIN_AFFORDANCES,
+    StaleAffordanceError,
+    stale_affordance_blocked_event,
+)
 from src.sim.simulator_engine.causal_budget import CausalBudget
 
 
@@ -31,9 +37,8 @@ def enqueue_population_transitions(
         }:
             continue
         params = event.render_params or {}
-        definition_id = str(params.get("condition_definition_id", ""))
         region_id = str(params.get("region_id", ""))
-        if not region_id or not is_settlement_pressure(world, definition_id):
+        if not region_id:
             continue
         reason = (
             DomainInvalidationReason.CONDITION_ACTIVATED
@@ -75,11 +80,6 @@ def enqueue_unreacted_population_conditions(
             EntityRef("region", str(region.id)),
             month,
         ):
-            if not is_settlement_pressure(
-                world,
-                condition.definition_id,
-            ):
-                continue
             receipt = _reaction_receipt(world, condition)
             if receipt is not None and (
                 receipt.completed
@@ -138,6 +138,8 @@ def _reaction_receipt(world: Any, condition: Any) -> DomainReactionReceipt | Non
         condition.id,
         "population",
         condition.cause_event_id,
+        decision="maintain",
+        affordance_id=None,
     ).id
     return world.mechanical_language.reaction_receipts.get(receipt_id)
 
@@ -159,12 +161,16 @@ def _mark_condition_reacted(
     *,
     next_reaction_month: int | None = None,
     completed: bool = False,
+    decision: str,
+    affordance_id: str | None,
 ) -> DomainReactionReceipt:
     existing = _reaction_receipt(world, condition)
     updated = DomainReactionReceipt.create(
         condition.id,
         "population",
         condition.cause_event_id,
+        decision=decision,
+        affordance_id=affordance_id,
         decision_event_ids=tuple(dict.fromkeys((
             *(existing.decision_event_ids if existing is not None else ()),
             decision_event_id,
@@ -236,11 +242,10 @@ async def process_population_reactivity(
             continue
         evaluations += 1
         processed_source_ids.add(source_event.id)
-        origin, condition, definition = _active_condition(world, source_event)
+        origin, condition, _definition = _active_condition(world, source_event)
         if (
             origin is None
             or condition is None
-            or definition is None
             or _reaction_is_not_due(world, condition)
         ):
             continue
@@ -257,31 +262,34 @@ async def process_population_reactivity(
         if can_use_interpreter:
             llm_calls += 1
         produced.append(decision_event)
-        if decision.decision is not PopulationDecisionKind.ACT:
+        if decision.decision is not DomainDecisionKind.ACT:
             _mark_condition_reacted(
                 world,
                 condition,
                 decision_event.id,
-                completed=True,
+                next_reaction_month=int(world.month_stamp) + 1,
+                decision="maintain",
+                affordance_id=None,
             )
             continue
 
         if not budget.consume_domain_mutation():
             retry.append(invalidation)
             continue
-        transfer_event = resolve_population_transfer(
-            world,
-            origin=origin,
-            condition=condition,
-            condition_definition=definition,
-            decision_event_id=decision_event.id,
-            max_fraction=_config_value(
-                world,
-                "population_transfer_max_fraction_per_reaction",
-                0.20,
-            ),
-            preferences=decision.action_intent.preferences,
-        )
+        context, _, _ = population_affordance_context(world, source_event)
+        try:
+            transfer_event = DOMAIN_AFFORDANCES.execute(
+                context,
+                decision.selected_affordance_id or "",
+                decision_event_id=decision_event.id,
+                invalidations=invalidations,
+            )
+        except StaleAffordanceError:
+            transfer_event = stale_affordance_blocked_event(
+                context,
+                decision_event_id=decision_event.id,
+                selected_affordance_id=decision.selected_affordance_id or "",
+            )
         produced.append(transfer_event)
         if transfer_event.event_type != "population_transfer_completed":
             retry_after_months = max(1, int(_config_value(
@@ -296,35 +304,24 @@ async def process_population_reactivity(
                 next_reaction_month=(
                     int(world.month_stamp) + retry_after_months
                 ),
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
             continue
 
-        affordance = transfer_event.causal_payload["affordance"]
         _mark_condition_reacted(
             world,
             condition,
             decision_event.id,
-            next_reaction_month=(
-                None
-                if affordance["relief_complete"]
-                else int(world.month_stamp) + 1
-            ),
-            completed=bool(affordance["relief_complete"]),
+            next_reaction_month=int(world.month_stamp) + 1,
+            completed=False,
+            decision="act",
+            affordance_id=decision.selected_affordance_id,
         )
-        for region_id in (
-            affordance["origin_region_id"],
-            affordance["destination_region_id"],
-        ):
-            invalidations.mark(DomainInvalidation(
-                layer=DomainInvalidationLayer.MECHANICAL,
-                domain="population",
-                target_kind="region",
-                target_id=str(region_id),
-                reason=DomainInvalidationReason.POPULATION_CHANGED,
-                source_event_ids=(transfer_event.id,),
-                revision=transfer_event.id,
-            ))
-        mechanical = invalidations.drain(layer=DomainInvalidationLayer.MECHANICAL)
+        mechanical = invalidations.drain(
+            layer=DomainInvalidationLayer.MECHANICAL,
+            domain="population",
+        )
         sources_by_target: dict[str, list[str]] = {}
         for item in mechanical:
             for source_event_id in item.source_event_ids:

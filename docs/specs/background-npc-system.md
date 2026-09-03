@@ -135,6 +135,9 @@
 - `is_story=False`
 - `event_type="background_npc"`
 
+所有背景板场景（包括 `region_tick` 与 `action_echo`）都必须由调用方提供
+非空 `source_event_id`。没有事实事件锚点时直接跳过，不生成随机的无来源场景。
+
 ### 4.2 `avatar_witness`
 
 Avatar 在某地停留、经过或满足身份条件时见到的凡人片段。
@@ -407,7 +410,7 @@ sect=any;realm_min=FOUNDATION_ESTABLISHMENT
 
 ## 10. 触发与限流
 
-一期建议新增独立配置项，具体路径放在 `static/config.yml -> world.background_npc`，与现有 `random_minor_event_prob`、`fortune_probability` 等世界事件配置保持同层。
+一期建议新增独立配置项，具体路径放在 `static/config.yml -> world.background_npc`，与世界事件配置保持同层。
 
 推荐配置：
 
@@ -445,7 +448,7 @@ src/systems/background_npc/
   service.py
 ```
 
-模拟器 phase 可以放在 `random_minor_events` 附近，语义上属于低成本小事件层。
+背景板事件不再拥有独立的随机来源 phase；它们只能作为已有事实事件的派生回声生成。
 
 候选接入：
 
@@ -457,26 +460,14 @@ async def phase_background_npc_events(world, living_avatars) -> list[Event]:
 相位位置建议：
 
 1. 在行动执行之后。
-2. 在 `random_minor_events` 附近。
-3. 在 `finalize_step()` 之前统一入库。
+2. 在 `finalize_step()` 之前统一入库。
 
 不要在 `src/server/main.py` 中扩散逻辑。
 
 ## 12. 与 Random Minor Event 的边界
 
-现有 `random_minor_event` 面向 Avatar 小事，且当前会在线调用 LLM 生成文本。
-
-背景板 NPC 系统与其边界如下：
-
-1. `random_minor_event`：角色自身或角色间的微观事件。
-2. `background_npc`：凡人背景、地区烟火、Avatar 被凡俗世界看见。
-
-两者都生成普通小事件，但：
-
-- `random_minor_event` 可以改变关系。
-- `background_npc` 不改变任何状态。
-- `random_minor_event` 的文本由 LLM 生成。
-- `background_npc` 的文本来自预写 i18n 模板。
+背景板 NPC 只负责凡人背景、地区烟火和 Avatar 被凡俗世界看见；它不改变任何状态，
+文本仍来自预写 i18n 模板。
 
 ## 13. 与事件系统的关系
 

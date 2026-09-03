@@ -82,6 +82,23 @@ describe('useUiStore', () => {
 
       expect(store.selectedTarget).toEqual({ type: 'region', id: 'region-1' })
     })
+
+    it('should select infrastructure sites and request their detail', async () => {
+      const siteDetail = {
+        id: 'bridge-1', name: 'Ponte', kind: 'bridge', cell_refs: [[0, 0]], region_ids: [1, 2],
+        route_ids: [], water_body_ids: [], capability_ids: [], owner_ref: null, maintainer_ref: null,
+        integrity: 1, enabled: true, status: 'active', x: 0, y: 0, clickable: true, last_event_id: null,
+      }
+      vi.mocked(avatarApi.fetchDetailInfo).mockResolvedValue(siteDetail as never)
+
+      await store.select('site', 'bridge-1')
+
+      expect(store.selectedTarget).toEqual({ type: 'site', id: 'bridge-1' })
+      expect(avatarApi.fetchDetailInfo).toHaveBeenCalledWith({ type: 'site', id: 'bridge-1' })
+      expect(store.detailData).toMatchObject({
+        id: 'bridge-1', name: 'Ponte', cellRefs: [[0, 0]], regionIds: [1, 2],
+      })
+    })
   })
 
   describe('clearSelection', () => {

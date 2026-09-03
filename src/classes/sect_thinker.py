@@ -144,6 +144,7 @@ class SectThinker:
             "imperial_crisis": dict(ctx.imperial_crisis) if ctx.imperial_crisis else None,
             # Read-only regional observations for the sect's canonical regions.
             "regional_semantics": list(ctx.regional_semantics),
+            "institutional_presence": list(ctx.institutional_presence),
             "history": {
                 "summary_text": str(ctx.history.get("summary_text", "")),
                 "recent_events": recent,

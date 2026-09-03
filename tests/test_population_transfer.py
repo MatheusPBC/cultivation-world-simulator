@@ -9,7 +9,6 @@ from src.classes.environment.region import CityRegion
 from src.classes.event import FactKind
 from src.classes.mechanical_language import ConditionDefinition, ConditionInstance
 from src.classes.core.world import World
-from src.classes.domain_proposal import PopulationPreference
 from src.systems.population_transfer import resolve_population_transfer
 from src.systems.time import Month, Year, create_month_stamp
 
@@ -134,7 +133,7 @@ def test_calculates_strict_quantity_within_max_fraction():
         max_fraction=0.12,
     )
 
-    amount = event.causal_payload["affordance"]["amount"]
+    amount = event.causal_payload["execution"]["amount"]
     assert 10.0 < amount <= 90.0 * 0.12
     assert origin.population == pytest.approx(90.0 - amount)
     assert destination.population == pytest.approx(20.0 + amount)
@@ -189,7 +188,7 @@ def test_partial_transfer_can_reduce_pressure_without_resolving_condition():
     assert event.event_type == "population_transfer_completed"
     assert origin.population == pytest.approx(81.0)
     assert destination.population == pytest.approx(9.0)
-    assert event.causal_payload["affordance"]["relief_complete"] is False
+    assert event.causal_payload["execution"]["relief_complete"] is False
 
 
 def test_transfer_does_not_create_the_same_pressure_at_destination():
@@ -224,7 +223,7 @@ def test_transfer_does_not_create_the_same_pressure_at_destination():
     assert destination.population / destination.population_capacity <= (
         definition.activate_above
     )
-    assert event.causal_payload["affordance"][
+    assert event.causal_payload["execution"][
         "destination_safe_headroom_before"
     ] == pytest.approx(1.0)
 
@@ -299,7 +298,7 @@ def test_lower_load_preference_blocks_transfer_to_a_more_pressured_city():
         condition=condition,
         condition_definition=definition,
         decision_event_id="decision-preference",
-        preferences=(PopulationPreference.LOWER_SETTLEMENT_LOAD,),
+        preferences=("lower_settlement_load",),
     )
 
     assert event.event_type == "population_transfer_blocked"

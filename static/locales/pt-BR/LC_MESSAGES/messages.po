@@ -931,6 +931,20 @@ msgstr ""
 msgid "help_people_requirements"
 msgstr "Apenas em áreas urbanas e com Pedras Espirituais suficientes"
 
+# Action: SponsorDaoRite
+msgid "sponsor_dao_rite_action_name"
+msgstr "Patrocinar rito do Dao"
+
+msgid "sponsor_dao_rite_description"
+msgstr ""
+"Patrocine um rito popular conhecido na região atual em nome da corte ou da "
+"seita"
+
+msgid "sponsor_dao_rite_requirements"
+msgstr ""
+"Requer ser o imperador reinante ou um patriarca vivo, estar presente na "
+"região e patrocinar no máximo um rito por mês"
+
 # Action: Mine
 msgid "mine_action_name"
 msgstr "Minerar"
@@ -1447,6 +1461,9 @@ msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
 msgstr ""
 "A leitura anual de legitimidade mantém a crise imperial sem resolução."
 
+msgid "{actor} made a domain decision: {decision}."
+msgstr "{actor} tomou uma decisão de domínio: {decision}."
+
 msgid ""
 "The annual legitimacy reading remains unresolved while the throne lacks its "
 "recorded emperor."
@@ -1484,6 +1501,21 @@ msgstr "A formação {formation} em {region} expirou."
 
 msgid "The grave of {name} weathered away."
 msgstr "O túmulo de {name} se desfez com o tempo."
+
+msgid "Regional weather changed across {count} regions."
+msgstr "O clima regional mudou em {count} regiões."
+
+msgid "Persistent water pressure caused flooding in {region}."
+msgstr "A pressão persistente da água causou uma enchente em {region}."
+
+msgid "Flood waters receded in {region}."
+msgstr "As águas da enchente recuaram em {region}."
+
+msgid "Active regional hazard: {hazard} (since month {month})."
+msgstr "Perigo regional ativo: {hazard} (desde o mês {month})."
+
+msgid "regional_climate_updated"
+msgstr "O clima regional foi atualizado em {count} regiões."
 
 msgid " (and sold old {item} at reduced price)"
 msgstr " (e vendeu o item antigo {item} por um preço reduzido)"
@@ -2915,6 +2947,23 @@ msgstr "{name} pereceu no domínio oculto {domain}."
 
 msgid "{}: {}"
 msgstr "{}: {}"
+
+msgid "Infrastructure site {site} changed physical condition."
+msgstr "O local de infraestrutura {site} teve sua condição física alterada."
+
+msgid "infrastructure_site_condition_changed"
+msgstr "A condição física de {site_name} foi alterada."
+
+msgid "Route {route} changed operational capacity."
+msgstr "A rota {route} teve sua capacidade operacional alterada."
+
+msgid "route_operational_capacity_changed"
+msgstr "A capacidade operacional da rota {route_id} foi alterada."
+
+msgid "infrastructure_site_restored"
+msgstr ""
+"{maintainer_kind}:{maintainer_id} restaurou a infraestrutura usando "
+"{spirit_stone_cost} pedras espirituais."
 
 msgid ""
 "The dynasty responded to {region}'s condition with {decision}: {reason}"
@@ -4380,6 +4429,9 @@ msgstr "Irmão marcial ou irmã marcial"
 msgid "parent"
 msgstr "Pai ou mãe"
 
+msgid "Relationship impact for {action} was interpreted."
+msgstr "O impacto de relacionamento da ação {action} foi interpretado."
+
 msgid "numeric_relation_archenemy"
 msgstr "Hostil"
 
@@ -5103,46 +5155,6 @@ msgstr ""
 
 msgid "[{month_stamp}] {content}"
 msgstr "[{month_stamp}] {content}"
-
-msgid ""
-"Because {reason_fragment}, relations between {sect_a_name} and {sect_b_name}"
-" improved (+{value_int} for {duration_months} months)."
-msgstr ""
-"Por causa de {reason_fragment}, as relações entre {sect_a_name} e "
-"{sect_b_name} melhoraram (+{value_int} por {duration_months} meses)."
-
-msgid ""
-"Because {reason_fragment}, relations between {sect_a_name} and {sect_b_name}"
-" worsened (-{value_int} for {duration_months} months)."
-msgstr ""
-"Por causa de {reason_fragment}, as relações entre {sect_a_name} e "
-"{sect_b_name} pioraram (-{value_int} por {duration_months} meses)."
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} gained +{value_int} magic stones."
-msgstr ""
-"Por causa de {reason_fragment}, {sect_a_name} ganhou +{value_int} pedras "
-"mágicas."
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} lost -{value_int} magic stones."
-msgstr ""
-"Por causa de {reason_fragment}, {sect_a_name} perdeu -{value_int} pedras "
-"mágicas."
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} gained +{value} extra income per "
-"tile for {duration_months} months."
-msgstr ""
-"Por causa de {reason_fragment}, {sect_a_name} recebeu +{value} de renda "
-"extra por bloco durante {duration_months} meses."
-
-msgid ""
-"Because {reason_fragment}, {sect_a_name} suffered -{value} income per tile "
-"for {duration_months} months."
-msgstr ""
-"Por causa de {reason_fragment}, {sect_a_name} sofreu -{value} de renda por "
-"bloco durante {duration_months} meses."
 
 msgid "comma_separator"
 msgstr ", "

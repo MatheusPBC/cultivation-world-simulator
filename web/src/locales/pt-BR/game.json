@@ -695,6 +695,11 @@
         "transcendence": "Transcendência"
       },
       "semantic_context": {
+        "hazards_title": "Perigos materiais ativos",
+        "hazards": {
+          "regional_flood": "Enchente regional"
+        },
+        "risk": "Risco de ativação {value}%",
         "conditions_title": "Condições semânticas ativas",
         "readings_title": "Leituras principais",
         "empty": "Nenhum contexto semântico disponível.",
@@ -703,6 +708,7 @@
         "definition": "Definição {id}",
         "source_event": "Evento-fonte {id}",
         "derived_from": "Entradas derivadas",
+        "state_refs": "Proveniência técnica",
         "group_id": "Grupo: {id}",
         "unknown_value": "Desconhecido",
         "confidence": "Confiança {value}%",
@@ -786,6 +792,40 @@
         "capacity": "Capacidade: {value}",
         "state_refs": "Referências de estado"
       }
+    },
+    "infrastructure_site": {
+      "title": "Infraestrutura",
+      "kind": "Tipo",
+      "status": "Estado",
+      "status_values": {
+        "active": "Ativa",
+        "impaired": "Danificada",
+        "destroyed": "Destruída"
+      },
+      "integrity": "Integridade",
+      "location": "Localização",
+      "enabled": "Ativa",
+      "references": "Referências",
+      "regions": "Regiões",
+      "capabilities": "Capacidades",
+      "owner": "Proprietário",
+      "maintainer": "Mantenedor",
+      "last_event": "Último evento"
+    },
+    "route": {
+      "title": "Rota causal",
+      "id": "Identificador",
+      "mode": "Modo",
+      "endpoints": "Regiões conectadas",
+      "capacity_section": "Capacidade operacional",
+      "capacity": "Capacidade nominal",
+      "operational_capacity": "Capacidade atual",
+      "quality": "Qualidade",
+      "enabled": "Ativa",
+      "references": "Referências causais",
+      "allowed_resources": "Recursos permitidos",
+      "dependency_sites": "Sites de infraestrutura",
+      "source_events": "Eventos de origem"
     },
     "sect": {
       "stats": {

@@ -343,6 +343,7 @@ async def handle_battle_finish(
         month_stamp=world.month_stamp,
         start_text=start_content,
         result_text=result_event.content,
+        source_event=result_event,
         actors=[attacker, target],
         related_avatar_ids=rel_ids,
         prompt=story_prompt,

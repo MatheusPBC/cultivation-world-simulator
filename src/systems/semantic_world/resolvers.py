@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Any
 
 from src.classes.environment.region import CityRegion
+from src.classes.environment.route import Route
 from src.classes.environment.city_state import UrbanServiceDemand
 from src.classes.mechanical_language.bindings import (
     GroundedMetricBinding,
@@ -32,6 +33,15 @@ from src.systems.spiritual_ecology import (
     SPIRITUAL_TREASURE_QUALIFIERS,
     resolve_spiritual_metric,
     spiritual_essence_qualifiers,
+)
+from src.systems.regional_hydrology import (
+    CLIMATE_QUALIFIERS,
+    DRAINAGE_CONCEPT,
+    FLOODING_CONCEPT,
+    HYDROLOGY_QUALIFIERS,
+    PRECIPITATION_CONCEPT,
+    SOIL_WATER_CONCEPT,
+    project_regional_hydrology,
 )
 
 
@@ -63,7 +73,7 @@ def _settlement_value(
 
 
 def _settlement_key(dimension: PrimitiveDimension):
-    def enumerate_keys(subject: Any):
+    def enumerate_keys(_world: Any, subject: Any):
         if isinstance(subject, CityRegion):
             yield MetricKey(dimension, "region", str(subject.id), "settlement")
 
@@ -296,7 +306,7 @@ def _urban_service_value(
 
 
 def _urban_service_keys(dimension: PrimitiveDimension):
-    def enumerate_keys(subject: Any):
+    def enumerate_keys(_world: Any, subject: Any):
         if not isinstance(subject, CityRegion):
             return
         qualifiers = _URBAN_SERVICE_QUALIFIERS
@@ -328,7 +338,7 @@ _COLLECTIVE_HEALTH_QUALIFIERS = (("kind", "collective_health"),)
 def _spiritual_essence_keys(element: str):
     qualifiers = spiritual_essence_qualifiers(element)
 
-    def enumerate_keys(subject: Any):
+    def enumerate_keys(_world: Any, subject: Any):
         if getattr(subject, "essence", None) is not None:
             yield MetricKey(
                 PrimitiveDimension.STOCK,
@@ -421,7 +431,7 @@ def _collective_health_value(
 
 
 def _collective_health_keys(dimension: PrimitiveDimension, concept_id: str):
-    def enumerate_keys(subject: Any):
+    def enumerate_keys(_world: Any, subject: Any):
         if isinstance(subject, CityRegion):
             yield MetricKey(
                 dimension,
@@ -545,7 +555,7 @@ def _regional_economy_value(
 
 
 def _economy_keys(dimension: PrimitiveDimension, source: str):
-    def enumerate_keys(subject: Any):
+    def enumerate_keys(_world: Any, subject: Any):
         if not isinstance(subject, CityRegion):
             return
         economy = subject.economy
@@ -590,6 +600,141 @@ def _economy_keys(dimension: PrimitiveDimension, source: str):
     return enumerate_keys
 
 
+_INFRASTRUCTURE_SITE_QUALIFIERS = (("kind", "infrastructure_site"),)
+_ROUTE_OPERATIONAL_QUALIFIERS = (("kind", "route_operational"),)
+
+
+def _route_operational_capacity_value(
+    world: Any,
+    key: MetricKey,
+    subject: Any,
+    month: int,
+) -> MetricReading | None:
+    if not isinstance(subject, Route):
+        return None
+    game_map = getattr(world, "map", None)
+    if game_map is None or subject.id not in getattr(game_map, "routes", {}):
+        return None
+    dependency_sites = game_map.get_route_dependency_sites(subject.id)
+    return MetricReading(
+        key=key,
+        value=game_map.get_route_operational_capacity(subject.id),
+        unit="transport_units_per_month",
+        availability=MeasurementAvailability.MEASURABLE,
+        reading_kind=ReadingKind.DERIVED,
+        calculated_month=month,
+        state_refs=[
+            f"map:route:{subject.id}:capacity",
+            f"map:route:{subject.id}:quality",
+            f"map:route:{subject.id}:enabled",
+            *(
+                state_ref
+                for site in dependency_sites
+                for state_ref in (
+                    f"map:infrastructure_site:{site.id}:integrity",
+                    f"map:infrastructure_site:{site.id}:enabled",
+                    f"map:infrastructure_site:{site.id}:route:{subject.id}",
+                )
+            ),
+        ],
+        source_event_ids=list(dict.fromkeys(
+            site.last_event_id
+            for site in dependency_sites
+            if site.last_event_id is not None
+        )),
+    )
+
+
+def _route_operational_capacity_keys(_world: Any, subject: Any):
+    if isinstance(subject, Route):
+        yield MetricKey(
+            PrimitiveDimension.CAPACITY,
+            "route",
+            subject.id,
+            "transport",
+            qualifiers=_ROUTE_OPERATIONAL_QUALIFIERS,
+        )
+
+
+def _infrastructure_sites_for_region(
+    world: Any,
+    subject: Any,
+    *,
+    capability_id: str | None = None,
+) -> list[Any]:
+    game_map = getattr(world, "map", None)
+    sites = getattr(game_map, "infrastructure_sites", None)
+    region_id = getattr(subject, "id", None)
+    if not isinstance(sites, dict) or region_id is None:
+        return []
+    normalized_region_id = str(region_id)
+    return sorted(
+        (
+            site
+            for site in sites.values()
+            if normalized_region_id in {str(item) for item in site.region_ids}
+            and (
+                capability_id is None
+                or capability_id in site.capability_ids
+            )
+        ),
+        key=lambda site: site.id,
+    )
+
+
+def _infrastructure_site_capacity_value(
+    world: Any,
+    key: MetricKey,
+    subject: Any,
+    month: int,
+) -> MetricReading | None:
+    sites = _infrastructure_sites_for_region(
+        world,
+        subject,
+        capability_id=key.concept_id,
+    )
+    if not sites:
+        return None
+    return MetricReading(
+        key=key,
+        value=sum(site.integrity if site.enabled else 0.0 for site in sites),
+        unit="site_equivalents",
+        availability=MeasurementAvailability.MEASURABLE,
+        reading_kind=ReadingKind.DERIVED,
+        calculated_month=month,
+        state_refs=[
+            state_ref
+            for site in sites
+            for state_ref in (
+                f"map:infrastructure_site:{site.id}:enabled",
+                f"map:infrastructure_site:{site.id}:integrity",
+                f"map:infrastructure_site:{site.id}:capability:{key.concept_id}",
+            )
+        ],
+        source_event_ids=list(dict.fromkeys(
+            site.last_event_id
+            for site in sites
+            if site.last_event_id is not None
+        )),
+    )
+
+
+def _infrastructure_site_capacity_keys(world: Any, subject: Any):
+    sites = _infrastructure_sites_for_region(world, subject)
+    for capability_id in sorted({
+        capability_id
+        for site in sites
+        for capability_id in site.capability_ids
+    }):
+        yield MetricKey(
+            PrimitiveDimension.CAPACITY,
+            "region",
+            str(subject.id),
+            capability_id,
+            qualifiers=_INFRASTRUCTURE_SITE_QUALIFIERS,
+        )
+
+
 def _magic_stone_value(
     _world: Any,
     key: MetricKey,
@@ -608,8 +753,141 @@ def _magic_stone_value(
     )
 
 
+def _regional_hydrology_value(
+    world: Any,
+    key: MetricKey,
+    subject: Any,
+    month: int,
+) -> MetricReading | None:
+    region_id = getattr(subject, "id", None)
+    if region_id is None:
+        return None
+    projection = project_regional_hydrology(world, region_id)
+    if projection is None:
+        return None
+    values = {
+        (PrimitiveDimension.LOAD, PRECIPITATION_CONCEPT): projection.precipitation,
+        (PrimitiveDimension.LOAD, SOIL_WATER_CONCEPT): projection.soil_water,
+        (PrimitiveDimension.CAPACITY, DRAINAGE_CONCEPT): projection.drainage,
+        (PrimitiveDimension.RISK, FLOODING_CONCEPT): projection.flooding,
+    }
+    value = values.get((key.dimension, key.concept_id))
+    if value is None:
+        return None
+    is_climate = key.concept_id in {PRECIPITATION_CONCEPT, SOIL_WATER_CONCEPT}
+    state_refs = (
+        [
+            f"climate:region:{region_id}:precipitation"
+            if key.concept_id == PRECIPITATION_CONCEPT
+            else f"climate:region:{region_id}:soil_saturation"
+        ]
+        if is_climate
+        else list(projection.state_refs)
+    )
+    return MetricReading(
+        key=key,
+        value=value,
+        unit="ratio",
+        availability=MeasurementAvailability.MEASURABLE,
+        reading_kind=ReadingKind.EXACT if is_climate else ReadingKind.DERIVED,
+        calculated_month=month,
+        state_refs=state_refs,
+        source_event_ids=list(projection.source_event_ids),
+    )
+
+
+def _regional_hydrology_key(
+    dimension: PrimitiveDimension,
+    concept_id: str,
+    qualifiers: tuple[tuple[str, str], ...],
+):
+    def enumerate_keys(world: Any, subject: Any):
+        region_id = getattr(subject, "id", None)
+        if region_id is not None and project_regional_hydrology(world, region_id) is not None:
+            yield MetricKey(
+                dimension,
+                "region",
+                str(region_id),
+                concept_id,
+                qualifiers=qualifiers,
+            )
+
+    return enumerate_keys
+
+
 DEFAULT_METRIC_RESOLVERS = MetricResolverRegistry(
     [
+        GroundedMetricBinding(
+            id="region.climate.precipitation",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=PRECIPITATION_CONCEPT,
+            unit="ratio",
+            resolver=_regional_hydrology_value,
+            enumerate_keys=_regional_hydrology_key(
+                PrimitiveDimension.LOAD,
+                PRECIPITATION_CONCEPT,
+                CLIMATE_QUALIFIERS,
+            ),
+            required_qualifiers=CLIMATE_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.climate.soil_water",
+            subject_kind="region",
+            dimension=PrimitiveDimension.LOAD,
+            concept_pattern=SOIL_WATER_CONCEPT,
+            unit="ratio",
+            resolver=_regional_hydrology_value,
+            enumerate_keys=_regional_hydrology_key(
+                PrimitiveDimension.LOAD,
+                SOIL_WATER_CONCEPT,
+                CLIMATE_QUALIFIERS,
+            ),
+            required_qualifiers=CLIMATE_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.hydrology.drainage",
+            subject_kind="region",
+            dimension=PrimitiveDimension.CAPACITY,
+            concept_pattern=DRAINAGE_CONCEPT,
+            unit="ratio",
+            resolver=_regional_hydrology_value,
+            enumerate_keys=_regional_hydrology_key(
+                PrimitiveDimension.CAPACITY,
+                DRAINAGE_CONCEPT,
+                HYDROLOGY_QUALIFIERS,
+            ),
+            required_qualifiers=HYDROLOGY_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="region.hydrology.flooding",
+            subject_kind="region",
+            dimension=PrimitiveDimension.RISK,
+            concept_pattern=FLOODING_CONCEPT,
+            unit="ratio",
+            resolver=_regional_hydrology_value,
+            enumerate_keys=_regional_hydrology_key(
+                PrimitiveDimension.RISK,
+                FLOODING_CONCEPT,
+                HYDROLOGY_QUALIFIERS,
+            ),
+            required_qualifiers=HYDROLOGY_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
+        GroundedMetricBinding(
+            id="route.operational.capacity",
+            subject_kind="route",
+            dimension=PrimitiveDimension.CAPACITY,
+            concept_pattern="transport",
+            unit="transport_units_per_month",
+            resolver=_route_operational_capacity_value,
+            enumerate_keys=_route_operational_capacity_keys,
+            required_qualifiers=_ROUTE_OPERATIONAL_QUALIFIERS,
+            exact_qualifiers=True,
+        ),
         GroundedMetricBinding(
             id="region.settlement.load",
             subject_kind="region",
@@ -627,6 +905,17 @@ DEFAULT_METRIC_RESOLVERS = MetricResolverRegistry(
             unit="ten_thousand_people",
             resolver=_settlement_value,
             enumerate_keys=_settlement_key(PrimitiveDimension.CAPACITY),
+        ),
+        GroundedMetricBinding(
+            id="region.infrastructure_site.capacity",
+            subject_kind="region",
+            dimension=PrimitiveDimension.CAPACITY,
+            concept_pattern="*",
+            unit="site_equivalents",
+            resolver=_infrastructure_site_capacity_value,
+            enumerate_keys=_infrastructure_site_capacity_keys,
+            required_qualifiers=_INFRASTRUCTURE_SITE_QUALIFIERS,
+            exact_qualifiers=True,
         ),
         GroundedMetricBinding(
             id="region.urban_service.load",
@@ -841,8 +1130,8 @@ def metric_unit(key: MetricKey) -> str | None:
     return DEFAULT_METRIC_RESOLVERS.unit_for(key)
 
 
-def available_metric_keys(target: Any) -> list[MetricKey]:
-    return DEFAULT_METRIC_RESOLVERS.available_keys(target)
+def available_metric_keys(world: Any, target: Any) -> list[MetricKey]:
+    return DEFAULT_METRIC_RESOLVERS.available_keys(world, target)
 
 
 def resolve_metric(
@@ -920,6 +1209,8 @@ def _resolve_subject(world: Any, key: MetricKey) -> Any | None:
             return world.map.regions.get(int(key.subject_id))
         except (TypeError, ValueError, AttributeError):
             return None
+    if key.subject_kind == "route":
+        return getattr(getattr(world, "map", None), "routes", {}).get(key.subject_id)
     if key.subject_kind == "avatar":
         return world.avatar_manager.get_avatar(key.subject_id)
     if key.subject_kind == "sect":

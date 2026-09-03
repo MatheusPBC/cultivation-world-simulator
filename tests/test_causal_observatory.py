@@ -102,7 +102,7 @@ def test_observatory_aggregates_conditions_reactions_materials_and_reuse():
         "population_transfer_completed",
         origin=CausalOrigin.ACTOR_DECISION,
         fact_kind=FactKind.STATE_TRANSITION,
-        payload={"outcome": "observed", "affordance": {"kind": "population_transfer"}},
+        payload={"outcome": "observed", "execution": {"kind": "population_transfer"}},
         causes=(decision.id,),
     )
     resolved = _event(
@@ -133,6 +133,8 @@ def test_observatory_aggregates_conditions_reactions_materials_and_reuse():
         instance.id,
         "population",
         activated.id,
+        decision="act",
+        affordance_id="aff-population",
         decision_event_ids=(decision.id,),
         completed=True,
     )
@@ -212,7 +214,7 @@ def test_observatory_counts_no_action_blocked_affordance_and_broken_chain():
             "blocked",
             "regional_resource_transfer_blocked",
             fact_kind=FactKind.OCCURRENCE,
-            payload={"outcome": "blocked", "affordance": {"kind": "resource_transfer"}},
+            payload={"outcome": "blocked", "execution": {"kind": "resource_transfer"}},
             causes=("missing-cause",),
         ),
     )
@@ -267,7 +269,7 @@ def test_observatory_separates_attempts_from_project_lifecycle_and_reports_quali
             "urban_capacity_project_started",
             payload={
                 "outcome": "started",
-                "affordance": {"kind": "settlement_capacity_expansion"},
+                "execution": {"kind": "settlement_capacity_expansion"},
             },
         ),
         _event(
@@ -283,7 +285,7 @@ def test_observatory_separates_attempts_from_project_lifecycle_and_reports_quali
             payload={
                 "outcome": "blocked",
                 "reason": "no_reachable_destination_or_quantity",
-                "affordance": {"kind": "population_transfer"},
+                "execution": {"kind": "population_transfer"},
             },
         ),
     )
@@ -320,6 +322,8 @@ def test_observatory_does_not_count_no_action_receipt_as_successful_affordance()
         "condition-1",
         "government",
         "revision-1",
+        decision="maintain",
+        affordance_id=None,
         decision_event_ids=(decision.id,),
         completed=True,
     )
@@ -521,7 +525,7 @@ def test_observatory_does_not_count_blocked_transfer_as_material_migration():
         fact_kind=FactKind.OCCURRENCE,
         payload={
             "outcome": "blocked",
-            "affordance": {"kind": "population_transfer"},
+            "execution": {"kind": "population_transfer"},
         },
     )
     assert world.event_manager.add_event(blocked)
@@ -556,7 +560,7 @@ async def test_runner_is_deterministic_test_only_and_does_not_call_provider(
         step_calls += 1
         from src.utils.llm.client import call_llm_with_task_name
 
-        await call_llm_with_task_name("relation_delta", "unused-template.txt", infos={})
+        await call_llm_with_task_name("relationship_impact", "unused-template.txt", infos={})
         event = _event(int(world.month_stamp), f"step-{world.month_stamp}", "tick")
         world.event_manager.add_event(event)
         world.month_stamp += 1

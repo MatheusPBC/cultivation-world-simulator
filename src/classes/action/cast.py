@@ -204,6 +204,7 @@ class Cast(TimedAction):
             month_stamp=self.world.month_stamp,
             start_text=getattr(self, "_start_event_content", ""),
             result_text=f"{content} {exchange_event.content}",
+            source_event=exchange_event,
             actors=[self.avatar],
             related_avatar_ids=[self.avatar.id],
             allow_relation_changes=False,

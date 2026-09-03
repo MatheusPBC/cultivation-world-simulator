@@ -24,11 +24,17 @@ def test_court_official_can_support_active_imperial_claim(base_world, dummy_avat
     crisis = base_world.dynasty.imperial_crisis
 
     assert "SupportImperialClaim" in get_action_infos(supporter)
-    supporter.load_decide_result_chain([("SupportImperialClaim", {})], "I back the claimant.", "Declare support")
+    supporter.load_decide_result_chain(
+        [("SupportImperialClaim", {"candidate_id": claimant.id})],
+        "I back the claimant.",
+        "Declare support",
+    )
     support_event = supporter.commit_next_plan()
 
-    assert crisis.political_positions == {supporter.id: "support"}
+    assert crisis.get_claim(claimant.id).political_positions == {
+        supporter.id: "support"
+    }
     assert support_event is not None
     assert base_world.event_manager.get_event_by_id(support_event.id) is None
-    assert support_event.causal_links[0].cause_event_id == crisis.evidence_event_ids[0]
+    assert support_event.causal_links[1].cause_event_id == claim_event.id
     assert "SupportImperialClaim" not in get_action_infos(supporter)

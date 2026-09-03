@@ -146,7 +146,12 @@ def _resource_source_event_ids(
         )
         route_change = any(
             str(delta.get("owner_kind")) == "route"
-            and str(delta.get("aspect")) in {"enabled", "capacity", "quality"}
+            and str(delta.get("aspect")) in {
+                "enabled",
+                "capacity",
+                "quality",
+                "operational_capacity",
+            }
             for delta in deltas
         )
         params = event.render_params or {}

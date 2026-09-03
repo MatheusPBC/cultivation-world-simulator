@@ -120,9 +120,10 @@ async def test_tournament_execute_human_list(mock_get_strength, base_world, mock
     # 1 start event
     # 2 semi-finals
     # 1 final
+    # 1 relationship interpretation/transition
     # 1 end event
     # 1 story event
-    assert len(events) == 6
+    assert len(events) == 7
     
     # Check that H5 is not in the start event
     start_event = events[0]

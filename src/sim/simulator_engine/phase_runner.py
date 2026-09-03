@@ -52,3 +52,4 @@ class SimulationPhaseRunner:
             # 任意异常向外传播，都要在这里统一清理，不依赖只在成功路径上
             # 才会执行的 finalize_step。不吞异常——这里不 except，只清理。
             self.world.step_causal_recorder = None
+            self.world.step_invalidations = None

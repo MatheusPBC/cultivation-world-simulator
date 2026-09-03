@@ -5,9 +5,8 @@ import polib
 from src.run.load_map import load_cultivation_world_map
 from src.run.map_presets import list_map_presets
 from src.run.map_snapshot import load_map_from_snapshot, serialize_map_snapshot
-from src.run.map_source import derive_tile_rows_from_region_rows, read_map_source
-from src.run.map_source import load_region_tile_bindings
-from tools.map_presets.quality_audit import audit_landmarks, audit_water_region
+from src.run.map_source import read_map_source
+from tools.map_presets.quality_audit import audit_landmarks
 from src.classes.core.world import World
 from src.server.runtime.session import GameSessionRuntime, create_default_game_state
 from src.server.services.game_queries import get_world_map
@@ -21,10 +20,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def _read_preset_tile_rows(map_id: str) -> list[list[str]]:
     source = read_map_source(PROJECT_ROOT / "static" / "game_configs" / "maps" / map_id / "map.json")
-    return derive_tile_rows_from_region_rows(
-        source.region_rows,
-        wilderness_tile=source.wilderness_tile,
-    )
+    return [[tile.value for tile in row] for row in source.geography.terrain_rows]
 
 
 def _count_pair_edges(tile_rows: list[list[str]], pair: set[str]) -> int:
@@ -92,16 +88,22 @@ def test_official_map_presets_load_with_uniform_size():
     assert all(region_set == region_sets[0] for region_set in region_sets)
 
 
-def test_region_tile_bindings_cover_all_regions():
-    bindings = load_region_tile_bindings()
+def test_physical_geography_covers_region_terrain_and_landmarks():
     game_map = load_cultivation_world_map("classic")
 
-    assert set(game_map.regions).issubset(set(bindings))
-    assert bindings[112].tile == "farm"
-    assert bindings[201].tile == "mountain"
-    assert bindings[201].landmark_asset == "cave"
-    assert bindings[301].landmark_asset == "city_301"
-    assert bindings[401].landmark_asset == "sect_1"
+    assert game_map.geography is not None
+    source = read_map_source(PROJECT_ROOT / "static" / "game_configs" / "maps" / "classic" / "map.json")
+    for region_id, expected_terrain in ((112, "farm"), (201, "mountain")):
+        coordinate = next(
+            (x, y)
+            for y, row in enumerate(source.region_rows)
+            for x, value in enumerate(row)
+            if value == region_id
+        )
+        assert game_map.get_terrain(*coordinate).value == expected_terrain
+    assert game_map.landmarks[201]["asset"] == "cave"
+    assert game_map.landmarks[301]["asset"] == "city_301"
+    assert game_map.landmarks[401]["asset"] == "sect_1"
 
 
 def test_official_map_visual_shape_guards():
@@ -116,10 +118,9 @@ def test_official_map_visual_shape_guards():
 def test_official_map_core_quality_guards():
     for map_id in ["classic", "mountain_frontier"]:
         source = read_map_source(PROJECT_ROOT / "static" / "game_configs" / "maps" / map_id / "map.json")
-        issue_codes = {issue.code for issue in audit_water_region(map_id, source.region_rows)}
-
-        assert "disconnected_water_region" not in issue_codes
-        assert "water_region_no_sea_outlet" not in issue_codes
+        water_bodies = source.geography.water_bodies
+        assert any(body.kind == "river" and body.region_id == 106 for body in water_bodies)
+        assert any(body.kind == "sea" and body.region_id == 105 for body in water_bodies)
 
     mountain_source = read_map_source(
         PROJECT_ROOT / "static" / "game_configs" / "maps" / "mountain_frontier" / "map.json"
@@ -132,23 +133,66 @@ def test_official_map_core_quality_guards():
     assert "landmark_poor_fit" not in {issue.code for issue in landmark_issues}
 
 
+def test_official_presets_have_grounded_infrastructure_sites():
+    expected_kinds = {"classic": "farm", "island_seas": "irrigation", "mountain_frontier": "mine"}
+    for map_id, expected_kind in expected_kinds.items():
+        source = read_map_source(PROJECT_ROOT / "static" / "game_configs" / "maps" / map_id / "map.json")
+        sites = getattr(source, "infrastructure_sites", ())
+        assert sites, map_id
+        assert any(getattr(site, "kind", None) == expected_kind for site in sites)
+
+    classic = read_map_source(
+        PROJECT_ROOT / "static" / "game_configs" / "maps" / "classic" / "map.json"
+    )
+    bridge = next(
+        site
+        for site in classic.infrastructure_sites
+        if site.id == "classic-tianhe-bridge-301-405"
+    )
+    assert bridge.route_ids == ("classic-301-405",)
+    assert bridge.water_body_ids == ("classic-tianhe",)
+    assert bridge.cell_refs == ((45, 24),)
+
+    loaded_classic = load_cultivation_world_map("classic")
+    assert loaded_classic.get_route_operational_capacity("classic-301-405") == 110.4
+    loaded_classic.update_infrastructure_site_runtime(
+        bridge.id,
+        integrity=0.5,
+        last_event_id="test:bridge-damage",
+    )
+    assert loaded_classic.get_route_operational_capacity("classic-301-405") == 55.2
+
+
 def test_map_snapshot_round_trip_restores_tiles_and_regions():
     game_map = load_cultivation_world_map("island_seas")
     snapshot = serialize_map_snapshot(game_map)
 
-    assert snapshot["schema_version"] == 3
+    assert snapshot["schema_version"] == 5
     assert snapshot["preset_id"] == "island_seas"
+    assert snapshot["map_name"] == game_map.map_name
     assert snapshot["width"] == 84
     assert snapshot["height"] == 60
-    assert snapshot["wilderness_tile"] == "sea"
+    assert "wilderness_tile" not in snapshot
+    assert "region_tile_overrides" not in snapshot
+    assert snapshot["geography"]["terrain_rows"] == [
+        [tile.value for tile in row]
+        for row in game_map.geography.terrain_rows
+    ]
+    assert snapshot["geography"]["elevation_rows"] == game_map.geography.elevation_rows
     assert len(snapshot["region_rows"]) == 60
     assert snapshot["landmarks"]
+    assert snapshot["infrastructure_sites"]
 
     restored = load_map_from_snapshot(snapshot)
     assert restored.map_id == "island_seas"
+    assert restored.map_name == game_map.map_name
     assert restored.width == game_map.width
     assert restored.height == game_map.height
     assert set(restored.regions) == set(game_map.regions)
+    assert restored.geography is not None
+    assert restored.geography.terrain_rows == game_map.geography.terrain_rows
+    assert restored.geography.elevation_rows == game_map.geography.elevation_rows
+    assert restored.geography.water_bodies == game_map.geography.water_bodies
 
     for y in range(game_map.height):
         for x in range(game_map.width):
@@ -158,6 +202,12 @@ def test_map_snapshot_round_trip_restores_tiles_and_regions():
             assert (restored_tile.region.id if restored_tile.region else -1) == (
                 original_tile.region.id if original_tile.region else -1
             )
+
+    assert restored.get_water_bodies_at(1, 0) == game_map.get_water_bodies_at(1, 0)
+    assert restored.get_water_bodies_touching_region(106) == game_map.get_water_bodies_touching_region(106)
+    assert restored.get_neighboring_region_ids(101) == game_map.get_neighboring_region_ids(101)
+    assert restored.get_river_relation(106, 107) == game_map.get_river_relation(106, 107)
+    assert [site.to_dict() for site in restored.infrastructure_sites.values()] == snapshot["infrastructure_sites"]
 
 
 def test_region_first_map_loads_wilderness_and_landmarks():
@@ -174,9 +224,9 @@ def test_region_first_map_loads_wilderness_and_landmarks():
             break
 
     assert wilderness_coord is not None
-    wilderness_tile = game_map.get_tile(*wilderness_coord)
-    assert wilderness_tile.region is None
-    assert wilderness_tile.type.value == source.wilderness_tile
+    unclaimed_tile = game_map.get_tile(*wilderness_coord)
+    assert unclaimed_tile.region is None
+    assert unclaimed_tile.type.value == source.geography.terrain_rows[wilderness_coord[1]][wilderness_coord[0]].value
 
     assert game_map.landmarks[301]["asset"] == "city_301"
     assert "x" in game_map.landmarks[301]

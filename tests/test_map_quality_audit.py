@@ -6,8 +6,10 @@ from tools.map_presets.quality_audit import (
     audit_region_components,
     audit_tile_components,
     audit_water_region,
+    count_tile_touch_edges,
     collect_components,
     format_issues,
+    audit_infrastructure_sites,
 )
 from tools.map_presets.validate_presets import SOFT_QUALITY_CODES
 
@@ -17,11 +19,6 @@ class DummyLandmark:
     x: int
     y: int
     asset: str = "city_301"
-
-
-@dataclass(frozen=True)
-class DummyMapSource:
-    wilderness_tile: str
 
 
 def _codes(issues):
@@ -38,9 +35,9 @@ def test_collect_components_reports_sizes_and_bboxes():
 
 def test_audit_water_region_flags_disconnected_river_on_classic_map():
     rows = [
-        [106, 106, 101, 105],
-        [101, 101, 101, 105],
-        [106, 106, 101, 105],
+        ["water", "water", "plain", "sea"],
+        ["plain", "plain", "plain", "sea"],
+        ["water", "water", "plain", "sea"],
     ]
 
     issues = audit_water_region("classic", rows)
@@ -50,14 +47,18 @@ def test_audit_water_region_flags_disconnected_river_on_classic_map():
 
 def test_audit_water_region_flags_missing_sea_outlet():
     rows = [
-        [106, 106, 101],
-        [101, 106, 101],
-        [101, 101, 101],
+        ["water", "water", "plain"],
+        ["plain", "water", "plain"],
+        ["plain", "plain", "plain"],
     ]
 
     issues = audit_water_region("mountain_frontier", rows)
 
     assert "water_region_no_sea_outlet" in _codes(issues)
+
+
+def test_count_tile_touch_edges_uses_physical_terrain():
+    assert count_tile_touch_edges([["water", "sea"], ["plain", "plain"]], {"water", "sea"}) == 1
 
 
 def test_audit_tile_components_flags_tiny_water_and_sea_specks():
@@ -118,7 +119,7 @@ def test_audit_map_identity_protects_classic_from_becoming_sea_wilderness():
         ["sea", "plain", "plain"],
     ]
 
-    issues = audit_map_identity("classic", DummyMapSource("sea"), rows)
+    issues = audit_map_identity("classic", rows)
 
     assert "map_identity_drift" in _codes(issues)
 
@@ -130,7 +131,7 @@ def test_audit_map_identity_protects_island_seas_archipelago_shape():
         ["sea", "plain", "plain"],
     ]
 
-    issues = audit_map_identity("island_seas", DummyMapSource("plain"), rows)
+    issues = audit_map_identity("island_seas", rows)
 
     assert "map_identity_drift" in _codes(issues)
 
@@ -142,13 +143,13 @@ def test_audit_map_identity_protects_mountain_frontier_terrain_mix():
         ["plain", "farm", "plain"],
     ]
 
-    issues = audit_map_identity("mountain_frontier", DummyMapSource("plain"), rows)
+    issues = audit_map_identity("mountain_frontier", rows)
 
     assert "map_identity_drift" in _codes(issues)
 
 
 def test_format_issues_includes_codes_and_map_ids():
-    issues = audit_water_region("classic", [[106], [101], [106]])
+    issues = audit_water_region("classic", [["water"], ["plain"], ["water"]])
     formatted = format_issues(issues)
 
     assert "classic" in formatted
@@ -157,3 +158,54 @@ def test_format_issues_includes_codes_and_map_ids():
 
 def test_validate_presets_keeps_only_landmark_edge_warning_soft():
     assert SOFT_QUALITY_CODES == {"landmark_near_boundary"}
+
+
+def test_audit_infrastructure_sites_catches_unknown_refs_and_invalid_anchor():
+    rows = [[101, 101], [101, 101]]
+    sites = [{
+        "id": "bad-site",
+        "kind": "farm",
+        "name": "Bad Site",
+        "cell_refs": [[1, 1]],
+        "region_ids": [101],
+        "route_ids": ["missing-route"],
+        "water_body_ids": [],
+        "capability_ids": ["food_production"],
+        "owner_ref": None,
+        "maintainer_ref": None,
+        "integrity": 1.0,
+        "enabled": True,
+        "last_event_id": None,
+    }]
+    issues = audit_infrastructure_sites(
+        "test_map", rows, sites, width=2, height=2, routes=[], water_bodies=[]
+    )
+    assert "invalid_infrastructure_site" in _codes(issues)
+
+
+def test_audit_infrastructure_sites_accepts_bridge_only_with_matching_route():
+    rows = [[101, 102], [101, 102]]
+    site = {
+        "id": "bridge-1",
+        "kind": "bridge",
+        "name": "Bridge",
+        "cell_refs": [[0, 0], [1, 0]],
+        "region_ids": [101, 102],
+        "route_ids": ["route-1"],
+        "water_body_ids": [],
+        "capability_ids": ["land_transport"],
+        "owner_ref": None,
+        "maintainer_ref": None,
+        "integrity": 1.0,
+        "enabled": True,
+        "last_event_id": None,
+    }
+    assert audit_infrastructure_sites(
+        "test_map",
+        rows,
+        [site],
+        width=2,
+        height=2,
+        routes=[{"id": "route-1", "endpoint_region_ids": [101, 102]}],
+        water_bodies=[],
+    ) == []

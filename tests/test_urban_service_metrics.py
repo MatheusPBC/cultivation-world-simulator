@@ -535,7 +535,7 @@ def test_test_mode_discovery_is_provider_free_and_group_ids_do_not_collide():
 
 
 def test_available_service_surface_contains_aggregate_and_group_access_keys():
-    keys = available_metric_keys(_city())
+    keys = available_metric_keys(None, _city())
     service_keys = [key for key in keys if key.qualifiers == SERVICE_QUALIFIERS]
 
     assert {key.dimension for key in service_keys} == {

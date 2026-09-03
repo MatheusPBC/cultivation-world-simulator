@@ -142,6 +142,7 @@ class Impart(InvitationAction):
                 month_stamp=self.world.month_stamp,
                 start_text=getattr(self, "_start_event_content", ""),
                 result_text=result_text,
+                source_event=result_event,
                 actors=[self.avatar, target],
                 related_avatar_ids=[self.avatar.id, target.id],
                 allow_relation_changes=False,

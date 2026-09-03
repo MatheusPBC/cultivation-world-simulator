@@ -1,12 +1,10 @@
 import pytest
 import random
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from src.classes.action.meditate import Meditate
 from src.classes.action.educate import Educate
-from src.classes.environment.region import CityRegion, CultivateRegion, Region
-from src.classes.environment.tile import TileType, Tile
-from src.classes.core.avatar import Avatar
-from src.systems.cultivation import Realm, CultivationProgress
+from src.classes.environment.region import CultivateRegion
+from src.systems.cultivation import Realm
 
 # --- 禅定 (Meditate) 测试 ---
 
@@ -175,15 +173,11 @@ def test_educate_execution(avatar_in_city):
     # Mock add_exp
     avatar_in_city.cultivation_progress.add_exp = MagicMock()
     
-    # 固定随机数防止人口变化干扰（虽然这里主要测经验）
-    random.seed(1)
-    
     action._execute()
     
     # 练气期 multiplier = 1
-    # 人口倍率 = 0.5 + 50/100 = 1.0
     # 基准经验 BASE_EXP_TOTAL = 150
-    # 150 * 1 * 1 = 150
+    # Population is not an input to the cultivation result.
     # avatar_in_city.cultivation_progress.add_exp.assert_called_with(150)
     
     dummy_avatar = avatar_in_city
@@ -192,8 +186,8 @@ def test_educate_execution(avatar_in_city):
     # 允许一定的误差，或者先断言调用了
     assert args[0] == 150
 
-def test_educate_population_effect(avatar_in_city):
-    """测试教化对人口的影响"""
+def test_educate_does_not_change_population(avatar_in_city):
+    """教化只改变角色修为，不凭空创造人口。"""
     avatar_in_city.temporary_effects.append({
         "source": "test_buff",
         "effects": {
@@ -211,14 +205,9 @@ def test_educate_population_effect(avatar_in_city):
     
     action = Educate(avatar_in_city, avatar_in_city.world)
     
-    # 强制触发
-    # 使用 patch.object 覆盖 action._execute 内部的 random.random
-    # 注意：由于是在 action 模块内部 import random，通常需要 patch 'src.classes.action.educate.random.random'
-    # 或者直接 patch 'random.random' 如果是直接 import random
-    with patch('src.classes.action.educate.random.random', return_value=0.1):
-        action._execute()
+    action._execute()
         
-    assert region.population == pytest.approx(50.2)
+    assert region.population == pytest.approx(50.0)
 
 def test_educate_high_population_bonus(avatar_in_city):
     """测试高人口城市的教化加成"""
@@ -244,9 +233,7 @@ def test_educate_high_population_bonus(avatar_in_city):
     
     action._execute()
     
-    # 满员城市倍率 = 0.5 + 100/100 = 1.5
-    expected = 150 * 1 * 1.5
-    # avatar_in_city.cultivation_progress.add_exp.assert_called_with(int(expected))
+    expected = 150
     
     dummy_avatar = avatar_in_city
     dummy_avatar.cultivation_progress.add_exp.assert_called()

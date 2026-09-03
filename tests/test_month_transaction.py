@@ -7,6 +7,8 @@ import pytest
 from src.classes.environment.region import CityRegion
 from src.classes.environment.city_state import CityDistrict, CityGovernance, CityState, UrbanAsset
 from src.classes.event import Event, FactKind
+from src.classes.agent_decision import AgentDecision
+from src.classes.causal_origin import CausalOrigin
 from src.classes.individual_consequence import record_hp_change_from_event
 from src.classes.mechanical_language import ConditionInstance
 from src.classes.regional_economy import RegionalEconomyState
@@ -184,10 +186,31 @@ async def test_failed_project_commit_restores_capacity_project_and_events(base_w
     observed_events = []
 
     def mutate(simulator, ctx):
+        decision = AgentDecision(
+            month_stamp=int(simulator.world.month_stamp),
+            subject_kind="city",
+            subject_id=str(region.id),
+            source="test",
+            considered_count=1,
+            chosen_chain=[
+                {
+                    "action_name": "settlement_capacity_expansion",
+                    "params": {},
+                }
+            ],
+        )
+        decision_event = Event(
+            simulator.world.month_stamp,
+            "Transactional Works chose to expand settlement capacity.",
+            fact_kind=FactKind.DECISION,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"deltas": [], "decision": decision.to_dict()},
+        )
+        ctx.add_events([decision_event])
         started = start_urban_capacity_project(
             simulator.world,
             region,
-            decision_event_id="decision-rollback",
+            decision_event_id=decision_event.id,
             trigger_event_id="condition-rollback",
             invalidations=ctx.invalidations,
         )
@@ -277,6 +300,62 @@ async def test_successful_month_keeps_canonical_mutations(base_world):
     assert await SimulationPhaseRunner(Simulator(base_world), phases=phases).run() == []
     assert base_world.map.regions[304] is region
     assert region.population == 70
+
+
+@pytest.mark.asyncio
+async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng(
+    base_world,
+    dummy_avatar,
+    monkeypatch,
+):
+    from src.classes.mechanical_language import DomainReactionReceipt
+    from src.classes.relation.relation import RelationState
+
+    base_world.avatar_manager.register_avatar(dummy_avatar)
+    before_month = base_world.month_stamp
+    before_event_count = base_world.event_manager.count()
+    before_rng = random.getstate()
+    before_relations = dict(dummy_avatar.relations)
+    before_receipts = dict(base_world.mechanical_language.reaction_receipts)
+
+    def mutate(simulator, ctx):
+        dummy_avatar.relations[dummy_avatar] = RelationState(friendliness=42)
+        receipt = DomainReactionReceipt.create(
+            "rollback-condition",
+            "population",
+            "rollback-trigger",
+            decision="maintain",
+            affordance_id=None,
+            decision_event_ids=("rollback-decision",),
+        )
+        simulator.world.mechanical_language.reaction_receipts[receipt.id] = receipt
+        random.random()
+        ctx.add_events([Event(simulator.world.month_stamp, "will not persist")])
+
+    phases = (
+        SimulationPhase("mutate", 1, "mutate", mutate),
+        SimulationPhase(
+            "finalize_step",
+            2,
+            "finalize_step",
+            lambda _simulator, ctx: finalize_step(ctx),
+            reset_check_after=False,
+        ),
+    )
+    monkeypatch.setattr(
+        base_world.event_manager,
+        "commit_step",
+        lambda _events, _chapter: False,
+    )
+
+    with pytest.raises(EventPersistenceError):
+        await SimulationPhaseRunner(Simulator(base_world), phases=phases).run()
+
+    assert dummy_avatar.relations == before_relations
+    assert base_world.mechanical_language.reaction_receipts == before_receipts
+    assert base_world.month_stamp == before_month
+    assert base_world.event_manager.count() == before_event_count
+    assert random.getstate() == before_rng
 
 
 @pytest.mark.asyncio

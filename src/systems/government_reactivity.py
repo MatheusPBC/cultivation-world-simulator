@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
-from src.classes.domain_proposal import GovernmentDecisionKind
+from src.classes.domain_affordance import DomainDecisionKind
 from src.classes.environment.region import CityRegion
 from src.classes.event import Event
 from src.classes.mechanical_language import (
@@ -21,13 +21,15 @@ from src.sim.simulator_engine.domain_invalidation import (
     DomainInvalidationReason,
 )
 from src.systems.government_interpreter import (
-    eligible_capability_ids,
-    eligible_project_kinds,
+    government_affordance_context,
     interpret_government_transition,
     is_dynasty_governed,
 )
-from src.systems.city_maintenance import execute_urban_maintenance
-from src.systems.urban_capacity_project import start_urban_capacity_project
+from src.systems.domain_affordance_registry import (
+    DOMAIN_AFFORDANCES,
+    StaleAffordanceError,
+    stale_affordance_blocked_event,
+)
 
 
 def _region_from_id(world: Any, region_id: str) -> CityRegion | None:
@@ -45,13 +47,6 @@ def _dynasty_id(world: Any) -> str | None:
     dynasty = getattr(world, "dynasty", None)
     value = getattr(dynasty, "id", None)
     return str(value) if value is not None else None
-
-
-def _eligible(world: Any, region: CityRegion, condition: ConditionInstance) -> bool:
-    return bool(
-        eligible_capability_ids(world, region, condition)
-        or eligible_project_kinds(world, region, condition)
-    )
 
 
 def _condition_for_event(
@@ -98,6 +93,8 @@ def _receipt(
         condition.id,
         f"government:{dynasty_id}",
         revision,
+        decision="maintain",
+        affordance_id=None,
     ).id
     return world.mechanical_language.reaction_receipts.get(receipt_id)
 
@@ -110,6 +107,8 @@ def _mark_receipt(
     *,
     completed: bool,
     next_eligible_month: int | None = None,
+    decision: str,
+    affordance_id: str | None,
 ) -> None:
     dynasty_id = _dynasty_id(world)
     if dynasty_id is None:
@@ -119,6 +118,8 @@ def _mark_receipt(
         condition.id,
         f"government:{dynasty_id}",
         revision,
+        decision=decision,
+        affordance_id=affordance_id,
         decision_event_ids=tuple(
             dict.fromkeys(
                 (*(existing.decision_event_ids if existing else ()), decision_event_id)
@@ -146,7 +147,6 @@ def enqueue_government_transitions(
             region is None
             or condition is None
             or not is_dynasty_governed(world, region)
-            or not _eligible(world, region, condition)
         ):
             continue
         invalidations.mark(
@@ -176,8 +176,6 @@ def enqueue_unreacted_government_conditions(
         for condition in world.mechanical_language.get_active_conditions(
             EntityRef("region", str(region.id)), month
         ):
-            if not _eligible(world, region, condition):
-                continue
             revision = str(condition.cause_event_id)
             receipt = _receipt(world, condition, revision)
             if receipt is not None and (
@@ -262,7 +260,6 @@ async def process_government_reactivity(
             region is None
             or condition is None
             or not is_dynasty_governed(world, region)
-            or not _eligible(world, region, condition)
         ):
             continue
         revision = str(trigger.revision or source_event.id)
@@ -284,14 +281,21 @@ async def process_government_reactivity(
             condition,
             llm_call=llm_call if can_use_interpreter else None,
             force_rule=not can_use_interpreter,
-            capabilities=eligible_capability_ids(world, region, condition),
-            project_kinds=eligible_project_kinds(world, region, condition),
         )
         if can_use_interpreter:
             llm_calls += 1
         produced.append(decision_event)
-        if decision.decision is GovernmentDecisionKind.MAINTAIN:
-            _mark_receipt(world, condition, revision, decision_event.id, completed=True)
+        if decision.decision is DomainDecisionKind.MAINTAIN:
+            _mark_receipt(
+                world,
+                condition,
+                revision,
+                decision_event.id,
+                completed=False,
+                next_eligible_month=int(world.month_stamp) + 1,
+                decision="maintain",
+                affordance_id=None,
+            )
             continue
         if not budget.consume_domain_mutation():
             _mark_receipt(
@@ -301,40 +305,46 @@ async def process_government_reactivity(
                 decision_event.id,
                 completed=False,
                 next_eligible_month=int(world.month_stamp) + 1,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
             retry.append(trigger)
             continue
-        intent = decision.action_intent
-        assert intent is not None
-        if decision.decision is GovernmentDecisionKind.URBAN_CAPACITY_PROJECT:
-            definition = world.mechanical_language.condition_definitions[
-                condition.definition_id
-            ]
-            action_event = start_urban_capacity_project(
-                world,
-                region,
+        context, _, _ = government_affordance_context(
+            world, source_event, condition
+        )
+        try:
+            selected = DOMAIN_AFFORDANCES.revalidate(
+                context, decision.selected_affordance_id or ""
+            )
+            if selected.action_kind == "urban_capacity_project":
+                blocked_type = "urban_capacity_project_blocked"
+                retry_months = int(
+                    _config_value(
+                        world, "government_blocked_project_retry_months", 12
+                    )
+                )
+            else:
+                blocked_type = "city_maintenance_blocked"
+                retry_months = int(
+                    _config_value(
+                        world, "government_blocked_maintenance_retry_months", 1
+                    )
+                )
+            action_event = DOMAIN_AFFORDANCES.execute(
+                context,
+                decision.selected_affordance_id or "",
                 decision_event_id=decision_event.id,
-                trigger_event_id=source_event.id,
-                target_settlement_ratio=definition.resolve_below,
                 invalidations=invalidations,
             )
-            blocked_type = "urban_capacity_project_blocked"
-            retry_months = int(
-                _config_value(world, "government_blocked_project_retry_months", 12)
-            )
-        else:
-            action_event = execute_urban_maintenance(
-                world,
-                region,
-                capability_id=intent.capability_id,
+        except StaleAffordanceError:
+            action_event = stale_affordance_blocked_event(
+                context,
                 decision_event_id=decision_event.id,
-                trigger_event_id=source_event.id,
-                invalidations=invalidations,
+                selected_affordance_id=decision.selected_affordance_id or "",
             )
-            blocked_type = "city_maintenance_blocked"
-            retry_months = int(
-                _config_value(world, "government_blocked_maintenance_retry_months", 1)
-            )
+            blocked_type = "domain_affordance_blocked"
+            retry_months = 1
         produced.append(action_event)
         if action_event.event_type == blocked_type:
             _mark_receipt(
@@ -344,9 +354,24 @@ async def process_government_reactivity(
                 decision_event.id,
                 completed=False,
                 next_eligible_month=int(world.month_stamp) + retry_months,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
         else:
-            _mark_receipt(world, condition, revision, decision_event.id, completed=True)
+            _mark_receipt(
+                world,
+                condition,
+                revision,
+                decision_event.id,
+                completed=(selected.action_kind == "urban_capacity_project"),
+                next_eligible_month=(
+                    None
+                    if selected.action_kind == "urban_capacity_project"
+                    else int(world.month_stamp) + 1
+                ),
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
+            )
 
     for item in (*retry, *pending):
         invalidations.mark(item)

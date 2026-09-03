@@ -19,6 +19,11 @@ from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
 from src.sim.simulator import Simulator
 from src.sim.simulator_engine.context import SimulationStepContext
+from src.sim.simulator_engine.domain_invalidation import (
+    DomainInvalidation,
+    DomainInvalidationLayer,
+    DomainInvalidationReason,
+)
 from src.sim.simulator_engine import phase_registry
 from src.sim.simulator_engine.phase_registry import get_simulation_phases
 from src.systems.semantic_world.service import evaluate_semantic_world
@@ -35,6 +40,11 @@ def test_semantic_phase_runs_after_population_and_before_appraisal():
     assert names.index("update_city_population") < names.index("evaluate_semantic_world")
     assert names.index("update_regional_economy") < names.index("react_economy")
     assert names.index("react_economy") < names.index("evaluate_semantic_world")
+    assert names.index("update_regional_climate") < names.index("evaluate_semantic_world")
+    assert names.index("update_regional_climate") < names.index("update_regional_floods")
+    assert names.index("update_regional_floods") < names.index("resolve_material_hazard_impacts")
+    assert names.index("resolve_material_hazard_impacts") < names.index("update_route_infrastructure_dependencies")
+    assert names.index("update_route_infrastructure_dependencies") < names.index("evaluate_semantic_world")
     assert names.index("evaluate_semantic_world") < names.index("generate_event_appraisals")
     assert names.index("evaluate_semantic_world") < names.index("react_government")
     assert names.index("evaluate_semantic_world") < names.index("react_organization")
@@ -94,6 +104,40 @@ async def test_semantic_phase_routes_avatar_recovery_as_health_only_source(
     assert captured["source_event_ids_by_target"] == {}
     assert captured["health_source_event_ids_by_target"] == {
         "region:302": ["recovery-event"]
+    }
+
+
+@pytest.mark.asyncio
+async def test_semantic_phase_routes_climate_evidence_only_to_climate_affinities(
+    base_world,
+    monkeypatch,
+):
+    captured = {}
+
+    async def fake_evaluate(_world, **kwargs):
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr(
+        "src.systems.semantic_world.service.evaluate_semantic_world",
+        fake_evaluate,
+    )
+    ctx = SimulationStepContext.create(base_world)
+    ctx.invalidations.mark(DomainInvalidation(
+        layer=DomainInvalidationLayer.MECHANICAL,
+        domain="region",
+        target_kind="region",
+        target_id="302",
+        reason=DomainInvalidationReason.CLIMATE_CHANGED,
+        source_event_ids=("climate-event",),
+        revision="climate:302:1",
+    ))
+
+    await phase_registry.evaluate_semantic_world(Simulator(base_world), ctx)
+
+    assert captured["source_event_ids_by_target"] == {}
+    assert captured["climate_source_event_ids_by_target"] == {
+        "region:302": ["climate-event"]
     }
 
 

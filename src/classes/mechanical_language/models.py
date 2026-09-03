@@ -407,9 +407,19 @@ class DomainReactionReceipt:
     condition_instance_id: str
     domain: str
     trigger_revision: str
+    decision: str
+    affordance_id: str | None
     decision_event_ids: tuple[str, ...] = ()
     next_eligible_month: int | None = None
     completed: bool = False
+
+    def __post_init__(self) -> None:
+        if self.decision not in {"maintain", "act"}:
+            raise ValueError("reaction receipt decision must be maintain or act")
+        if self.decision == "act" and not self.affordance_id:
+            raise ValueError("an acting receipt requires affordance_id")
+        if self.decision == "maintain" and self.affordance_id is not None:
+            raise ValueError("a maintain receipt cannot carry affordance_id")
 
     @classmethod
     def create(
@@ -418,15 +428,25 @@ class DomainReactionReceipt:
         domain: str,
         trigger_revision: str,
         *,
+        decision: str,
+        affordance_id: str | None,
         decision_event_ids: tuple[str, ...] = (),
         next_eligible_month: int | None = None,
         completed: bool = False,
     ) -> "DomainReactionReceipt":
+        if decision not in {"maintain", "act"}:
+            raise ValueError("reaction receipt decision must be maintain or act")
+        if decision == "act" and not affordance_id:
+            raise ValueError("an acting receipt requires affordance_id")
+        if decision == "maintain" and affordance_id is not None:
+            raise ValueError("a maintain receipt cannot carry affordance_id")
         return cls(
             id=f"{condition_instance_id}|{domain}|{trigger_revision}",
             condition_instance_id=condition_instance_id,
             domain=domain,
             trigger_revision=trigger_revision,
+            decision=decision,
+            affordance_id=affordance_id,
             decision_event_ids=decision_event_ids,
             next_eligible_month=next_eligible_month,
             completed=completed,
@@ -438,6 +458,8 @@ class DomainReactionReceipt:
             "condition_instance_id": self.condition_instance_id,
             "domain": self.domain,
             "trigger_revision": self.trigger_revision,
+            "decision": self.decision,
+            "affordance_id": self.affordance_id,
             "decision_event_ids": list(self.decision_event_ids),
             "next_eligible_month": self.next_eligible_month,
             "completed": self.completed,
@@ -450,6 +472,12 @@ class DomainReactionReceipt:
             condition_instance_id=str(data["condition_instance_id"]),
             domain=str(data["domain"]),
             trigger_revision=str(data["trigger_revision"]),
+            decision=str(data["decision"]),
+            affordance_id=(
+                str(data["affordance_id"])
+                if data["affordance_id"] is not None
+                else None
+            ),
             decision_event_ids=tuple(
                 str(item) for item in data["decision_event_ids"]
             ),

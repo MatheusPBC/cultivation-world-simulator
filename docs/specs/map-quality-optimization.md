@@ -4,16 +4,20 @@
 
 ## 背景
 
-当前官方地图已经收束为 schema v2：
+O mapa oficial está consolidado no schema v6:
 
 1. 官方地图真源是 `static/game_configs/maps/<map_id>/map.json`。
-2. `region_rows` 是唯一语义矩阵，只保存 region id。
-3. tile 由 `static/game_configs/region_tile.csv` 与 `wilderness_tile` 推导。
-4. 一个 region 当前只允许绑定一种 tile。
+2. `region_rows` é a matriz territorial semântica e guarda apenas region ids.
+3. `geography.terrain_rows` é a matriz física independente usada por runtime,
+   API, editor e previews.
+4. `geography.elevation_rows` e `geography.water_bodies` dão grounding físico
+   autoral a altitude e água.
 5. 城市、宗门、洞府、遗迹等大型图像位置由 `landmarks` 控制。
 6. 地图局部名称与描述差异由 `region_overrides` 控制。
 
-这个设计适合当前阶段，不应为了修地图观感而恢复 `tile_map.csv + region_map.csv` 双矩阵，也不应引入每格地形覆盖作为新的主路径。
+Esse desenho não deve regredir para `tile_map.csv + region_map.csv`,
+`wilderness_tile` ou terreno derivado do tipo de região. Qualidade territorial
+e qualidade física são auditadas separadamente.
 
 当前问题主要不是 schema 选错，而是官方地图内容与工具链还没有形成稳定的质量门：地图可以被刷成大块 region，水系可以被切断，编辑工具也存在把官方地图尺寸写坏的风险。
 
@@ -88,10 +92,11 @@
 
 ## 设计原则
 
-1. 保持 region-first。
-   - 本轮不新增 tile layer、river layer、road layer、height layer。
-   - 不恢复旧双矩阵。
-   - 不为单个 region 增加每格 tile override。
+1. Manter region-first com geografia física separada.
+   - `region_rows` continua sendo território, não terreno.
+   - Terreno, elevação e água pertencem à `GeographyLayer`.
+   - Rotas explícitas permanecem em `Map.routes`; não criar rede paralela.
+   - Não restaurar as matrizes antigas nem override físico por região.
 
 2. 地图质量优先通过 `region_rows` 改善。
    - 水系用水域 region 的连续形状表达。
@@ -140,7 +145,7 @@
 3. 保存时保留 map source 元数据。
    - 保留已有 `schema_version`。
    - 保留或正确递增 `version` 的规则需要明确。
-   - 保留 `wilderness_tile`、`landmarks`、`region_overrides`。
+   - Preservar `geography`, `routes`, `landmarks` e `region_overrides`.
    - 输出仍使用 `ensure_ascii=False, indent=2` 并以换行结尾。
 
 4. 加入工具级 smoke test。
@@ -222,7 +227,8 @@
 通用规则：
 
 1. 修改 `static/game_configs/maps/<id>/map.json` 的 `region_rows`。
-2. 不改 `region_tile.csv`，除非发现 region 绑定本身错误。
+2. Não reintroduzir uma tabela de terreno por região; editar a geografia física
+   diretamente no source v5.
 3. 不新增 region id。
 4. 不删除三张图共享的 region roster。
 5. 移动 landmark 时必须保持 anchor 属于对应 region。

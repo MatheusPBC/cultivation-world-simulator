@@ -185,7 +185,7 @@ def test_build_sect_decision_context_includes_public_imperial_crisis(base_world,
     world.avatar_manager.register_avatar(supporter)
     world.dynasty = Dynasty(id=1, name="Test", desc="", current_emperor_id=emperor.id)
     open_imperial_claim(world, claimant.id)
-    support_imperial_claim(world, supporter.id)
+    support_imperial_claim(world, supporter.id, claimant.id)
 
     storage = _create_event_storage_with_sect_events(sect.id)
     try:
@@ -194,8 +194,10 @@ def test_build_sect_decision_context_includes_public_imperial_crisis(base_world,
         _cleanup_event_storage(storage)
 
     assert context.imperial_crisis is not None
-    assert context.imperial_crisis["claimant"]["name"] == claimant.name
-    assert context.imperial_crisis["declared_supporters"] == [{"id": supporter.id, "name": supporter.name}]
+    assert context.imperial_crisis["claims"][0]["candidate"]["name"] == claimant.name
+    assert context.imperial_crisis["claims"][0]["positions"] == {
+        supporter.id: "support"
+    }
 
 
 def test_build_sect_decision_context_localizes_runtime_notes(base_world):
@@ -272,3 +274,26 @@ def test_sect_semantic_context_is_empty_without_a_canonical_sect_region(base_wor
     world, _, sect2 = _create_world_with_sects(base_world)
 
     assert build_sect_semantic_context(world, sect2) == []
+
+
+def test_sect_decision_context_exposes_influenced_regions_institutional_presence(
+    base_world,
+):
+    world, sect1, _ = _create_world_with_sects(base_world)
+    SectManager(world).update_sects()
+    storage = _create_event_storage_with_sect_events(sect1.id)
+    try:
+        context = build_sect_decision_context(sect1, world, storage, history_limit=0)
+    finally:
+        _cleanup_event_storage(storage)
+
+    assert context.institutional_presence
+    assert all(
+        any(
+            int(influence["sect_id"]) == sect1.id
+            and int(influence["owned_tile_count"]) > 0
+            for influence in region["sect_influences"]
+        )
+        for region in context.institutional_presence
+    )
+    assert context.institutional_presence[0]["region_id"] == 1001

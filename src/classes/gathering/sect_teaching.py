@@ -8,7 +8,10 @@ if TYPE_CHECKING:
 from src.classes.core.sect import sects_by_id
 from src.classes.effect.consts import EXTRA_EPIPHANY_PROBABILITY
 from src.classes.story_event_service import StoryEventService
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.utils.config import CONFIG
 from src.i18n import t
 from src.run.log import get_logger
@@ -175,18 +178,31 @@ class SectTeachingConference(Gathering):
             )
             events.append(exp_event)
 
-        story_event = await self._generate_story(sect, teacher, students, exp_gains, epiphany_students, world.month_stamp)
+        story_event = await self._generate_story(
+            sect, teacher, students, exp_gains, epiphany_students, world.month_stamp,
+            source_event=summary_event,
+        )
         if story_event is not None:
             events.append(story_event)
 
         for student in students:
-            a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+            proposal = await RelationDeltaService.propose_relationship_impact(
                 action_key="gathering",
                 avatar_a=teacher,
                 avatar_b=student,
                 event_text=summary_content,
             )
-            RelationDeltaService.apply_bidirectional_delta(teacher, student, a_to_b, b_to_a)
+            events.append(
+                RelationDeltaService.apply_relationship_impact(
+                    teacher,
+                    student,
+                    proposal,
+                    source_event=summary_event,
+                    action_key="gathering",
+                    allowed_a_to_b=frozenset(RelationshipValence),
+                    allowed_b_to_a=frozenset(RelationshipValence),
+                )
+            )
             
         return events
 
@@ -198,7 +214,9 @@ class SectTeachingConference(Gathering):
         ratio = random.uniform(0.1, 0.3)
         return int(req_exp * ratio)
 
-    async def _generate_story(self, sect, teacher, students, exp_gains, epiphany_list, month_stamp):
+    async def _generate_story(
+        self, sect, teacher, students, exp_gains, epiphany_list, month_stamp, *, source_event: Event
+    ):
         # 1. 构造 Events Text (事件列表)
         events_list = []
         events_list.append(t("sect_teaching_event_desc", teacher_name=teacher.name))
@@ -228,13 +246,13 @@ class SectTeachingConference(Gathering):
             details_list.append(f"- {s.name}: {str(s.get_info(detailed=False))}")
             
         details_text = "\n".join(details_list)
-        
         return await StoryEventService.maybe_create_gathering_story(
             month_stamp=month_stamp,
             gathering_info=t("sect_teaching_gathering_info", sect_name=sect.name),
             events_text=events_text,
             details_text=details_text,
             related_avatars=[teacher, *students],
+            source_event=source_event,
             prompt=t(self.STORY_PROMPT_ID),
         )
 

@@ -1,0 +1,5 @@
+Judge the qualitative relationship impact independently in both directions. Return JSON only. Each valence is positive, negative, neutral, or ambivalent; each intensity is mild, moderate, or strong. Neutral and ambivalent are no-ops.
+Character A: {avatar_a_name}
+Character B: {avatar_b_name}
+Interaction: {event_text}
+Output: {{"a_to_b":{{"valence":"ambivalent","intensity":"mild"}},"b_to_a":{{"valence":"neutral","intensity":"mild"}}}}

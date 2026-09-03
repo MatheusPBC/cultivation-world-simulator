@@ -8,7 +8,10 @@ from .mutual_action import MutualAction
 from src.classes.event import Event, NULL_EVENT
 from src.utils.config import CONFIG
 from src.classes.action_runtime import ActionResult, ActionStatus
-from src.classes.relation.relation_delta_service import RelationDeltaService
+from src.classes.relation.relation_delta_service import (
+    RelationDeltaService,
+    RelationshipValence,
+)
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 
 if TYPE_CHECKING:
@@ -103,6 +106,7 @@ class Conversation(MutualAction):
                 related_avatars=[self.avatar.id, target.id]
             )
             self._conversation_result_text = content
+            self._conversation_source_event = content_event
             self._conversation_target = target
             events_to_return.append(content_event)
         return ActionResult(status=ActionStatus.COMPLETED, events=events_to_return)
@@ -142,6 +146,7 @@ class Conversation(MutualAction):
                     related_avatars=[self.avatar.id, target.id],
                 )
                 self._conversation_result_text = summary_text
+                self._conversation_source_event = event
                 self._conversation_relation_hint = relation_hint
                 self._conversation_story_hint = story_hint
                 self._conversation_target = target
@@ -162,29 +167,40 @@ class Conversation(MutualAction):
         result_text = getattr(self, "_conversation_result_text", "")
         relation_hint = str(getattr(self, "_conversation_relation_hint", "") or "").strip()
         story_hint = str(getattr(self, "_conversation_story_hint", "") or "").strip()
-        if target is None or not result_text:
+        source_event = getattr(self, "_conversation_source_event", None)
+        if target is None or not result_text or source_event is None:
             return []
 
         relation_resolution_text = result_text
         if relation_hint:
             relation_resolution_text = f"{result_text}\n[relation_hint={relation_hint}]"
 
-        a_to_b, b_to_a = await RelationDeltaService.resolve_event_text_delta(
+        proposal = await RelationDeltaService.propose_relationship_impact(
             action_key="conversation",
             avatar_a=self.avatar,
             avatar_b=target,
             event_text=relation_resolution_text,
         )
-        RelationDeltaService.apply_bidirectional_delta(self.avatar, target, a_to_b, b_to_a)
+        allowed = frozenset(RelationshipValence)
+        relation_event = RelationDeltaService.apply_relationship_impact(
+            self.avatar,
+            target,
+            proposal,
+            source_event=source_event,
+            action_key="conversation",
+            allowed_a_to_b=allowed,
+            allowed_b_to_a=allowed,
+        )
 
         story_event = await StoryEventService.maybe_create_story(
             kind=StoryEventKind.DAILY_SOCIAL,
             month_stamp=self.world.month_stamp,
             start_text=result_text,
             result_text=result_text,
+            source_event=source_event,
             actors=[self.avatar, target],
             related_avatar_ids=[self.avatar.id, target.id],
             prompt=story_hint,
             allow_relation_changes=False,
         )
-        return [story_event] if story_event is not None else []
+        return [relation_event, *([story_event] if story_event is not None else [])]

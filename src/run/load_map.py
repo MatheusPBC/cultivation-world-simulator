@@ -18,7 +18,6 @@ from src.run.map_presets import resolve_map_source_file
 from src.run.map_source import (
     MapSource,
     collect_region_coords,
-    derive_tile_rows_from_region_rows,
     map_source_to_dict,
     read_map_source,
 )
@@ -47,10 +46,10 @@ def build_map_from_source(
     map_name: str = "",
     preset_version: int | None = None,
 ) -> Map:
-    tile_rows = derive_tile_rows_from_region_rows(
-        source.region_rows,
-        wilderness_tile=source.wilderness_tile,
-    )
+    tile_rows = [
+        [terrain.value for terrain in row]
+        for row in source.geography.terrain_rows
+    ]
     game_map = build_map_from_rows(
         tile_rows,
         source.region_rows,
@@ -62,7 +61,7 @@ def build_map_from_source(
             for region_id, override in source.region_overrides.items()
         },
     )
-    game_map.wilderness_tile = source.wilderness_tile
+    game_map.set_geography(source.geography)
     game_map.landmarks = {
         region_id: landmark.to_dict()
         for region_id, landmark in source.landmarks.items()
@@ -72,6 +71,7 @@ def build_map_from_source(
         for region_id, override in source.region_overrides.items()
     }
     game_map.set_routes(source.routes)
+    game_map.set_infrastructure_sites(source.infrastructure_sites)
     game_map.map_source = map_source_to_dict(source)
     return game_map
 
@@ -88,6 +88,12 @@ def build_map_from_rows(
     """Build a Map from already parsed tile and region matrices."""
     height = len(tile_rows)
     width = len(tile_rows[0]) if height > 0 else 0
+    if height <= 0 or width <= 0:
+        raise ValueError("Map terrain matrix must not be empty")
+    if any(len(row) != width for row in tile_rows):
+        raise ValueError("Map terrain rows must have a uniform width")
+    if len(region_rows) != height or any(len(row) != width for row in region_rows):
+        raise ValueError("Region matrix dimensions must match terrain")
     
     game_map = Map(width=width, height=height, map_id=map_id, map_name=map_name, preset_version=preset_version)
     game_map.region_overrides = region_overrides or {}
@@ -95,32 +101,27 @@ def build_map_from_rows(
     # 2. 填充 Tile Type
     for y, row in enumerate(tile_rows):
         for x, tile_name in enumerate(row):
-            if x < width:
-                try:
-                    t_type = TileType[tile_name.upper()]
-                except KeyError:
-                    if tile_name.startswith("city_"):
-                        t_type = TileType.CITY
-                    else:
-                        # 洞府、遗迹和宗门切片都走大型 region 覆盖层。
-                        # 底层地貌由地图查询序列化时提供，避免前端尝试渲染
-                        # 没有普通地形贴图的 CAVE/RUIN/SECT。
-                        t_type = TileType.SECT
-                
-                game_map.create_tile(x, y, t_type)
+            try:
+                t_type = TileType(str(tile_name).lower())
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid physical terrain at ({x}, {y}): {tile_name}"
+                ) from exc
+            if t_type in {TileType.CITY, TileType.CAVE, TileType.RUIN, TileType.SECT}:
+                raise ValueError(
+                    f"Semantic site cannot be physical terrain at ({x}, {y}): {tile_name}"
+                )
+            game_map.create_tile(x, y, t_type)
     
     normalized_region_rows: list[list[int]] = []
-    for y, row in enumerate(region_rows):
-        if y >= height:
-            break
+    for row in region_rows:
         normalized_region_row: list[int] = []
-        for x, val in enumerate(row):
-            if x >= width:
-                break
-            try:
-                normalized_region_row.append(int(val))
-            except (ValueError, TypeError):
-                normalized_region_row.append(-1)
+        for val in row:
+            if isinstance(val, bool) or not isinstance(val, int):
+                raise ValueError("Region matrix values must be integer region IDs or -1")
+            if val != -1 and val <= 0:
+                raise ValueError("Region matrix values must be positive region IDs or -1")
+            normalized_region_row.append(val)
         normalized_region_rows.append(normalized_region_row)
 
     region_coords = collect_region_coords(normalized_region_rows)
@@ -210,27 +211,28 @@ def _load_and_assign_regions(game_map: Map, region_coords: dict[int, list[tuple[
                 else:
                     params["sect_name"] = get_str(row, "name")
             
-            # 实例化
             try:
                 region_obj = cls(**params)
-                game_map.regions[rid] = region_obj
-                
-                # 写入 Map 缓存 (region_cors)
-                game_map.region_cors[rid] = cors
-                
-                # 绑定到 Tiles
-                for rx, ry in cors:
-                    if game_map.is_in_bounds(rx, ry):
-                        game_map.tiles[(rx, ry)].region = region_obj
-                        
-            except Exception as e:
-                print(f"Error creating region {rid}: {e}")
+            except Exception as exc:
+                raise ValueError(f"Failed to create region {rid}: {exc}") from exc
+
+            game_map.regions[rid] = region_obj
+            game_map.region_cors[rid] = cors
+            for rx, ry in cors:
+                game_map.tiles[(rx, ry)].region = region_obj
 
     # 执行加载
     process_region_config(game_configs["normal_region"], NormalRegion, "normal")
     process_region_config(game_configs["city_region"], CityRegion, "city")
     process_region_config(game_configs["cultivate_region"], CultivateRegion, "cultivate")
     process_region_config(game_configs["sect_region"], SectRegion, "sect")
+
+    missing_region_ids = sorted(set(region_coords) - set(game_map.regions))
+    if missing_region_ids:
+        raise ValueError(
+            "Map references regions missing from canonical configuration: "
+            + ", ".join(str(region_id) for region_id in missing_region_ids)
+        )
 
 
 def _load_city_economy() -> dict[int, RegionalEconomyState]:

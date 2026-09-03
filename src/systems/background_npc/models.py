@@ -57,6 +57,7 @@ class BackgroundNpcContext:
     action_key: str | None = None
     sect_name: str | None = None
     dynasty_title: str | None = None
+    source_event_id: str = ""
 
 
 __all__ = [

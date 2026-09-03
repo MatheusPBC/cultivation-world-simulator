@@ -19,16 +19,28 @@
 
 ## 当前地图目标
 
-当前官方地图只扩展地图形状和位置关系：
+当前官方地图只扩展地图形状、位置关系和少量有明确地理依据的空间设施：
 
 1. 从一张地图扩展到三张官方地图。
 2. 三张地图统一尺寸。
 3. 不新增 region。
 4. 不新增地块类型。
 5. 不新增风土文化字段。
-6. 只改变 region 的形状、面积和位置。
+6. 每张预设至少登记一个 `infrastructure_site`，只保存空间身份、引用和当前完整度。
+7. 只改变 region 的形状、面积和位置，不在预设里脚本化灾害或结果。
 
 也就是说，同一个 region id 在不同官方地图里仍然代表同一个区域，但它可以出现在不同位置，也可以有不同大小和边界形状。
+
+## Schema v6：空间设施目录
+
+`map.json` 使用 schema v6，并要求 `infrastructure_sites` 数组。设施是地图拥有的声明式空间实体，不复制路线、库存、生产、价格、流量或城市内部 `UrbanAsset` 状态。每个设施保存：
+
+- `cell_refs` 和 `region_ids`：真实地图上的锚点与所属区域；
+- `route_ids` 和 `water_body_ids`：只引用本预设已有的网络或水体；
+- `capability_ids`：设施提供的可观察能力标签；
+- `integrity`、`enabled`、`last_event_id`：可持久化的当前状态与来源。
+
+桥必须引用一条连接其两个区域的现有路线；港口和灌溉设施必须引用现有水体。形成物继续由运行时的 `Map.region_formations` 管理，不重复登记为设施。设施目录本身不会生成问题或自动改变世界状态。
 
 ## 三张官方地图
 
@@ -77,9 +89,10 @@
 
 维护流程应该是：
 
-1. 编辑或生成 `static/game_configs/maps/<id>/map.json`，必要时同步 `static/game_configs/region_tile.csv`。
-2. 运行地图校验工具。
-3. 生成预览图。
+1. Edite ou gere `static/game_configs/maps/<id>/map.json`, mantendo separadas
+   as matrizes de território e geografia física.
+2. 运行地图校验工具；它同时验证 schema v6 和设施引用。
+3. 生成预览图；设施以独立标记投影，不改变地形或区域颜色。
 4. 查看预览图修正空间结构。
 5. 在前端实机验证地图渲染、标签、宗门层和角色位置。
 

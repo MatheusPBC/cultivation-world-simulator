@@ -13,9 +13,12 @@ from src.utils.llm.test_mode_fallbacks import TestModeLLMUnavailable, TestModeUn
 async def test_task_call_uses_rule_fallback_without_provider_request():
     with patch("src.utils.llm.client._call_with_requests", new_callable=AsyncMock) as provider:
         with llm_test_mode_scope(True):
-            result = await call_llm_with_task_name("relation_delta", "unused-template.txt", infos={})
+            result = await call_llm_with_task_name("relationship_impact", "unused-template.txt", infos={})
 
-    assert result == {"delta_a_to_b": 0, "delta_b_to_a": 0}
+    assert result == {
+        "a_to_b": {"valence": "ambivalent", "intensity": "mild"},
+        "b_to_a": {"valence": "ambivalent", "intensity": "mild"},
+    }
     provider.assert_not_awaited()
 
 

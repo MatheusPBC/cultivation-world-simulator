@@ -9,6 +9,7 @@ from src.classes.core.avatar.core import Avatar
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.gender import Gender
 from src.classes.gathering.sect_teaching import SectTeachingConference
+from src.classes.event import Event
 from src.classes.sect_ranks import SectRank
 from src.systems.cultivation import CultivationProgress
 from src.systems.time import MonthStamp
@@ -80,6 +81,7 @@ async def test_generate_story_uses_refined_sect_context_in_details(base_world):
     student = _create_member(world, sect, "student_1", "弟子乙", 1, SectRank.OuterDisciple)
 
     conference = SectTeachingConference()
+    source_event = Event(world.month_stamp, "The teaching conference concluded.")
     with patch.object(
         conference,
         "_build_sect_teaching_context_text",
@@ -95,9 +97,11 @@ async def test_generate_story_uses_refined_sect_context_in_details(base_world):
             exp_gains=[(student, 42)],
             epiphany_list=[],
             month_stamp=world.month_stamp,
+            source_event=source_event,
         )
 
     details_text = mock_story.await_args.kwargs["details_text"]
     assert "【宗门背景】当前与玄霜宗交战，财库平稳。" in details_text
     assert "师尊甲:" in details_text
     assert "- 弟子乙:" in details_text
+    assert mock_story.await_args.kwargs["source_event"] is source_event

@@ -20,7 +20,6 @@ class HelpPeople(TimedAction):
     EMOJI = "🤝"
     PARAMS = {}
     TOTAL_COST = 45
-    TOTAL_POPULATION_GAIN = 1.8
     LUCK_DELTA = 0.3
 
     duration_months = 3
@@ -49,9 +48,6 @@ class HelpPeople(TimedAction):
     # TimedAction 已统一 step 逻辑
 
     async def finish(self) -> list[Event]:
-        region = self.avatar.tile.region
-        if isinstance(region, CityRegion):
-            region.change_population(self.TOTAL_POPULATION_GAIN)
         self.avatar.add_persistent_effect(
             "effect_source_help_people_karma",
             {"extra_luck": self.LUCK_DELTA},

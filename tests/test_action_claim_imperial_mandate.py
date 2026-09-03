@@ -34,13 +34,13 @@ def test_claim_imperial_mandate_opens_crisis_via_avatar_plan(base_world, dummy_a
 
     assert start_event is not None
     assert base_world.dynasty.imperial_crisis is not None
-    assert base_world.dynasty.imperial_crisis.claimant_avatar_id == claimant.id
+    assert base_world.dynasty.imperial_crisis.get_claim(claimant.id) is not None
     claim_event = start_event
     assert base_world.event_manager.get_event_by_id(claim_event.id) is None
     delta = claim_event.causal_payload["deltas"][0]
     assert delta["owner_kind"] == "dynasty"
     assert delta["owner_id"] == "1"
-    assert delta["aspect"] == "imperial_crisis"
-    assert delta["before"] == "none"
-    assert delta["after"] == "active"
+    assert delta["aspect"] == "imperial_claims"
+    assert delta["before"] == "[]"
+    assert claimant.id in delta["after"]
     assert ClaimImperialMandate(claimant, base_world).can_possibly_start() is False

@@ -48,7 +48,9 @@ class Route:
     """A stable, explicitly authored connection between exactly two regions.
 
     Route state is intentionally mutable only through the validated runtime
-    fields.  The endpoint pair and policy remain stable after construction.
+    fields. The endpoint pair and policy remain stable after construction.
+    ``capacity`` is nominal; usable capacity is derived by the owning Map from
+    quality and explicitly linked Infrastructure Sites.
     """
 
     id: str

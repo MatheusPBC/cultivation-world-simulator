@@ -4,6 +4,7 @@ import RegionDetail from '@/components/game/panels/info/RegionDetail.vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { useWorldJournalStore } from '@/stores/worldJournal'
+import ptBrGame from '@/locales/pt-BR/game.json'
 
 const sharedI18n = createI18n({
   legacy: false,
@@ -16,6 +17,9 @@ const sharedI18n = createI18n({
             type_explanations: { normal: '普通区域说明', city: '城市说明' },
             regional_context_title: '区域态势',
             semantic_context: {
+              hazards_title: '物理危险',
+              hazards: { regional_flood: '区域洪水' },
+              risk: '触发风险 {value}%',
               conditions_title: '活动中的语义条件',
               readings_title: '关键读数',
               empty: '暂无可用语义上下文。',
@@ -281,6 +285,60 @@ describe('RegionDetail', () => {
     expect(wrapper.text()).not.toContain('可用能力')
   })
 
+  it('renders canonical InfrastructureSite state references for a regional capacity reading', () => {
+    const wrapper = mount(RegionDetail, {
+      props: {
+        data: {
+          id: 'region-1',
+          name: 'Infrastructure Region',
+          type: 'normal',
+          type_name: 'Test',
+          desc: 'Test Desc',
+          animals: [],
+          plants: [],
+          lodes: [],
+          semantic_context: {
+            readings: [{
+              key: { dimension: 'capacity', subject_kind: 'region', subject_id: 'region-1', concept_id: 'clean_water' },
+              derived_from: [],
+              value: 8,
+              unit: 'site_equivalents',
+              availability: 'measurable',
+              reading_kind: 'derived',
+              confidence: null,
+              state_refs: [
+                'map:infrastructure_site:site:public-well:enabled',
+                'map:infrastructure_site:site:public-well:integrity',
+                'map:infrastructure_site:site:public-well:capability:clean_water',
+              ],
+              source_event_ids: [],
+            }],
+            conditions: [],
+            definitions: [],
+          },
+        },
+      },
+      global: {
+        plugins: [pinia, createI18n({
+          legacy: false,
+          locale: 'pt-BR',
+          messages: { 'pt-BR': { game: ptBrGame } },
+        })],
+        stubs: {
+          EntityRow: true,
+          RelationRow: true,
+          SecondaryPopup: true,
+        },
+      },
+    })
+
+    const stateRefs = wrapper.get('[data-testid="region-reading-state-refs"]')
+    expect(stateRefs.text()).toContain('Proveniência técnica')
+    expect(stateRefs.text()).toContain('map:infrastructure_site:site:public-well:enabled')
+    expect(stateRefs.text()).toContain('map:infrastructure_site:site:public-well:integrity')
+    expect(stateRefs.text()).toContain('map:infrastructure_site:site:public-well:capability:clean_water')
+  })
+
   it('opens the existing Why causal detail flow for condition and reading source events', async () => {
     const journalStore = useWorldJournalStore()
     const openCausalDetail = vi.spyOn(journalStore, 'openCausalDetail').mockResolvedValue()
@@ -316,6 +374,14 @@ describe('RegionDetail', () => {
               cause_event_id: 'event-1',
               source_readings: [],
             }],
+            active_hazards: [{
+              kind: 'regional_flood',
+              region_id: 'region-1',
+              started_month: 2,
+              activation_risk: 0.82,
+              source_event_ids: ['event-rain'],
+              last_event_id: 'event-flood',
+            }],
             definitions: [],
           },
         },
@@ -332,9 +398,11 @@ describe('RegionDetail', () => {
 
     await wrapper.get('[data-testid="region-condition-causal-event-condition-1-event-1"]').trigger('click')
     await wrapper.get('[data-testid="region-reading-causal-event-event-reading"]').trigger('click')
+    await wrapper.get('[data-testid="region-hazard-causal-event-event-flood"]').trigger('click')
 
     expect(openCausalDetail).toHaveBeenNthCalledWith(1, 'event-1')
     expect(openCausalDetail).toHaveBeenNthCalledWith(2, 'event-reading')
+    expect(openCausalDetail).toHaveBeenNthCalledWith(3, 'event-flood')
   })
 
   it('renders factual city assets and grounded spiritual ecology with sources', async () => {

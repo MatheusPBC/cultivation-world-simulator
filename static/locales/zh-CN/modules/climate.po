@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Regional weather changed across {count} regions."
+msgstr "{count}个地区的天气发生了变化。"
+
+msgid "Persistent water pressure caused flooding in {region}."
+msgstr "持续的水压导致{region}发生洪灾。"
+
+msgid "Flood waters receded in {region}."
+msgstr "{region}的洪水退去了。"
+
+msgid "Active regional hazard: {hazard} (since month {month})."
+msgstr "当前地区灾害：{hazard}（自第{month}月起）。"
+
+msgid "regional_climate_updated"
+msgstr "{count}个地区的气候已更新。"

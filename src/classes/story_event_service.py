@@ -5,6 +5,8 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from src.classes.event import Event
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.goldfinger import merge_story_prompt_with_goldfinger
 from src.classes.story_teller import StoryTeller
 from src.utils.config import CONFIG
@@ -86,11 +88,15 @@ class StoryEventService:
         month_stamp,
         start_text: str,
         result_text: str,
+        source_event: Event,
         actors: list[Avatar | None],
         related_avatar_ids: list[str] | None,
         prompt: str = "",
         allow_relation_changes: bool = False,
     ) -> Event | None:
+        if not isinstance(source_event, Event) or not str(source_event.id).strip():
+            raise ValueError("source_event must be a persisted Event anchor")
+
         # 历史命名沿用中；当前仅用于让 StoryTeller 选择双人故事模板，
         # 不代表故事阶段会直接修改角色关系。
         if not cls.should_trigger(kind):
@@ -113,12 +119,20 @@ class StoryEventService:
             prompt=enriched_prompt,
             allow_relation_changes=allow_relation_changes,
         )
-        return Event(
+        story_event = Event(
             month_stamp=month_stamp,
             content=story,
             related_avatars=cls._normalize_related_avatar_ids(related_avatar_ids),
+            is_major=False,
             is_story=True,
+            causal_origin=CausalOrigin.LLM_INTERPRETATION,
         )
+        story_event.causal_links.append(CausalLink(
+            event_id=story_event.id,
+            cause_event_id=source_event.id,
+            relation=CausalRelation.CONTRIBUTED_TO,
+        ))
+        return story_event
 
     @classmethod
     async def maybe_create_gathering_story(
@@ -129,8 +143,11 @@ class StoryEventService:
         events_text: str,
         details_text: str,
         related_avatars: list[Avatar],
+        source_event: Event,
         prompt: str = "",
     ) -> Event | None:
+        if not isinstance(source_event, Event) or not str(source_event.id).strip():
+            raise ValueError("source_event must be a persisted Event anchor")
         if not cls.should_trigger(StoryEventKind.GATHERING):
             return None
         if not related_avatars:
@@ -144,9 +161,17 @@ class StoryEventService:
             related_avatars=related_avatars,
             prompt=enriched_prompt,
         )
-        return Event(
+        story_event = Event(
             month_stamp=month_stamp,
             content=story,
             related_avatars=[avatar.id for avatar in related_avatars],
+            is_major=False,
             is_story=True,
+            causal_origin=CausalOrigin.LLM_INTERPRETATION,
         )
+        story_event.causal_links.append(CausalLink(
+            event_id=story_event.id,
+            cause_event_id=source_event.id,
+            relation=CausalRelation.CONTRIBUTED_TO,
+        ))
+        return story_event

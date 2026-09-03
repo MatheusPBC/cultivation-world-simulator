@@ -68,7 +68,11 @@ def test_map_source_roundtrip_and_all_presets_have_explicit_routes(tmp_path) -> 
             Path("static/game_configs/maps") / map_id / "map.json"
         )
         payload = map_source_to_dict(source)
-        assert payload["schema_version"] == 4
+        assert payload["schema_version"] == 6
+        assert "wilderness_tile" not in payload
+        assert len(payload["geography"]["terrain_rows"]) == 60
+        assert len(payload["geography"]["elevation_rows"]) == 60
+        assert payload["geography"]["water_bodies"]
         assert payload["routes"]
         assert map_source_to_dict(read_map_source_from_payload(payload, map_id, tmp_path)) == payload
 
@@ -97,7 +101,12 @@ def test_save_load_preserves_route_runtime_by_stable_id(tmp_path) -> None:
 
     with open(tmp_path / "routes-save.json", encoding="utf-8") as file:
         save_data = json.load(file)
-    saved_route = next(item for item in save_data["world"]["routes"] if item["id"] == route.id)
+    assert "routes" not in save_data["world"]
+    saved_route = next(
+        item
+        for item in save_data["world"]["map_snapshot"]["routes"]
+        if item["id"] == route.id
+    )
     assert saved_route["capacity"] == 17.0
     assert saved_route["quality"] == 0.21
     assert saved_route["enabled"] is False

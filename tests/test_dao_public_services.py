@@ -2,12 +2,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.classes.celestial_dao import DaoTradition
+from src.classes.celestial_dao import DaoPetition, DaoTradition
 from src.classes.core.dynasty import Dynasty
 from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
 from src.server.services.game_command_service import GameCommandService
 from src.server.services.game_query_service import GameQueryService
-from src.systems.celestial_dao_service import create_petition
 
 
 class _Runtime:
@@ -38,14 +37,15 @@ async def test_dao_public_services_query_and_serialize_mutation(
     base_world.dynasty = Dynasty(
         id=1, name="Test", desc="", current_emperor_id=dummy_avatar.id
     )
-    petition = create_petition(
-        base_world,
+    petition = DaoPetition(
         initiator_kind="court",
         initiator_id="1",
         region_id=7,
+        tradition=DaoTradition.MERCY,
         motivated_event_ids=[],
         rite_event_ids=["r1", "r2", "r3"],
     )
+    base_world.dao_petitions.append(petition)
     runtime = _Runtime(base_world)
 
     query_data = _service(GameQueryService, runtime).get_dao_petitions()
@@ -87,6 +87,6 @@ async def test_imperial_claim_command_runs_inside_runtime_mutation(
         avatar_id=claimant.id
     )
 
-    assert result["claimant_avatar_id"] == claimant.id
+    assert result["claims"][0]["candidate_id"] == claimant.id
     assert base_world.event_manager.get_event_by_id(result["event_id"]) is not None
     assert runtime.mutations == 1

@@ -129,6 +129,7 @@ class Catch(TimedAction):
                 month_stamp=self.world.month_stamp,
                 start_text=getattr(self, "_start_event_content", ""),
                 result_text=content,
+                source_event=result_event,
                 actors=[self.avatar],
                 related_avatar_ids=[self.avatar.id],
                 allow_relation_changes=False,
@@ -137,5 +138,4 @@ class Catch(TimedAction):
             if story_event is not None:
                 events.append(story_event)
             return events
-
 

@@ -6,8 +6,10 @@ import Viewport from './Viewport.vue'
 import MapLayer from './MapLayer.vue'
 import EntityLayer from './EntityLayer.vue'
 import POILayer from './POILayer.vue'
+import InfrastructureSiteLayer from './InfrastructureSiteLayer.vue'
 import PerceptionLayer from './PerceptionLayer.vue'
-import SectInfluenceLayer from './SectInfluenceLayer.vue'
+import MapLayerControls from './MapLayerControls.vue'
+import { DEFAULT_MAP_LAYER_VISIBILITY } from './composables/useMapLayerRenderer'
 import CloudLayer from './CloudLayer.vue'
 import { useTextures } from './composables/useTextures'
 
@@ -16,6 +18,7 @@ const { width, height } = useElementSize(container)
 const { loadBaseTextures, isLoaded } = useTextures()
 
 const mapSize = ref({ width: 2000, height: 2000 })
+const layerVisibility = ref({ ...DEFAULT_MAP_LAYER_VISIBILITY })
 
 defineProps<{
   sidebarWidth?: number
@@ -25,6 +28,7 @@ const emit = defineEmits<{
   (e: 'avatarSelected', payload: { type: 'avatar'; id: string; name?: string }): void
   (e: 'regionSelected', payload: { type: 'region'; id: string; name?: string }): void
   (e: 'poiSelected', payload: { type: 'avatar' | 'poi'; id: string; kind?: string; name?: string }): void
+  (e: 'siteSelected', payload: { type: 'site'; id: string; kind?: string; name?: string }): void
 }>()
 
 function onMapLoaded(size: { width: number, height: number }) {
@@ -43,6 +47,10 @@ function handlePoiSelected(payload: { type: 'avatar' | 'poi'; id: string; kind?:
   emit('poiSelected', payload)
 }
 
+function handleSiteSelected(payload: { type: 'site'; id: string; kind?: string; name?: string }) {
+  emit('siteSelected', payload)
+}
+
 const devicePixelRatio = 1 // 强制为 1，避免像素风游戏在高分屏下的坐标和缩放问题
 
 onMounted(() => {
@@ -52,6 +60,7 @@ onMounted(() => {
 
 <template>
   <div ref="container" class="game-canvas-container">
+    <MapLayerControls v-model="layerVisibility" />
     <!-- 
       antialias: false (像素风必须关闭)
       resolution: devicePixelRatio (保证清晰度)
@@ -82,10 +91,14 @@ onMounted(() => {
         -->
         <MapLayer 
           @mapLoaded="onMapLoaded" 
+          :visibility="layerVisibility"
           @regionSelected="handleRegionSelected" 
         />
-        <SectInfluenceLayer :width="mapSize.width" :height="mapSize.height" />
         <POILayer @poiSelected="handlePoiSelected" />
+        <InfrastructureSiteLayer
+          :visible="layerVisibility.infrastructure"
+          @siteSelected="handleSiteSelected"
+        />
         <EntityLayer @avatarSelected="handleAvatarSelected" />
         <PerceptionLayer :width="mapSize.width" :height="mapSize.height" />
         <CloudLayer :width="mapSize.width" :height="mapSize.height" />
@@ -96,6 +109,7 @@ onMounted(() => {
 
 <style scoped>
 .game-canvas-container {
+  position: relative;
   width: 100%;
   height: 100%;
   overflow: hidden;

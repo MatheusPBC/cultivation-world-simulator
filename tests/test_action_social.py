@@ -4,9 +4,50 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from src.classes.mutual_action.conversation import Conversation
 from src.classes.action_runtime import ActionStatus
 from src.classes.event import Event
+from src.classes.relation.relation_delta_service import (
+    DirectionalRelationshipImpact,
+    RelationDeltaService,
+    RelationshipImpactProposal,
+    RelationshipValence,
+)
 from src.server.runtime.session import DEFAULT_GAME_STATE, GameSessionRuntime
 
 class TestActionSocial:
+
+    def test_relationship_impact_uses_bounded_owner_mapping_and_ambivalence_is_noop(self, dummy_avatar, target_avatar):
+        dummy_avatar.get_friendliness = MagicMock(side_effect=[0, 6, 6, 6])
+        target_avatar.get_friendliness = MagicMock(side_effect=[0, -4, -4, -4])
+        with patch.object(RelationDeltaService, "apply_bidirectional_delta") as apply_delta:
+            source = Event(dummy_avatar.world.month_stamp, "interaction")
+            changed = RelationDeltaService.apply_relationship_impact(
+                dummy_avatar,
+                target_avatar,
+                RelationshipImpactProposal(
+                    DirectionalRelationshipImpact("positive", "strong"),
+                    DirectionalRelationshipImpact("negative", "moderate"),
+                ),
+                source_event=source,
+                action_key="conversation",
+                allowed_a_to_b=frozenset(RelationshipValence),
+                allowed_b_to_a=frozenset(RelationshipValence),
+            )
+            unchanged = RelationDeltaService.apply_relationship_impact(
+                dummy_avatar,
+                target_avatar,
+                RelationshipImpactProposal(
+                    DirectionalRelationshipImpact("ambivalent", "strong"),
+                    DirectionalRelationshipImpact("neutral", "mild"),
+                ),
+                source_event=source,
+                action_key="conversation",
+                allowed_a_to_b=frozenset(RelationshipValence),
+                allowed_b_to_a=frozenset(RelationshipValence),
+            )
+
+        assert changed.causal_payload["deltas"][0]["magnitude"] == 6
+        assert changed.causal_payload["deltas"][1]["magnitude"] == -4
+        assert unchanged.causal_payload["deltas"] == []
+        apply_delta.assert_called_once_with(dummy_avatar, target_avatar, 6, -4)
     
     @pytest.fixture
     def target_avatar(self, dummy_avatar):
@@ -117,25 +158,44 @@ class TestActionSocial:
         action = Conversation(dummy_avatar, dummy_avatar.world)
         action._conversation_target = target_avatar
         action._conversation_result_text = "两人言谈渐缓，气氛不再像先前那般紧绷。"
+        action._conversation_source_event = Event(
+            dummy_avatar.world.month_stamp,
+            action._conversation_result_text,
+            related_avatars=[dummy_avatar.id, target_avatar.id],
+        )
         action._conversation_relation_hint = "关系略有缓和"
         action._conversation_story_hint = "这场交谈带着试探后的松动感。"
 
         with patch(
-            "src.classes.mutual_action.conversation.RelationDeltaService.resolve_event_text_delta",
+            "src.classes.mutual_action.conversation.RelationDeltaService.propose_relationship_impact",
             new_callable=AsyncMock,
-        ) as mock_resolve_delta, patch(
-            "src.classes.mutual_action.conversation.RelationDeltaService.apply_bidirectional_delta"
+        ) as mock_propose_impact, patch(
+            "src.classes.mutual_action.conversation.RelationDeltaService.apply_relationship_impact"
         ) as mock_apply_delta, patch(
             "src.classes.mutual_action.conversation.StoryEventService.maybe_create_story",
             new_callable=AsyncMock,
         ) as mock_story:
-            mock_resolve_delta.return_value = (1, 2)
+            mock_propose_impact.return_value = RelationshipImpactProposal(
+                DirectionalRelationshipImpact("positive", "mild"),
+                DirectionalRelationshipImpact("positive", "mild"),
+            )
             mock_story.return_value = None
 
             events = await action.finish(target_avatar=target_avatar)
 
-        assert events == []
-        assert mock_resolve_delta.await_count == 1
-        assert "[relation_hint=关系略有缓和]" in mock_resolve_delta.await_args.kwargs["event_text"]
+        assert events == [mock_apply_delta.return_value]
+        assert mock_propose_impact.await_count == 1
+        assert "[relation_hint=关系略有缓和]" in mock_propose_impact.await_args.kwargs["event_text"]
         assert mock_story.await_args.kwargs["prompt"] == "这场交谈带着试探后的松动感。"
-        mock_apply_delta.assert_called_once_with(dummy_avatar, target_avatar, 1, 2)
+        mock_apply_delta.assert_called_once_with(
+            dummy_avatar,
+            target_avatar,
+            RelationshipImpactProposal(
+                DirectionalRelationshipImpact("positive", "mild"),
+                DirectionalRelationshipImpact("positive", "mild"),
+            ),
+            source_event=action._conversation_source_event,
+            action_key="conversation",
+            allowed_a_to_b=frozenset(RelationshipValence),
+            allowed_b_to_a=frozenset(RelationshipValence),
+        )

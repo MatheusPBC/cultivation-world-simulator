@@ -303,6 +303,70 @@ msgstr ""
 msgid "AUXILIARY_2065_DESC"
 msgstr ""
 
+#. auxiliary.csv: 百虫囊
+msgid "AUXILIARY_2071_NAME"
+msgstr ""
+
+#. auxiliary.csv: 以粗布与兽皮制成的蛊囊，可收纳寻常灵虫。
+msgid "AUXILIARY_2071_DESC"
+msgstr ""
+
+#. auxiliary.csv: 五毒蛊盅
+msgid "AUXILIARY_2072_NAME"
+msgstr ""
+
+#. auxiliary.csv: 以五毒相生之法炼成的蛊盅，蛊性较为稳定。
+msgid "AUXILIARY_2072_DESC"
+msgstr ""
+
+#. auxiliary.csv: 千机蛊匣
+msgid "AUXILIARY_2073_NAME"
+msgstr ""
+
+#. auxiliary.csv: 机关与蛊术结合的蛊匣，便于隐蔽施蛊。
+msgid "AUXILIARY_2073_DESC"
+msgstr ""
+
+#. auxiliary.csv: 万蛊母巢
+msgid "AUXILIARY_2074_NAME"
+msgstr ""
+
+#. auxiliary.csv: 母蛊盘踞其中，可统御群蛊。
+msgid "AUXILIARY_2074_DESC"
+msgstr ""
+
+#. auxiliary.csv: 引灵阵盘
+msgid "AUXILIARY_2081_NAME"
+msgstr ""
+
+#. auxiliary.csv: 刻有基础引灵纹路的阵盘，可牵动当前区域灵机，布置临时阵法。
+msgid "AUXILIARY_2081_DESC"
+msgstr ""
+
+#. auxiliary.csv: 聚脉阵盘
+msgid "AUXILIARY_2082_NAME"
+msgstr ""
+
+#. auxiliary.csv: 盘中阵纹能接续浅层地脉，使布下的阵法更稳，威能与持续时间略有提升。
+msgid "AUXILIARY_2082_DESC"
+msgstr ""
+
+#. auxiliary.csv: 玄枢阵盘
+msgid "AUXILIARY_2083_NAME"
+msgstr ""
+
+#. auxiliary.csv: 以玄枢灵纹统摄多重灵路，布阵时能令阵势更盛，并减少部分灵石损耗。
+msgid "AUXILIARY_2083_DESC"
+msgstr ""
+
+#. auxiliary.csv: 太虚阵盘
+msgid "AUXILIARY_2084_NAME"
+msgstr ""
+
+#. auxiliary.csv: 灵纹自成周天循环，可借虚空灵机补全阵势，使阵法威能、持续与运转效率大幅提升。
+msgid "AUXILIARY_2084_DESC"
+msgstr ""
+
 #. celestial_phenomenon.csv: 紫气东来
 msgid "CELESTIAL_PHENOMENON_1_NAME"
 msgstr ""
@@ -791,6 +855,106 @@ msgstr ""
 msgid "ELIXIR_3016_DESC"
 msgstr ""
 
+#. elixir.csv: 练气驻颜丹
+msgid "ELIXIR_3017_NAME"
+msgstr ""
+
+#. elixir.csv: 以花露与灵草炼成，可略微改善气色与容貌（限服一颗）。
+msgid "ELIXIR_3017_DESC"
+msgstr ""
+
+#. elixir.csv: 筑基驻颜丹
+msgid "ELIXIR_3018_NAME"
+msgstr ""
+
+#. elixir.csv: 药性更稳，可长期滋养肌骨神气，使容貌更显出众（限服一颗）。
+msgid "ELIXIR_3018_DESC"
+msgstr ""
+
+#. elixir.csv: 金丹驻颜丹
+msgid "ELIXIR_3019_NAME"
+msgstr ""
+
+#. elixir.csv: 融入金丹灵机，能长久定住巅峰容色，不易为岁月侵蚀（限服一颗）。
+msgid "ELIXIR_3019_DESC"
+msgstr ""
+
+#. elixir.csv: 元婴驻颜丹
+msgid "ELIXIR_3020_NAME"
+msgstr ""
+
+#. elixir.csv: 蕴含造化之气，服之可使容貌若定格于最盛之时（限服一颗）。
+msgid "ELIXIR_3020_DESC"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_spirit_gathering_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_mountain_guard_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_healing_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_clarity_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_vein_seeking_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_wood_growth_name"
+msgstr ""
+
+#. formation.csv:
+msgid "formation_beast_driving_name"
+msgstr ""
+
+#. goldfinger.csv: 气运之子
+msgid "GOLDFINGER_1_NAME"
+msgstr ""
+
+#. goldfinger.csv: 你仿佛生来便被天地眷顾，很多人求而不得的机缘总会向你靠近。
+msgid "GOLDFINGER_1_DESC"
+msgstr ""
+
+#. goldfinger.csv: 福缘深厚
+msgid "GOLDFINGER_2_NAME"
+msgstr ""
+
+#. goldfinger.csv: 你福缘深厚，常常能在险处见转机，在寻常处见收获。
+msgid "GOLDFINGER_2_DESC"
+msgstr ""
+
+#. goldfinger.csv: 穿越者
+msgid "GOLDFINGER_3_NAME"
+msgstr ""
+
+#. goldfinger.csv: 你来自另一个世界，现代的记忆与思维仍在影响你看待修仙界的方式。
+msgid "GOLDFINGER_3_DESC"
+msgstr ""
+
+#. goldfinger.csv: 重生者
+msgid "GOLDFINGER_4_NAME"
+msgstr ""
+
+#. goldfinger.csv: 你像是带着上一世的残影归来，对某些选择与危险有说不清的敏锐直觉。
+msgid "GOLDFINGER_4_DESC"
+msgstr ""
+
+#. goldfinger.csv: 随身老爷爷
+msgid "GOLDFINGER_5_NAME"
+msgstr ""
+
+#. goldfinger.csv: 你的命运里像是始终藏着一位看不见的前辈，在关键时刻指点、催促，甚至与你争执。
+msgid "GOLDFINGER_5_DESC"
+msgstr ""
+
 #. hidden_domain.csv: 万木残界
 msgid "HIDDEN_DOMAIN_HIDDEN_DOMAIN_WOOD_NAME"
 msgstr ""
@@ -1191,6 +1355,22 @@ msgstr ""
 msgid "NORMAL_REGION_118_DESC"
 msgstr ""
 
+#. opportunity_boon.csv: 一缕天机洗练命数，气运微增。
+msgid "OPPORTUNITY_BOON_LUCK_DESC"
+msgstr ""
+
+#. opportunity_boon.csv: 灵机入体，寿元略有增长。
+msgid "OPPORTUNITY_BOON_LIFESPAN_DESC"
+msgstr ""
+
+#. opportunity_boon.csv: 心神澄明，数年内修行更易入境。
+msgid "OPPORTUNITY_BOON_CULTIVATION_DESC"
+msgstr ""
+
+#. opportunity_boon.csv: 灵机淬炼体魄，数年内战力有所提升。
+msgid "OPPORTUNITY_BOON_BODY_DESC"
+msgstr ""
+
 #. orthodoxy.csv: 道
 msgid "ORTHODOXY_DAO_NAME"
 msgstr ""
@@ -1463,22 +1643,6 @@ msgstr ""
 msgid "PERSONA_29_DESC"
 msgstr ""
 
-#. persona.csv: 穿越者
-msgid "PERSONA_30_NAME"
-msgstr ""
-
-#. persona.csv: 你来自现代社会，怀念现代社会的一切。
-msgid "PERSONA_30_DESC"
-msgstr ""
-
-#. persona.csv: 气运之子
-msgid "PERSONA_31_NAME"
-msgstr ""
-
-#. persona.csv: 天生气运加身，更易遇到奇遇。
-msgid "PERSONA_31_DESC"
-msgstr ""
-
 #. persona.csv: 剑痴
 msgid "PERSONA_32_NAME"
 msgstr ""
@@ -1511,14 +1675,6 @@ msgstr ""
 msgid "PERSONA_35_DESC"
 msgstr ""
 
-#. persona.csv: 重生者
-msgid "PERSONA_36_NAME"
-msgstr ""
-
-#. persona.csv: 经历过一世，对未来有模糊预知。
-msgid "PERSONA_36_DESC"
-msgstr ""
-
 #. persona.csv: 疑心重
 msgid "PERSONA_37_NAME"
 msgstr ""
@@ -1541,14 +1697,6 @@ msgstr ""
 
 #. persona.csv: 精通丹道，对灵药敏感。
 msgid "PERSONA_39_DESC"
-msgstr ""
-
-#. persona.csv: 福缘深厚
-msgid "PERSONA_40_NAME"
-msgstr ""
-
-#. persona.csv: 天生福运，逢凶化吉。
-msgid "PERSONA_40_DESC"
 msgstr ""
 
 #. persona.csv: 剑修
@@ -1855,6 +2003,110 @@ msgstr ""
 msgid "PERSONA_1007_DESC"
 msgstr ""
 
+#. persona.csv: 出世
+msgid "PERSONA_1008_NAME"
+msgstr ""
+
+#. persona.csv: 你疏离尘世，不喜卷入凡俗权柄与庙堂机务。
+msgid "PERSONA_1008_DESC"
+msgstr ""
+
+#. persona.csv: 山泽孤修
+msgid "PERSONA_1009_NAME"
+msgstr ""
+
+#. persona.csv: 你惯于山泽独修，最厌与朝廷往来。
+msgid "PERSONA_1009_DESC"
+msgstr ""
+
+#. persona.csv: 入世
+msgid "PERSONA_1010_NAME"
+msgstr ""
+
+#. persona.csv: 你愿意踏入尘世，以凡俗事务磨砺自身与名望。
+msgid "PERSONA_1010_DESC"
+msgstr ""
+
+#. persona.csv: 名教中人
+msgid "PERSONA_1011_NAME"
+msgstr ""
+
+#. persona.csv: 你崇尚名教秩序，乐于以文章教化与政务匡世。
+msgid "PERSONA_1011_DESC"
+msgstr ""
+
+#. persona.csv: 爱美
+msgid "PERSONA_1012_NAME"
+msgstr ""
+
+#. persona.csv: 你很在意自己的容貌，也会花心思打理仪容，让自己看起来更体面。
+msgid "PERSONA_1012_DESC"
+msgstr ""
+
+#. persona.csv: 悦己
+msgid "PERSONA_1013_NAME"
+msgstr ""
+
+#. persona.csv: 你非常在意自己的容貌，几乎把“变得更好看”当成执念。
+msgid "PERSONA_1013_DESC"
+msgstr ""
+
+#. persona.csv: 扮猪吃老虎
+msgid "PERSONA_1014_NAME"
+msgstr ""
+
+#. persona.csv: 你习惯收敛锋芒、示敌以弱，他人常常误判你的实力与危险性，甚至有时候欺辱你，反而被你打脸。
+msgid "PERSONA_1014_DESC"
+msgstr ""
+
+#. persona.csv: 亲近异类
+msgid "PERSONA_1015_NAME"
+msgstr ""
+
+#. persona.csv: 你对不同种族的修士抱有天然好奇与亲近，愿意越过出身差异建立关系。
+msgid "PERSONA_1015_DESC"
+msgstr ""
+
+#. persona.csv: 痛恨异类
+msgid "PERSONA_1016_NAME"
+msgstr ""
+
+#. persona.csv: 你本能地排斥与自己种族不同的修士，很难真正信任异族。
+msgid "PERSONA_1016_DESC"
+msgstr ""
+
+#. persona.csv: 蛊师
+msgid "PERSONA_1017_NAME"
+msgstr ""
+
+#. persona.csv: 通晓虫豸毒术，善以蛊入道。
+msgid "PERSONA_1017_DESC"
+msgstr ""
+
+#. persona.csv: 蛊仙
+msgid "PERSONA_1018_NAME"
+msgstr ""
+
+#. persona.csv: 天生与万蛊相亲，举念之间可令虫豸奉命。
+msgid "PERSONA_1018_DESC"
+msgstr ""
+
+#. persona.csv: 阵师
+msgid "PERSONA_1019_NAME"
+msgstr ""
+
+#. persona.csv: 通晓阵法结构，能以阵盘调动区域灵机。
+msgid "PERSONA_1019_DESC"
+msgstr ""
+
+#. persona.csv: 阵仙
+msgid "PERSONA_1020_NAME"
+msgstr ""
+
+#. persona.csv: 天生精通阵道，布阵时能更高效地牵引地脉与灵机。
+msgid "PERSONA_1020_DESC"
+msgstr ""
+
 #. plant.csv: 奇草
 msgid "PLANT_1_NAME"
 msgstr ""
@@ -1943,52 +2195,52 @@ msgstr ""
 msgid "PLANT_11_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_1"
+#. race.csv: 人族
+msgid "RACE_HUMAN_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_2"
+#. race.csv: 你是一个普通的人类
+msgid "RACE_HUMAN_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_3"
+#. race.csv: 狐族
+msgid "RACE_FOX_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_4"
+#. race.csv: 狐族天生灵慧，善于察言观色，容貌多半出众，常被认为与机缘和人情往来有天然亲和。
+msgid "RACE_FOX_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_5"
+#. race.csv: 狼族
+msgid "RACE_WOLF_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_6"
+#. race.csv: 狼族血脉强健，重视生存、狩猎与战斗，本能敏锐，行动迅捷，常在厮杀中磨砺修为。
+msgid "RACE_WOLF_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_7"
+#. race.csv: 鸟族
+msgid "RACE_BIRD_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_8"
+#. race.csv: 鸟族感知开阔，身法轻灵，天生向往远方，擅长侦察、脱身与探索未知之地。
+msgid "RACE_BIRD_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_9"
+#. race.csv: 蛇族
+msgid "RACE_SNAKE_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_10"
+#. race.csv: 蛇族气息幽微，行事隐忍，擅长潜伏与突袭，常被人族修士忌惮，却也更能适应阴暗险地。
+msgid "RACE_SNAKE_DESC"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_11"
+#. race.csv: 龟族
+msgid "RACE_TURTLE_NAME"
 msgstr ""
 
-#. random_minor_event.csv: 
-msgid "minor_event_cause_12"
+#. race.csv: 龟族寿元绵长，体魄稳固，行事缓慢谨慎，最擅长守御、疗养与长久闭关。
+msgid "RACE_TURTLE_DESC"
 msgstr ""
 
 #. root.csv: 金灵根
@@ -2075,7 +2327,7 @@ msgstr ""
 msgid "SECT_1_NAME"
 msgstr ""
 
-#. sect.csv: 第一宗，以无上剑道称雄于世。镇派绝学为“九霄御雷剑诀”。【剑心通明】作为剑修，你使用剑类兵器时...
+#. sect.csv: 凌霄剑宗坐落于绝云峰群，山门、剑阁与试剑台层层高起，终年罡风呼啸，越往上越考验剑修心志。宗内以...
 msgid "SECT_1_DESC"
 msgstr ""
 
@@ -2083,7 +2335,7 @@ msgstr ""
 msgid "SECT_2_NAME"
 msgstr ""
 
-#. sect.csv: 以驯养凶兽闻名，豢养各种妖兽灵怪为战力。【万兽之主】你拥有独特的御兽天赋，捕捉妖兽对你来说轻而...
+#. sect.csv: 万兽魔山深藏十万大山腹地，九十九层洞天圈养着自低阶灵兽到凶煞妖王的庞大兽群，兽栏、血食场与契灵...
 msgid "SECT_2_DESC"
 msgstr ""
 
@@ -2091,7 +2343,7 @@ msgstr ""
 msgid "SECT_3_NAME"
 msgstr ""
 
-#. sect.csv: 居于海外孤岛，实则严守中立。拥有一块上古奇石“观海玉璧”，可窥探天机。【知天命】你拥有超乎常人...
+#. sect.csv: 听涛阁立于静海涯绝壁之上，寒冰灵玉筑成的楼阁映着海潮与星辉，阁中最重要的并非兵刃，而是观海玉璧...
 msgid "SECT_3_DESC"
 msgstr ""
 
@@ -2099,7 +2351,7 @@ msgstr ""
 msgid "SECT_4_NAME"
 msgstr ""
 
-#. sect.csv: 参悟生死枯荣，接引黄泉之力，术法阴冷狠厉。【黄泉渡魂】你修行黄泉之法，心志坚定，突破瓶颈时心无...
+#. sect.csv: 九幽黄泉道盘踞死寂海群岛，山门间建有引魂殿、渡魂桥、镇尸窟与幽灯长廊，海雾终年不散，来去都像行...
 msgid "SECT_4_DESC"
 msgstr ""
 
@@ -2107,7 +2359,7 @@ msgstr ""
 msgid "SECT_5_NAME"
 msgstr ""
 
-#. sect.csv: 邪宗大派。以机关、傀儡、毒杀闻名于世，素来行踪诡秘。【诡道刺杀】你精通潜伏与刺杀，对于强敌，避...
+#. sect.csv: 千机诡门藏身千机谷深处，外看楼台精巧华丽，内里却遍布机关廊、傀儡坊、毒械库与暗道密室，一砖一瓦...
 msgid "SECT_5_DESC"
 msgstr ""
 
@@ -2115,7 +2367,7 @@ msgstr ""
 msgid "SECT_6_NAME"
 msgstr ""
 
-#. sect.csv: 以情入道，靠双修增进修为，善驭人心，长于权变。【红尘炼心】你的体质特殊，通过双修能获得远超常人...
+#. sect.csv: 醉梦楼建于闹市洞天之中，香阁、水榭、乐坊与幻梦池彼此相连，白日歌舞不断，夜里灯火如霞，表面像人...
 msgid "SECT_6_DESC"
 msgstr ""
 
@@ -2123,7 +2375,7 @@ msgstr ""
 msgid "SECT_7_NAME"
 msgstr ""
 
-#. sect.csv: 佛门圣地，以金刚之躯镇压世间妖邪。【金身罗汉】你修习护体神功，拥有极强的肉身防御与伤害减免能力...
+#. sect.csv: 须弥禅院立于风暴海中的普渡岛，以金刚塔为中心，伏魔殿、听钟台、苦修崖和药浴池分列四方，钟声一起...
 msgid "SECT_7_DESC"
 msgstr ""
 
@@ -2131,7 +2383,7 @@ msgstr ""
 msgid "SECT_8_NAME"
 msgstr ""
 
-#. sect.csv: 镇宗典籍《影杀真经》。以地煞阴气为根基。【如影随形】你极擅身法与遁术，遇到危险时总能全身而退，...
+#. sect.csv: 影煞殿潜伏于暗影沼泽深处，树冠之上有隐楼，泥沼之下有密道，影牢、匿形场、毒瘴潭与情报据点层层交...
 msgid "SECT_8_DESC"
 msgstr ""
 
@@ -2139,7 +2391,7 @@ msgstr ""
 msgid "SECT_9_NAME"
 msgstr ""
 
-#. sect.csv: 由商会发展而来的庞大势力。拥有“流云飞舟”商队，富甲天下。【财通鬼神】你深谙炼器与经商之道，温...
+#. sect.csv: 万宝仙盟建立于多宝浮空岛群之上，拍卖殿、千炉塔、云舟港、总库与各类商行彼此贯通，飞舟昼夜不停，...
 msgid "SECT_9_DESC"
 msgstr ""
 
@@ -2147,7 +2399,7 @@ msgstr ""
 msgid "SECT_10_NAME"
 msgstr ""
 
-#. sect.csv: 精擅天魔音律与精神操控，功法阴柔诡谲，以无形魔音乱人心智。【魔音摄魂】你擅长以音律乱人心智，灵...
+#. sect.csv: 摄魂音宗盘踞回音谷中，琴楼、鼓台、试音廊与摄魂阵场顺着山势铺开，谷风一过，连最细微的弦声都能被...
 msgid "SECT_10_DESC"
 msgstr ""
 
@@ -2155,7 +2407,7 @@ msgstr ""
 msgid "SECT_11_NAME"
 msgstr ""
 
-#. sect.csv: 当世第一阵法大派，讲究天道演算，以万物为棋，山川为阵。【阵法通神】你善用阵法辅助修炼，能够聚集...
+#. sect.csv: 天衍阵宗坐落于迷踪天，一峰之内暗藏无数折叠空间，演天台、万阵廊、试阵谷与地脉井层层嵌套，弟子若...
 msgid "SECT_11_DESC"
 msgstr ""
 
@@ -2163,7 +2415,7 @@ msgstr ""
 msgid "SECT_12_NAME"
 msgstr ""
 
-#. sect.csv: 修习“大光明金身”，信奉光明不灭。以武入道，肉身成圣。拥有极强的生命秘术。【光耀长生】你的生命...
+#. sect.csv: 长明宫位于极北永夜中的极光天境，长明殿、圣火坛、洗髓池与曜甲校场常年被极光照亮，冰与火并存，使...
 msgid "SECT_12_DESC"
 msgstr ""
 
@@ -2171,7 +2423,7 @@ msgstr ""
 msgid "SECT_13_NAME"
 msgstr ""
 
-#. sect.csv: 儒家正统，养浩然之气。行事刚正，言出法随，克制邪魔。【吾善养气】你养浩然之气，气脉悠长，面对境...
+#. sect.csv: 浩然书院坐落于圣贤林中，讲经堂、明法殿、碑林书库和问心石径散布林间，晨钟未起便已书声琅琅，来往...
 msgid "SECT_13_DESC"
 msgstr ""
 
@@ -2179,7 +2431,7 @@ msgstr ""
 msgid "SECT_14_NAME"
 msgstr ""
 
-#. sect.csv: 元衍界第一魔宗，行事霸道残忍，崇尚“弱肉强食”，通过掠夺与血祭提升修为。【血海滔天】你崇尚力量...
+#. sect.csv: 罗刹血宗盘踞修罗血池之上，血河祭坛、战功堂、炼骨窟与夺元台昼夜不停运转，空气里常年弥漫着血雾、...
 msgid "SECT_14_DESC"
 msgstr ""
 
@@ -2187,7 +2439,7 @@ msgstr ""
 msgid "SECT_REGION_401_NAME"
 msgstr ""
 
-#. sect_region.csv: 绝云峰高耸入云，四周罡风环绕，唯有剑修可御剑而上。山上设有弟子修炼之地，环境清幽。
+#. sect_region.csv: 绝云峰群高插云海，峰间多以铁索与云桥相连，山道险绝，唯有真正稳住剑意的人才能登上更高处。半山可...
 msgid "SECT_REGION_401_DESC"
 msgstr ""
 
@@ -2195,7 +2447,7 @@ msgstr ""
 msgid "SECT_REGION_402_NAME"
 msgstr ""
 
-#. sect_region.csv: 万兽窟位于十万大山腹地，洞窟内妖气冲天，在此可闻万兽咆哮。洞内纵横交错，共有九十九层洞天，每层...
+#. sect_region.csv: 万兽窟深藏群山腹地，外层是瘴气与藤蔓封锁的天然屏障，深入其中，才会见到层层下沉的洞天兽域。不同...
 msgid "SECT_REGION_402_DESC"
 msgstr ""
 
@@ -2203,7 +2455,7 @@ msgstr ""
 msgid "SECT_REGION_403_NAME"
 msgstr ""
 
-#. sect_region.csv: 听涛阁悬于海边绝壁之上，终年听潮。阁中玉璧倒映星辰大海，宫殿楼阁皆为寒冰灵玉所筑，通体透明，虚...
+#. sect_region.csv: 静海涯悬在万丈海崖之上，寒冰灵玉筑成的殿阁、回廊与观潮台半隐于海雾之间，远望时仿佛整座山门都漂...
 msgid "SECT_REGION_403_DESC"
 msgstr ""
 
@@ -2211,7 +2463,7 @@ msgstr ""
 msgid "SECT_REGION_404_NAME"
 msgstr ""
 
-#. sect_region.csv: 九幽黄泉道位于死寂海群岛上，海水漆黑如墨，无风起浪。传闻海底直通九幽黄泉。海浪起啸之时，万魂齐...
+#. sect_region.csv: 死寂海由数座黑色群岛与暗潮海湾组成，岛间以狭长栈桥、残碑渡口和幽火灯塔相连，远远望去像一串漂在...
 msgid "SECT_REGION_404_DESC"
 msgstr ""
 
@@ -2219,7 +2471,7 @@ msgstr ""
 msgid "SECT_REGION_405_NAME"
 msgstr ""
 
-#. sect_region.csv: 千机谷中遍布机关陷阱，看似寻常山谷，踏错一步即死无葬身之地。谷中宫殿楼阁看似华丽却处处暗藏杀机。
+#. sect_region.csv: 千机谷初看只是寻常山谷，青石路、飞檐楼阁与庭院花木都布置得极为精巧，可走近后才会发现桥会转向，...
 msgid "SECT_REGION_405_DESC"
 msgstr ""
 
@@ -2227,7 +2479,7 @@ msgstr ""
 msgid "SECT_REGION_406_NAME"
 msgstr ""
 
-#. sect_region.csv: 醉梦楼建于繁华闹市之中的独立洞天，歌舞升平，终日不散的迷醉香气。宗门建筑极尽奢华，殿宇楼阁之间...
+#. sect_region.csv: 销金窟藏于繁华闹市背后的独立洞天，入门是灯海、香雾、曲桥与层层叠叠的楼阁水榭，越往深处走，喧闹...
 msgid "SECT_REGION_406_DESC"
 msgstr ""
 
@@ -2235,7 +2487,7 @@ msgstr ""
 msgid "SECT_REGION_407_NAME"
 msgstr ""
 
-#. sect_region.csv: 位于海域风暴中心，金光漫天。钟声响起时，风暴止息。宗门建筑立于岛上，以金刚塔为中心，钟声可震慑...
+#. sect_region.csv: 普渡岛孤悬风暴海中央，岛外巨浪冲天、电光翻涌，岛内却被钟声与佛光压出一片近乎凝固的宁静。金刚塔...
 msgid "SECT_REGION_407_DESC"
 msgstr ""
 
@@ -2243,7 +2495,7 @@ msgstr ""
 msgid "SECT_REGION_408_NAME"
 msgstr ""
 
-#. sect_region.csv: 终年迷雾笼罩的剧毒沼泽，这里没有光，只有潜藏在暗处的眼睛。参天巨木、缠绕藤蔓、终日浮游不散的瘴...
+#. sect_region.csv: 暗影沼泽终年不见天光，毒雾、腐水与盘结古木把整片地域封得密不透风，外来者往往还未看见山门，就先...
 msgid "SECT_REGION_408_DESC"
 msgstr ""
 
@@ -2251,7 +2503,7 @@ msgstr ""
 msgid "SECT_REGION_409_NAME"
 msgstr ""
 
-#. sect_region.csv: 万宝仙盟建于多宝浮空岛之上，巨大的浮空岛屿群由无数锁链相连，往来飞舟如云，繁华至极。城中高塔林...
+#. sect_region.csv: 多宝浮空岛并非单一岛屿，而是由大小不一的浮空岛群组成，岛与岛之间以巨链、云桥和飞舟航道连成一座...
 msgid "SECT_REGION_409_DESC"
 msgstr ""
 
@@ -2259,7 +2511,7 @@ msgstr ""
 msgid "SECT_REGION_410_NAME"
 msgstr ""
 
-#. sect_region.csv: 特殊的山谷构造使得声音凝而不散。风过之时，如鬼哭神嚎。谷内亭台楼阁错落，丝竹之声终日不绝，看似...
+#. sect_region.csv: 回音谷两侧山壁高耸内收，天然形成无数回响孔洞与共鸣裂隙，哪怕只拨动一声琴弦，也能在谷中盘旋许久...
 msgid "SECT_REGION_410_DESC"
 msgstr ""
 
@@ -2267,7 +2519,7 @@ msgstr ""
 msgid "SECT_REGION_411_NAME"
 msgstr ""
 
-#. sect_region.csv: 看似只有一座山，实则包含无数折叠空间。不懂阵法者寸步难行。整座山脉被无数重叠的阵法大阵覆盖，一...
+#. sect_region.csv: 迷踪天表面只是一座孤峰，真正踏入山门后却会发现亭台、石阶、悬桥与山道都嵌在层层折叠的空间之中，...
 msgid "SECT_REGION_411_DESC"
 msgstr ""
 
@@ -2275,7 +2527,7 @@ msgstr ""
 msgid "SECT_REGION_412_NAME"
 msgstr ""
 
-#. sect_region.csv: 位于极北永夜之地，却被万年不灭的极光笼罩，亮如白昼。城池由万年寒冰与玄铁铸就，在漫天极光的映照...
+#. sect_region.csv: 极光天境位于极北永夜深处，外界冰原漫长寂静，唯独这片宫城终年被流动极光照得亮如白昼。高大的冰墙...
 msgid "SECT_REGION_412_DESC"
 msgstr ""
 
@@ -2283,7 +2535,7 @@ msgstr ""
 msgid "SECT_REGION_413_NAME"
 msgstr ""
 
-#. sect_region.csv: 位于元衍界中腹，古木参天，碑林林立，每块碑文都蕴含圣人微言大义。林中书声琅琅之声可传十里，是天...
+#. sect_region.csv: 圣贤林地处中腹灵脉交汇之地，古木参天，碑林散布，讲堂、书阁与临水小院掩映在林荫之间，行走其间常...
 msgid "SECT_REGION_413_DESC"
 msgstr ""
 
@@ -2291,7 +2543,7 @@ msgstr ""
 msgid "SECT_REGION_414_NAME"
 msgstr ""
 
-#. sect_region.csv: 山体呈现暗红色，仿佛被鲜血浸透。宗门建于巨大的地下血池之上。山中常有血雾弥漫，怪石嶙峋，随处可...
+#. sect_region.csv: 修罗血池所在的山体通体暗红，岩缝间常有血色雾气与热流上涌，山腹深处则掏空成巨大的地下血池与层层...
 msgid "SECT_REGION_414_DESC"
 msgstr ""
 
@@ -3079,7 +3331,7 @@ msgstr ""
 msgid "WEAPON_1077_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_INTRO_NAME"
 msgstr ""
 
@@ -3087,23 +3339,23 @@ msgstr ""
 msgid "WORLD_INFO_INTRO_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_REALM_NAME"
 msgstr ""
 
-#. world_info.csv: 修仙的境界从弱到强：练气、筑基、金丹、元婴。每个境界分前期、中期、后期。境界间差距很大。
+#. world_info.csv: 世界底层境界从弱到强为练气、筑基、金丹、元婴，每境分前期、中期、后期。不同道统可有别名，但规则...
 msgid "WORLD_INFO_REALM_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_LIFESPAN_NAME"
 msgstr ""
 
-#. world_info.csv: 若当前年龄达到最大寿元，会立刻死亡。突破境界可以增加最大寿元，突破失败也可能折损寿元。
+#. world_info.csv: 每个角色都有寿元上限。寿元耗尽时会死亡；突破境界通常能延长寿元，突破失败也可能折损寿元。
 msgid "WORLD_INFO_LIFESPAN_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_DEATH_NAME"
 msgstr ""
 
@@ -3111,7 +3363,7 @@ msgstr ""
 msgid "WORLD_INFO_DEATH_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_REGION_NAME"
 msgstr ""
 
@@ -3119,15 +3371,15 @@ msgstr ""
 msgid "WORLD_INFO_REGION_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_CULTIVATION_NAME"
 msgstr ""
 
-#. world_info.csv: 修炼可以增加经验，直到到达突破前的瓶颈。突破是概率事件，突破后会进入下一个境界。
+#. world_info.csv: 修行会积累修为，直至抵达当前阶层的瓶颈。突破有成败之分，成功后会晋入下一层级，失败则可能付出代价。
 msgid "WORLD_INFO_CULTIVATION_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_ROOT_NAME"
 msgstr ""
 
@@ -3135,7 +3387,7 @@ msgstr ""
 msgid "WORLD_INFO_ROOT_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_WORLD_QI_NAME"
 msgstr ""
 
@@ -3143,7 +3395,7 @@ msgstr ""
 msgid "WORLD_INFO_WORLD_QI_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_SPIRIT_STONE_NAME"
 msgstr ""
 
@@ -3151,7 +3403,7 @@ msgstr ""
 msgid "WORLD_INFO_SPIRIT_STONE_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_SECT_NAME"
 msgstr ""
 
@@ -3159,7 +3411,7 @@ msgstr ""
 msgid "WORLD_INFO_SECT_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_BATTLE_NAME"
 msgstr ""
 
@@ -3167,7 +3419,7 @@ msgstr ""
 msgid "WORLD_INFO_BATTLE_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_ACTION_NAME"
 msgstr ""
 
@@ -3175,23 +3427,23 @@ msgstr ""
 msgid "WORLD_INFO_ACTION_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_EQUIPMENT_AND_ELIXIR_NAME"
 msgstr ""
 
-#. world_info.csv: 通过兵器、辅助装备、丹药等装备，可以获得额外的属性加成，获得或小或大的增益。拥有好的装备或者服...
+#. world_info.csv: 兵器、辅助装备与丹药能带来额外加成。高品阶装备与合适丹药往往能显著提升修士的生存与争斗能力。
 msgid "WORLD_INFO_EQUIPMENT_AND_ELIXIR_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_SHOPPING_NAME"
 msgstr ""
 
-#. world_info.csv: 在城市区域可以购买练气级别丹药、兵器。购买丹药后会立刻服用强化自身。购买兵器可以帮自己切换兵器...
+#. world_info.csv: 在城市区域可以购买练气品阶的丹药与兵器。购买丹药后会立刻服用以强化自身；购买兵器可切换为更顺手...
 msgid "WORLD_INFO_SHOPPING_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_AUCTION_NAME"
 msgstr ""
 
@@ -3199,7 +3451,7 @@ msgstr ""
 msgid "WORLD_INFO_AUCTION_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_SECRET_REALM_NAME"
 msgstr ""
 
@@ -3207,7 +3459,7 @@ msgstr ""
 msgid "WORLD_INFO_SECRET_REALM_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_ORTHODOXY_NAME"
 msgstr ""
 
@@ -3215,15 +3467,15 @@ msgstr ""
 msgid "WORLD_INFO_ORTHODOXY_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_RANKING_NAME"
 msgstr ""
 
-#. world_info.csv: 修仙界设有天地人三榜及宗门榜。天榜收录元婴期强者，地榜收录金丹期强者，人榜收录筑基期强者，宗门...
+#. world_info.csv: 修仙界设有天地人三榜及宗门榜。天地人三榜按等价标准境界划分：天榜收录元婴层级强者，地榜收录金丹...
 msgid "WORLD_INFO_RANKING_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_DYNASTY_NAME"
 msgstr ""
 
@@ -3231,11 +3483,51 @@ msgstr ""
 msgid "WORLD_INFO_DYNASTY_DESC"
 msgstr ""
 
-#. world_info.csv: 
+#. world_info.csv:
 msgid "WORLD_INFO_OFFICIAL_NAME"
 msgstr ""
 
 #. world_info.csv: 修士可为朝廷理政，积累朝廷威望并领取俸禄。威望足够可升官，官职越高，俸禄与气运越多；久不理政，...
 msgid "WORLD_INFO_OFFICIAL_DESC"
+msgstr ""
+
+#. world_info.csv:
+msgid "WORLD_INFO_RACE_NAME"
+msgstr ""
+
+#. world_info.csv: 世界中存在人族与妖族修士。妖族包括狐、狼、鸟、蛇、龟等种族，各有不同天性：狐灵慧狡黠，狼凶悍掠...
+msgid "WORLD_INFO_RACE_DESC"
+msgstr ""
+
+#. world_info.csv:
+msgid "WORLD_INFO_CULTIVATION_ALIAS_NAME"
+msgstr ""
+
+#. world_info.csv: 同一修行阶层在不同体系中有各自名目：道家与散修为练气、筑基、金丹、元婴；武道为淬体、易筋、宗师...
+msgid "WORLD_INFO_CULTIVATION_ALIAS_DESC"
+msgstr ""
+
+#. world_info.csv:
+msgid "WORLD_INFO_GU_NAME"
+msgstr ""
+
+#. world_info.csv: 蛊术需要修士持有蛊具并拥有下蛊能力，才能对可观测目标施加蛊。不同蛊有不同发作方式：潜心蛊会潜移...
+msgid "WORLD_INFO_GU_DESC"
+msgstr ""
+
+#. world_info.csv:
+msgid "WORLD_INFO_FORMATION_NAME"
+msgstr ""
+
+#. world_info.csv: 阵法需要修士持有阵盘并拥有布阵能力，才能在当前区域布置限时区域效果。不同阵法适合不同区域：修行...
+msgid "WORLD_INFO_FORMATION_DESC"
+msgstr ""
+
+#. world_info.csv:
+msgid "WORLD_INFO_OPPORTUNITY_NAME"
+msgstr ""
+
+#. world_info.csv: 修士偶有福至心灵，感应到某人或某地与自身缘法相牵。若循感应而去，或得宝物与助益，或空手而返，亦...
+msgid "WORLD_INFO_OPPORTUNITY_DESC"
 msgstr ""
 

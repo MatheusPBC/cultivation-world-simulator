@@ -57,6 +57,7 @@ from .claim_imperial_mandate import ClaimImperialMandate
 from .support_imperial_claim import SupportImperialClaim
 from .oppose_imperial_claim import OpposeImperialClaim
 from .withdraw_imperial_claim import WithdrawImperialClaim
+from .sponsor_dao_rite import SponsorDaoRite
 
 # 注册到 ActionRegistry（标注是否为实际可执行动作）
 register_action(actual=False)(Action)
@@ -113,6 +114,7 @@ register_action(actual=True)(ClaimImperialMandate)
 register_action(actual=True)(SupportImperialClaim)
 register_action(actual=True)(OpposeImperialClaim)
 register_action(actual=True)(WithdrawImperialClaim)
+register_action(actual=True)(SponsorDaoRite)
 # Talk 已移动到 mutual_action 模块，在那里注册
 
 __all__ = [
@@ -172,4 +174,5 @@ __all__ = [
     "SupportImperialClaim",
     "OpposeImperialClaim",
     "WithdrawImperialClaim",
+    "SponsorDaoRite",
 ]

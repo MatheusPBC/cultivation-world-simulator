@@ -15,7 +15,8 @@ class WithdrawImperialClaim(InstantAction):
 
     def can_possibly_start(self) -> bool:
         crisis = getattr(getattr(self.world, "dynasty", None), "imperial_crisis", None)
-        return bool(crisis and crisis.status == "active" and str(crisis.claimant_avatar_id) == str(self.avatar.id))
+        claim = crisis.get_claim(str(self.avatar.id)) if crisis is not None else None
+        return bool(crisis and crisis.status == "active" and claim and claim.status == "active")
 
     def can_start(self) -> tuple[bool, str]:
         return (True, "") if self.can_possibly_start() else (False, t("Only the active claimant can withdraw the imperial claim"))

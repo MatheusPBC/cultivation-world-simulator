@@ -2,6 +2,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.classes.story_event_service import StoryEventKind, StoryEventService
+from src.classes.event import Event
+from src.classes.causal_link import CausalRelation
 from src.classes.goldfinger import goldfingers_by_id
 
 
@@ -10,6 +12,10 @@ def _find_goldfinger_by_key(key: str):
         if goldfinger.key == key:
             return goldfinger
     raise AssertionError(f"Goldfinger not found: {key}")
+
+
+def _source_event(avatar):
+    return Event(avatar.world.month_stamp, "事实结果", related_avatars=[avatar.id])
 
 
 @pytest.mark.asyncio
@@ -23,6 +29,7 @@ async def test_gathering_story_always_triggers(dummy_avatar):
             events_text="Event text",
             details_text="Detail text",
             related_avatars=[dummy_avatar],
+            source_event=_source_event(dummy_avatar),
         )
 
     assert event is not None
@@ -39,12 +46,27 @@ async def test_story_not_created_when_probability_misses(dummy_avatar):
             month_stamp=dummy_avatar.world.month_stamp,
             start_text="Start",
             result_text="Result",
+            source_event=_source_event(dummy_avatar),
             actors=[dummy_avatar],
             related_avatar_ids=[dummy_avatar.id],
         )
 
     assert event is None
     mock_tell.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_story_requires_real_source_event(dummy_avatar):
+    with pytest.raises(ValueError, match="source_event"):
+        await StoryEventService.maybe_create_story(
+            kind=StoryEventKind.DAILY_SOCIAL,
+            month_stamp=dummy_avatar.world.month_stamp,
+            start_text="Start",
+            result_text="Result",
+            source_event=None,
+            actors=[dummy_avatar],
+            related_avatar_ids=[dummy_avatar.id],
+        )
 
 
 @pytest.mark.asyncio
@@ -58,6 +80,7 @@ async def test_story_created_when_probability_hits(dummy_avatar):
             month_stamp=dummy_avatar.world.month_stamp,
             start_text="Start",
             result_text="Result",
+            source_event=_source_event(dummy_avatar),
             actors=[dummy_avatar],
             related_avatar_ids=[dummy_avatar.id],
         )
@@ -65,6 +88,9 @@ async def test_story_created_when_probability_hits(dummy_avatar):
     assert event is not None
     assert event.is_story is True
     assert event.content == "Story body"
+    assert event.is_major is False
+    assert event.causal_payload is None
+    assert event.causal_links[0].relation == CausalRelation.CONTRIBUTED_TO
     mock_tell.assert_awaited_once()
 
 
@@ -83,6 +109,7 @@ async def test_story_service_merges_goldfinger_prompt(dummy_avatar):
             result_text="Result",
             actors=[dummy_avatar],
             related_avatar_ids=[dummy_avatar.id],
+            source_event=_source_event(dummy_avatar),
             prompt="原始提示",
         )
 
@@ -106,6 +133,7 @@ async def test_gathering_story_merges_goldfinger_prompt(dummy_avatar):
             events_text="Event text",
             details_text="Detail text",
             related_avatars=[dummy_avatar],
+            source_event=_source_event(dummy_avatar),
             prompt="聚会提示",
         )
 

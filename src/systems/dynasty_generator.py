@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 
 from src.classes.core.dynasty import Dynasty, dynasties_by_id
+from src.classes.gender import Gender
+from src.classes.race import get_race
 from src.utils.df import game_configs, get_str
 
 
@@ -29,35 +31,65 @@ def _pick_royal_surname() -> str:
     return random.choice(candidates)
 
 
-def _pick_emperor_given_name() -> str:
+def _pick_given_name(gender: Gender) -> str:
     given_name_rows = game_configs.get("given_name", []) or []
     candidates = [
         get_str(row, "given_name")
         for row in given_name_rows
-        if get_str(row, "given_name") and not get_str(row, "sect_id") and get_str(row, "gender") == "1"
+        if get_str(row, "given_name")
+        and not get_str(row, "sect_id")
+        and get_str(row, "gender") == ("1" if gender is Gender.MALE else "0")
     ]
     if not candidates:
         raise ValueError("No emperor given-name candidates loaded from given_name.csv")
     return random.choice(candidates)
 
 
-def generate_emperor_avatar(world, dynasty: Dynasty):
-    """Create the sovereign through the normal Avatar lifecycle."""
+def _build_royal_avatar(world, dynasty: Dynasty, *, gender: Gender, age_years: int):
+    """Create one royal through the same planner/factory path as other avatars."""
+    from src.classes.age import Age
+    from src.sim.avatar_init.factory import AvatarFactory
+    from src.sim.avatar_init.planning import MortalPlanner
+
     surname = str(getattr(dynasty, "royal_surname", "") or "")
     if not surname:
         raise ValueError("Dynasty royal surname is required before generating emperor")
 
-    from src.classes.age import Age
-    from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
-    from src.sim.avatar_init import create_random_mortal
-    age_years = random.randint(30, 60)
-    given_name = _pick_emperor_given_name()
-    avatar = create_random_mortal(world, world.month_stamp, f"{surname}{given_name}", Age(age_years), level=1)
-    avatar.official_rank = OFFICIAL_GRAND_COUNCILOR
-    avatar.court_reputation = max(700, int(getattr(avatar, "court_reputation", 0)))
+    name = f"{surname}{_pick_given_name(gender)}"
+    age = Age(age_years)
+    plan = MortalPlanner.plan(world, name=name, age=age, level=1, allow_relations=False)
+    plan.gender = gender
+    plan.race = get_race("human")
+    plan.sect = None
+    plan.surname = surname
+    avatar = AvatarFactory.build_from_plan(world, world.month_stamp, name=name, age=age, plan=plan, attach_relations=False)
     world.avatar_manager.register_avatar(avatar)
-    dynasty.current_emperor_id = str(avatar.id)
     return avatar
+
+
+def generate_emperor_avatar(world, dynasty: Dynasty):
+    """Create an initial emperor, consort, and two adult children."""
+    from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
+
+    emperor = _build_royal_avatar(world, dynasty, gender=Gender.MALE, age_years=random.randint(35, 55))
+    consort = _build_royal_avatar(world, dynasty, gender=Gender.FEMALE, age_years=random.randint(30, 50))
+    emperor.become_lovers_with(consort)
+    children = [
+        _build_royal_avatar(world, dynasty, gender=Gender.MALE, age_years=random.randint(18, 28)),
+        _build_royal_avatar(world, dynasty, gender=Gender.FEMALE, age_years=random.randint(18, 28)),
+    ]
+    for child in children:
+        emperor.acknowledge_child(child)
+        consort.acknowledge_child(child)
+
+    emperor.official_rank = OFFICIAL_GRAND_COUNCILOR
+    emperor.court_reputation = max(700, int(getattr(emperor, "court_reputation", 0)))
+    dynasty.current_emperor_id = str(emperor.id)
+    dynasty.add_royal_house_member(emperor.id, blood=True)
+    dynasty.add_royal_house_member(consort.id)
+    for child in children:
+        dynasty.add_royal_house_member(child.id, blood=True)
+    return emperor
 
 
 def generate_dynasty() -> Dynasty:

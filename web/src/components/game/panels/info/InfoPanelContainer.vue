@@ -11,6 +11,8 @@ import AvatarDetailView from './AvatarDetail.vue';
 import RegionDetailView from './RegionDetail.vue';
 import SectDetailView from './SectDetail.vue';
 import POIDetailView from './POIDetail.vue';
+import InfrastructureSiteDetailView from './InfrastructureSiteDetail.vue';
+import RouteDetailView from './RouteDetail.vue';
 
 const uiStore = useUiStore();
 const panelRef = ref<HTMLElement | null>(null);
@@ -24,6 +26,8 @@ const currentComponent = computed(() => {
     case 'region': return RegionDetailView;
     case 'sect': return SectDetailView;
     case 'poi': return POIDetailView;
+    case 'site': return InfrastructureSiteDetailView;
+    case 'route': return RouteDetailView;
     default: return null;
   }
 });
@@ -32,7 +36,9 @@ const currentComponent = computed(() => {
 
 const title = computed(() => {
   if (uiStore.detailData) {
-    return uiStore.detailData.name;
+    if (typeof uiStore.detailData === 'object' && uiStore.detailData && 'name' in uiStore.detailData) {
+      return uiStore.detailData.name;
+    }
   }
   return uiStore.selectedTarget?.id || t('common.detail');
 });

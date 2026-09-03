@@ -9,5 +9,7 @@
   "cancel": "Cancelar",
   "refresh": "Atualizar",
   "error": "Erro",
-  "success": "Sucesso"
+  "success": "Sucesso",
+  "yes": "Sim",
+  "no": "Não"
 }

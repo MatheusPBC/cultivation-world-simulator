@@ -11,12 +11,18 @@ from .models import (
 from .service import BackgroundNpcService
 
 
-def try_trigger_background_npc_events(world, living_avatars) -> list:
-    return BackgroundNpcService.create_monthly_events(world, living_avatars)
+def try_trigger_background_npc_events(world, living_avatars, *, source_event_id: str) -> list:
+    return BackgroundNpcService.create_monthly_events(
+        world, living_avatars, source_event_id=source_event_id
+    )
 
 
-def try_trigger_background_npc_action_echo(world, avatar, action_key: str) -> list:
-    return BackgroundNpcService.create_action_echo_events(world, avatar, action_key)
+def try_trigger_background_npc_action_echo(
+    world, avatar, action_key: str, *, source_event_id: str
+) -> list:
+    return BackgroundNpcService.create_action_echo_events(
+        world, avatar, action_key, source_event_id=source_event_id
+    )
 
 
 __all__ = [

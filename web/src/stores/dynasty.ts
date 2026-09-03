@@ -16,6 +16,8 @@ function createEmptyOverview(): DynastyOverview {
     official_preference_label: '',
     is_low_magic: true,
     current_emperor: null,
+    royal_house_member_ids: [],
+    royal_blood_member_ids: [],
   }
 }
 

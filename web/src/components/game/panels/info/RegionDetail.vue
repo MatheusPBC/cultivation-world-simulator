@@ -38,6 +38,7 @@ const activeSemanticConditions = computed(() =>
   semanticContext.value?.conditions.filter((condition) => condition.resolved_month == null) ?? [],
 );
 const semanticReadings = computed(() => semanticContext.value?.readings ?? []);
+const activeHazards = computed(() => semanticContext.value?.active_hazards ?? []);
 const cityState = computed(() => props.data.city_state);
 const economy = computed(() => props.data.economy);
 const infrastructure = computed(() => props.data.infrastructure);
@@ -103,6 +104,7 @@ const hasCityStateFacts = computed(() => Boolean(
 ));
 const hasRegionalContext = computed(() => Boolean(
   props.data.dao_tradition ||
+  activeHazards.value.length ||
   activeSemanticConditions.value.length ||
   semanticReadings.value.length ||
   hasCityStateFacts.value ||
@@ -120,6 +122,10 @@ function conditionEventIds(condition: SemanticCondition): string[] {
   return [...new Set([condition.cause_event_id, condition.resolution_event_id].filter(
     (eventId): eventId is string => Boolean(eventId),
   ))];
+}
+
+function hazardEventIds(hazard: (typeof activeHazards.value)[number]): string[] {
+  return [...new Set([...hazard.source_event_ids, hazard.last_event_id].filter(Boolean))];
 }
 
 function readingValue(reading: (typeof semanticReadings.value)[number]): string {
@@ -364,6 +370,32 @@ function collectiveHealthStateRefs(): string[] {
           </article>
         </div>
       </section>
+      <section v-if="activeHazards.length" class="semantic-subsection" data-testid="region-active-hazards">
+        <h3 class="subheading">{{ t('game.info_panel.region.semantic_context.hazards_title') }}</h3>
+        <article v-for="hazard in activeHazards" :key="`${hazard.kind}:${hazard.region_id}`" class="semantic-condition">
+          <div class="semantic-condition__header">
+            <strong>{{ t(`game.info_panel.region.semantic_context.hazards.${hazard.kind}`) }}</strong>
+            <span>{{ t('game.info_panel.region.semantic_context.risk', { value: Math.round(hazard.activation_risk * 100) }) }}</span>
+          </div>
+          <div class="semantic-meta">
+            {{ t('game.info_panel.region.semantic_context.started_month', { month: hazard.started_month }) }}
+          </div>
+          <div v-if="hazardEventIds(hazard).length" class="semantic-events">
+            <div v-for="eventId in hazardEventIds(hazard)" :key="eventId" class="semantic-event">
+              <span class="semantic-event__id">{{ t('game.info_panel.region.semantic_context.source_event', { id: eventId }) }}</span>
+              <button
+                type="button"
+                class="semantic-event__why"
+                :data-testid="`region-hazard-causal-event-${eventId}`"
+                :data-event-id="eventId"
+                @click="openCausalDetail(eventId)"
+              >
+                {{ t('game.world_journal.why_button') }}
+              </button>
+            </div>
+          </div>
+        </article>
+      </section>
       <section v-if="activeSemanticConditions.length" class="semantic-subsection">
         <h3 class="subheading">{{ t('game.info_panel.region.semantic_context.conditions_title') }}</h3>
         <article v-for="condition in activeSemanticConditions" :key="condition.id" class="semantic-condition">
@@ -418,6 +450,20 @@ function collectiveHealthStateRefs(): string[] {
             <ul>
               <li v-for="input in reading.derived_from" :key="readingKeyText(input)">
                 {{ readingKeyText(input) }}
+              </li>
+            </ul>
+          </div>
+          <div
+            v-if="reading.state_refs.length"
+            class="semantic-reading__provenance"
+            data-testid="region-reading-state-refs"
+          >
+            <span class="semantic-reading__provenance-label">
+              {{ t('game.info_panel.region.semantic_context.state_refs') }}:
+            </span>
+            <ul>
+              <li v-for="stateRef in reading.state_refs" :key="stateRef">
+                {{ stateRef }}
               </li>
             </ul>
           </div>
@@ -580,7 +626,7 @@ function collectiveHealthStateRefs(): string[] {
         </article>
       </section>
 
-      <div v-if="semanticContext && !activeSemanticConditions.length && !semanticReadings.length && !spiritualEcology && !collectiveHealth" class="empty-hint">
+      <div v-if="semanticContext && !activeHazards.length && !activeSemanticConditions.length && !semanticReadings.length && !spiritualEcology && !collectiveHealth" class="empty-hint">
         {{ t('game.info_panel.region.semantic_context.empty') }}
       </div>
     </div>

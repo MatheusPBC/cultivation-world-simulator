@@ -125,6 +125,9 @@ def _create_child_for_couple(world: World, parent1: Avatar, parent2: Avatar) -> 
     
     # 5. 注册到世界凡人管理器
     world.mortal_manager.register_mortal(child)
+    dynasty = getattr(world, "dynasty", None)
+    if dynasty is not None:
+        dynasty.register_birth(child.id, [str(parent1.id), str(parent2.id)])
     
     # 6. 生成事件文本
     # key: "{p1} and {p2} gave birth to a {gender} named {child}."

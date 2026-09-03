@@ -31,7 +31,7 @@ from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
 from src.systems.time import MonthStamp
 from src.utils.llm.runtime_mode import llm_test_mode_scope
-from tests.test_government_interpreter import _setup as setup_government_condition
+from tests.domain_reactivity_fixtures import setup_government_condition
 from tests.test_sect_decider import _create_avatar
 from tests.test_causal_world_multimonth import _seed_grounded_urban_risk
 
@@ -135,7 +135,10 @@ async def test_one_regional_condition_can_drive_distinct_government_and_sect_act
         "government:1",
         "organization:9",
     }
-    assert all(receipt.completed for receipt in receipts)
+    receipts_by_domain = {receipt.domain: receipt for receipt in receipts}
+    assert not receipts_by_domain["government:1"].completed
+    assert receipts_by_domain["government:1"].next_eligible_month == 13
+    assert receipts_by_domain["organization:9"].completed
     assert {
         link.cause_event_id
         for event in [government_events[-1], organization_events[-1]]
@@ -198,7 +201,7 @@ async def test_simulator_step_runs_government_and_organization_once_without_real
     assert {
         receipt.domain
         for receipt in base_world.mechanical_language.reaction_receipts.values()
-    } == {"government:1", "organization:9"}
+    } >= {"government:1", "organization:9"}
 
 
 @pytest.mark.asyncio
@@ -298,7 +301,7 @@ async def test_institutional_receipts_and_mutations_survive_full_save_load(
     assert {
         receipt.domain
         for receipt in loaded_world.mechanical_language.reaction_receipts.values()
-    } == {"government:1", "organization:9"}
+    } >= {"government:1", "organization:9"}
     loaded_city = loaded_world.map.regions[city.id]
     assert (
         next(

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Container, Graphics } from 'pixi.js'
 import { useMapStore } from '../../stores/map'
 import { useWorldStore } from '../../stores/world'
 import { useSectStore } from '../../stores/sect'
 
 const props = defineProps<{
-  width: number
-  height: number
+  visible?: boolean
+  zIndex?: number
 }>()
+
+const visible = computed(() => props.visible ?? true)
 
 const TILE_SIZE = 64
 const container = ref<Container>()
@@ -118,5 +120,11 @@ watch(
 </script>
 
 <template>
-  <container ref="container" :z-index="150" event-mode="none" />
+  <container
+    ref="container"
+    label="sect-influence"
+    :visible="visible"
+    :z-index="props.zIndex ?? 150"
+    event-mode="none"
+  />
 </template>

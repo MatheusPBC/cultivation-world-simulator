@@ -40,7 +40,10 @@ def find_canonical_route(
         routes,
         key=lambda item: (-float(item.quality), -float(item.capacity), item.id),
     ):
-        effective_capacity = float(route.capacity) * float(route.quality)
+        dependency_sites = game_map.get_route_dependency_sites(route.id)
+        effective_capacity = float(
+            game_map.get_route_operational_capacity(route.id)
+        )
         if effective_capacity <= 0:
             continue
         return {
@@ -51,6 +54,12 @@ def find_canonical_route(
             "quality": float(route.quality),
             "effective_capacity": effective_capacity,
             "mode": str(route.mode),
+            "dependency_site_ids": [site.id for site in dependency_sites],
+            "source_event_ids": list(dict.fromkeys(
+                site.last_event_id
+                for site in dependency_sites
+                if site.last_event_id is not None
+            )),
         }
     return None
 
@@ -147,7 +156,7 @@ def resolve_resource_transfer(
     )
     event.causal_payload = {
         "outcome": "completed",
-        "affordance": {
+        "execution": {
             "kind": "resource_transfer",
             "resource_id": resource_id,
             "source_region_id": str(source.id),
@@ -158,6 +167,8 @@ def resolve_resource_transfer(
             "route_capacity": route["capacity"],
             "route_quality": route["quality"],
             "route_mode": route["mode"],
+            "route_dependency_site_ids": route["dependency_site_ids"],
+            "route_source_event_ids": route["source_event_ids"],
             "access_source": source.economy.access[resource_id],
             "access_destination": destination.economy.access[resource_id],
         },
@@ -184,6 +195,14 @@ def resolve_resource_transfer(
         cause_event_id=decision_event_id,
         relation=CausalRelation.MOTIVATED_BY,
     ))
+    event.causal_links.extend(
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=source_event_id,
+            relation=CausalRelation.CONTRIBUTED_TO,
+        )
+        for source_event_id in route["source_event_ids"]
+    )
     return event
 
 
@@ -202,7 +221,7 @@ def _blocked(world: Any, destination: CityRegion, resource_id: str, decision_eve
         causal_payload={
             "outcome": "blocked",
             "reason": reason,
-            "affordance": {
+            "execution": {
                 "kind": "resource_transfer",
                 "resource_id": resource_id,
                 "destination_region_id": str(destination.id),

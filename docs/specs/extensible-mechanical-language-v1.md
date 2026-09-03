@@ -339,6 +339,33 @@ requests. Persisted definitions remain subject to the current language-version
 compatibility policy; no hidden migration or parallel legacy path is part of
 V1.
 
+### Regional evaluation scope
+
+Semantic discovery in V1 may select any canonical Region that exposes at least
+one uncovered metric which the engine resolves as measurable for that concrete
+target. The LLM receives only these grounded metric schemas. It cannot turn an
+unknown reading into a numeric proposal, mutate canonical state, or bypass the
+same deterministic proposal validator used for urban discovery.
+
+Discovery candidates are deduplicated by metric-surface structure rather than
+Region identity. Retry cooldown is also attached to that surface, so equivalent
+Regions do not generate redundant calls and a failed surface does not starve a
+different measurable surface. CityRegion keeps its established scheduling
+priority; non-city discovery adds reach without changing the existing urban
+calendar semantics. Configured discovery and causal budgets remain operational
+guardrails, not laws of the world.
+
+Deterministic reuse remains broader than discovery: every accepted definition
+whose `target_kind` is `region` is evaluated against every canonical Region.
+Resolvers decide whether the required evidence is measurable for each concrete
+target. An unknown reading cannot activate or resolve a condition and does not
+add a reuse context.
+
+Regional condition events remain observations. City, Population, and
+Government reactions require a CityRegion target; Organization may react in a
+non-city Region only through its existing grounded regional-adversity and
+member-presence rules.
+
 ## 10. Acceptance scenario
 
 The following scenario is normative for V1 and uses the same concept,
@@ -401,8 +428,8 @@ The following are intentionally not implemented by this delivery:
   state directly.
 - Maintaining a shadow simulation or duplicate state store.
 - Treating guardrail defaults as immutable world laws.
-- Disease/epidemiology, climate/hydrology, flood simulation, crime/public
-  security, territorial war/control/supply, and autonomous government,
+- Disease/epidemiology, detailed water propagation, flood effects on population
+  or economy, crime/public security, territorial war/control/supply, and autonomous government,
   culture, religion, or war interpreters.
 - Inferring poverty, class access, spiritual danger, or route connectivity
   from prose, proximity, or coordinates.

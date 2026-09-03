@@ -1,0 +1,9 @@
+Avalie qualitativamente, em cada direção, o impacto de uma interação já ocorrida na relação entre os personagens.
+Retorne apenas JSON. Em cada direção, valence deve ser positive, negative, neutral ou ambivalent; intensity deve ser mild, moderate ou strong.
+Neutral e ambivalent não alteram a amizade. Nunca retorne números nem prosa.
+
+Personagem A: {avatar_a_name}
+Personagem B: {avatar_b_name}
+Interação: {event_text}
+
+Saída: {{"a_to_b":{{"valence":"ambivalent","intensity":"mild"}},"b_to_a":{{"valence":"neutral","intensity":"mild"}}}}

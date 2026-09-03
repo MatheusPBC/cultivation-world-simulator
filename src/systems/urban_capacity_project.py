@@ -274,7 +274,7 @@ def start_urban_capacity_project(
                 "construction_work_effective_capacity": plan.construction_work_effective_capacity,
                 "available_stock": plan.available_stock,
             },
-            "affordance": {
+            "execution": {
                 "kind": PROJECT_KIND,
                 "housing_asset_id": plan.housing_asset.id,
                 "construction_work_asset_id": plan.construction_work_asset.id,
@@ -417,7 +417,7 @@ def _stall_for_reservation_issue(
                 "material_remaining": remaining_material,
                 "reserved_material": reserved_material,
             },
-            "affordance": {
+            "execution": {
                 "kind": PROJECT_KIND,
                 "construction_resource_id": project.construction_resource_id,
                 "construction_work_asset_id": project.construction_work_asset_id,
@@ -495,7 +495,7 @@ def advance_urban_capacity_projects(
                                 region.city_state.governance.administrative_capacity
                             ),
                         },
-                        "affordance": {
+                        "execution": {
                             "kind": PROJECT_KIND,
                             "housing_asset_id": project.housing_asset_id,
                             "construction_work_asset_id": project.construction_work_asset_id,
@@ -594,7 +594,7 @@ def advance_urban_capacity_projects(
                         "reservation_before": reserved_before,
                         "reservation_after": reserved_after,
                     },
-                    "affordance": {
+                    "execution": {
                         "kind": PROJECT_KIND,
                         "construction_resource_id": current.construction_resource_id,
                         "construction_work_asset_id": current.construction_work_asset_id,

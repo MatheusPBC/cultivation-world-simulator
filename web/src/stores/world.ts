@@ -12,6 +12,8 @@ import { useSectStore } from './sect';
 import { useMortalStore } from './mortal';
 import { useDynastyStore } from './dynasty';
 import { useAvatarOverviewStore } from './avatarOverview';
+import { useUiStore } from './ui';
+import { useInstitutionalPresenceStore } from './institutionalPresence';
 
 const PHENOMENON_RARITY_ORDER: Record<string, number> = {
   N: 0,
@@ -42,6 +44,8 @@ export const useWorldStore = defineStore('world', () => {
   const mortalStore = useMortalStore();
   const dynastyStore = useDynastyStore();
   const avatarOverviewStore = useAvatarOverviewStore();
+  const uiStore = useUiStore();
+  const institutionalPresenceStore = useInstitutionalPresenceStore();
 
   const year = ref(0);
   const month = ref(0);
@@ -73,6 +77,16 @@ export const useWorldStore = defineStore('world', () => {
     setTime(payload.year, payload.month);
 
     if (payload.poi_updates) mapStore.applyPoiUpdates(payload.poi_updates);
+    if (payload.site_updates) mapStore.applyInfrastructureSiteUpdates(payload.site_updates);
+    if (payload.route_updates) mapStore.applyRouteUpdates(payload.route_updates);
+    const selectedTarget = uiStore.selectedTarget;
+    const selectedSiteChanged = selectedTarget?.type === 'site' && payload.site_updates?.some(update => (
+      String(update.op === 'remove' ? update.id : update.site.id) === selectedTarget.id
+    ));
+    const selectedRouteChanged = selectedTarget?.type === 'route' && payload.route_updates?.some(update => (
+      String(update.id) === selectedTarget.id
+    ));
+    if (selectedSiteChanged || selectedRouteChanged) void uiStore.refreshDetail();
     if (payload.events) eventStore.addEvents(payload.events, year.value, month.value);
     
     if (payload.phenomenon !== undefined) {
@@ -85,7 +99,10 @@ export const useWorldStore = defineStore('world', () => {
         activeDomains.value = [];
     }
 
-    void sectStore.refreshTerritories();
+    void Promise.all([
+      sectStore.refreshTerritories(),
+      institutionalPresenceStore.refresh(),
+    ]);
   }
 
   function applyStateSnapshot(stateRes: WorldStateSnapshot) {
@@ -134,7 +151,10 @@ export const useWorldStore = defineStore('world', () => {
 
       // Load initial events
       await eventStore.resetEvents({});
-      await sectStore.refreshTerritories();
+      await Promise.all([
+        sectStore.refreshTerritories(),
+        institutionalPresenceStore.refresh(),
+      ]);
 
     } catch (e) {
       logError('WorldStore initialize', e);
@@ -148,7 +168,10 @@ export const useWorldStore = defineStore('world', () => {
       const stateRes = await worldApi.fetchInitialState();
       if (currentRequestId !== fetchStateRequestId) return;
       applyStateSnapshot(stateRes);
-      await sectStore.refreshTerritories();
+      await Promise.all([
+        sectStore.refreshTerritories(),
+        institutionalPresenceStore.refresh(),
+      ]);
     } catch (e) {
       if (currentRequestId !== fetchStateRequestId) return;
       logError('WorldStore fetch state', e);
@@ -169,6 +192,7 @@ export const useWorldStore = defineStore('world', () => {
     avatarStore.reset();
     eventStore.reset();
     sectStore.reset();
+    institutionalPresenceStore.reset();
     mortalStore.reset();
     dynastyStore.reset();
     avatarOverviewStore.reset();

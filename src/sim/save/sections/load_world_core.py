@@ -20,6 +20,8 @@ class WorldCoreLoadSection:
         from src.systems.time import MonthStamp
         from src.systems.world_secret import load_world_secret_from_save
         from src.classes.mechanical_language import MechanicalLanguageState
+        from src.classes.environment.climate import ClimateState
+        from src.classes.environment.regional_flood import RegionalFloodState
 
         world_data = context.world_data or {}
         run_config_snapshot = context.run_config_snapshot or {}
@@ -55,6 +57,10 @@ class WorldCoreLoadSection:
         apply_world_lore_snapshot(world, world.world_lore_snapshot)
         world.mechanical_language = MechanicalLanguageState.from_dict(world_data["mechanical_language"])
         world.mechanical_language.bind_world(world)
+        world.climate_state = ClimateState.from_dict(world_data.get("climate_state", {}))
+        world.regional_flood_state = RegionalFloodState.from_dict(
+            world_data["regional_flood_state"]
+        )
         load_world_secret_from_save(world, world_data.get("world_secret"))
 
         from src.classes.celestial_phenomenon import celestial_phenomena_by_id

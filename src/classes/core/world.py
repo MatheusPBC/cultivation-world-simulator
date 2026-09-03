@@ -23,6 +23,8 @@ from src.classes.war import STATUS_PEACE, STATUS_WAR
 from src.systems.opportunity import OpportunityManager
 from src.classes.celestial_dao import DaoPetition
 from src.classes.mechanical_language import MechanicalLanguageState
+from src.classes.environment.climate import ClimateState
+from src.classes.environment.regional_flood import RegionalFloodState
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -73,6 +75,12 @@ class World():
     # Per-world semantic vocabulary and reusable definitions. Canonical facts
     # remain owned by their domain objects; this registry stores observation rules.
     mechanical_language: MechanicalLanguageState = field(default_factory=MechanicalLanguageState)
+    # Dynamic physical weather belongs to the world. Static terrain, elevation,
+    # water bodies, routes, and infrastructure remain map-owned.
+    climate_state: ClimateState = field(default_factory=ClimateState)
+    # Active physical flood occurrences belong to the world. Their hydrological
+    # inputs remain projections over climate and map-owned geography.
+    regional_flood_state: RegionalFloodState = field(default_factory=RegionalFloodState)
     # 宗门上下文（惰性初始化），用于统一本局启用宗门作用域
     _sect_context: Any = field(default=None, init=False, repr=False)
 

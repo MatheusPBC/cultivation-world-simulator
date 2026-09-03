@@ -109,6 +109,7 @@ async def test_two_year_causal_cycle_survives_save_load_without_real_llm(
         "npc_awakening_rate_per_month": 0.0,
         "world_lore": "",
         "test_mode": True,
+        "domain_affordance_action_urgency_threshold": 0.0,
         "semantic_discovery_budget_per_month": 2,
         "population_interpreter_llm_budget_per_month": 2,
         "economy_interpreter_llm_budget_per_month": 2,
@@ -154,13 +155,20 @@ async def test_two_year_causal_cycle_survives_save_load_without_real_llm(
     assert loaded_world.mechanical_language.reaction_receipts
     assert loaded_world.map.get_routes_between(302, 305)
 
-    maintenance = next(
+    maintenance_events = [
         event
         for event in loaded_world.event_manager.get_recent_events(500)
         if event.event_type == "city_maintenance_completed"
-    )
-    links = loaded_world.event_manager.get_causal_links_for_event(maintenance.id)
-    assert {link.relation.value for link in links} >= {"motivated_by", "triggered_by"}
+        and event.render_params.get("region_id") == str(loaded_pressured.id)
+        and event.render_params.get("capability_id") == capability_id
+    ]
+    assert maintenance_events
+    for maintenance in maintenance_events:
+        links = loaded_world.event_manager.get_causal_links_for_event(maintenance.id)
+        assert {link.relation.value for link in links} >= {
+            "motivated_by",
+            "triggered_by",
+        }
     resolution = next(
         event
         for event in loaded_world.event_manager.get_recent_events(500)
@@ -169,6 +177,7 @@ async def test_two_year_causal_cycle_survives_save_load_without_real_llm(
     )
     resolution_links = loaded_world.event_manager.get_causal_links_for_event(resolution.id)
     assert any(
-        link.cause_event_id == maintenance.id and link.relation.value == "enabled_by"
+        link.cause_event_id in {event.id for event in maintenance_events}
+        and link.relation.value == "enabled_by"
         for link in resolution_links
     )

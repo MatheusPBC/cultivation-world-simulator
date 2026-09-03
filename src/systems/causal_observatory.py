@@ -140,6 +140,20 @@ class CausalTortureReport:
             "untyped_events": sum(
                 int(run.event_quality["untyped_events"]) for run in self.runs
             ),
+            "story_mutations": sum(
+                int(run.event_quality["story_mutations"]) for run in self.runs
+            ),
+            "max_chain_depth": max(
+                (
+                    int(depth)
+                    for run in self.runs
+                    for depth in run.causal_telemetry[
+                        "chain_depth_distribution"
+                    ]
+                    if str(depth).isdigit()
+                ),
+                default=0,
+            ),
             "broken_causes": sum(
                 int(run.causal_telemetry["broken_cause_count"])
                 for run in self.runs
@@ -320,7 +334,7 @@ def _is_affordance_attempt(event: Any) -> bool:
         single_step_affordance
         or event_type == "urban_capacity_project_blocked"
     )
-    if not single_step_affordance and not isinstance(payload.get("affordance"), Mapping):
+    if not single_step_affordance and not isinstance(payload.get("execution"), Mapping):
         return False
     return _affordance_outcome(event) in {
         "started",
@@ -591,6 +605,12 @@ def _event_quality(events: list[Any]) -> dict[str, Any]:
         if (event_type := str(getattr(event, "event_type", "") or "").strip())
     )
     repeated_pairs = [count for count in monthly.values() if count > 1]
+    story_mutations = sum(
+        1
+        for event in events
+        if bool(getattr(event, "is_story", False))
+        and bool((getattr(event, "causal_payload", None) or {}).get("deltas") or [])
+    )
     return {
         "typed_events": len(events) - len(untyped),
         "untyped_events": len(untyped),
@@ -604,6 +624,7 @@ def _event_quality(events: list[Any]) -> dict[str, Any]:
         "dominant_event_share": dominant_count / len(events) if events else 0.0,
         "repeated_type_month_pairs": len(repeated_pairs),
         "max_same_type_in_month": max(repeated_pairs, default=0),
+        "story_mutations": story_mutations,
     }
 
 

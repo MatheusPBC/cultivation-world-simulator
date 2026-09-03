@@ -4,10 +4,13 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 
 msgid "A causal probe injured {avatar} without killing them."
-msgstr ""
+msgstr "因果探针使{avatar}受伤，但没有致命。"
 
 msgid "A causal probe strained {service} service in {region}."
-msgstr ""
+msgstr "因果探针使{region}的{service}服务承受压力。"
+
+msgid "{actor} made a domain decision: {decision}."
+msgstr "{actor}作出了领域决策：{decision}。"
 
 msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
 msgstr ""
@@ -25,7 +28,7 @@ msgid "{avatar} committed to an action chain"
 msgstr ""
 
 msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
-msgstr ""
+msgstr "{name}在秘境{domain}中受伤，损失了{damage}点生命。"
 
 msgid "{official} publicly opposes the imperial claimant."
 msgstr ""

@@ -6,6 +6,7 @@ from collections import Counter
 from typing import Any
 
 from src.classes.event import Event
+from src.classes.causal_link import CausalLink, CausalRelation
 from src.i18n import t
 from src.utils.config import CONFIG
 
@@ -45,8 +46,10 @@ class BackgroundNpcService:
         avatar: Any,
         action_key: str,
         *,
+        source_event_id: str,
         max_events: int | None = None,
     ) -> list[Event]:
+        cls._require_source_event_id(source_event_id)
         config = cls._get_config()
         if not bool(getattr(config, "enabled", True)):
             return []
@@ -61,11 +64,19 @@ class BackgroundNpcService:
             BackgroundNpcTriggerKind.ACTION_ECHO,
             avatars=[avatar],
             action_key=action_key,
+            source_event_id=source_event_id,
             max_events=max_events,
         )
 
     @classmethod
-    def create_monthly_events(cls, world: Any, living_avatars: list[Any]) -> list[Event]:
+    def create_monthly_events(
+        cls,
+        world: Any,
+        living_avatars: list[Any],
+        *,
+        source_event_id: str,
+    ) -> list[Event]:
+        cls._require_source_event_id(source_event_id)
         config = cls._get_config()
         if not bool(getattr(config, "enabled", True)):
             return []
@@ -77,6 +88,7 @@ class BackgroundNpcService:
                 cls._create_events_for_trigger(
                     world,
                     BackgroundNpcTriggerKind.REGION_TICK,
+                    source_event_id=source_event_id,
                     max_events=int(getattr(config, "max_region_tick_per_month", 1) or 1),
                 )
             )
@@ -92,6 +104,7 @@ class BackgroundNpcService:
                 cls._create_events_for_trigger(
                     world,
                     BackgroundNpcTriggerKind.AVATAR_WITNESS,
+                    source_event_id=source_event_id,
                     avatars=witness_avatars,
                     max_events=int(getattr(config, "max_avatar_witness_per_month", 2) or 2),
                 )
@@ -106,6 +119,7 @@ class BackgroundNpcService:
         *,
         avatars: list[Any] | None = None,
         action_key: str | None = None,
+        source_event_id: str,
         max_events: int,
     ) -> list[Event]:
         if max_events <= 0:
@@ -119,7 +133,7 @@ class BackgroundNpcService:
 
         events: list[Event] = []
         if trigger_kind == BackgroundNpcTriggerKind.REGION_TICK:
-            candidates = cls._build_region_tick_contexts(world, profiles, event_types, bindings)
+            candidates = cls._build_region_tick_contexts(world, profiles, event_types, bindings, source_event_id=source_event_id)
             events.extend(cls._pick_and_build_events(world, candidates, max_events=max_events))
         else:
             for avatar in avatars or []:
@@ -133,6 +147,7 @@ class BackgroundNpcService:
                     bindings,
                     trigger_kind=trigger_kind,
                     action_key=action_key,
+                    source_event_id=source_event_id,
                 )
                 events.extend(cls._pick_and_build_events(world, candidates, max_events=max_events - len(events)))
         return events
@@ -144,6 +159,8 @@ class BackgroundNpcService:
         profiles: dict[str, BackgroundNpcProfile],
         event_types: list[BackgroundNpcEventType],
         bindings: list[BackgroundNpcRegionBinding],
+        *,
+        source_event_id: str,
     ) -> list[BackgroundNpcContext]:
         contexts: list[BackgroundNpcContext] = []
         for region in cls._iter_regions(world):
@@ -154,7 +171,7 @@ class BackgroundNpcService:
                 if profile is None:
                     continue
                 if cls._matches_region(world, region, event_type, profile, bindings):
-                    contexts.append(cls._build_context(world, region, profile, event_type))
+                    contexts.append(cls._build_context(world, region, profile, event_type, source_event_id=source_event_id))
         return contexts
 
     @classmethod
@@ -168,6 +185,7 @@ class BackgroundNpcService:
         *,
         trigger_kind: BackgroundNpcTriggerKind,
         action_key: str | None,
+        source_event_id: str,
     ) -> list[BackgroundNpcContext]:
         region = getattr(getattr(avatar, "tile", None), "region", None)
         if region is None:
@@ -185,7 +203,10 @@ class BackgroundNpcService:
                 continue
             if not cls._matches_avatar(avatar, event_type.avatar_filters):
                 continue
-            contexts.append(cls._build_context(world, region, profile, event_type, avatar=avatar, action_key=action_key))
+            contexts.append(cls._build_context(
+                world, region, profile, event_type, avatar=avatar,
+                action_key=action_key, source_event_id=source_event_id,
+            ))
         return contexts
 
     @classmethod
@@ -346,6 +367,7 @@ class BackgroundNpcService:
         *,
         avatar: Any | None = None,
         action_key: str | None = None,
+        source_event_id: str,
     ) -> BackgroundNpcContext:
         sect_name = cls._resolve_sect_name(region, avatar)
         dynasty = getattr(world, "dynasty", None)
@@ -358,6 +380,7 @@ class BackgroundNpcService:
             action_key=action_key,
             sect_name=sect_name,
             dynasty_title=dynasty_title,
+            source_event_id=source_event_id,
         )
 
     @staticmethod
@@ -408,7 +431,7 @@ class BackgroundNpcService:
             except (TypeError, ValueError):
                 related_sects = None
 
-        return Event(
+        event = Event(
             world.month_stamp,
             content,
             related_avatars=related_avatars,
@@ -418,6 +441,12 @@ class BackgroundNpcService:
             event_type=BACKGROUND_NPC_EVENT_TYPE,
             render_params=cls._build_render_params(context),
         )
+        event.causal_links.append(CausalLink(
+            event_id=event.id,
+            cause_event_id=context.source_event_id,
+            relation=CausalRelation.CONTRIBUTED_TO,
+        ))
+        return event
 
     @staticmethod
     def _build_render_params(context: BackgroundNpcContext) -> dict[str, Any]:
@@ -429,6 +458,7 @@ class BackgroundNpcService:
             "event_key": context.event_type.event_key,
             "profile_key": context.profile.profile_key,
             "npc_role": t(context.profile.role_label_id),
+            "source_event_id": context.source_event_id,
         }
         if region is not None:
             params["region_id"] = int(getattr(region, "id", -1))
@@ -487,6 +517,13 @@ class BackgroundNpcService:
     @staticmethod
     def _get_config() -> Any:
         return getattr(getattr(CONFIG, "world", object()), "background_npc", object())
+
+    @staticmethod
+    def _require_source_event_id(source_event_id: str) -> str:
+        normalized = str(source_event_id or "").strip()
+        if not normalized:
+            raise ValueError("source_event_id is required for background NPC scenes")
+        return normalized
 
 
 __all__ = ["BackgroundNpcService"]

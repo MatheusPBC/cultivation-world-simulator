@@ -37,7 +37,9 @@ describe('InfoPanelContainer', () => {
         stubs: {
           AvatarDetail: true,
           SectDetail: true,
-          RegionDetail: true
+          RegionDetail: true,
+          InfrastructureSiteDetail: true,
+          RouteDetail: true,
         }
       }
     })
@@ -55,7 +57,9 @@ describe('InfoPanelContainer', () => {
         stubs: {
           AvatarDetail: true,
           SectDetail: true,
-          RegionDetail: true
+          RegionDetail: true,
+          InfrastructureSiteDetail: true,
+          RouteDetail: true,
         }
       }
     })
@@ -93,6 +97,8 @@ describe('InfoPanelContainer', () => {
           AvatarDetail: true,
           SectDetail: true,
           RegionDetail: true,
+          InfrastructureSiteDetail: true,
+          RouteDetail: true,
         },
       },
     })
@@ -109,5 +115,48 @@ describe('InfoPanelContainer', () => {
     expect(wrapper.text()).toContain('千机谷')
     expect(wrapper.text()).not.toContain('宗门驻地')
     expect(wrapper.text()).not.toContain('固有地名')
+  })
+
+  it('resolves the infrastructure site detail panel', async () => {
+    const i18n = createInfoPanelI18n()
+    const siteStub = { template: '<div data-testid="infrastructure-site-detail" />' }
+    const wrapper = mount(InfoPanelContainer, {
+      global: {
+        plugins: [createPinia(), i18n],
+        stubs: { InfrastructureSiteDetail: siteStub },
+      },
+    })
+    const uiStore = useUiStore()
+    uiStore.selectedTarget = { type: 'site', id: 'bridge-1' }
+    uiStore.detailData = {
+      id: 'bridge-1', name: 'Ponte', kind: 'bridge', cellRefs: [[0, 0]], regionIds: [1, 2],
+      routeIds: [], waterBodyIds: [], capabilityIds: [], ownerRef: null, maintainerRef: null,
+      integrity: 0.8, enabled: true, status: 'impaired', x: 0, y: 0, clickable: true, lastEventId: null,
+    }
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="infrastructure-site-detail"]').exists()).toBe(true)
+  })
+
+  it('resolves the route detail panel and uses its id as the title', async () => {
+    const i18n = createInfoPanelI18n()
+    const routeStub = { template: '<div data-testid="route-detail" />' }
+    const wrapper = mount(InfoPanelContainer, {
+      global: {
+        plugins: [createPinia(), i18n],
+        stubs: { RouteDetail: routeStub },
+      },
+    })
+    const uiStore = useUiStore()
+    uiStore.selectedTarget = { type: 'route', id: 'route-1' }
+    uiStore.detailData = {
+      id: 'route-1', endpointRegionIds: [1, 2], mode: 'land', capacity: 100,
+      operationalCapacity: 80, quality: 0.8, enabled: true, allowedResourceIds: [],
+      dependencySiteIds: [], sourceEventIds: [],
+    } as any
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="route-detail"]').exists()).toBe(true)
+    expect(wrapper.find('.main-title').text()).toBe('route-1')
   })
 })

@@ -61,6 +61,13 @@ class GameLoopRunner:
             if getattr(self.runtime, "is_reset_requested", lambda: False)():
                 return
             await self.manager.broadcast(self.tick_payload_builder.build(events=events, world=world))
+            acknowledge_site_updates = getattr(
+                getattr(world, "map", None),
+                "acknowledge_infrastructure_site_updates",
+                None,
+            )
+            if callable(acknowledge_site_updates):
+                acknowledge_site_updates()
 
             should_auto_save, year, _month = self.should_trigger_auto_save(world)
             if should_auto_save:

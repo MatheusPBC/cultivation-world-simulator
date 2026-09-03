@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from omegaconf import OmegaConf
-
 from src.classes.core.sect import sects_by_id
 from src.classes.environment.sect_region import SectRegion
 from src.classes.items.auxiliary import auxiliaries_by_id
@@ -79,15 +77,73 @@ def build_map_summary(world: Any) -> dict[str, Any]:
     if game_map is None:
         return {}
 
+    geography = getattr(game_map, "geography", None)
+    terrain_rows = getattr(geography, "terrain_rows", None)
+    terrain_distribution: dict[str, int] = {}
+    if isinstance(terrain_rows, list):
+        for row in terrain_rows:
+            if not isinstance(row, (list, tuple)):
+                continue
+            for terrain in row:
+                terrain_name = str(getattr(terrain, "value", terrain) or "unknown")
+                terrain_distribution[terrain_name] = terrain_distribution.get(terrain_name, 0) + 1
+
+    elevation_rows = getattr(geography, "elevation_rows", None)
+    elevations = (
+        [
+            float(elevation)
+            for row in elevation_rows
+            if isinstance(row, (list, tuple))
+            for elevation in row
+            if isinstance(elevation, (int, float)) and not isinstance(elevation, bool)
+        ]
+        if isinstance(elevation_rows, list)
+        else []
+    )
+
+    water_bodies: list[dict[str, Any]] = []
+    raw_water_bodies = getattr(geography, "water_bodies", None)
+    if isinstance(raw_water_bodies, (list, tuple)):
+        for body in raw_water_bodies:
+            body_id = getattr(body, "id", None)
+            kind = getattr(getattr(body, "kind", None), "value", getattr(body, "kind", None))
+            cell_refs = getattr(body, "cell_refs", None)
+            if not isinstance(body_id, str) or not isinstance(kind, str):
+                continue
+            cells = list(cell_refs) if isinstance(cell_refs, (list, tuple)) else []
+            xs = [int(cell[0]) for cell in cells]
+            ys = [int(cell[1]) for cell in cells]
+            entry: dict[str, Any] = {
+                "id": body_id,
+                "kind": kind,
+                "cell_count": len(cells),
+                "bounds": {
+                    "min_x": min(xs),
+                    "min_y": min(ys),
+                    "max_x": max(xs),
+                    "max_y": max(ys),
+                } if cells else None,
+                "navigable": bool(getattr(body, "navigable", False)),
+            }
+            region_id = getattr(body, "region_id", None)
+            if region_id is not None:
+                entry["region_id"] = region_id
+            flow_direction = getattr(body, "flow_direction", None)
+            if flow_direction is not None:
+                entry["flow_direction"] = list(flow_direction)
+            water_bodies.append(entry)
+
     return {
         "map_id": str(getattr(game_map, "map_id", "") or ""),
         "map_name": str(getattr(game_map, "map_name", "") or ""),
         "preset_version": int(getattr(game_map, "preset_version", 0) or 0),
         "width": int(getattr(game_map, "width", 0) or 0),
         "height": int(getattr(game_map, "height", 0) or 0),
-        "wilderness_tile": str(getattr(game_map, "wilderness_tile", "") or ""),
         "landmark_count": len(getattr(game_map, "landmarks", {}) or {}),
         "region_override_count": len(getattr(game_map, "region_overrides", {}) or {}),
+        "terrain_distribution": dict(sorted(terrain_distribution.items())),
+        "elevation_range": {"min": min(elevations), "max": max(elevations)} if elevations else None,
+        "water_bodies": sorted(water_bodies, key=lambda body: body["id"]),
     }
 
 

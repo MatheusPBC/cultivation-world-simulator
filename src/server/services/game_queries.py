@@ -21,6 +21,114 @@ CHRONICLE_QUERY_MAX_LIMIT = 50
 CHRONICLE_QUERY_DEFAULT_LIMIT = 20
 
 
+def _serialize_physical_terrain(game_map: Any) -> list[list[str]]:
+    """Return the map-owned physical terrain matrix for the public map query."""
+    terrain_rows = game_map.geography.terrain_rows
+    return [
+        [
+            str(getattr(terrain, "name", getattr(terrain, "value", terrain))).upper()
+            for terrain in row
+        ]
+        for row in terrain_rows
+    ]
+
+
+def _serialize_territory(game_map: Any) -> list[list[int]]:
+    """Return the semantic territory matrix owned by ``Map.region_cors``."""
+    territory_rows = [[-1 for _ in range(game_map.width)] for _ in range(game_map.height)]
+    for region_id, coordinates in game_map.region_cors.items():
+        for coordinate in coordinates:
+            x, y = coordinate
+            if 0 <= x < game_map.width and 0 <= y < game_map.height:
+                territory_rows[y][x] = int(region_id)
+    return territory_rows
+
+
+def _serialize_routes(game_map: Any) -> list[dict[str, Any]]:
+    """Return the explicit map-owned route registry in stable ID order."""
+    return [
+        {
+            **route.to_dict(),
+            "operational_capacity": game_map.get_route_operational_capacity(route.id),
+            "dependency_site_ids": [
+                site.id for site in game_map.get_route_dependency_sites(route.id)
+            ],
+        }
+        for route in sorted(game_map.routes.values(), key=lambda route: route.id)
+    ]
+
+
+def _serialize_route_detail(game_map: Any, route: Any) -> dict[str, Any]:
+    dependency_sites = game_map.get_route_dependency_sites(route.id)
+    source_event_ids = list(dict.fromkeys(
+        site.last_event_id
+        for site in dependency_sites
+        if site.last_event_id is not None
+    ))
+    return {
+        **route.to_dict(),
+        "name": route.id,
+        "operational_capacity": game_map.get_route_operational_capacity(route.id),
+        "dependency_site_ids": [site.id for site in dependency_sites],
+        "source_event_ids": source_event_ids,
+    }
+
+
+def _serialize_infrastructure_site(site: Any) -> dict[str, Any]:
+    """Project one canonical spatial site without copying domain ownership."""
+    payload = site.to_dict()
+    anchor_x, anchor_y = site.cell_refs[0]
+    return {
+        **payload,
+        "status": site.status,
+        "x": anchor_x,
+        "y": anchor_y,
+        "clickable": True,
+    }
+
+
+def _serialize_infrastructure_sites(game_map: Any) -> list[dict[str, Any]]:
+    sites = getattr(game_map, "infrastructure_sites", {}) or {}
+    return [
+        _serialize_infrastructure_site(site)
+        for site in sorted(sites.values(), key=lambda item: item.id)
+    ]
+
+
+def _serialize_physical_geography(game_map: Any) -> dict[str, Any]:
+    """Expose only the stable, serializable Physical Geography V1 snapshot."""
+    geography = game_map.geography
+    elevation_rows = [list(row) for row in geography.elevation_rows]
+
+    raw_water_bodies = geography.water_bodies
+    water_bodies: list[dict[str, Any]] = []
+    if isinstance(raw_water_bodies, (list, tuple)):
+        for body in raw_water_bodies:
+            body_id = getattr(body, "id", None)
+            kind = getattr(getattr(body, "kind", None), "value", getattr(body, "kind", None))
+            cell_refs = getattr(body, "cell_refs", None)
+            if not isinstance(body_id, str) or not isinstance(kind, str):
+                continue
+            if not isinstance(cell_refs, (list, tuple)):
+                continue
+            serialized_body: dict[str, Any] = {
+                "id": body_id,
+                "kind": kind,
+                "cell_refs": [list(cell) for cell in cell_refs if isinstance(cell, (list, tuple)) and len(cell) == 2],
+                "navigable": bool(getattr(body, "navigable", False)),
+            }
+            region_id = getattr(body, "region_id", None)
+            if region_id is not None:
+                serialized_body["region_id"] = region_id
+            flow_direction = getattr(body, "flow_direction", None)
+            if flow_direction is not None:
+                serialized_body["flow_direction"] = list(flow_direction)
+            water_bodies.append(serialized_body)
+
+    water_bodies.sort(key=lambda body: body["id"])
+    return {"elevation_rows": elevation_rows, "water_bodies": water_bodies}
+
+
 def get_runtime_status(runtime, version: str) -> dict[str, Any]:
     from src.server.services.roleplay_service import get_roleplay_session as build_roleplay_session
 
@@ -398,31 +506,7 @@ def get_world_map(runtime, *, sects_by_id: dict[int, Any], render_config: dict[s
 
     width, height = world.map.width, world.map.height
 
-    def serialize_tile_type(x: int, y: int) -> str:
-        tile = world.map.get_tile(x, y)
-        tile_type_name = tile.type.name
-        if tile_type_name in {"CAVE", "RUIN"}:
-            return "MOUNTAIN"
-        if tile_type_name == "SECT":
-            region = getattr(tile, "region", None)
-            region_type = region.get_region_type() if region is not None and hasattr(region, "get_region_type") else ""
-            if region_type == "normal":
-                return "PLAIN"
-            if region_type == "city":
-                return "CITY"
-            if region_type == "cultivate":
-                return "MOUNTAIN"
-            if region_type == "sect":
-                return "MOUNTAIN"
-            return "PLAIN"
-        return tile_type_name
-
-    map_data: list[list[str]] = []
-    for y in range(height):
-        row: list[str] = []
-        for x in range(width):
-            row.append(serialize_tile_type(x, y))
-        map_data.append(row)
+    map_data = _serialize_physical_terrain(world.map)
 
     regions_data: list[dict[str, Any]] = []
     if hasattr(world.map, "regions"):
@@ -467,6 +551,10 @@ def get_world_map(runtime, *, sects_by_id: dict[int, Any], render_config: dict[s
         "width": width,
         "height": height,
         "data": map_data,
+        "territory_rows": _serialize_territory(world.map),
+        "routes": _serialize_routes(world.map),
+        "infrastructure_sites": _serialize_infrastructure_sites(world.map),
+        "geography": _serialize_physical_geography(world.map),
         "regions": regions_data,
         "pois": [
             poi.get_summary_payload()
@@ -1040,6 +1128,12 @@ def get_detail(
         target = manager.get(target_id) if manager is not None else None
         if target is not None and target.is_expired(int(world.month_stamp)):
             target = None
+    elif target_type == "site":
+        sites = getattr(world.map, "infrastructure_sites", {}) if world.map else {}
+        target = sites.get(target_id)
+    elif target_type == "route":
+        routes = getattr(world.map, "routes", {}) if world.map else {}
+        target = routes.get(target_id)
     else:
         raise_public_error(
             status_code=400,
@@ -1072,4 +1166,12 @@ def get_detail(
         return build_avatar_detail(target, resolve_avatar_pic_id=resolve_avatar_pic_id)
     if target_type == "poi":
         return target.get_detail_payload(world)
+    if target_type == "site":
+        payload = _serialize_infrastructure_site(target)
+        payload["source_event_ids"] = (
+            [target.last_event_id] if target.last_event_id is not None else []
+        )
+        return payload
+    if target_type == "route":
+        return _serialize_route_detail(world.map, target)
     return target.get_structured_info()

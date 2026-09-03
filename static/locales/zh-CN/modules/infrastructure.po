@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Infrastructure site {site} changed physical condition."
+msgstr "基础设施地点{site}的物理状态发生了变化。"
+
+msgid "infrastructure_site_condition_changed"
+msgstr "{site_name}的物理状态发生了变化。"
+
+msgid "Route {route} changed operational capacity."
+msgstr "路线{route}的通行能力发生了变化。"
+
+msgid "route_operational_capacity_changed"
+msgstr "路线{route_id}的通行能力发生了变化。"
+
+msgid "infrastructure_site_restored"
+msgstr "{maintainer_kind}:{maintainer_id}修复了基础设施，消耗{spirit_stone_cost}灵石。"

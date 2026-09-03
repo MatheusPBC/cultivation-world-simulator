@@ -236,6 +236,7 @@ class Breakthrough(TimedAction):
             month_stamp=self.world.month_stamp,
             start_text=core_text,
             result_text=story_result,
+            source_event=core_event,
             actors=[self.avatar, self._calamity_other],
             related_avatar_ids=rel_ids,
             prompt=prompt,

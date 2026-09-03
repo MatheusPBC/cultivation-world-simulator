@@ -14,7 +14,7 @@ from .models import (
 
 
 MetricResolver = Callable[[Any, MetricKey, Any, int], MetricReading | None]
-MetricEnumerator = Callable[[Any], Iterable[MetricKey]]
+MetricEnumerator = Callable[[Any, Any], Iterable[MetricKey]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,12 +100,12 @@ class MetricResolverRegistry:
             raise ValueError(f"metric binding {binding.id} returned a mismatched unit")
         return reading
 
-    def available_keys(self, target: Any) -> list[MetricKey]:
+    def available_keys(self, world: Any, target: Any) -> list[MetricKey]:
         found: dict[tuple[Any, ...], MetricKey] = {}
         for binding in self._bindings:
             if binding.enumerate_keys is None:
                 continue
-            for key in binding.enumerate_keys(target):
+            for key in binding.enumerate_keys(world, target):
                 if not binding.matches(key):
                     raise ValueError(f"metric binding {binding.id} enumerated an invalid key")
                 found[key.identity] = key

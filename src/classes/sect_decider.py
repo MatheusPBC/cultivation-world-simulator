@@ -292,6 +292,7 @@ class SectDecider:
             # Read-only regional observations; these never authorize or execute
             # a new action by themselves.
             "regional_semantics": list(ctx.regional_semantics),
+            "institutional_presence": list(ctx.institutional_presence),
             "history": {
                 "summary_text": str(ctx.history.get("summary_text", "")),
             },

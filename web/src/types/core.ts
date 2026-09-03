@@ -308,6 +308,64 @@ export interface RelationInfo {
 
 export type MapMatrix = string[][];
 
+export interface WaterBodySummary {
+  id: string;
+  kind: string;
+  cellRefs: Array<[number, number]>;
+  navigable: boolean;
+  regionId?: number;
+  flowDirection?: [number, number];
+}
+
+export interface PhysicalGeographySnapshot {
+  elevationRows: number[][];
+  waterBodies: WaterBodySummary[];
+}
+
+export interface RouteSummary {
+  id: string;
+  endpointRegionIds: [number, number];
+  mode: string;
+  capacity: number;
+  operationalCapacity: number;
+  quality: number;
+  enabled: boolean;
+  allowedResourceIds: string[];
+  dependencySiteIds: string[];
+}
+
+export interface RouteDetail extends RouteSummary {
+  sourceEventIds: string[];
+}
+
+export type InfrastructureSiteStatus = 'active' | 'impaired' | 'destroyed'
+
+export interface EntityReference {
+  kind: string
+  id: string
+}
+
+export interface InfrastructureSiteSummary extends EntityBase, Coordinates {
+  kind: string
+  cellRefs: Array<[number, number]>
+  regionIds: number[]
+  routeIds: string[]
+  waterBodyIds: string[]
+  capabilityIds: string[]
+  ownerRef: EntityReference | null
+  maintainerRef: EntityReference | null
+  integrity: number
+  enabled: boolean
+  status: InfrastructureSiteStatus
+  clickable: boolean
+  lastEventId: string | null
+}
+
+export interface InfrastructureSiteDetail extends InfrastructureSiteSummary {
+  desc?: string
+  sourceEventIds?: string[]
+}
+
 export interface RegionSummary extends EntityBase, Coordinates {
   type: string;
   sect_id?: number;
@@ -317,6 +375,30 @@ export interface RegionSummary extends EntityBase, Coordinates {
   sect_is_active?: boolean;
   sub_type?: string; // for cultivate regions: "cave" or "ruin"
   formation?: RegionFormationInfo | null;
+}
+
+export interface InstitutionalPresenceGovernance {
+  controllerKind: string;
+  controllerId: string;
+  administrativeCapacity: number;
+}
+
+export interface InstitutionalPresenceSectInfluence {
+  sectId: number;
+  sectName: string;
+  color: string;
+  ownedTileCount: number;
+  share: number;
+}
+
+export interface InstitutionalPresenceRegion {
+  regionId: number;
+  regionName: string;
+  regionType: string;
+  tileCount: number;
+  governance: InstitutionalPresenceGovernance | null;
+  sectInfluences: InstitutionalPresenceSectInfluence[];
+  dominantSectId: number | null;
 }
 
 export interface POISummary extends EntityBase, Coordinates {
@@ -545,8 +627,18 @@ export interface RegionSemanticContext {
   readings: SemanticReading[];
   conditions: SemanticCondition[];
   definitions: SemanticDefinition[];
+  active_hazards?: RegionalHazard[];
   spiritual_ecology?: SpiritualEcologyView | null;
   collective_health?: CollectiveHealthView | null;
+}
+
+export interface RegionalHazard {
+  kind: 'regional_flood';
+  region_id: string;
+  started_month: number;
+  activation_risk: number;
+  source_event_ids: string[];
+  last_event_id: string;
 }
 
 export interface SpiritualEssenceObservation {
@@ -706,6 +798,8 @@ export interface DynastyOverview {
     max_age: number;
     is_mortal: boolean;
   } | null;
+  royal_house_member_ids: string[];
+  royal_blood_member_ids: string[];
 }
 
 export interface DynastyOfficial {
@@ -726,14 +820,21 @@ export interface DynastyDetail {
   };
   officials: DynastyOfficial[];
   imperialCrisis: {
+    kind: 'challenge' | 'succession' | string;
     status: string;
     openedMonth: number;
-    emperor: { id: string; name: string };
-    claimant: { id: string; name: string };
-    supportCount: number;
-    supporters: Array<{ id: string; name: string }>;
-    evidenceEventIds: string[];
-    legitimacyFactors: Record<string, number>;
+    incumbent: { id: string; name: string } | null;
+    claims: Array<{
+      candidate: { id: string; name: string };
+      position: string;
+      status: string;
+      winner: boolean;
+      supportCount: number;
+      supporters: Array<{ id: string; name: string }>;
+      politicalPositions: Record<string, string>;
+      evaluations: Array<Record<string, unknown>>;
+      evidenceEventIds: string[];
+    }>;
   } | null;
 }
 

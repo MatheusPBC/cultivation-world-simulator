@@ -22,6 +22,7 @@ from src.systems.time import MonthStamp
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 from tests.test_semantic_world_service import _proposal
+from tests.domain_reactivity_fixtures import select_first_affordance
 
 
 def _add_reactive_city(world, region_id: int, ratio: float, coordinate: tuple[int, int]):
@@ -65,14 +66,7 @@ async def test_semantic_transition_drives_one_intent_and_deterministic_transfer(
     queue = DomainInvalidationQueue()
     enqueue_population_transitions(base_world, [transition], queue)
     total_before = origin.population + destination.population
-    interpreter = AsyncMock(return_value={
-        "decision": "act",
-        "reason": "A lower-load city can receive population.",
-        "action_intent": {
-            "action_kind": "population_transfer",
-            "preferences": ["lower_settlement_load", "available_capacity"],
-        },
-    })
+    interpreter = AsyncMock(side_effect=select_first_affordance)
 
     events = await process_population_reactivity(
         base_world,
@@ -125,7 +119,7 @@ async def test_no_action_is_a_causal_decision_without_population_mutation(base_w
 
 
 @pytest.mark.asyncio
-async def test_intent_can_be_blocked_when_no_destination_has_capacity(base_world):
+async def test_no_material_destination_records_maintain_without_calling_llm(base_world):
     origin = _add_reactive_city(base_world, 302, 0.90, (1, 1))
     full = _add_reactive_city(base_world, 305, 1.0, (4, 4))
     transition = await _activate_pressure(base_world)
@@ -136,35 +130,25 @@ async def test_intent_can_be_blocked_when_no_destination_has_capacity(base_world
     enqueue_population_transitions(base_world, [transition], queue)
     before = (origin.population, full.population)
 
+    interpreter = AsyncMock(side_effect=AssertionError("no affordance means no LLM"))
     events = await process_population_reactivity(
         base_world,
         current_events=[transition],
         invalidations=queue,
-        llm_call=AsyncMock(return_value={
-            "decision": "act",
-            "reason": "Try to leave.",
-            "action_intent": {
-                "action_kind": "population_transfer",
-                "preferences": ["available_capacity"],
-            },
-        }),
+        llm_call=interpreter,
     )
 
     assert [event.event_type for event in events] == [
-        "population_interpretation_decision",
-        "population_transfer_blocked",
+        "population_interpretation_decision"
     ]
+    assert interpreter.await_count == 0
     assert (origin.population, full.population) == before
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
-    assert receipt.next_eligible_month == int(base_world.month_stamp) + 6
+    assert receipt.decision == "maintain"
+    assert receipt.affordance_id is None
+    assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
     base_world.month_stamp = MonthStamp(int(base_world.month_stamp) + 1)
     retry_queue = DomainInvalidationQueue()
-    enqueue_unreacted_population_conditions(base_world, retry_queue)
-    assert all(
-        item.target_id != str(origin.id)
-        for item in retry_queue.drain()
-    )
-    base_world.month_stamp = MonthStamp(int(base_world.month_stamp) + 5)
     enqueue_unreacted_population_conditions(base_world, retry_queue)
     assert any(
         item.target_id == str(origin.id)
@@ -184,20 +168,14 @@ async def test_partial_transfer_retries_next_month_while_condition_remains_activ
         base_world,
         current_events=[transition],
         invalidations=queue,
-        llm_call=AsyncMock(return_value={
-            "decision": "act",
-            "reason": "Use the available capacity.",
-            "action_intent": {
-                "action_kind": "population_transfer",
-                "preferences": ["available_capacity"],
-            },
-        }),
+        llm_call=AsyncMock(side_effect=select_first_affordance),
     )
 
     transfer = next(
         event for event in events if event.event_type == "population_transfer_completed"
     )
-    assert transfer.causal_payload["affordance"]["relief_complete"] is False
+    assert "affordance" not in transfer.causal_payload
+    assert transfer.causal_payload["affordance_id"]
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
     assert receipt.decision_event_ids
     assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
@@ -223,8 +201,8 @@ async def test_partial_transfer_retries_next_month_while_condition_remains_activ
     ]
     receipt = next(iter(base_world.mechanical_language.reaction_receipts.values()))
     assert len(receipt.decision_event_ids) == 2
-    assert receipt.next_eligible_month is None
-    assert receipt.completed is True
+    assert receipt.next_eligible_month == int(base_world.month_stamp) + 1
+    assert receipt.completed is False
 
 
 @pytest.mark.asyncio
@@ -234,7 +212,10 @@ async def test_llm_budget_zero_uses_rule_without_losing_the_transition(base_worl
     transition = await _activate_pressure(base_world)
     queue = DomainInvalidationQueue()
     enqueue_population_transitions(base_world, [transition], queue)
-    base_world.run_config_snapshot = {"population_interpreter_llm_budget_per_month": 0}
+    base_world.run_config_snapshot = {
+        "population_interpreter_llm_budget_per_month": 0,
+        "domain_affordance_action_urgency_threshold": 0.0,
+    }
     forbidden_llm = AsyncMock(side_effect=AssertionError("LLM budget is zero"))
 
     events = await process_population_reactivity(
@@ -259,6 +240,7 @@ async def test_population_reaction_budget_zero_performs_no_evaluations(base_worl
     enqueue_population_transitions(base_world, [transition], queue)
     base_world.run_config_snapshot = {
         "test_mode": True,
+        "domain_affordance_action_urgency_threshold": 0.0,
         "population_reaction_evaluation_budget_per_month": 0,
     }
     interpreter = AsyncMock(side_effect=AssertionError("budget zero must skip evaluation"))
@@ -347,6 +329,7 @@ async def test_monthly_smoke_uses_one_rule_decision_and_survives_save_load(
         "npc_awakening_rate_per_month": 0.01,
         "world_lore": "",
         "test_mode": True,
+        "domain_affordance_action_urgency_threshold": 0.0,
         "population_interpreter_llm_budget_per_month": 2,
         "population_transfer_max_fraction_per_reaction": 0.20,
     }

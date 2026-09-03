@@ -19,7 +19,7 @@ def test_phase_update_dynasty_keeps_reigning_avatar(base_world, dummy_avatar):
     assert base_world.avatar_manager.get_avatar(dummy_avatar.id) is dummy_avatar
 
 
-def test_phase_update_dynasty_generates_avatar_if_missing(base_world):
+def test_phase_update_dynasty_opens_succession_without_generating_emperor(base_world):
     base_world.dynasty = Dynasty(
         id=1,
         name="秦",
@@ -29,8 +29,8 @@ def test_phase_update_dynasty_generates_avatar_if_missing(base_world):
 
     events = world_phases.phase_update_dynasty(base_world)
 
-    assert len(events) == 1
-    assert "新君" in events[0].content
-    emperor = base_world.avatar_manager.get_avatar(base_world.dynasty.current_emperor_id)
-    assert emperor is not None
-    assert emperor.name.startswith("上官")
+    assert events == []
+    assert base_world.dynasty.current_emperor_id is None
+    assert base_world.dynasty.imperial_crisis is not None
+    assert base_world.dynasty.imperial_crisis.kind == "succession"
+    assert base_world.dynasty.imperial_crisis.claims == []

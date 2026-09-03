@@ -24,7 +24,7 @@ def build_region_semantic_context(world: Any, region: Any) -> dict[str, Any]:
             target=region,
             calculated_month=month,
         ).to_dict()
-        for key in available_metric_keys(region)
+        for key in available_metric_keys(world, region)
     ]
 
     definitions = []
@@ -47,6 +47,18 @@ def build_region_semantic_context(world: Any, region: Any) -> dict[str, Any]:
             "lifecycle": definition.lifecycle.value,
         })
 
+    flood = world.regional_flood_state.active_by_region.get(str(region.id))
+    active_hazards = (
+        [
+            {
+                "kind": "regional_flood",
+                **flood.to_dict(),
+            }
+        ]
+        if flood is not None
+        else []
+    )
+
     return {
         "readings": readings,
         "conditions": [
@@ -57,6 +69,7 @@ def build_region_semantic_context(world: Any, region: Any) -> dict[str, Any]:
             )
         ],
         "definitions": definitions,
+        "active_hazards": active_hazards,
         "spiritual_ecology": project_spiritual_ecology(
             world,
             getattr(region, "id", -1),
@@ -108,6 +121,10 @@ def region_semantic_relevance(world: Any, region: Any) -> float:
         and item.get("unit") == "ratio"
     ]
     values.extend(float(item.get("intensity", 0.0)) for item in context["conditions"])
+    values.extend(
+        float(item.get("activation_risk", 0.0))
+        for item in context["active_hazards"]
+    )
     return max(values, default=0.0)
 
 
@@ -140,4 +157,19 @@ def build_avatar_semantic_context(avatar: Any) -> str:
         causes = [item["cause_event_id"] for item in context["conditions"] if item.get("cause_event_id")]
         if causes:
             lines.append(t("Condition evidence: {sources}", sources=", ".join(causes)))
+    for hazard in context["active_hazards"]:
+        lines.append(
+            t(
+                "Active regional hazard: {hazard} (since month {month}).",
+                hazard=hazard["kind"],
+                month=hazard["started_month"],
+            )
+        )
+        if hazard.get("source_event_ids"):
+            lines.append(
+                t(
+                    "Causal evidence: {sources}",
+                    sources=", ".join(hazard["source_event_ids"]),
+                )
+            )
     return "\n".join(lines)

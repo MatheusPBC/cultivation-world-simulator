@@ -17,7 +17,7 @@ class SectEffectsMixin:
         effects: dict[str, Any],
         start_month: int,
         duration: int,
-        source: str = "sect_random_event",
+        source: str = "temporary",
     ) -> None:
         if not effects:
             return

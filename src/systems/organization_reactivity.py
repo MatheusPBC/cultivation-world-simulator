@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
 
-from src.classes.domain_proposal import OrganizationDecisionKind
+from src.classes.domain_affordance import DomainDecisionKind
 from src.classes.event import Event
 from src.classes.mechanical_language import (
     ConditionInstance,
@@ -19,12 +19,16 @@ from src.sim.simulator_engine.domain_invalidation import (
     DomainInvalidationQueue,
     DomainInvalidationReason,
 )
-from src.systems.organization_interpreter import interpret_organization_transition
-from src.systems.semantic_world.condition_semantics import is_regional_adversity
-from src.systems.sect_member_support import (
-    eligible_member_ids,
-    execute_sect_member_support,
+from src.systems.organization_interpreter import (
+    interpret_organization_transition,
+    organization_affordance_context,
 )
+from src.systems.domain_affordance_registry import (
+    DOMAIN_AFFORDANCES,
+    StaleAffordanceError,
+    stale_affordance_blocked_event,
+)
+from src.systems.sect_member_support import eligible_member_ids
 
 
 ORGANIZATION_DOMAIN_PREFIX = "organization:"
@@ -61,6 +65,8 @@ def _condition_for_event(
     region = _region_from_id(world, region_id)
     if region is None or not definition_id:
         return None, None
+    if definition_id not in world.mechanical_language.condition_definitions:
+        return None, None
     condition = next(
         (
             item
@@ -79,6 +85,8 @@ def _receipt_id(condition: ConditionInstance, sect_id: str) -> str:
         condition.id,
         f"{ORGANIZATION_DOMAIN_PREFIX}{sect_id}",
         condition.cause_event_id,
+        decision="maintain",
+        affordance_id=None,
     ).id
 
 
@@ -98,12 +106,16 @@ def _mark_receipt(
     *,
     completed: bool,
     next_eligible_month: int | None = None,
+    decision: str,
+    affordance_id: str | None,
 ) -> DomainReactionReceipt:
     existing = _receipt(world, condition, sect_id)
     updated = DomainReactionReceipt.create(
         condition.id,
         f"{ORGANIZATION_DOMAIN_PREFIX}{sect_id}",
         condition.cause_event_id,
+        decision=decision,
+        affordance_id=affordance_id,
         decision_event_ids=tuple(
             dict.fromkeys(
                 (*(existing.decision_event_ids if existing else ()), decision_event_id)
@@ -152,7 +164,6 @@ def enqueue_organization_transitions(
         if (
             region is None
             or condition is None
-            or not is_regional_adversity(world, condition.definition_id)
         ):
             continue
         region_id = str(region.id)
@@ -179,8 +190,6 @@ def enqueue_unreacted_organization_conditions(
         for condition in world.mechanical_language.get_active_conditions(
             EntityRef("region", region_id), target_month
         ):
-            if not is_regional_adversity(world, condition.definition_id):
-                continue
             for sect in _active_sects(world):
                 if not eligible_member_ids(sect, region_id=region_id):
                     continue
@@ -275,7 +284,6 @@ async def process_organization_reactivity(
             region is None
             or condition is None
             or sect is None
-            or not is_regional_adversity(world, condition.definition_id)
         ):
             continue
         eligible = eligible_member_ids(sect, region_id=str(region.id))
@@ -302,9 +310,16 @@ async def process_organization_reactivity(
         if can_use_llm:
             llm_calls += 1
         produced.append(decision_event)
-        if decision.decision is OrganizationDecisionKind.MAINTAIN:
+        if decision.decision is DomainDecisionKind.MAINTAIN:
             _mark_receipt(
-                world, condition, str(sect.id), decision_event.id, completed=True
+                world,
+                condition,
+                str(sect.id),
+                decision_event.id,
+                completed=False,
+                next_eligible_month=int(world.month_stamp) + 1,
+                decision="maintain",
+                affordance_id=None,
             )
             continue
         if not budget.consume_domain_mutation():
@@ -315,21 +330,31 @@ async def process_organization_reactivity(
                 decision_event.id,
                 completed=False,
                 next_eligible_month=int(world.month_stamp) + 1,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
             retry.append(trigger)
             continue
-        intent = decision.action_intent
-        assert intent is not None
-        action_event = execute_sect_member_support(
-            world,
-            sect,
-            member_id=intent.member_id,
-            region_id=str(region.id),
-            decision_event_id=decision_event.id,
-            condition_event_id=source_event.id,
+        context = organization_affordance_context(
+            world, sect, region, condition, source_event
         )
+        try:
+            action_event = DOMAIN_AFFORDANCES.execute(
+                context,
+                decision.selected_affordance_id or "",
+                decision_event_id=decision_event.id,
+            )
+        except StaleAffordanceError:
+            action_event = stale_affordance_blocked_event(
+                context,
+                decision_event_id=decision_event.id,
+                selected_affordance_id=decision.selected_affordance_id or "",
+            )
         produced.append(action_event)
-        if action_event.event_type == "sect_member_support_blocked":
+        if action_event.event_type in {
+            "sect_member_support_blocked",
+            "domain_affordance_blocked",
+        }:
             _mark_receipt(
                 world,
                 condition,
@@ -337,10 +362,18 @@ async def process_organization_reactivity(
                 decision_event.id,
                 completed=False,
                 next_eligible_month=int(world.month_stamp) + 1,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
         else:
             _mark_receipt(
-                world, condition, str(sect.id), decision_event.id, completed=True
+                world,
+                condition,
+                str(sect.id),
+                decision_event.id,
+                completed=True,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
             )
 
     for item in (*retry, *pending):

@@ -143,8 +143,8 @@ describe('SectDetail', () => {
       color: '#ff0000',
       runtime_effect_items: [
         {
-          source: 'sect_random_event',
-          source_label: 'Sect random event',
+          source: 'sect_mission',
+          source_label: 'Sect mission',
           desc: 'Extra income per tile +0.8',
           remaining_months: 60,
           is_permanent: false,
@@ -213,7 +213,7 @@ describe('SectDetail', () => {
     expect(text).toContain('120/turn')
     expect(text).toContain('23/100')
     expect(text).toContain('Extra income per tile +0.8')
-    expect(text).toContain('Sect random event remains for 60 months')
+    expect(text).toContain('Sect mission remains for 60 months')
     expect(text).toContain('At war for 1 years')
     expect(text).toContain('Neutral Sect')
     expect(text).toContain('At peace for 3 years')

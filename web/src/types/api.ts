@@ -60,6 +60,8 @@ export interface TickPayloadDTO {
   world_revision?: number;
   events?: EventDTO[];
   poi_updates?: POIUpdateDTO[];
+  site_updates?: InfrastructureSiteUpdateDTO[];
+  route_updates?: RouteUpdateDTO[];
   phenomenon?: CelestialPhenomenon | null;
   active_domains?: HiddenDomainInfo[];
 }
@@ -78,6 +80,9 @@ export interface MapResponseDTO {
   width?: number;
   height?: number;
   data: MapMatrix;
+  territory_rows: number[][];
+  routes: RouteDTO[];
+  geography: PhysicalGeographyDTO;
   regions: Array<{
     id: string | number;
     name: string;
@@ -90,6 +95,7 @@ export interface MapResponseDTO {
     sect_color?: string;
     sub_type?: string;
   }>;
+  infrastructure_sites: InfrastructureSiteDTO[];
   pois?: Array<{
     id: string;
     kind: string;
@@ -101,6 +107,67 @@ export interface MapResponseDTO {
     deceased_avatar_id?: string;
   }>;
   render_config?: MapRenderConfigDTO;
+}
+
+export interface EntityReferenceDTO {
+  kind: string;
+  id: string;
+}
+
+export interface InfrastructureSiteDTO {
+  id: string;
+  kind: string;
+  name: string;
+  cell_refs: Array<[number, number]>;
+  region_ids: number[];
+  route_ids: string[];
+  water_body_ids: string[];
+  capability_ids: string[];
+  owner_ref: EntityReferenceDTO | null;
+  maintainer_ref: EntityReferenceDTO | null;
+  integrity: number;
+  enabled: boolean;
+  status: 'active' | 'impaired' | 'destroyed';
+  x: number;
+  y: number;
+  clickable: boolean;
+  last_event_id: string | null;
+}
+
+export type InfrastructureSiteUpdateDTO =
+  | { op: 'upsert'; site: InfrastructureSiteDTO }
+  | { op: 'remove'; id: string };
+
+export interface RouteDTO {
+  id: string;
+  endpoint_region_ids: [number, number];
+  mode: string;
+  capacity: number;
+  operational_capacity: number;
+  quality: number;
+  enabled: boolean;
+  allowed_resource_ids: string[];
+  dependency_site_ids: string[];
+}
+
+export interface RouteUpdateDTO {
+  id: string;
+  operational_capacity: number;
+  dependency_site_ids: string[];
+}
+
+export interface WaterBodyDTO {
+  id: string;
+  kind: 'river' | 'lake' | 'sea' | string;
+  cell_refs: Array<[number, number]>;
+  navigable: boolean;
+  region_id?: number;
+  flow_direction?: [number, number];
+}
+
+export interface PhysicalGeographyDTO {
+  elevation_rows: number[][];
+  water_bodies: WaterBodyDTO[];
 }
 
 export type POIUpdateDTO =
@@ -130,6 +197,14 @@ export type AvatarDetailDTO = AvatarDetail;
 export type RegionDetailDTO = RegionDetail;
 export type SectDetailDTO = SectDetail;
 export type POIDetailDTO = POIDetail;
+export interface InfrastructureSiteDetailDTO extends InfrastructureSiteDTO {
+  desc?: string;
+  source_event_ids?: string[];
+}
+
+export interface RouteDetailDTO extends RouteDTO {
+  source_event_ids: string[];
+}
 
 export type MetricReadingDTO = SemanticReading;
 
@@ -137,7 +212,9 @@ export type DetailResponseDTO =
   | AvatarDetailDTO
   | RegionDetailDTO
   | SectDetailDTO
-  | POIDetailDTO;
+  | POIDetailDTO
+  | InfrastructureSiteDetailDTO
+  | RouteDetailDTO;
 
 export interface MapRenderConfigDTO {
   water_speed?: 'none' | 'low' | 'medium' | 'high';
@@ -913,6 +990,34 @@ export interface SectTerritoriesResponseDTO {
   sects: SectTerritorySummaryDTO[];
 }
 
+export interface InstitutionalPresenceGovernanceDTO {
+  controller_kind: string;
+  controller_id: string;
+  administrative_capacity: number;
+}
+
+export interface InstitutionalPresenceSectInfluenceDTO {
+  sect_id: number;
+  sect_name: string;
+  color: string;
+  owned_tile_count: number;
+  share: number;
+}
+
+export interface InstitutionalPresenceRegionDTO {
+  region_id: number;
+  region_name: string;
+  region_type: string;
+  tile_count: number;
+  governance: InstitutionalPresenceGovernanceDTO | null;
+  sect_influences: InstitutionalPresenceSectInfluenceDTO[];
+  dominant_sect_id: number | null;
+}
+
+export interface InstitutionalPresenceResponseDTO {
+  regions: InstitutionalPresenceRegionDTO[];
+}
+
 export interface TrackedMortalDTO {
   id: string;
   name: string;
@@ -961,6 +1066,8 @@ export interface DynastyOverviewResponseDTO {
     max_age: number;
     is_mortal: boolean;
   } | null;
+  royal_house_member_ids: string[];
+  royal_blood_member_ids: string[];
 }
 
 export interface DynastyOfficialDTO {
@@ -981,14 +1088,21 @@ export interface DynastyDetailResponseDTO {
   };
   officials: DynastyOfficialDTO[];
   imperial_crisis: {
+    kind: 'challenge' | 'succession' | string;
     status: string;
     opened_month: number;
-    emperor: { id: string; name: string };
-    claimant: { id: string; name: string };
-    support_count: number;
-    supporters: Array<{ id: string; name: string }>;
-    evidence_event_ids: string[];
-    legitimacy_factors: Record<string, number>;
+    incumbent: { id: string; name: string } | null;
+    claims: Array<{
+      candidate: { id: string; name: string };
+      position: string;
+      status: string;
+      winner: boolean;
+      support_count: number;
+      supporters: Array<{ id: string; name: string }>;
+      political_positions: Record<string, string>;
+      evaluations: Array<Record<string, unknown>>;
+      evidence_event_ids: string[];
+    }>;
   } | null;
 }
 

@@ -296,7 +296,7 @@ class GameCommandService:
             world = self._deps.runtime.get("world")
             if world is None:
                 raise ValueError("A world is required to open an imperial claim")
-            return open_imperial_claim(world, avatar_id)
+            return open_imperial_claim(world, avatar_id, decision_source="api")
 
         event = await self._deps.runtime.run_mutation(mutate)
         world = self._deps.runtime.get("world")

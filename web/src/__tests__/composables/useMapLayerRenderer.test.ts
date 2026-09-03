@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useMapStore } from '@/stores/map'
 
 const mockTexture = vi.hoisted(() => ({ valid: true }))
+const preloadRegionTexturesMock = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
@@ -26,13 +27,14 @@ vi.mock('@/components/game/composables/useTextures', () => ({
       WATER: mockTexture,
     }),
     isLoaded: ref(true),
-    preloadRegionTextures: vi.fn().mockResolvedValue(undefined),
+    preloadRegionTextures: preloadRegionTexturesMock,
     getTileTexture: vi.fn(() => mockTexture),
   }),
 }))
 
 const spriteDestroyMock = vi.hoisted(() => vi.fn())
 const graphicsDestroyMock = vi.hoisted(() => vi.fn())
+const graphicsStrokeMock = vi.hoisted(() => vi.fn())
 const tilingSpriteDestroyMock = vi.hoisted(() => vi.fn())
 const tickerDestroyMock = vi.hoisted(() => vi.fn())
 const tickerStopMock = vi.hoisted(() => vi.fn())
@@ -66,10 +68,21 @@ vi.mock('pixi.js', () => ({
     destroy = spriteDestroyMock
   },
   Graphics: class {
+    eventMode = 'none'
     rect() {
       return this
     }
     fill() {
+      return this
+    }
+    moveTo() {
+      return this
+    }
+    lineTo() {
+      return this
+    }
+    stroke(options?: unknown) {
+      graphicsStrokeMock(options)
       return this
     }
     destroy = graphicsDestroyMock
@@ -89,7 +102,12 @@ vi.mock('pixi.js', () => ({
   },
 }))
 
-import { useMapLayerRenderer } from '@/components/game/composables/useMapLayerRenderer'
+import {
+  buildMapLayerRenderPlan,
+  DEFAULT_MAP_LAYER_VISIBILITY,
+  type MapLayerRenderInput,
+  useMapLayerRenderer,
+} from '@/components/game/composables/useMapLayerRenderer'
 
 function createMockContainer() {
   const children: Array<{ destroy: ReturnType<typeof vi.fn> }> = []
@@ -109,6 +127,7 @@ describe('useMapLayerRenderer', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    preloadRegionTexturesMock.mockResolvedValue(undefined)
   })
 
   it('destroys old Pixi display objects before rerendering the map', async () => {
@@ -139,5 +158,279 @@ describe('useMapLayerRenderer', () => {
 
     expect(containerDestroyMock).toHaveBeenCalledWith({ children: true, texture: false })
     expect(spriteDestroyMock).toHaveBeenCalledWith({ children: true, texture: false })
+  })
+
+  it('destroys unused animated water layers on a dry map', async () => {
+    const mapStore = useMapStore()
+    mapStore.mapData = [['PLAIN']]
+
+    const container = createMockContainer()
+    mount(defineComponent({
+      setup() {
+        const renderer = useMapLayerRenderer(vi.fn())
+        renderer.mapContainer.value = container as never
+        return () => null
+      },
+    }))
+
+    mapStore.isLoaded = true
+    await nextTick()
+    await nextTick()
+
+    expect(tilingSpriteDestroyMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('discards an obsolete render that finishes after a newer layer render', async () => {
+    const mapStore = useMapStore()
+    mapStore.mapData = [['PLAIN']]
+    const visibility = ref({ ...DEFAULT_MAP_LAYER_VISIBILITY })
+    const emit = vi.fn()
+    let resolveFirst!: () => void
+    let resolveSecond!: () => void
+    preloadRegionTexturesMock
+      .mockImplementationOnce(() => new Promise<void>(resolve => { resolveFirst = resolve }))
+      .mockImplementationOnce(() => new Promise<void>(resolve => { resolveSecond = resolve }))
+
+    const container = createMockContainer()
+    mount(defineComponent({
+      setup() {
+        const renderer = useMapLayerRenderer(emit, visibility)
+        renderer.mapContainer.value = container as never
+        return () => null
+      },
+    }))
+
+    mapStore.isLoaded = true
+    await nextTick()
+    visibility.value = { ...visibility.value, elevation: true }
+    await nextTick()
+
+    resolveSecond()
+    await Promise.resolve()
+    await nextTick()
+    resolveFirst()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(emit).toHaveBeenCalledTimes(1)
+  })
+
+  it('discards a pending render when the map store is reset', async () => {
+    const mapStore = useMapStore()
+    mapStore.mapData = [['PLAIN']]
+    const emit = vi.fn()
+    let resolvePreload!: () => void
+    preloadRegionTexturesMock.mockImplementationOnce(
+      () => new Promise<void>(resolve => { resolvePreload = resolve }),
+    )
+
+    const container = createMockContainer()
+    mount(defineComponent({
+      setup() {
+        const renderer = useMapLayerRenderer(emit)
+        renderer.mapContainer.value = container as never
+        return () => null
+      },
+    }))
+
+    mapStore.isLoaded = true
+    await nextTick()
+    mapStore.reset()
+    await nextTick()
+    resolvePreload()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(emit).not.toHaveBeenCalled()
+    expect(container.children).toEqual([])
+  })
+
+  it('does not rebuild Pixi terrain when only region names or sects are toggled', async () => {
+    const mapStore = useMapStore()
+    mapStore.mapData = [['PLAIN']]
+    const visibility = ref({ ...DEFAULT_MAP_LAYER_VISIBILITY })
+    const container = createMockContainer()
+    mount(defineComponent({
+      setup() {
+        const renderer = useMapLayerRenderer(vi.fn(), visibility)
+        renderer.mapContainer.value = container as never
+        return () => null
+      },
+    }))
+
+    mapStore.isLoaded = true
+    await nextTick()
+    await nextTick()
+    expect(preloadRegionTexturesMock).toHaveBeenCalledTimes(1)
+
+    visibility.value = { ...visibility.value, names: false }
+    await nextTick()
+    await nextTick()
+    visibility.value = { ...visibility.value, sects: false }
+    await nextTick()
+    await nextTick()
+
+    expect(preloadRegionTexturesMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('builds water overlays only from canonical water-body cell refs', () => {
+    const input: MapLayerRenderInput = {
+      mapData: [['WATER', 'PLAIN'], ['PLAIN', 'PLAIN']],
+      geography: {
+        elevationRows: [[10, 20], [30, 40]],
+        waterBodies: [{
+          id: 'river:1',
+          kind: 'river',
+          cellRefs: [[1, 1]],
+          navigable: true,
+          flowDirection: [1, 0],
+        }],
+      },
+      territoryRows: [[1, 1], [1, 1]],
+      regions: [{ id: '1', name: 'Vale', x: 0, y: 0, type: 'city' }],
+      routes: [],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    }
+
+    const plan = buildMapLayerRenderPlan(input)
+
+    expect(plan.waterBodies).toEqual([expect.objectContaining({
+      id: 'river:1',
+      cellRefs: [[1, 1]],
+      navigable: true,
+      flowDirection: [1, 0],
+    })])
+    expect(plan.waterBodies[0]?.cellRefs).not.toContainEqual([0, 0])
+  })
+
+  it('derives region borders from territory rows and not from visual terrain', () => {
+    const input: MapLayerRenderInput = {
+      mapData: [['PLAIN', 'PLAIN'], ['PLAIN', 'PLAIN']],
+      geography: { elevationRows: [], waterBodies: [] },
+      territoryRows: [[1, 1], [1, 2]],
+      regions: [],
+      routes: [],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    }
+
+    const plan = buildMapLayerRenderPlan(input)
+
+    expect(plan.borders).toEqual(expect.arrayContaining([
+      { x: 1, y: 1, side: 'right' },
+      { x: 1, y: 1, side: 'bottom' },
+    ]))
+  })
+
+  it('projects each shared regional boundary only once', () => {
+    const plan = buildMapLayerRenderPlan({
+      mapData: [['PLAIN', 'PLAIN']],
+      geography: { elevationRows: [], waterBodies: [] },
+      territoryRows: [[1, 2]],
+      regions: [],
+      routes: [],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    })
+
+    const sharedEdgeCount = plan.borders.filter(edge => (
+      (edge.x === 0 && edge.y === 0 && edge.side === 'right')
+      || (edge.x === 1 && edge.y === 0 && edge.side === 'left')
+    )).length
+
+    expect(sharedEdgeCount).toBe(1)
+  })
+
+  it('projects enabled routes as direct topological lines between region anchors', () => {
+    const input: MapLayerRenderInput = {
+      mapData: [['PLAIN']],
+      geography: { elevationRows: [], waterBodies: [] },
+      territoryRows: [[1]],
+      regions: [
+        { id: '1', name: 'Origem', x: 2, y: 3, type: 'city' },
+        { id: '2', name: 'Destino', x: 8, y: 5, type: 'city' },
+      ],
+      routes: [{
+        id: 'route:1',
+        endpointRegionIds: [1, 2],
+        mode: 'road',
+        capacity: 100,
+        operationalCapacity: 75,
+        quality: 0.75,
+        enabled: true,
+        allowedResourceIds: [],
+        dependencySiteIds: [],
+      }],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    }
+
+    const plan = buildMapLayerRenderPlan(input)
+
+    expect(plan.routes).toEqual([expect.objectContaining({
+      id: 'route:1',
+      from: { x: 2 * 64 + 32, y: 3 * 64 + 32 },
+      to: { x: 8 * 64 + 32, y: 5 * 64 + 32 },
+      mode: 'road',
+      operationalCapacity: 75,
+      enabled: true,
+    })])
+  })
+
+  it('rerenders route overlays when operational capacity changes', async () => {
+    const mapStore = useMapStore()
+    mapStore.mapData = [['PLAIN']]
+    mapStore.territoryRows = [[1]]
+    mapStore.regions = new Map([
+      ['1', { id: '1', name: 'Origem', x: 0, y: 0, type: 'city' }],
+      ['2', { id: '2', name: 'Destino', x: 1, y: 0, type: 'city' }],
+    ])
+    mapStore.routes = [{
+      id: 'route:1', endpointRegionIds: [1, 2], mode: 'road', capacity: 100,
+      operationalCapacity: 80, quality: 0.8, enabled: true,
+      allowedResourceIds: [], dependencySiteIds: ['bridge:1'],
+    }]
+    const emit = vi.fn()
+    const container = createMockContainer()
+    mount(defineComponent({
+      setup() {
+        const renderer = useMapLayerRenderer(emit)
+        renderer.mapContainer.value = container as never
+        return () => null
+      },
+    }))
+
+    mapStore.isLoaded = true
+    await nextTick()
+    await nextTick()
+    expect(emit).toHaveBeenCalledTimes(1)
+    graphicsStrokeMock.mockClear()
+
+    mapStore.applyRouteUpdates([{
+      id: 'route:1', operational_capacity: 20, dependency_site_ids: ['bridge:1'],
+    }])
+    await nextTick()
+    await nextTick()
+
+    expect(emit).toHaveBeenCalledTimes(2)
+    expect(graphicsStrokeMock).toHaveBeenCalledWith(expect.objectContaining({
+      color: 0xd8b36a,
+      alpha: 0.38,
+    }))
+  })
+
+  it('assigns elevation colors deterministically and omits the overlay when hidden', () => {
+    const input: MapLayerRenderInput = {
+      mapData: [['PLAIN', 'PLAIN']],
+      geography: { elevationRows: [[0, 100]], waterBodies: [] },
+      territoryRows: [[1, 1]],
+      regions: [],
+      routes: [],
+      visibility: { ...DEFAULT_MAP_LAYER_VISIBILITY, elevation: true },
+    }
+
+    const plan = buildMapLayerRenderPlan(input)
+
+    expect(plan.elevation).toHaveLength(2)
+    expect(plan.elevation[0]?.color).not.toBe(plan.elevation[1]?.color)
+    expect(buildMapLayerRenderPlan({ ...input, visibility: DEFAULT_MAP_LAYER_VISIBILITY }).elevation)
+      .toEqual([])
   })
 })

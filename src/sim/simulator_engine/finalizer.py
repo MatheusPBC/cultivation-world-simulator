@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from src.classes.event import Event
+from collections.abc import Mapping
+
+from src.classes.agent_decision import AgentDecision
+from src.classes.causal_link import CausalRelation
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import Event, FactKind
 from src.classes.close_relation_event_service import append_close_relation_major_observations
 from src.run.log import get_logger
 
@@ -9,6 +14,108 @@ from .context import SimulationStepContext
 
 class EventPersistenceError(RuntimeError):
     pass
+
+
+class CausalIntegrityError(RuntimeError):
+    pass
+
+
+def _event_by_id(ctx: SimulationStepContext, current: dict[str, Event], event_id: str):
+    event = current.get(event_id)
+    if event is not None:
+        return event
+    manager = getattr(ctx.world, "event_manager", None)
+    getter = getattr(manager, "get_event_by_id", None)
+    return getter(event_id) if callable(getter) else None
+
+
+def _deltas(event: Event) -> list[dict]:
+    payload = event.causal_payload
+    if not isinstance(payload, Mapping):
+        return []
+    raw = payload.get("deltas", [])
+    if not isinstance(raw, list) or any(not isinstance(item, Mapping) for item in raw):
+        raise CausalIntegrityError(f"event {event.id} has an invalid StateDelta payload")
+    return [dict(item) for item in raw]
+
+
+def validate_causal_integrity(
+    ctx: SimulationStepContext, events: list[Event]
+) -> None:
+    """Reject inverted authorship before the event-store transaction begins."""
+    current = {event.id: event for event in events}
+    required_decision_fields = set(AgentDecision().to_dict())
+    for event in events:
+        deltas = _deltas(event)
+        payload = event.causal_payload
+        if event.fact_kind is FactKind.DECISION:
+            if not isinstance(payload, Mapping) or not isinstance(
+                payload.get("decision"), Mapping
+            ):
+                raise CausalIntegrityError(
+                    f"decision event {event.id} must contain AgentDecision"
+                )
+            decision_payload = dict(payload["decision"])
+            if set(decision_payload) != required_decision_fields:
+                raise CausalIntegrityError(
+                    f"decision event {event.id} has an incomplete AgentDecision"
+                )
+            decision = AgentDecision.from_dict(decision_payload)
+            if (
+                not decision.id
+                or not decision.subject_kind
+                or not decision.subject_id
+                or not decision.source
+            ):
+                raise CausalIntegrityError(
+                    f"decision event {event.id} has an invalid AgentDecision"
+                )
+            if deltas:
+                raise CausalIntegrityError(
+                    f"decision event {event.id} cannot carry StateDelta"
+                )
+        if event.causal_origin is CausalOrigin.LLM_INTERPRETATION and deltas:
+            raise CausalIntegrityError(
+                f"LLM interpretation {event.id} cannot carry StateDelta"
+            )
+        if event.is_story:
+            if deltas:
+                raise CausalIntegrityError(f"story event {event.id} cannot mutate state")
+            if not event.causal_links:
+                raise CausalIntegrityError(
+                    f"story event {event.id} requires a factual source"
+                )
+            for link in event.causal_links:
+                cause = _event_by_id(ctx, current, link.cause_event_id)
+                if (
+                    link.relation is not CausalRelation.CONTRIBUTED_TO
+                    or cause is None
+                    or cause.is_story
+                ):
+                    raise CausalIntegrityError(
+                        f"story event {event.id} must contribute to a real fact"
+                    )
+        if deltas:
+            for link in event.causal_links:
+                cause = _event_by_id(ctx, current, link.cause_event_id)
+                if cause is not None and cause.is_story:
+                    raise CausalIntegrityError(
+                        f"story event {cause.id} cannot cause mutation {event.id}"
+                    )
+        if (
+            event.fact_kind is FactKind.STATE_TRANSITION
+            and event.causal_origin is CausalOrigin.ACTOR_DECISION
+            and deltas
+        ):
+            has_decision = any(
+                (cause := _event_by_id(ctx, current, link.cause_event_id)) is not None
+                and cause.fact_kind is FactKind.DECISION
+                for link in event.causal_links
+            )
+            if not has_decision:
+                raise CausalIntegrityError(
+                    f"actor transition {event.id} requires a real decision cause"
+                )
 
 
 def log_events(events: list[Event]) -> None:
@@ -51,6 +158,7 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
             )
 
     ctx.causal.attach_to(final_events)
+    validate_causal_integrity(ctx, final_events)
 
     if ctx.world.event_manager:
         persisted = ctx.world.event_manager.commit_step(
@@ -72,4 +180,5 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
     # 这里的清理只是幂等的兜底，保留是为了 finalize_step 单独被调用
     # （例如测试直接调用 finalize_step(ctx)）时行为依旧正确。
     ctx.world.step_causal_recorder = None
+    ctx.world.step_invalidations = None
     return final_events

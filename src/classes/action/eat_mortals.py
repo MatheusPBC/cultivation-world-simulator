@@ -7,6 +7,7 @@ from src.classes.alignment import Alignment
 from src.classes.environment.region import CityRegion
 from src.classes.race import is_yao_avatar
 from src.systems.cultivation import REALM_RANK
+from src.classes.action.population_effects import apply_avatar_population_effect
 
 
 class EatMortals(TimedAction):
@@ -56,7 +57,21 @@ class EatMortals(TimedAction):
 
         population_loss = max(0.001, float(region.population) * self.POPULATION_LOSS_RATIO)
         eaten_people = max(1, int(float(region.population) * 10000 * self.POPULATION_LOSS_RATIO))
-        region.change_population(-population_loss)
+        population_event = apply_avatar_population_effect(
+            self.world,
+            self.avatar,
+            region,
+            delta=-population_loss,
+            affected_quantity=eaten_people,
+            action_name=self.__class__.__name__,
+            content=t(
+                "{avatar} ate {count} mortals in {city}, refining flesh and fear into {exp} cultivation experience.",
+                avatar=self.avatar.name,
+                count=eaten_people,
+                city=region.name,
+                exp=0,
+            ),
+        )
 
         realm_rank = REALM_RANK.get(self.avatar.cultivation_progress.realm, 0) + 1
         multiplier = 1.0 + float(self.avatar.effects.get("extra_eat_mortals_exp_multiplier", 0.0) or 0.0)
@@ -64,11 +79,12 @@ class EatMortals(TimedAction):
         if self.avatar.cultivation_progress.can_cultivate():
             self.avatar.cultivation_progress.add_exp(exp)
 
-        return [
-            Event(
-                self.world.month_stamp,
-                t("{avatar} ate {count} mortals in {city}, refining flesh and fear into {exp} cultivation experience.", avatar=self.avatar.name, count=eaten_people, city=region.name, exp=exp),
-                related_avatars=[self.avatar.id],
-                is_major=True,
-            )
-        ]
+        population_event.content = t(
+            "{avatar} ate {count} mortals in {city}, refining flesh and fear into {exp} cultivation experience.",
+            avatar=self.avatar.name,
+            count=eaten_people,
+            city=region.name,
+            exp=exp,
+        )
+        population_event.is_major = True
+        return [population_event]

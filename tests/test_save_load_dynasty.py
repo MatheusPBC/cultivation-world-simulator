@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from src.classes.celestial_dao import DaoPetition, DaoTradition
-from src.classes.core.dynasty import Dynasty, ImperialCrisis
+from src.classes.core.dynasty import Dynasty, ImperialClaim, ImperialCrisis
 from src.sim.simulator import Simulator
 from src.sim.save.save_game import save_game
 from src.sim.load.load_game import load_game
@@ -17,12 +17,17 @@ def test_save_and_load_preserves_avatar_sovereign_crisis_and_petition(base_world
         desc="重文轻武，典章繁密，民间书院兴盛。",
         royal_surname="上官",
         current_emperor_id=dummy_avatar.id,
+        royal_house_member_ids=[dummy_avatar.id, "claimant"],
+        royal_blood_member_ids=[dummy_avatar.id, "claimant"],
         imperial_crisis=ImperialCrisis(
-            dummy_avatar.id,
-            "claimant",
-            int(base_world.month_stamp),
-            status="active",
-            political_positions={"official": "support"},
+            kind="challenge",
+            incumbent_id=dummy_avatar.id,
+            opened_month=int(base_world.month_stamp),
+            claims=[ImperialClaim(
+                candidate_id="claimant",
+                opened_month=int(base_world.month_stamp),
+                political_positions={"official": "support"},
+            )],
         ),
     )
     base_world.dao_petitions = [
@@ -49,12 +54,14 @@ def test_save_and_load_preserves_avatar_sovereign_crisis_and_petition(base_world
     assert new_world.dynasty.royal_surname == "上官"
     assert new_world.dynasty.title == "宋朝"
     assert new_world.dynasty.current_emperor_id == dummy_avatar.id
+    assert new_world.dynasty.royal_house_member_ids == [dummy_avatar.id, "claimant"]
+    assert new_world.dynasty.royal_blood_member_ids == [dummy_avatar.id, "claimant"]
     assert new_world.avatar_manager.get_avatar(dummy_avatar.id).name == "上官景天"
     assert new_world.dynasty.imperial_crisis.status == "active"
-    assert new_world.dynasty.imperial_crisis.political_positions == {
+    assert new_world.dynasty.imperial_crisis.kind == "challenge"
+    assert new_world.dynasty.imperial_crisis.claims[0].political_positions == {
         "official": "support",
     }
-    assert "support_avatar_ids" not in new_world.dynasty.imperial_crisis.to_dict()
     assert new_world.dao_petitions[0].tradition is DaoTradition.BALANCE
     assert new_world.dao_petitions[0].target_avatar_id == "claimant"
     assert new_world.dao_petitions[0].target_evidence_event_ids == ["source-event"]

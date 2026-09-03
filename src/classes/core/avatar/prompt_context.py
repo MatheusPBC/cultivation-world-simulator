@@ -21,32 +21,49 @@ def _build_court_crisis_context(avatar: "Avatar") -> dict:
         return {"active_imperial_crisis": None}
 
     avatar_id = str(getattr(avatar, "id", ""))
-    contender_ids = {str(crisis.emperor_avatar_id), str(crisis.claimant_avatar_id)}
+    contender_ids = {
+        str(value)
+        for value in (
+            crisis.incumbent_id,
+            *(claim.candidate_id for claim in crisis.claims),
+        )
+        if value is not None
+    }
     is_official = str(getattr(avatar, "official_rank", OFFICIAL_NONE) or OFFICIAL_NONE) != OFFICIAL_NONE
     if not is_official and avatar_id not in contender_ids:
         return {"active_imperial_crisis": None}
 
     get_avatar = world.avatar_manager.get_avatar
-    emperor = get_avatar(str(crisis.emperor_avatar_id))
-    claimant = get_avatar(str(crisis.claimant_avatar_id))
-    supporters = []
-    for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
-        if position != "support":
-            continue
-        supporter = get_avatar(str(supporter_id))
-        if supporter is not None:
-            supporters.append(str(getattr(supporter, "name", "") or ""))
+    incumbent = get_avatar(str(crisis.incumbent_id)) if crisis.incumbent_id else None
+    claims = []
+    for claim in crisis.claims:
+        candidate = get_avatar(str(claim.candidate_id))
+        claims.append(
+            {
+                "candidate_id": str(claim.candidate_id),
+                "candidate_name": str(getattr(candidate, "name", "") or ""),
+                "status": str(claim.status),
+                "positions": dict(claim.political_positions),
+            }
+        )
     role = "court_official"
-    if avatar_id == str(crisis.emperor_avatar_id):
-        role = "emperor"
-    elif avatar_id == str(crisis.claimant_avatar_id):
-        role = "claimant"
+    if avatar_id == str(crisis.incumbent_id):
+        role = "incumbent"
+    elif avatar_id in {str(claim.candidate_id) for claim in crisis.claims}:
+        role = "candidate"
     return {
         "active_imperial_crisis": {
             "role": role,
-            "emperor_name": str(getattr(emperor, "name", "") or ""),
-            "claimant_name": str(getattr(claimant, "name", "") or ""),
-            "declared_supporters": supporters,
+            "kind": str(crisis.kind),
+            "incumbent": (
+                {
+                    "id": str(crisis.incumbent_id),
+                    "name": str(getattr(incumbent, "name", "") or ""),
+                }
+                if crisis.incumbent_id
+                else None
+            ),
+            "claims": claims,
             "opened_month": int(getattr(crisis, "opened_month", 0) or 0),
         }
     }
