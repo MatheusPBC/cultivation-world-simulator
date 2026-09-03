@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from src.classes.agent_decision import AgentDecision
+from src.classes.causal_origin import CausalOrigin
 from src.classes.actions import get_action_infos
 from src.classes.ai import llm_ai
 from src.classes.core.avatar import Avatar
@@ -69,6 +70,7 @@ def _record_agent_decision(
         is_major=False,
         is_story=False,
         fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.LLM_INTERPRETATION,
         causal_payload=causal_payload,
     )
     # 运行时身份：一次决策可能跨月消费多个计划（见 commit_next_plan），

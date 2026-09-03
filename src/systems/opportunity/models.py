@@ -25,6 +25,8 @@ class OpportunityRecord:
     hint_text: str
     created_month: int
     expires_month: int
+    condition_id: str | None = None
+    source_event_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -35,6 +37,8 @@ class OpportunityRecord:
             "hint_text": self.hint_text,
             "created_month": int(self.created_month),
             "expires_month": int(self.expires_month),
+            "condition_id": self.condition_id,
+            "source_event_ids": list(self.source_event_ids),
         }
 
     @classmethod
@@ -47,6 +51,8 @@ class OpportunityRecord:
             hint_text=str(data.get("hint_text") or ""),
             created_month=int(data.get("created_month", 0) or 0),
             expires_month=int(data.get("expires_month", 0) or 0),
+            condition_id=str(data.get("condition_id") or "") or None,
+            source_event_ids=tuple(str(item) for item in data.get("source_event_ids", []) if str(item)),
         )
 
 

@@ -258,6 +258,7 @@ def mock_llm_managers():
          patch("src.classes.relation.relation_delta_service.call_llm_with_task_name", new_callable=AsyncMock) as mock_relation_delta, \
          patch("src.classes.world_lore.WorldLoreManager.apply_world_lore", new_callable=AsyncMock) as mock_hist, \
          patch("src.classes.story_teller.call_llm_with_task_name", new_callable=AsyncMock) as mock_call_llm_story, \
+         patch("src.systems.chronicle_service.ChronicleService.maybe_generate_chapter", new_callable=AsyncMock) as mock_chronicle, \
          patch("src.utils.llm.config.LLMConfig.from_mode", return_value=mock_llm_config) as mock_config:
         
         mock_ai.decide = AsyncMock(return_value={})
@@ -268,6 +269,7 @@ def mock_llm_managers():
         mock_relation_delta.return_value = {"delta_a_to_b": 0, "delta_b_to_a": 0}
         mock_hist.return_value = None
         mock_call_llm_story.return_value = {"story": "测试故事"}
+        mock_chronicle.return_value = None
 
         yield {
             "ai": mock_ai,
@@ -279,6 +281,7 @@ def mock_llm_managers():
             "hist": mock_hist,
             "story": mock_call_llm_story,
             "gathering_story": mock_call_llm_story,
+            "chronicle": mock_chronicle,
             "config": mock_config
         }
 

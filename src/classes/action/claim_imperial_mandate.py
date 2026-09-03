@@ -26,10 +26,7 @@ class ClaimImperialMandate(InstantAction):
         return True, ""
 
     def start(self):
-        open_imperial_claim(self.world, str(self.avatar.id))
-        # The domain service records the major decision fact immediately, so it
-        # remains available to both an API mutation and the simulation phase.
-        return None
+        return open_imperial_claim(self.world, str(self.avatar.id))
 
     def _execute(self) -> None:
         return

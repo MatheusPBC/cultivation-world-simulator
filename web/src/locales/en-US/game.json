@@ -608,7 +608,98 @@
       "host_meta": "Owner",
       "no_host": "Unowned",
       "price_meta": "{price} Stones",
-      "formation_remaining": "{months} months remaining"
+      "formation_remaining": "{months} months remaining",
+      "regional_context_title": "Regional context",
+      "dao_tradition": "Dao tradition",
+      "dao_traditions": {
+        "mandate_and_order": "Mandate and order",
+        "balance": "Balance",
+        "mercy": "Mercy",
+        "transcendence": "Transcendence"
+      },
+      "semantic_context": {
+        "conditions_title": "Active semantic conditions",
+        "readings_title": "Key readings",
+        "empty": "No semantic context is available.",
+        "intensity": "Intensity {value}",
+        "started_month": "Started in month {month}",
+        "definition": "Definition {id}",
+        "source_event": "Source event {id}",
+        "derived_from": "Derived inputs",
+        "unknown_value": "Unknown",
+        "confidence": "Confidence {value}%",
+        "availability": {
+          "measurable": "Measurable",
+          "partially_measurable": "Partially measurable",
+          "unmeasurable": "Unmeasurable"
+        },
+        "reading_kind": {
+          "exact": "Exact",
+          "derived": "Derived",
+          "estimated": "Estimated",
+          "unknown": "Unknown"
+        }
+      },
+      "economy": {
+        "title": "Regional economy",
+        "stocks": "Stocks",
+        "capacities": "Capacities",
+        "production_rates": "Production rates",
+        "demand_rates": "Demand rates",
+        "access": "Access",
+        "dependencies": "Dependencies"
+      },
+      "infrastructure": {
+        "title": "Infrastructure",
+        "capacities": "Capacities",
+        "quality": "Quality"
+      },
+      "city_state": {
+        "title": "Urban state",
+        "districts": "Districts",
+        "assets": "Urban assets",
+        "governance": "Governance",
+        "population_weight": "Population share: {value}",
+        "tiles": "Tiles: {value}",
+        "capacity": "Capacity: {value}",
+        "quality": "Quality: {value}",
+        "integrity": "Integrity: {value}",
+        "controller": "Controller",
+        "administrative_capacity": "Administrative capacity: {value}"
+      },
+      "spiritual_ecology": {
+        "title": "Spiritual ecology",
+        "grounding_label": "Grounding",
+        "essence": "Essence",
+        "densities": "Element densities",
+        "formations": "Active formations",
+        "graves": "Graves",
+        "treasures": "Treasures",
+        "celestial_context": "Celestial context",
+        "state_refs": "Grounding references",
+        "started_month": "Started: month {value}",
+        "expires_month": "Expires: month {value}",
+        "created_month": "Created: month {value}",
+        "location": "Location: {value}",
+        "effects": "Recorded effects",
+        "grounding": {
+          "grounded": "Grounded facts",
+          "unknown": "Unknown grounding"
+        }
+      },
+      "collective_health": {
+        "title": "Collective health",
+        "grounding_label": "Grounding",
+        "living_avatar_count": "Living avatars",
+        "active_wounded_count": "Active wounded",
+        "hp_deficit": "HP deficit",
+        "healing_capacity": "Healing capacity",
+        "injuries": "Active injuries",
+        "healing_assets": "Healing assets",
+        "hp_lost": "HP lost: {value}",
+        "capacity": "Capacity: {value}",
+        "state_refs": "State references"
+      }
     },
     "sect": {
       "stats": {

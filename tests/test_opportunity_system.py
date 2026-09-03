@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 import pytest
 
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.environment.region import CityRegion
+from src.classes.mechanical_language import ConditionInstance
 from src.classes.environment.tile import TileType
 from src.classes.age import Age
 from src.classes.alignment import Alignment
@@ -27,6 +26,7 @@ from src.systems.opportunity import (
 from src.systems.time import Month, Year, create_month_stamp
 from src.systems.single_choice import ItemExchangeKind
 from src.utils.id_generator import get_avatar_id
+from src.systems.opportunity.targeting import _build_record
 
 
 def _add_region(world, region_id: int, name: str, coords: list[tuple[int, int]]) -> CityRegion:
@@ -85,6 +85,32 @@ def _record_for_region(avatar, region_id: int) -> OpportunityRecord:
         created_month=now - 1,
         expires_month=now + 60,
     )
+
+
+def test_region_condition_prioritizes_opportunity_target_and_persists_evidence(base_world, dummy_avatar, monkeypatch):
+    quiet = _add_region(base_world, 101, "Quiet", [(5, 5)])
+    relevant = _add_region(base_world, 102, "Relevant", [(6, 6)])
+    base_world.mechanical_language.add_condition_instance(ConditionInstance(
+        id="condition-102",
+        definition_id="overcrowded_settlement",
+        target_kind="region",
+        target_id="102",
+        label="overcrowded settlement",
+        intensity=0.9,
+        started_month=int(base_world.month_stamp),
+        cause_event_id="event-pressure",
+    ))
+    monkeypatch.setattr("src.systems.opportunity._weighted_choice_from_mapping", lambda mapping, defaults: "region")
+
+    record = _build_record(dummy_avatar, base_world)
+    restored = OpportunityRecord.from_dict(record.to_dict())
+
+    assert quiet.id != relevant.id
+    assert record.target_id == str(relevant.id)
+    assert record.condition_id == "condition-102"
+    assert record.source_event_ids == ("event-pressure",)
+    assert restored.condition_id == record.condition_id
+    assert restored.source_event_ids == record.source_event_ids
 
 
 @pytest.mark.asyncio
@@ -222,6 +248,7 @@ async def test_boon_outcome_adds_effect_and_recalculates(base_world, dummy_avata
 async def test_equipment_outcome_grants_next_realm_weapon(base_world, dummy_avatar, monkeypatch):
     _add_region(base_world, 101, "远城", [(5, 5)])
     base_world.avatar_manager.register_avatar(dummy_avatar)
+    dummy_avatar.weapon = None
     base_world.opportunity_manager.add(_record_for_region(dummy_avatar, 101))
     _place_avatar(dummy_avatar, 5, 5)
     weapon = Weapon(

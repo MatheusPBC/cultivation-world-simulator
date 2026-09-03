@@ -1,6 +1,5 @@
 from .context import get_opportunity_context_text
 from .config import _get_cfg_value, _opportunity_probability, _weighted_choice_from_mapping
-from .manager import _get_manager
 from .models import OpportunityManager, OpportunityOutcome, OpportunityRecord, OpportunityTargetType
 from .outcomes import _load_boon_records, _pick_equipment, _pick_outcome
 from .persistence import load_opportunities, serialize_opportunities
@@ -11,6 +10,12 @@ __all__ = [
     "OpportunityOutcome",
     "OpportunityRecord",
     "OpportunityTargetType",
+    "_get_cfg_value",
+    "_load_boon_records",
+    "_opportunity_probability",
+    "_pick_equipment",
+    "_pick_outcome",
+    "_weighted_choice_from_mapping",
     "get_opportunity_context_text",
     "load_opportunities",
     "phase_check_opportunities",

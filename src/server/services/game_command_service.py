@@ -298,8 +298,14 @@ class GameCommandService:
                 raise ValueError("A world is required to open an imperial claim")
             return open_imperial_claim(world, avatar_id)
 
-        crisis = await self._deps.runtime.run_mutation(mutate)
-        return crisis.to_dict()
+        event = await self._deps.runtime.run_mutation(mutate)
+        world = self._deps.runtime.get("world")
+        if world is None or world.event_manager is None or not world.event_manager.add_event(event):
+            raise RuntimeError("Imperial claim event could not be persisted")
+        crisis = getattr(getattr(world, "dynasty", None), "imperial_crisis", None)
+        if crisis is None:
+            raise RuntimeError("Imperial claim did not create a crisis")
+        return {**crisis.to_dict(), "event_id": event.id}
 
     async def cleanup_events(
         self,

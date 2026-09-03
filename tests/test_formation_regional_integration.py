@@ -11,11 +11,19 @@ from src.classes.items.magic_stone import MagicStone
 from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
 from src.sim.simulator import Simulator
+from src.classes.mechanical_language import ConditionInstance, EntityRef
 from src.systems.formation import FORMATION_HEALING
+
+FORMATION_REGION_ID = 201
 
 
 def _setup_region(world, avatar):
-    region = CultivateRegion(id=301, name="Formation Valley", desc="", cors=[(0, 0)])
+    region = CultivateRegion(
+        id=FORMATION_REGION_ID,
+        name="Formation Valley",
+        desc="",
+        cors=[(0, 0)],
+    )
     tile = Tile(0, 0, TileType.CAVE)
     tile.region = region
     avatar.tile = tile
@@ -37,10 +45,12 @@ async def test_formation_finish_creates_causal_region_condition(dummy_avatar, ba
         action._execute(FORMATION_HEALING)
     event = (await action.finish(FORMATION_HEALING))[0]
 
-    condition = region.conditions[-1]
+    condition = base_world.mechanical_language.get_conditions_for_target(
+        EntityRef("region", str(region.id))
+    )[-1]
     assert event.is_major is True
     assert event.fact_kind.value == "derived_condition"
-    assert condition.kind == "healing_formation"
+    assert condition.definition_id == "formation:healing_formation"
     assert condition.started_month == int(base_world.month_stamp)
     assert condition.expires_month == (
         int(base_world.month_stamp) + base_world.map.region_formations[region.id]["duration"]
@@ -54,13 +64,17 @@ async def test_formation_finish_creates_causal_region_condition(dummy_avatar, ba
 
 
 def test_formation_region_condition_survives_save_load(dummy_avatar, base_world, tmp_path):
-    region = _setup_region(base_world, dummy_avatar)
+    _setup_region(base_world, dummy_avatar)
     dummy_avatar.magic_stone = MagicStone(int(dummy_avatar.magic_stone))
     dummy_avatar.weapon = None
     dummy_avatar.auxiliary = None
-    region.add_condition(
-        __import__("src.classes.environment.region_condition", fromlist=["RegionCondition"]).RegionCondition(
-            kind="healing_formation",
+    base_world.mechanical_language.add_condition_instance(
+        ConditionInstance(
+            id="formation-condition",
+            definition_id="formation:healing_formation",
+            target_kind="region",
+            target_id=str(FORMATION_REGION_ID),
+            label="healing_formation",
             intensity=1.0,
             started_month=int(base_world.month_stamp),
             expires_month=int(base_world.month_stamp) + 26,
@@ -81,9 +95,12 @@ def test_formation_region_condition_survives_save_load(dummy_avatar, base_world,
     assert success
     with open(save_path, encoding="utf-8") as handle:
         data = json.load(handle)
-    assert data["world"]["regions_status"]["301"]["conditions"][0]["cause_event_id"] == "event-formation"
+    assert "conditions" not in data["world"]["regions_status"][str(FORMATION_REGION_ID)]
+    assert data["world"]["mechanical_language"]["condition_instances"]["formation-condition"]["cause_event_id"] == "event-formation"
 
     loaded_world, _, _ = load_game(save_path)
-    loaded = loaded_world.map.regions[301].conditions[0]
-    assert loaded.kind == "healing_formation"
+    loaded = loaded_world.mechanical_language.get_conditions_for_target(
+        EntityRef("region", str(FORMATION_REGION_ID))
+    )[0]
+    assert loaded.definition_id == "formation:healing_formation"
     assert loaded.cause_event_id == "event-formation"

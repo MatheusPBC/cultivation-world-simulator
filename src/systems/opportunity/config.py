@@ -10,14 +10,6 @@ def _get_cfg_value(name: str, default: Any) -> Any:
     return default if cfg is None else cfg
 
 
-def _get_manager(world: "World") -> OpportunityManager:
-    manager = getattr(world, "opportunity_manager", None)
-    if manager is None:
-        manager = OpportunityManager()
-        setattr(world, "opportunity_manager", manager)
-    return manager
-
-
 def _cooldown_after_dissipated() -> int:
     return int(_get_cfg_value("cooldown_months_after_dissipated", 12) or 12)
 

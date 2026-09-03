@@ -10,7 +10,7 @@ import LiveGuideView from '@/components/game/panels/world-journal/LiveGuideView.
 import DaoPetitionsView from '@/components/game/panels/world-journal/DaoPetitionsView.vue'
 import { useUiStore } from '@/stores/ui'
 import { useWorldJournalStore, type WorldJournalTab } from '@/stores/worldJournal'
-import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, LiveGuideSubjectDTO, WorldJournalPeriodMonths } from '@/types/api'
+import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, LiveGuideSubjectDTO, MetricReadingDTO, WorldJournalPeriodMonths } from '@/types/api'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
@@ -117,6 +117,17 @@ function relationLabel(edge: CausalEdgeDTO) {
 function edgeEventText(edge: CausalEdgeDTO) {
   if (edge.pruned || !edge.event) return t('game.world_journal.why_pruned')
   return renderEventText(edge.event)
+}
+
+function measurementValue(reading: MetricReadingDTO): string {
+  if (reading.value === null || reading.reading_kind === 'unknown') {
+    return t('game.world_journal.why_measurement_unknown')
+  }
+  return `${reading.value} ${reading.unit}`
+}
+
+function measurementKeyText(key: MetricReadingDTO['key']): string {
+  return `${key.dimension}(${key.concept_id}) · ${key.subject_kind}:${key.subject_id}`
 }
 
 function openChronicleDossier(chapterId: string, anchorId: string) {
@@ -404,6 +415,57 @@ onMounted(() => {
                 <li v-for="delta in causalDetail.deltas" :key="delta.id" class="why-edge">
                   <span class="why-relation">{{ delta.aspect }}</span>
                   <span class="why-edge-text">{{ delta.before }} &rarr; {{ delta.after }}</span>
+                </li>
+              </ul>
+            </section>
+
+            <section class="why-section" data-testid="why-measurements">
+              <h4>{{ t('game.world_journal.why_measurements') }}</h4>
+              <p v-if="causalDetail.measurements.length === 0" class="journal-empty">
+                {{ t('game.world_journal.why_no_measurements') }}
+              </p>
+              <ul v-else class="why-measurement-list">
+                <li
+                  v-for="(reading, index) in causalDetail.measurements"
+                  :key="`measurement-${index}`"
+                  class="why-measurement"
+                >
+                  <div class="why-measurement__header">
+                    <strong>{{ reading.key.dimension }}({{ reading.key.concept_id }})</strong>
+                    <span>{{ measurementValue(reading) }}</span>
+                  </div>
+                  <div class="why-measurement__meta">
+                    {{ t(`game.world_journal.why_measurement_availability.${reading.availability}`) }}
+                    · {{ t(`game.world_journal.why_measurement_kind.${reading.reading_kind}`) }}
+                  </div>
+                  <div class="why-measurement__refs">
+                    <span>{{ t('game.world_journal.why_measurement_state_refs') }}:</span>
+                    <span>{{ reading.state_refs.length ? reading.state_refs.join(', ') : t('game.world_journal.why_measurement_none') }}</span>
+                  </div>
+                  <div v-if="reading.derived_from.length" class="why-measurement__derived-from">
+                    <span class="why-measurement__derived-from-label">
+                      {{ t('game.world_journal.why_measurement_derived_from') }}:
+                    </span>
+                    <ul>
+                      <li v-for="input in reading.derived_from" :key="measurementKeyText(input)">
+                        {{ measurementKeyText(input) }}
+                      </li>
+                    </ul>
+                  </div>
+                  <div v-if="reading.source_event_ids.length" class="why-measurement__sources">
+                    <span class="why-measurement__sources-label">{{ t('game.world_journal.why_measurement_source_events') }}:</span>
+                    <div v-for="eventId in reading.source_event_ids" :key="eventId" class="why-measurement__source">
+                      <span>{{ eventId }}</span>
+                      <button
+                        type="button"
+                        class="why-button"
+                        :data-testid="`why-measurement-source-event-${eventId}`"
+                        @click="openWhy(eventId)"
+                      >
+                        {{ t('game.world_journal.why_button') }}
+                      </button>
+                    </div>
+                  </div>
                 </li>
               </ul>
             </section>
@@ -903,6 +965,88 @@ onMounted(() => {
 .why-edge-text--pruned {
   color: #8a8478;
   font-style: italic;
+}
+
+.why-measurement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.why-measurement {
+  padding: 9px 10px;
+  border: 1px solid #2e2e2e;
+  border-radius: 8px;
+  background: #1a1a1a;
+}
+
+.why-measurement__header,
+.why-measurement__refs,
+.why-measurement__source {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.why-measurement__header strong {
+  color: #ded8ca;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.why-measurement__header span {
+  color: #f1dfb9;
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.why-measurement__meta,
+.why-measurement__refs,
+.why-measurement__derived-from,
+.why-measurement__sources {
+  margin-top: 5px;
+  color: #918b7f;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.why-measurement__derived-from-label {
+  display: block;
+  color: #bdb6a9;
+}
+
+.why-measurement__derived-from ul {
+  margin: 3px 0 0;
+  padding-left: 16px;
+}
+
+.why-measurement__derived-from li + li {
+  margin-top: 3px;
+}
+
+.why-measurement__sources-label {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.why-measurement__sources {
+  color: #bdb6a9;
+}
+
+.why-measurement__source + .why-measurement__source {
+  margin-top: 4px;
+}
+
+.why-measurement__source .why-button {
+  min-height: 28px;
+  padding: 3px 9px;
+  font-size: 10px;
 }
 
 .why-decision-thinking {

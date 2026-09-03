@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def can_take_risk(avatar) -> tuple[bool, str]:
     """Shared rule guard; the semantic state remains owned by Avatar."""
     if getattr(getattr(avatar, "individual_consequences", None), "active_injury", None) is not None:
-        return False, t("伤势未愈，无法进行高风险行动")
+        return False, t("Unhealed injuries prevent high-risk actions.")
     return True, ""
 
 

@@ -20,7 +20,7 @@ from src.classes.event_appraisal import AppraisalSource, EventAppraisal
 from src.classes.event_query import EventQuery
 from src.classes.event_storage import EventStorage, EventStorageError
 from src.sim.managers.event_manager import EventManager
-from src.systems.time import MonthStamp, Year, Month, create_month_stamp
+from src.systems.time import Year, Month, create_month_stamp
 
 
 # --- Fixtures ---
@@ -125,6 +125,47 @@ class TestEventStorageBasic:
 
         assert result is True
         assert event_storage.count() == 1
+
+    def test_commit_step_commits_the_whole_batch_and_preserves_causal_links(self, event_storage):
+        from src.classes.causal_link import CausalLink, CausalRelation
+
+        cause = make_event(100, 5, "Batch cause", ["avatar_1"])
+        effect = make_event(100, 5, "Batch effect", ["avatar_2"])
+        effect.causal_links = [
+            CausalLink(
+                event_id=effect.id,
+                cause_event_id=cause.id,
+                relation=CausalRelation.ENABLED_BY,
+            )
+        ]
+
+        assert event_storage.commit_step([cause, effect]) is True
+        assert event_storage.count() == 2
+        assert event_storage.get_event_by_id(cause.id) is not None
+        links = event_storage.get_causal_links_for_event(effect.id)
+        assert [(link.event_id, link.cause_event_id, link.relation) for link in links] == [
+            (effect.id, cause.id, CausalRelation.ENABLED_BY)
+        ]
+
+    def test_commit_step_rolls_back_when_a_later_event_fails(self, event_storage, monkeypatch):
+        original_insert = event_storage._insert_event
+        insert_count = 0
+
+        def fail_on_second_event(event):
+            nonlocal insert_count
+            insert_count += 1
+            if insert_count == 2:
+                raise RuntimeError("injected batch failure")
+            original_insert(event)
+
+        monkeypatch.setattr(event_storage, "_insert_event", fail_on_second_event)
+        first = make_event(100, 5, "Must roll back", ["avatar_1"])
+        second = make_event(100, 5, "Injected failure", ["avatar_2"])
+
+        assert event_storage.commit_step([first, second]) is False
+        assert event_storage.count() == 0
+        assert event_storage.get_event_by_id(first.id) is None
+        assert event_storage.get_event_by_id(second.id) is None
 
     def test_subject_snapshots_round_trip(self, event_storage):
         event = make_event(100, 5, "Alice acted", ["avatar_1"])

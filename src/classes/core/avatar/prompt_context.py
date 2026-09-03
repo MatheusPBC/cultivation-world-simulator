@@ -30,7 +30,9 @@ def _build_court_crisis_context(avatar: "Avatar") -> dict:
     emperor = get_avatar(str(crisis.emperor_avatar_id))
     claimant = get_avatar(str(crisis.claimant_avatar_id))
     supporters = []
-    for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+    for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
+        if position != "support":
+            continue
         supporter = get_avatar(str(supporter_id))
         if supporter is not None:
             supporters.append(str(getattr(supporter, "name", "") or ""))

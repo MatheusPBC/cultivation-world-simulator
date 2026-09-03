@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import random
 from enum import Enum
-from typing import Optional, Any
-import asyncio
+from typing import Optional
 
 from src.utils.config import CONFIG
 from src.classes.core.avatar import Avatar
@@ -15,7 +14,6 @@ from src.classes.close_relation_event_service import (
 )
 from src.classes.technique import (
     TechniqueGrade,
-    get_random_upper_technique_for_avatar,
     techniques_by_id,
     Technique,
     is_attribute_compatible_with_root,
@@ -631,7 +629,8 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
         ratio = random.uniform(0.1, 0.3)
         damage = int(max_hp * ratio) + random.randint(10, 50)
         
-        avatar.hp.cur -= damage
+        before_hp = avatar.hp.cur
+        avatar.hp.reduce(damage)
         # 注意：这里可能扣成负数，simulator 会在 _phase_resolve_death 中处理
         res_text = t("misfortune_result_injury", name=avatar.name, damage=damage, current=avatar.hp.cur, max=max_hp)
         
@@ -668,6 +667,9 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
     
     month_at_finish = avatar.world.month_stamp
     base_event = Event(month_at_finish, event_text, related_avatars=[avatar.id], is_major=True)
+    if kind == MisfortuneKind.INJURY:
+        from src.classes.individual_consequence import record_hp_change_from_event
+        record_hp_change_from_event(avatar, base_event, before_hp)
     
     story_event = await StoryEventService.maybe_create_story(
         kind=StoryEventKind.WORLD_MISFORTUNE,

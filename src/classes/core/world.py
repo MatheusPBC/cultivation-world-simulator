@@ -22,6 +22,7 @@ from src.classes.sect_diplomacy_state import SectDiplomacyState
 from src.classes.war import STATUS_PEACE, STATUS_WAR
 from src.systems.opportunity import OpportunityManager
 from src.classes.celestial_dao import DaoPetition
+from src.classes.mechanical_language import MechanicalLanguageState
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -69,10 +70,14 @@ class World():
     sect_diplomacy: SectDiplomacyState = field(default_factory=SectDiplomacyState)
     # 机缘管理器：维护单人限时机缘状态与冷却。
     opportunity_manager: OpportunityManager = field(default_factory=OpportunityManager)
+    # Per-world semantic vocabulary and reusable definitions. Canonical facts
+    # remain owned by their domain objects; this registry stores observation rules.
+    mechanical_language: MechanicalLanguageState = field(default_factory=MechanicalLanguageState)
     # 宗门上下文（惰性初始化），用于统一本局启用宗门作用域
     _sect_context: Any = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.mechanical_language.bind_world(self)
         if hasattr(self.event_manager, "set_subject_resolver"):
             self.event_manager.set_subject_resolver(
                 lambda avatar_id: self.avatar_manager.get_avatar(str(avatar_id))

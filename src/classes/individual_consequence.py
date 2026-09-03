@@ -105,9 +105,9 @@ def record_injury_from_event(avatar, event, damage: int) -> bool:
     )
     if not recorded:
         return False
+
     from src.classes.state_delta import StateDelta
-    payload = event.causal_payload or {"deltas": [], "decision": None}
-    payload.setdefault("deltas", []).append(StateDelta(
+    _append_event_delta(event, StateDelta(
         event_id=event.id,
         owner_kind="avatar",
         owner_id=str(avatar.id),
@@ -115,6 +115,64 @@ def record_injury_from_event(avatar, event, damage: int) -> bool:
         before=str(before) if before else None,
         after=str(state.active_injury.to_dict()),
         magnitude=float(damage),
-    ).to_dict())
-    event.causal_payload = payload
+    ))
     return True
+
+
+def record_hp_change_from_event(avatar, event, before_hp: int) -> bool:
+    """Attach the real HP transition and, when applicable, its V1 injury evidence."""
+    hp = getattr(avatar, "hp", None)
+    after_hp = getattr(hp, "cur", None)
+    if after_hp is None:
+        return False
+
+    before_hp = int(before_hp)
+    after_hp = int(after_hp)
+    if before_hp == after_hp:
+        return False
+    if _event_has_delta(event, str(avatar.id), "hp"):
+        return False
+
+    from src.classes.state_delta import StateDelta
+    _append_event_delta(event, StateDelta(
+        event_id=event.id,
+        owner_kind="avatar",
+        owner_id=str(avatar.id),
+        aspect="hp",
+        before=str(before_hp),
+        after=str(after_hp),
+        magnitude=float(after_hp - before_hp),
+    ))
+
+    damage = before_hp - after_hp
+    if damage > 0 and after_hp > 0:
+        record_injury_from_event(avatar, event, damage)
+    return True
+
+
+def _append_event_delta(event, delta) -> None:
+    payload = dict(event.causal_payload or {})
+    deltas = payload.setdefault("deltas", [])
+    if not isinstance(deltas, list):
+        deltas = []
+        payload["deltas"] = deltas
+    delta_data = delta.to_dict()
+    duplicate = any(
+        item.get("owner_kind") == delta_data["owner_kind"]
+        and item.get("owner_id") == delta_data["owner_id"]
+        and item.get("aspect") == delta_data["aspect"]
+        for item in deltas
+        if isinstance(item, dict)
+    )
+    if not duplicate:
+        deltas.append(delta_data)
+    event.causal_payload = payload
+
+
+def _event_has_delta(event, owner_id: str, aspect: str) -> bool:
+    payload = event.causal_payload or {}
+    return any(
+        item.get("owner_id") == owner_id and item.get("aspect") == aspect
+        for item in payload.get("deltas", [])
+        if isinstance(item, dict)
+    )

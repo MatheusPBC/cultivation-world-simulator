@@ -228,12 +228,13 @@ def test_healing_formation_affects_passive_hp_recovery(dummy_avatar, base_world)
 
 
 def test_region_formations_are_saved_and_loaded(dummy_avatar, base_world, tmp_path):
-    region = CultivateRegion(id=301, name="青云洞府", desc="", cors=[(0, 0)])
+    region_id = 201
+    region = CultivateRegion(id=region_id, name="青云洞府", desc="", cors=[(0, 0)])
     _place_avatar_in_region(base_world, dummy_avatar, region, tile_type=TileType.CAVE)
     dummy_avatar.weapon = None
     dummy_avatar.auxiliary = None
     base_world.avatar_manager.register_avatar(dummy_avatar)
-    base_world.map.region_formations[301] = {
+    base_world.map.region_formations[region_id] = {
         "formation_type": FORMATION_CLARITY,
         "caster_id": str(dummy_avatar.id),
         "disk_item_id": 2081,
@@ -257,7 +258,7 @@ def test_region_formations_are_saved_and_loaded(dummy_avatar, base_world, tmp_pa
     assert success
     with open(save_path, "r", encoding="utf-8") as f:
         save_data = json.load(f)
-    assert save_data["world"]["region_formations"]["301"]["formation_type"] == FORMATION_CLARITY
+    assert save_data["world"]["region_formations"][str(region_id)]["formation_type"] == FORMATION_CLARITY
 
     loaded_world, _, _ = load_game(save_path)
-    assert loaded_world.map.region_formations[301]["formation_type"] == FORMATION_CLARITY
+    assert loaded_world.map.region_formations[region_id]["formation_type"] == FORMATION_CLARITY

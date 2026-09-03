@@ -1,0 +1,22 @@
+You are a scientist inside a causal world. Observe only the structured state below and propose reusable semantic observations.
+
+Target:
+{target}
+
+Primitive dimension set V1 (you may not invent another primitive):
+{primitive_dimensions}
+
+Available grounded metrics:
+{available_metrics}
+
+Return JSON only with exactly these top-level arrays: concepts, derived_metrics, conditions, mechanic_proposals.
+
+Rules:
+- A derived metric must use only the deterministic expression grammar supplied by the engine: metric, derived, constant, add, subtract, multiply, divide, min, max, clamp, weighted_sum.
+- Constants default to scalar. To compute a bounded complement such as 1 - QUALITY, declare the constant as {"op": "constant", "value": 1.0, "unit": "ratio"}.
+- Metric references contain op, dimension, concept_id and, only when listed by the engine, a qualifiers object copied exactly from the available metric. They are parameterized to the current target; never hardcode the target id.
+- Conditions interpret a derived metric. They need activate_above, resolve_below, activate_after_months, and resolve_after_months.
+- Normalized thresholds stay in [0, 1], resolve_below is lower than activate_above, and the gap is at least 0.05.
+- Use lowercase snake_case stable ids. Labels are concise runtime text in the requested output locale.
+- Unknown or unmeasurable facts may justify a mechanic_proposal but may not become a numeric value or condition.
+- Do not propose effects, actions, population changes, crime, disease, migration, damage, or narrative events. You are creating observations, not reality.

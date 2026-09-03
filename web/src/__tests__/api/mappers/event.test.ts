@@ -1,8 +1,33 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeEventCausalDetail } from '@/api/mappers/event'
-import type { DecisionAppraisalDTO, EventCausalDetailDTO, EventDTO } from '@/types/api'
+import { mapEventDtoToGameEvent, normalizeEventCausalDetail } from '@/api/mappers/event'
+import type { DecisionAppraisalDTO, EventCausalDetailDTO, EventDTO, MetricReadingDTO } from '@/types/api'
 
 const baseEvent = { id: 'e1' } as EventDTO
+
+describe('mapEventDtoToGameEvent', () => {
+  it('preserves fact kind and causal origin', () => {
+    const event = {
+      id: 'event-1',
+      text: 'An actor changed the world',
+      content: 'An actor changed the world',
+      year: 1,
+      month: 1,
+      month_stamp: 12,
+      related_avatar_ids: [],
+      subjects: [],
+      is_major: false,
+      is_story: false,
+      created_at: 1,
+      fact_kind: 'state_transition',
+      causal_origin: 'actor_decision',
+    } satisfies EventDTO
+
+    const mapped = mapEventDtoToGameEvent(event)
+
+    expect(mapped.factKind).toBe('state_transition')
+    expect(mapped.causalOrigin).toBe('actor_decision')
+  })
+})
 
 describe('normalizeEventCausalDetail', () => {
   it('returns null when input has no event', () => {
@@ -23,6 +48,7 @@ describe('normalizeEventCausalDetail', () => {
     const result = normalizeEventCausalDetail(input)
 
     expect(result?.decision_appraisals).toEqual([])
+    expect(result?.measurements).toEqual([])
   })
 
   it('passes through a well-formed decision_appraisals list', () => {
@@ -58,6 +84,7 @@ describe('normalizeEventCausalDetail', () => {
       effects: [],
       deltas: [],
       decision: null,
+      measurements: [],
       decision_appraisals: decisionAppraisals,
       truncated: false,
     }
@@ -80,5 +107,48 @@ describe('normalizeEventCausalDetail', () => {
     const result = normalizeEventCausalDetail(input)
 
     expect(result?.decision_appraisals).toEqual([])
+  })
+
+  it('passes through a well-formed measurements list', () => {
+    const measurements: MetricReadingDTO[] = [{
+      key: { dimension: 'load', subject_kind: 'region', subject_id: 'r1', concept_id: 'settlement' },
+      derived_from: [],
+      value: 0.75,
+      unit: 'ratio',
+      availability: 'measurable',
+      reading_kind: 'derived',
+      confidence: null,
+      state_refs: ['region:r1:population'],
+      source_event_ids: ['event-1'],
+    }]
+    const input: EventCausalDetailDTO = {
+      event: baseEvent,
+      causes: [],
+      effects: [],
+      deltas: [],
+      measurements,
+      decision: null,
+      decision_appraisals: [],
+      truncated: false,
+    }
+
+    const result = normalizeEventCausalDetail(input)
+
+    expect(result?.measurements).toEqual(measurements)
+  })
+
+  it('defaults a non-array measurements value to an empty array', () => {
+    const input = {
+      event: baseEvent,
+      causes: [],
+      effects: [],
+      deltas: [],
+      decision: null,
+      measurements: { value: 1 },
+    } as unknown as EventCausalDetailDTO
+
+    const result = normalizeEventCausalDetail(input)
+
+    expect(result?.measurements).toEqual([])
   })
 })

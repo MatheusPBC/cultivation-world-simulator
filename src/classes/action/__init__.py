@@ -55,6 +55,8 @@ from .dig_grave import DigGrave
 from .take_treasure import TakeTreasure
 from .claim_imperial_mandate import ClaimImperialMandate
 from .support_imperial_claim import SupportImperialClaim
+from .oppose_imperial_claim import OpposeImperialClaim
+from .withdraw_imperial_claim import WithdrawImperialClaim
 
 # 注册到 ActionRegistry（标注是否为实际可执行动作）
 register_action(actual=False)(Action)
@@ -109,6 +111,8 @@ register_action(actual=True)(DigGrave)
 register_action(actual=True)(TakeTreasure)
 register_action(actual=True)(ClaimImperialMandate)
 register_action(actual=True)(SupportImperialClaim)
+register_action(actual=True)(OpposeImperialClaim)
+register_action(actual=True)(WithdrawImperialClaim)
 # Talk 已移动到 mutual_action 模块，在那里注册
 
 __all__ = [
@@ -166,4 +170,6 @@ __all__ = [
     "TakeTreasure",
     "ClaimImperialMandate",
     "SupportImperialClaim",
+    "OpposeImperialClaim",
+    "WithdrawImperialClaim",
 ]

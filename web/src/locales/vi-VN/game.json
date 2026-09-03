@@ -597,7 +597,98 @@
       "host_meta": "Chủ nhân",
       "no_host": "Vô Chủ",
       "price_meta": "{price} Linh Thạch",
-      "formation_remaining": "Còn {months} tháng"
+      "formation_remaining": "Còn {months} tháng",
+      "regional_context_title": "Bối cảnh khu vực",
+      "dao_tradition": "Đạo thống",
+      "dao_traditions": {
+        "mandate_and_order": "Thiên mệnh và trật tự",
+        "balance": "Cân bằng",
+        "mercy": "Từ bi",
+        "transcendence": "Siêu thoát"
+      },
+      "semantic_context": {
+        "conditions_title": "Điều kiện ngữ nghĩa đang hoạt động",
+        "readings_title": "Chỉ số chính",
+        "empty": "Không có bối cảnh ngữ nghĩa khả dụng.",
+        "intensity": "Cường độ {value}",
+        "started_month": "Bắt đầu ở tháng {month}",
+        "definition": "Định nghĩa {id}",
+        "source_event": "Sự kiện nguồn {id}",
+        "derived_from": "Đầu vào suy ra",
+        "unknown_value": "Chưa rõ",
+        "confidence": "Độ tin cậy {value}%",
+        "availability": {
+          "measurable": "Đo được",
+          "partially_measurable": "Đo được một phần",
+          "unmeasurable": "Không đo được"
+        },
+        "reading_kind": {
+          "exact": "Chính xác",
+          "derived": "Suy ra",
+          "estimated": "Ước tính",
+          "unknown": "Chưa rõ"
+        }
+      },
+      "economy": {
+        "title": "Kinh tế khu vực",
+        "stocks": "Tồn kho",
+        "capacities": "Công suất",
+        "production_rates": "Tốc độ sản xuất",
+        "demand_rates": "Mức nhu cầu",
+        "access": "Khả năng tiếp cận",
+        "dependencies": "Mức phụ thuộc"
+      },
+      "infrastructure": {
+        "title": "Cơ sở hạ tầng",
+        "capacities": "Công suất",
+        "quality": "Chất lượng"
+      },
+      "city_state": {
+        "title": "Trạng thái đô thị",
+        "districts": "Khu vực",
+        "assets": "Cơ sở đô thị",
+        "governance": "Quản trị",
+        "population_weight": "Tỷ trọng dân số: {value}",
+        "tiles": "Ô bản đồ: {value}",
+        "capacity": "Công suất: {value}",
+        "quality": "Chất lượng: {value}",
+        "integrity": "Độ nguyên vẹn: {value}",
+        "controller": "Người quản lý",
+        "administrative_capacity": "Năng lực hành chính: {value}"
+      },
+      "spiritual_ecology": {
+        "title": "Sinh thái linh lực",
+        "grounding_label": "Căn cứ",
+        "essence": "Tinh chất",
+        "densities": "Mật độ ngũ hành",
+        "formations": "Trận pháp đang hoạt động",
+        "graves": "Mộ",
+        "treasures": "Bảo vật",
+        "celestial_context": "Bối cảnh thiên tượng",
+        "state_refs": "Tham chiếu căn cứ",
+        "started_month": "Bắt đầu: tháng {value}",
+        "expires_month": "Hết hạn: tháng {value}",
+        "created_month": "Tạo vào: tháng {value}",
+        "location": "Vị trí: {value}",
+        "effects": "Hiệu ứng được ghi nhận",
+        "grounding": {
+          "grounded": "Sự kiện có căn cứ",
+          "unknown": "Chưa rõ căn cứ"
+        }
+      },
+      "collective_health": {
+        "title": "Sức khỏe cộng đồng",
+        "grounding_label": "Căn cứ",
+        "living_avatar_count": "Avatar còn sống",
+        "active_wounded_count": "Avatar đang bị thương",
+        "hp_deficit": "Thiếu HP",
+        "healing_capacity": "Năng lực chữa trị",
+        "injuries": "Vết thương hiện tại",
+        "healing_assets": "Tài sản chữa trị",
+        "hp_lost": "HP đã mất: {value}",
+        "capacity": "Công suất: {value}",
+        "state_refs": "Tham chiếu trạng thái"
+      }
     },
     "sect": {
       "stats": {

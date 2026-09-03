@@ -1,10 +1,17 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "id": "classic",
   "version": 2,
   "width": 84,
   "height": 60,
   "wilderness_tile": "plain",
+  "routes": [
+    {"id": "classic-301-405", "endpoint_region_ids": [301, 405], "mode": "road", "capacity": 120.0, "quality": 0.92, "enabled": true, "allowed_resource_ids": []},
+    {"id": "classic-302-402", "endpoint_region_ids": [302, 402], "mode": "road", "capacity": 80.0, "quality": 0.78, "enabled": true, "allowed_resource_ids": ["grain", "medicine"]},
+    {"id": "classic-303-403", "endpoint_region_ids": [303, 403], "mode": "road", "capacity": 95.0, "quality": 0.84, "enabled": true, "allowed_resource_ids": []},
+    {"id": "classic-305-412", "endpoint_region_ids": [305, 412], "mode": "mountain_pass", "capacity": 45.0, "quality": 0.68, "enabled": true, "allowed_resource_ids": ["spirit_stone"]},
+    {"id": "classic-302-305", "endpoint_region_ids": [302, 305], "mode": "road", "capacity": 70.0, "quality": 0.74, "enabled": true, "allowed_resource_ids": ["grain", "medicine"]}
+  ],
   "region_overrides": {
     "101": {
       "name_id": "MAP_REGION_CLASSIC_101_NAME",

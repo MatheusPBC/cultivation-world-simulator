@@ -4,7 +4,8 @@ import uuid
 from typing import TYPE_CHECKING
 from src.classes.observe import get_avatar_observation_radius
 from src.i18n import t
-from .config import _duration_months, _get_cfg_value, _weighted_choice_from_mapping
+from src.classes.mechanical_language import EntityRef
+from .config import _duration_months, _get_cfg_value
 from .models import OpportunityRecord, OpportunityTargetType, _can_int
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -101,7 +102,23 @@ def _pick_region_target(avatar: "Avatar", world: "World") -> "Region | None":
     ]
     if not candidates:
         return None
-    return random.choice(candidates)
+    # Existing opportunity outcomes remain unchanged; only relevance changes
+    # which destination is selected. The score is a projection of the shared
+    # semantic language and world-owned condition instances.
+    from src.systems.semantic_world.context import region_semantic_relevance
+    candidates.sort(
+        key=lambda region: (
+            -region_semantic_relevance(world, region),
+            -len(world.mechanical_language.get_active_conditions(
+                EntityRef("region", str(region.id)),
+                int(world.month_stamp),
+            )),
+            int(region.id),
+        )
+    )
+    highest_score = region_semantic_relevance(world, candidates[0])
+    relevant = [region for region in candidates if highest_score > 0 and region_semantic_relevance(world, region) == highest_score]
+    return random.choice(relevant) if relevant else random.choice(candidates)
 
 
 def _pick_avatar_target(avatar: "Avatar", world: "World") -> "Avatar | None":
@@ -140,6 +157,10 @@ def _build_record(avatar: "Avatar", world: "World") -> OpportunityRecord | None:
     if target_region is None:
         return None
     current_month = int(world.month_stamp)
+    condition = next(iter(world.mechanical_language.get_active_conditions(
+        EntityRef("region", str(target_region.id)),
+        current_month,
+    )), None)
     return OpportunityRecord(
         id=str(uuid.uuid4()),
         avatar_id=str(avatar.id),
@@ -148,6 +169,8 @@ def _build_record(avatar: "Avatar", world: "World") -> OpportunityRecord | None:
         hint_text=_build_region_hint(avatar, target_region),
         created_month=current_month,
         expires_month=current_month + _duration_months(),
+        condition_id=condition.id if condition else None,
+        source_event_ids=(condition.cause_event_id,) if condition and condition.cause_event_id else (),
     )
 
 def _resolve_target_avatar(world: "World", target_id: str) -> "Avatar | None":

@@ -1,0 +1,16 @@
+Bạn là bộ diễn giải kinh tế trong một thế giới nhân quả. Chỉ quyết định từ dữ liệu thiếu hụt và tuyến đường đã được kiểm chứng bên dưới. Không được bịa tuyến đường, hàng tồn, công suất, số lượng, giá hay delta.
+
+Thiếu hụt:
+{shortage}
+
+Điểm đến:
+{destination}
+
+Nguồn cung ứng tiềm năng:
+{candidates}
+
+Chỉ trả về JSON theo đúng một trong hai dạng sau:
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","action_intent":{{"action_kind":"resource_transfer","preferences":["available_supply","higher_route_quality"]}}}}
+
+Chỉ được dùng decision, reason, action_intent, action_kind và preferences. Chuyển hàng chỉ là ý định. Luật xác định yêu cầu một tuyến đường chuẩn được khai báo rõ ràng và tự tính nguồn cùng số lượng.

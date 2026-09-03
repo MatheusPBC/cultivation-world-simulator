@@ -3,6 +3,7 @@ import random
 from typing import Any, TYPE_CHECKING
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
+from src.classes.event import Event
 from src.classes.items.auxiliary import Auxiliary, get_random_auxiliary_by_realm
 from src.classes.items.weapon import Weapon, get_random_weapon_by_realm
 from src.classes.story_event_service import StoryEventKind, StoryEventService
@@ -155,7 +156,8 @@ def _apply_injury(owner: "Avatar") -> tuple[str, bool]:
         min_ratio, max_ratio = max_ratio, min_ratio
     damage = max(1, int(owner.hp.max * random.uniform(min_ratio, max_ratio)))
     owner._last_opportunity_injury_damage = damage
-    owner.hp.cur -= damage
+    owner._last_opportunity_injury_before_hp = owner.hp.cur
+    owner.hp.reduce(damage)
     if owner.hp.cur <= 0:
         handle_death(owner.world, owner, DeathReason(DeathType.SERIOUS_INJURY))
         return t(
@@ -182,12 +184,22 @@ async def _resolve_opportunity(owner: "Avatar", record: OpportunityRecord, relat
     else:
         result_text, is_major = _apply_empty(owner)
 
-    base_event = _event(owner, result_text, related_avatars=related_avatars, is_major=is_major)
+    base_event = _event(
+        owner,
+        result_text,
+        related_avatars=related_avatars,
+        is_major=is_major,
+        source_event_ids=record.source_event_ids,
+    )
     if outcome == OpportunityOutcome.INJURY and not getattr(owner, "is_dead", False):
         damage = int(getattr(owner, "_last_opportunity_injury_damage", 0) or 0)
         if damage:
-            from src.classes.individual_consequence import record_injury_from_event
-            record_injury_from_event(owner, base_event, damage)
+            from src.classes.individual_consequence import record_hp_change_from_event
+            record_hp_change_from_event(
+                owner,
+                base_event,
+                int(getattr(owner, "_last_opportunity_injury_before_hp", owner.hp.cur + damage)),
+            )
     story_event = await StoryEventService.maybe_create_story(
         kind=StoryEventKind.OPPORTUNITY,
         month_stamp=owner.world.month_stamp,

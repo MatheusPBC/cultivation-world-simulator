@@ -41,6 +41,8 @@ class DaoPetition:
     status: DaoPetitionStatus = DaoPetitionStatus.PENDING
     response_event_id: str = ""
     favor_expires_month: int | None = None
+    target_avatar_id: str | None = None
+    target_evidence_event_ids: list[str] = field(default_factory=list)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,6 +59,8 @@ class DaoPetition:
             "status": self.status.value,
             "response_event_id": self.response_event_id,
             "favor_expires_month": self.favor_expires_month,
+            "target_avatar_id": self.target_avatar_id,
+            "target_evidence_event_ids": list(self.target_evidence_event_ids),
         }
 
     @classmethod
@@ -74,4 +78,8 @@ class DaoPetition:
             status=DaoPetitionStatus(data.get("status", DaoPetitionStatus.PENDING)),
             response_event_id=str(data.get("response_event_id", "")),
             favor_expires_month=data.get("favor_expires_month"),
+            target_avatar_id=str(data.get("target_avatar_id") or "") or None,
+            target_evidence_event_ids=[
+                str(x) for x in data.get("target_evidence_event_ids", [])
+            ],
         )

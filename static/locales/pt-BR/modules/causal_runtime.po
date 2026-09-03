@@ -1,0 +1,31 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
+msgstr "A leitura anual de legitimidade mantém a crise imperial sem resolução."
+
+msgid "The annual legitimacy reading remains unresolved while the throne lacks its recorded emperor."
+msgstr "A leitura anual de legitimidade permanece inconclusiva enquanto o trono não possui um imperador registrado."
+
+msgid "The imperial claim fails because the claimant is no longer alive."
+msgstr "A pretensão imperial fracassa porque o pretendente não está mais vivo."
+
+msgid "The imperial claimant loses eligibility and the imperial claim fails."
+msgstr "O pretendente imperial perde a elegibilidade e sua pretensão fracassa."
+
+msgid "{avatar} committed to an action chain"
+msgstr "{avatar} comprometeu-se com uma cadeia de ações"
+
+msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
+msgstr "{name} sofreu um ferimento no domínio oculto {domain}, perdendo {damage} de HP."
+
+msgid "{official} publicly opposes the imperial claimant."
+msgstr "{official} declarou publicamente oposição ao pretendente imperial."
+
+msgid "{region} population changed from {before} to {after}"
+msgstr "A população de {region} mudou de {before} para {after}"
+
+msgid "Unhealed injuries prevent high-risk actions."
+msgstr "Ferimentos ainda não curados impedem ações de alto risco."

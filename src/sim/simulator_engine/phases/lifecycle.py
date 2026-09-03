@@ -12,6 +12,7 @@ from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.state_delta import StateDelta
 from src.classes.long_term_objective import process_avatar_long_term_objective
 from src.classes.nickname import process_avatar_nickname
+from src.i18n import t
 from src.sim.avatar_awake import process_awakening
 
 
@@ -111,10 +112,34 @@ def phase_resolve_individual_consequences(living_avatars: list[Avatar]) -> list[
             continue
         event = Event(
             avatar.world.month_stamp,
-            f"{avatar.name}的{summary['severity']}伤势已经痊愈。",
+            t(
+                "{avatar_name}'s {severity} injury has recovered.",
+                avatar_name=avatar.name,
+                severity=summary["severity"],
+            ),
             related_avatars=[avatar.id], fact_kind=FactKind.DERIVED_CONDITION,
-            causal_payload={"deltas": [StateDelta(owner_kind="avatar", owner_id=str(avatar.id), aspect="active_injury", before=str(summary), after=None).to_dict()], "decision": None},
+            causal_payload={"deltas": [
+                StateDelta(
+                    event_id="",
+                    owner_kind="avatar",
+                    owner_id=str(avatar.id),
+                    aspect="active_injury",
+                    before=str(summary),
+                    after=None,
+                ).to_dict(),
+                StateDelta(
+                    event_id="",
+                    owner_kind="avatar",
+                    owner_id=str(avatar.id),
+                    aspect="recovery",
+                    before=str({"hp": avatar.hp.cur, "active_injury": summary}),
+                    after=str({"hp": avatar.hp.cur, "active_injury": None}),
+                    magnitude=0.0,
+                ).to_dict(),
+            ], "decision": None},
         )
+        for delta in event.causal_payload["deltas"]:
+            delta["event_id"] = event.id
         event.causal_links = [CausalLink(event_id=event.id, cause_event_id=cause_id, relation=CausalRelation.RESOLVES) for cause_id in summary["cause_event_ids"]]
         events.append(event)
     return events

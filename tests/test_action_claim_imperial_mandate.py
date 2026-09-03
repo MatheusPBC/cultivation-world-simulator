@@ -32,10 +32,11 @@ def test_claim_imperial_mandate_opens_crisis_via_avatar_plan(base_world, dummy_a
 
     start_event = claimant.commit_next_plan()
 
-    assert start_event is None
+    assert start_event is not None
     assert base_world.dynasty.imperial_crisis is not None
     assert base_world.dynasty.imperial_crisis.claimant_avatar_id == claimant.id
-    claim_event = base_world.event_manager.get_event_by_id(base_world.dynasty.imperial_crisis.evidence_event_ids[0])
+    claim_event = start_event
+    assert base_world.event_manager.get_event_by_id(claim_event.id) is None
     delta = claim_event.causal_payload["deltas"][0]
     assert delta["owner_kind"] == "dynasty"
     assert delta["owner_id"] == "1"

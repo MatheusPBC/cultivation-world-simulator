@@ -1,0 +1,17 @@
+region_id,group_id,population_weight,service_priority_weights
+城市区域ID,人口群体概念ID,人口占比,受限服务相对优先权(JSON)
+301,commoners,0.65,"{""housing"": 0.9, ""clean_water"": 0.8, ""sanitation"": 0.75, ""security"": 0.75, ""healing"": 1.15}"
+301,merchants,0.25,"{""housing"": 1.2, ""clean_water"": 1.3, ""sanitation"": 1.3, ""security"": 1.25, ""healing"": 1.0}"
+301,cultivators,0.10,"{""housing"": 1.4, ""clean_water"": 1.4, ""sanitation"": 1.35, ""security"": 1.5, ""healing"": 1.35}"
+302,commoners,0.55,"{""housing"": 0.85, ""clean_water"": 0.7, ""sanitation"": 0.75, ""security"": 0.8, ""healing"": 1.2}"
+302,merchants,0.35,"{""housing"": 1.25, ""clean_water"": 1.4, ""sanitation"": 1.3, ""security"": 1.25, ""healing"": 1.0}"
+302,cultivators,0.10,"{""housing"": 1.35, ""clean_water"": 1.5, ""sanitation"": 1.35, ""security"": 1.4, ""healing"": 1.3}"
+303,commoners,0.70,"{""housing"": 0.9, ""clean_water"": 0.9, ""sanitation"": 0.85, ""security"": 0.85, ""healing"": 1.1}"
+303,merchants,0.15,"{""housing"": 1.15, ""clean_water"": 1.15, ""sanitation"": 1.2, ""security"": 1.2, ""healing"": 1.0}"
+303,cultivators,0.15,"{""housing"": 1.35, ""clean_water"": 1.3, ""sanitation"": 1.3, ""security"": 1.4, ""healing"": 1.4}"
+304,commoners,0.60,"{""housing"": 0.85, ""clean_water"": 0.9, ""sanitation"": 0.8, ""security"": 0.8, ""healing"": 1.15}"
+304,merchants,0.30,"{""housing"": 1.3, ""clean_water"": 1.25, ""sanitation"": 1.35, ""security"": 1.3, ""healing"": 1.0}"
+304,cultivators,0.10,"{""housing"": 1.4, ""clean_water"": 1.35, ""sanitation"": 1.4, ""security"": 1.45, ""healing"": 1.35}"
+305,commoners,0.75,"{""housing"": 0.9, ""clean_water"": 0.85, ""sanitation"": 0.8, ""security"": 0.85, ""healing"": 1.1}"
+305,merchants,0.10,"{""housing"": 1.15, ""clean_water"": 1.2, ""sanitation"": 1.2, ""security"": 1.2, ""healing"": 1.0}"
+305,cultivators,0.15,"{""housing"": 1.35, ""clean_water"": 1.35, ""sanitation"": 1.4, ""security"": 1.4, ""healing"": 1.4}"

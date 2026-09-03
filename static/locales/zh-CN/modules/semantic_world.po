@@ -1,0 +1,17 @@
+msgid "No current region is available."
+msgstr "当前没有可用的地区信息。"
+
+msgid "Region: {region}"
+msgstr "地区：{region}"
+
+msgid "Causal evidence: {sources}"
+msgstr "因果证据：{sources}"
+
+msgid "Active conditions: {conditions}"
+msgstr "当前状态：{conditions}"
+
+msgid "Condition evidence: {sources}"
+msgstr "状态证据：{sources}"
+
+msgid "Unknown measurement"
+msgstr "未知测量值"

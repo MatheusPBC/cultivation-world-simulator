@@ -107,6 +107,37 @@ class EventManager:
             self._memory_events.append(event)
             return True
 
+    def commit_step(self, events: list["Event"], chapter=None) -> bool:
+        """Persist all durable outputs of one simulation step atomically."""
+        from src.classes.event import is_null_event
+
+        persistable_events = [event for event in events if not is_null_event(event)]
+        for event in persistable_events:
+            self._capture_subject_snapshots(event)
+
+        if self._storage:
+            return self._storage.commit_step(persistable_events, chapter)
+
+        event_count = len(self._memory_events)
+        chapter_count = len(self._memory_chronicle_chapters)
+        try:
+            self._memory_events.extend(persistable_events)
+            if chapter is not None:
+                persisted_ids = {str(event.id) for event in self._memory_events}
+                if any(str(event_id) not in persisted_ids for event_id in chapter.source_event_ids):
+                    raise ValueError("chronicle chapter references missing events")
+                if any(
+                    getattr(item, "end_month_stamp", None) == chapter.end_month_stamp
+                    for item in self._memory_chronicle_chapters
+                ):
+                    raise ValueError("chronicle end month already exists")
+                self._memory_chronicle_chapters.append(chapter)
+            return True
+        except Exception:
+            del self._memory_events[event_count:]
+            del self._memory_chronicle_chapters[chapter_count:]
+            return False
+
     @staticmethod
     def _is_observed_by(event: "Event", avatar_id: str) -> bool:
         avatar_id = str(avatar_id)
@@ -330,6 +361,21 @@ class EventManager:
                 if link.cause_event_id == cause_event_id:
                     result.append(link)
         return result
+
+    def get_causal_telemetry(
+        self,
+        *,
+        start_month: int | None = None,
+        end_month: int | None = None,
+    ):
+        """Return a read-only authorship summary over persisted events."""
+        from src.systems.causal_telemetry import aggregate_causal_telemetry
+
+        return aggregate_causal_telemetry(
+            self,
+            start_month=start_month,
+            end_month=end_month,
+        )
 
     def get_event_appraisals(
         self,

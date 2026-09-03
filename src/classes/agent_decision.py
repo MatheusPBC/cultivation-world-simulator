@@ -19,7 +19,7 @@ import uuid
 class AgentDecision:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     month_stamp: int = 0
-    subject_kind: str = "avatar"      # "avatar" | "sect"
+    subject_kind: str = "avatar"      # "avatar" | "sect" | "population"
     subject_id: str = ""
     source: str = "llm"               # mirrors single_choice.ChoiceSource
     considered_count: int = 0         # how many actions were offered

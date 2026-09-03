@@ -1284,6 +1284,15 @@ msgstr ""
 "{winner} は {loser} を打ち破った。{loser} は {loser_dmg} のダメージを受け、{winner} も "
 "{winner_dmg} のダメージを負った。"
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr ""
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr ""
+
+msgid "A causal probe interrupted route {route}."
+msgstr ""
+
 msgid " (and sold old {item} at reduced price)"
 msgstr "（古い {item} も値下げして売却した）"
 

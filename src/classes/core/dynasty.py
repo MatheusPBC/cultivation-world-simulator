@@ -18,23 +18,30 @@ class ImperialCrisis:
     claimant_avatar_id: str
     opened_month: int
     status: str = "active"
-    support_avatar_ids: list[str] = field(default_factory=list)
     evidence_event_ids: list[str] = field(default_factory=list)
     legitimacy_factors: dict[str, int] = field(default_factory=dict)
+    # Political positions are facts of this crisis, not a separate faction
+    # object.  Values are support, oppose, or neutral.
+    political_positions: dict[str, str] = field(default_factory=dict)
+    evaluations: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"emperor_avatar_id": self.emperor_avatar_id, "claimant_avatar_id": self.claimant_avatar_id,
+        data = {"emperor_avatar_id": self.emperor_avatar_id, "claimant_avatar_id": self.claimant_avatar_id,
                 "opened_month": self.opened_month, "status": self.status,
-                "support_avatar_ids": list(self.support_avatar_ids), "evidence_event_ids": list(self.evidence_event_ids),
+                "evidence_event_ids": list(self.evidence_event_ids),
                 "legitimacy_factors": dict(self.legitimacy_factors)}
+        data["political_positions"] = dict(self.political_positions)
+        data["evaluations"] = [dict(item) for item in self.evaluations]
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ImperialCrisis":
         return cls(emperor_avatar_id=str(data["emperor_avatar_id"]), claimant_avatar_id=str(data["claimant_avatar_id"]),
                    opened_month=int(data["opened_month"]), status=str(data.get("status", "active")),
-                   support_avatar_ids=[str(x) for x in data.get("support_avatar_ids", [])],
                    evidence_event_ids=[str(x) for x in data.get("evidence_event_ids", [])],
-                   legitimacy_factors={str(key): int(value) for key, value in dict(data.get("legitimacy_factors", {}) or {}).items()})
+                   legitimacy_factors={str(key): int(value) for key, value in dict(data.get("legitimacy_factors", {}) or {}).items()},
+                   political_positions={str(key): str(value) for key, value in dict(data.get("political_positions", {}) or {}).items()},
+                   evaluations=[dict(item) for item in data.get("evaluations", []) if isinstance(item, dict)])
 
 
 @dataclass

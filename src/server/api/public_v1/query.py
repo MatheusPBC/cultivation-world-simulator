@@ -56,6 +56,12 @@ def create_public_query_router(
             return ok_response(query_service.get_world_state())
         return ok_response(build_world_state())
 
+    @router.get("/api/v1/query/world/semantic-model")
+    def get_world_semantic_model_v1():
+        if query_service is None:
+            raise RuntimeError("query service is required")
+        return ok_response(query_service.get_world_semantic_model())
+
     @router.get("/api/v1/query/world/map")
     def get_world_map_v1():
         if query_service is not None:

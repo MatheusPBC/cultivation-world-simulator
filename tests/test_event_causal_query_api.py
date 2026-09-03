@@ -274,3 +274,26 @@ class TestEventCausalDetailDecisionAndDeltas:
         data = response.json()["data"]
 
         assert data["deltas"] == [{"aspect": "population", "before": "80.0", "after": "78.4"}]
+
+    def test_measurements_come_from_the_events_own_causal_payload(self, client_with_world, world):
+        measurement = {
+            "key": {"dimension": "risk", "subject_kind": "region", "subject_id": "302", "concept_id": "settlement_density_pressure"},
+            "value": 0.9,
+            "unit": "ratio",
+            "availability": "measurable",
+            "reading_kind": "derived",
+            "state_refs": ["region:302:population", "region:302:population_capacity"],
+            "source_event_ids": [],
+        }
+        event = make_event(
+            100,
+            1,
+            "condition activated",
+            fact_kind=FactKind.DERIVED_CONDITION,
+            causal_payload={"deltas": [], "measurements": [measurement]},
+        )
+        world.event_manager.add_event(event)
+
+        data = client_with_world.get(f"/api/v1/query/events/{event.id}/causal").json()["data"]
+
+        assert data["measurements"] == [measurement]

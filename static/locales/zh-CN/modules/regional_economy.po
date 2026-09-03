@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "{region} could not satisfy demand for {resource}."
+msgstr "{region}无法满足对{resource}的需求。"
+
+msgid "{region} {flow_kind} changed {resource} stock by {amount}."
+msgstr "{region}的{flow_kind}使{resource}库存变化了{amount}。"
+
+msgid "{region} interpreted a resource shortage as {decision}: {reason}"
+msgstr "{region}将资源短缺解读为{decision}：{reason}"
+
+msgid "{resource} moved from {source} to {destination}."
+msgstr "{resource}从{source}运往{destination}。"
+
+msgid "{destination} could not receive {resource}."
+msgstr "{destination}未能接收{resource}。"

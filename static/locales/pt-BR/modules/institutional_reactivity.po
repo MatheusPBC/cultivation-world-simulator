@@ -1,0 +1,31 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "The dynasty responded to {region}'s condition with {decision}: {reason}"
+msgstr "A dinastia respondeu à condição de {region} com {decision}: {reason}"
+
+msgid "{sect_name} considered a response to a regional condition."
+msgstr "{sect_name} considerou uma resposta a uma condição regional."
+
+msgid "{sect_name} supported {avatar_name} with {amount} spirit stones."
+msgstr "{sect_name} apoiou {avatar_name} com {amount} pedras espirituais."
+
+msgid "Sect member support was blocked: {reason}"
+msgstr "O apoio ao membro da seita foi bloqueado: {reason}"
+
+msgid "Urban maintenance improved {capability} in {region}."
+msgstr "A manutenção urbana melhorou {capability} em {region}."
+
+msgid "Urban maintenance in {region} was blocked: {reason}"
+msgstr "A manutenção urbana em {region} foi bloqueada: {reason}"
+
+msgid "{sect_name} concluded a round of sect decisions"
+msgstr "{sect_name} concluiu uma rodada de decisões da seita"
+
+msgid "Urban capacity project in {region}: {outcome}."
+msgstr "Projeto de capacidade urbana em {region}: {outcome}."
+
+msgid "{region} interpreted an urban risk as {decision}: {reason}"
+msgstr "{region} interpretou um risco urbano como {decision}: {reason}"

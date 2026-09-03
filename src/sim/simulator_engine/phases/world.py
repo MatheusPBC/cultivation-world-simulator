@@ -11,8 +11,8 @@ from src.classes.observe import get_avatar_observation_radius
 from src.i18n import t
 from src.systems.autonomous_custom_content_service import try_trigger_autonomous_custom_creation
 from src.systems.fortune import try_trigger_fortune, try_trigger_misfortune
-from src.systems.opportunity import phase_check_opportunities, phase_generate_opportunities
-from src.systems.world_secret import phase_world_secret_discovery
+from src.systems.opportunity import phase_check_opportunities, phase_generate_opportunities  # noqa: F401
+from src.systems.world_secret import phase_world_secret_discovery  # noqa: F401
 from src.systems.fate_revelation import try_trigger_fate_revelation
 from src.systems.random_minor_event import try_trigger_random_minor_event
 from src.systems.background_npc import try_trigger_background_npc_events
@@ -227,7 +227,7 @@ def phase_update_celestial_phenomenon(world) -> list[Event]:
 POPULATION_EVENT_MIN_ABSOLUTE_CHANGE = 25.0
 
 
-def phase_update_city_population(world, causal=None) -> list[Event]:
+def phase_update_city_population(world, causal=None, invalidations=None) -> list[Event]:
     # 城市人口使用 logistic 公式按月自然变化。
     # `causal` 是可选的 CausalRecorder（见 causal_recorder.py）：
     # 缺省为 None 时行为与本次改动之前完全一致，不产生任何事件。
@@ -237,6 +237,7 @@ def phase_update_city_population(world, causal=None) -> list[Event]:
             before = region.population
             region.update_population_monthly()
             after = region.population
+            source_event_id = None
             if causal is not None and abs(after - before) >= POPULATION_EVENT_MIN_ABSOLUTE_CHANGE:
                 event = Event(
                     world.month_stamp,
@@ -262,6 +263,23 @@ def phase_update_city_population(world, causal=None) -> list[Event]:
                     ),
                 )
                 events.append(event)
+                source_event_id = event.id
+            if invalidations is not None and after != before:
+                from src.sim.simulator_engine.domain_invalidation import (
+                    DomainInvalidation,
+                    DomainInvalidationLayer,
+                    DomainInvalidationReason,
+                )
+
+                invalidations.mark(DomainInvalidation(
+                    layer=DomainInvalidationLayer.MECHANICAL,
+                    domain="population",
+                    target_kind="region",
+                    target_id=str(region.id),
+                    reason=DomainInvalidationReason.POPULATION_CHANGED,
+                    source_event_ids=(source_event_id,) if source_event_id else (),
+                    revision=source_event_id or f"population:{region.id}:{world.month_stamp}",
+                ))
     return events
 
 

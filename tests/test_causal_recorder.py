@@ -46,6 +46,26 @@ class TestCausalRecorderNeutrality:
 
 
 class TestCausalRecorderLinks:
+    def test_recorded_links_merge_with_existing_event_links(self):
+        recorder = CausalRecorder()
+        event = make_event()
+        event.causal_links.append(CausalLink(
+            event_id=event.id,
+            cause_event_id="existing",
+            relation=CausalRelation.ENABLED_BY,
+        ))
+        recorder.record_link(event.id, CausalLink(
+            cause_event_id="recorded",
+            relation=CausalRelation.MOTIVATED_BY,
+        ))
+
+        recorder.attach_to([event])
+
+        assert {link.cause_event_id for link in event.causal_links} == {
+            "existing",
+            "recorded",
+        }
+
     def test_record_link_sets_event_id_on_the_link(self):
         recorder = CausalRecorder()
         event = make_event()
@@ -99,6 +119,32 @@ class TestCausalRecorderLinks:
 
 
 class TestCausalRecorderDeltas:
+    def test_recorded_deltas_merge_with_existing_payload(self):
+        recorder = CausalRecorder()
+        event = make_event()
+        existing = StateDelta(
+            event_id=event.id,
+            owner_kind="region",
+            owner_id="1",
+            aspect="population",
+            before="80",
+            after="81",
+        )
+        event.causal_payload = {"deltas": [existing.to_dict()], "measurements": []}
+        added = StateDelta(
+            owner_kind="region",
+            owner_id="1",
+            aspect="grain",
+            before="3",
+            after="2",
+        )
+        recorder.record_delta(event.id, added)
+
+        recorder.attach_to([event])
+
+        assert event.causal_payload["deltas"] == [existing.to_dict(), added.to_dict()]
+        assert event.causal_payload["measurements"] == []
+
     def test_record_delta_sets_event_id_and_attaches_payload(self):
         recorder = CausalRecorder()
         event = make_event()

@@ -95,7 +95,9 @@ def build_dynasty_detail(world: Any) -> Dict[str, Any]:
         emperor = get_avatar(str(crisis.emperor_avatar_id))
         claimant = get_avatar(str(crisis.claimant_avatar_id))
         supporters = []
-        for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+        for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
+            if position != "support":
+                continue
             supporter = get_avatar(str(supporter_id))
             if supporter is None:
                 continue
@@ -110,8 +112,16 @@ def build_dynasty_detail(world: Any) -> Dict[str, Any]:
             "opened_month": int(crisis.opened_month),
             "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
             "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
-            "support_count": len(getattr(crisis, "support_avatar_ids", []) or []),
+            "support_count": len(
+                [
+                    supporter_id
+                    for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items()
+                    if position == "support"
+                ]
+            ),
             "supporters": supporters,
+            "political_positions": dict(getattr(crisis, "political_positions", {}) or {}),
+            "evaluations": [dict(item) for item in getattr(crisis, "evaluations", []) or []],
             "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
             "legitimacy_factors": dict(getattr(crisis, "legitimacy_factors", {}) or {}),
         }

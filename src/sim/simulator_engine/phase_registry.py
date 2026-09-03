@@ -138,7 +138,37 @@ def update_celestial_phenomenon(simulator, ctx):
 def update_city_population(simulator, ctx):
     # 唯一需要转发 ctx（因果记录器）的 wrapper：该 flow 此前完全丢弃 ctx，
     # 现在把 ctx.causal 转发给 owner，使其能在人口变化后记录 StateDelta。
-    ctx.add_events(world_phases.phase_update_city_population(simulator.world, ctx.causal))
+    ctx.add_events(world_phases.phase_update_city_population(
+        simulator.world,
+        ctx.causal,
+        ctx.invalidations,
+    ))
+
+
+def update_regional_economy(simulator, ctx):
+    from src.systems.regional_economy import phase_update_regional_economy
+    ctx.add_events(phase_update_regional_economy(
+        simulator.world,
+        ctx.causal,
+        ctx.invalidations,
+    ))
+
+
+async def react_economy(simulator, ctx):
+    from src.systems.economy_reactivity import process_economy_reactivity
+
+    ctx.add_events(await process_economy_reactivity(
+        simulator.world,
+        current_events=ctx.events,
+        invalidations=ctx.invalidations,
+        budget=ctx.causal_budget,
+    ))
+
+
+def advance_urban_capacity_projects(simulator, ctx):
+    from src.systems.urban_capacity_project import advance_urban_capacity_projects as advance
+
+    ctx.add_events(advance(simulator.world, invalidations=ctx.invalidations))
 
 
 def update_dynasty_and_officials(simulator, ctx):
@@ -152,6 +182,159 @@ def update_calculated_relations(simulator, ctx):
 
 async def annual_maintenance(simulator, ctx):
     await annual.run_annual_maintenance(simulator, ctx)
+
+
+async def evaluate_semantic_world(simulator, ctx):
+    from src.systems.semantic_world.service import evaluate_semantic_world as evaluate
+    from src.systems.city_reactivity import enqueue_city_transitions
+    from src.systems.government_reactivity import enqueue_government_transitions
+    from src.systems.organization_reactivity import enqueue_organization_transitions
+    from src.systems.population_reactivity import enqueue_population_transitions
+    from src.sim.simulator_engine.domain_invalidation import DomainInvalidationLayer
+
+    mechanical = ctx.invalidations.drain(layer=DomainInvalidationLayer.MECHANICAL)
+    sources_by_target: dict[str, list[str]] = {}
+    for item in mechanical:
+        for source_event_id in item.source_event_ids:
+            sources_by_target.setdefault(
+                f"{item.target_kind}:{item.target_id}",
+                [],
+            ).append(source_event_id)
+    health_sources_by_target: dict[str, list[str]] = {}
+    avatars_by_id = {
+        str(avatar.id): avatar
+        for avatar in simulator.world.avatar_manager.get_living_avatars()
+    }
+    for event in ctx.events:
+        payload = event.causal_payload if isinstance(event.causal_payload, dict) else {}
+        for delta in payload.get("deltas", []):
+            if not isinstance(delta, dict):
+                continue
+            if delta.get("owner_kind") != "avatar" or delta.get("aspect") not in {
+                "hp",
+                "active_injury",
+                "recovery",
+            }:
+                continue
+            avatar = avatars_by_id.get(str(delta.get("owner_id", "")))
+            region = getattr(getattr(avatar, "tile", None), "region", None)
+            if region is None:
+                continue
+            target_ref = f"region:{region.id}"
+            pending = health_sources_by_target.setdefault(target_ref, [])
+            if event.id not in pending:
+                pending.append(event.id)
+    events = await evaluate(
+        simulator.world,
+        source_event_ids_by_target=sources_by_target,
+        health_source_event_ids_by_target=health_sources_by_target,
+        budget=ctx.causal_budget,
+    )
+    enqueue_government_transitions(simulator.world, events, ctx.invalidations)
+    enqueue_organization_transitions(simulator.world, events, ctx.invalidations)
+    enqueue_city_transitions(simulator.world, events, ctx.invalidations)
+    enqueue_population_transitions(simulator.world, events, ctx.invalidations)
+    ctx.add_events(events)
+
+
+async def react_government(simulator, ctx):
+    from src.systems.government_reactivity import (
+        enqueue_unreacted_government_conditions,
+        process_government_reactivity,
+    )
+
+    enqueue_unreacted_government_conditions(simulator.world, ctx.invalidations)
+    ctx.add_events(await process_government_reactivity(
+        simulator.world,
+        current_events=ctx.events,
+        invalidations=ctx.invalidations,
+        budget=ctx.causal_budget,
+    ))
+
+
+async def react_organization(simulator, ctx):
+    from src.systems.organization_reactivity import (
+        enqueue_unreacted_organization_conditions,
+        process_organization_reactivity,
+    )
+
+    enqueue_unreacted_organization_conditions(simulator.world, ctx.invalidations)
+    ctx.add_events(await process_organization_reactivity(
+        simulator.world,
+        current_events=ctx.events,
+        invalidations=ctx.invalidations,
+        budget=ctx.causal_budget,
+    ))
+
+
+async def react_city(simulator, ctx):
+    from src.systems.city_reactivity import (
+        enqueue_unreacted_city_conditions,
+        process_city_reactivity,
+    )
+
+    enqueue_unreacted_city_conditions(simulator.world, ctx.invalidations)
+    ctx.add_events(await process_city_reactivity(
+        simulator.world,
+        current_events=ctx.events,
+        invalidations=ctx.invalidations,
+        budget=ctx.causal_budget,
+    ))
+
+
+async def react_population(simulator, ctx):
+    from src.systems.population_reactivity import (
+        enqueue_unreacted_population_conditions,
+        process_population_reactivity,
+    )
+
+    enqueue_unreacted_population_conditions(simulator.world, ctx.invalidations)
+    ctx.add_events(await process_population_reactivity(
+        simulator.world,
+        current_events=ctx.events,
+        invalidations=ctx.invalidations,
+        budget=ctx.causal_budget,
+    ))
+
+
+def carry_forward_mechanical_invalidations(simulator, ctx):
+    """Persist late mechanical evidence for next month's semantic pass."""
+    from src.sim.simulator_engine.domain_invalidation import DomainInvalidationLayer
+
+    pending = simulator.world.mechanical_language.pending_target_source_event_ids
+    affinity_pending = (
+        simulator.world.mechanical_language.pending_affinity_source_event_ids
+    )
+    events_by_id = {event.id: event for event in ctx.events}
+    for item in ctx.invalidations.drain(layer=DomainInvalidationLayer.MECHANICAL):
+        target_ref = f"{item.target_kind}:{item.target_id}"
+        capability_id = next(
+            (
+                str(event.render_params.get("capability_id", "")).strip()
+                for source_id in item.source_event_ids
+                if (event := events_by_id.get(source_id)) is not None
+                and isinstance(event.render_params, dict)
+                and str(event.render_params.get("capability_id", "")).strip()
+            ),
+            "",
+        )
+        if capability_id:
+            source_ids = affinity_pending.setdefault(target_ref, {}).setdefault(
+                f"urban_service:{capability_id}",
+                [],
+            )
+            source_ids.extend(
+                source_id
+                for source_id in item.source_event_ids
+                if source_id not in source_ids
+            )
+            continue
+        source_ids = pending.setdefault(target_ref, [])
+        source_ids.extend(
+            source_id
+            for source_id in item.source_event_ids
+            if source_id not in source_ids
+        )
 
 
 async def create_dao_petition(simulator, ctx):
@@ -197,23 +380,32 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("update_age_and_birth", 15, "update_age_and_birth", update_age_and_birth),
     SimulationPhase("backstory_generation", 16, "backstory_generation", backstory_generation),
     SimulationPhase("passive_effects", 17, "passive_effects", passive_effects),
-    SimulationPhase("resolve_individual_consequences", 17, "resolve_individual_consequences", resolve_individual_consequences),
-    SimulationPhase("autonomous_custom_creation", 18, "autonomous_custom_creation", autonomous_custom_creation),
-    SimulationPhase("random_minor_events", 19, "random_minor_events", random_minor_events),
-    SimulationPhase("background_npc_events", 20, "background_npc_events", background_npc_events),
-    SimulationPhase("sect_random_event", 21, "sect_random_event", sect_random_event),
-    SimulationPhase("sect_wars", 22, "sect_wars", sect_wars),
-    SimulationPhase("nickname_generation", 23, "nickname_generation", nickname_generation),
-    SimulationPhase("update_celestial_phenomenon", 24, "update_celestial_phenomenon", update_celestial_phenomenon),
-    SimulationPhase("update_city_population", 25, "update_city_population", update_city_population),
-    SimulationPhase("update_dynasty_and_officials", 26, "update_dynasty_and_officials", update_dynasty_and_officials),
-    SimulationPhase("handle_interactions_second", 27, "handle_interactions", handle_interactions),
-    SimulationPhase("update_calculated_relations", 28, "update_calculated_relations", update_calculated_relations),
-    SimulationPhase("create_dao_petition", 29, "create_dao_petition", create_dao_petition),
-    SimulationPhase("annual_maintenance", 30, "annual_maintenance", annual_maintenance),
-    SimulationPhase("generate_event_appraisals", 31, "generate_event_appraisals", generate_event_appraisals),
-    SimulationPhase("generate_chronicle", 32, "generate_chronicle", generate_chronicle),
-    SimulationPhase("finalize_step", 33, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("resolve_individual_consequences", 18, "resolve_individual_consequences", resolve_individual_consequences),
+    SimulationPhase("autonomous_custom_creation", 19, "autonomous_custom_creation", autonomous_custom_creation),
+    SimulationPhase("random_minor_events", 20, "random_minor_events", random_minor_events),
+    SimulationPhase("background_npc_events", 21, "background_npc_events", background_npc_events),
+    SimulationPhase("sect_random_event", 22, "sect_random_event", sect_random_event),
+    SimulationPhase("sect_wars", 23, "sect_wars", sect_wars),
+    SimulationPhase("nickname_generation", 24, "nickname_generation", nickname_generation),
+    SimulationPhase("update_celestial_phenomenon", 25, "update_celestial_phenomenon", update_celestial_phenomenon),
+    SimulationPhase("update_city_population", 26, "update_city_population", update_city_population),
+    SimulationPhase("update_regional_economy", 27, "update_regional_economy", update_regional_economy),
+    SimulationPhase("react_economy", 28, "react_economy", react_economy),
+    SimulationPhase("advance_urban_capacity_projects", 29, "advance_urban_capacity_projects", advance_urban_capacity_projects),
+    SimulationPhase("update_dynasty_and_officials", 30, "update_dynasty_and_officials", update_dynasty_and_officials),
+    SimulationPhase("handle_interactions_second", 31, "handle_interactions", handle_interactions),
+    SimulationPhase("update_calculated_relations", 32, "update_calculated_relations", update_calculated_relations),
+    SimulationPhase("create_dao_petition", 33, "create_dao_petition", create_dao_petition),
+    SimulationPhase("annual_maintenance", 34, "annual_maintenance", annual_maintenance),
+    SimulationPhase("evaluate_semantic_world", 35, "evaluate_semantic_world", evaluate_semantic_world),
+    SimulationPhase("react_government", 36, "react_government", react_government),
+    SimulationPhase("react_organization", 37, "react_organization", react_organization),
+    SimulationPhase("react_city", 38, "react_city", react_city),
+    SimulationPhase("react_population", 39, "react_population", react_population),
+    SimulationPhase("carry_forward_mechanical_invalidations", 40, "carry_forward_mechanical_invalidations", carry_forward_mechanical_invalidations),
+    SimulationPhase("generate_event_appraisals", 41, "generate_event_appraisals", generate_event_appraisals),
+    SimulationPhase("generate_chronicle", 42, "generate_chronicle", generate_chronicle),
+    SimulationPhase("finalize_step", 43, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

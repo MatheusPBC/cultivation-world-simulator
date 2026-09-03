@@ -31,8 +31,8 @@ def migrate_save_data(
         raise ValueError(f"Unknown map preset: {preset_id}")
 
     map_source = json.loads(map_path.read_text(encoding="utf-8"))
-    if int(map_source.get("schema_version", 0) or 0) != 3:
-        raise ValueError(f"Map preset {preset_id} is not schema version 3")
+    if int(map_source.get("schema_version", 0) or 0) != 4:
+        raise ValueError(f"Map preset {preset_id} is not schema version 4")
 
     source_overrides = map_source.get("region_overrides")
     if not isinstance(source_overrides, dict):

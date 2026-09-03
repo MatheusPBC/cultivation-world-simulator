@@ -1,0 +1,19 @@
+msgid ""
+msgstr ""
+"Language: pt-BR\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "A causal probe increased population pressure in {region}."
+msgstr "Uma sonda causal aumentou a pressão populacional em {region}."
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "Uma sonda causal reduziu o abastecimento de {resource} em {region}."
+
+msgid "A causal probe interrupted route {route}."
+msgstr "Uma sonda causal interrompeu a rota {route}."
+
+msgid "A causal probe strained {service} service in {region}."
+msgstr "Uma sonda causal sobrecarregou o serviço {service} em {region}."
+
+msgid "A causal probe injured {avatar} without killing them."
+msgstr "Uma sonda causal feriu {avatar} sem causar sua morte."

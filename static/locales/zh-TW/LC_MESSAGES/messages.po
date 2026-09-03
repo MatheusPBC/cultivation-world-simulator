@@ -1285,6 +1285,15 @@ msgid ""
 msgstr ""
 "{winner} 戰勝了 {loser}，{loser} 受傷 {loser_dmg} 點，{winner} 也受傷 {winner_dmg} 點。"
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr "因果探針增加了{region}的人口壓力。"
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "因果探針減少了{region}的{resource}供應。"
+
+msgid "A causal probe interrupted route {route}."
+msgstr "因果探針中斷了路線{route}。"
+
 msgid " (and sold old {item} at reduced price)"
 msgstr "（並將原有的{item}折價售出）"
 

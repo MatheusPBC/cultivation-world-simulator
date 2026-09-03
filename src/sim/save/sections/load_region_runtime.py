@@ -15,6 +15,14 @@ class RegionRuntimeLoadSection:
         game_map = context.game_map
         all_avatars = context.all_avatars or {}
 
+        route_data = world_data.get("routes")
+        if route_data is not None:
+            from src.classes.environment.route import Route
+
+            if not isinstance(route_data, list):
+                raise ValueError("Saved routes must be a list")
+            game_map.set_routes(Route.from_dict(item) for item in route_data)
+
         for rid_str, avatar_id in world_data.get("cultivate_regions_hosts", {}).items():
             rid = int(rid_str)
             if rid in game_map.regions:
@@ -28,19 +36,21 @@ class RegionRuntimeLoadSection:
                 region = game_map.regions[rid]
                 if isinstance(region, CityRegion):
                     region.population = status.get("population", region.population)
-                conditions = status.get("conditions") or []
+                    region.population_capacity = status["population_capacity"]
+                    from src.classes.environment.city_state import CityState
+                    from src.classes.regional_economy import InfrastructureState, RegionalEconomyState
+                    region.economy = RegionalEconomyState.from_dict(status.get("economy", {}))
+                    region.infrastructure = InfrastructureState.from_dict(status.get("infrastructure", {}))
+                    city_state_data = status.get("city_state")
+                    if city_state_data is not None:
+                        region.city_state = CityState.from_dict(
+                            city_state_data,
+                            city_tiles=region.cors,
+                        )
                 tradition = status.get("dao_tradition")
                 if tradition:
                     from src.classes.celestial_dao import DaoTradition
                     region.dao_tradition = DaoTradition(tradition)
-                if conditions:
-                    from src.classes.environment.region_condition import RegionCondition
-
-                    add_condition = getattr(region, "add_condition", None)
-                    if callable(add_condition):
-                        for condition_data in conditions:
-                            if isinstance(condition_data, dict):
-                                add_condition(RegionCondition.from_dict(condition_data))
 
         region_formations = {}
         for rid_str, formation in (world_data.get("region_formations", {}) or {}).items():

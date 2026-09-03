@@ -598,7 +598,98 @@
       "host_meta": "Propriétaire",
       "no_host": "Sans propriétaire",
       "price_meta": "{price} pierres",
-      "formation_remaining": "{months} mois restants"
+      "formation_remaining": "{months} mois restants",
+      "regional_context_title": "Contexte régional",
+      "dao_tradition": "Tradition du Dao",
+      "dao_traditions": {
+        "mandate_and_order": "Mandat et ordre",
+        "balance": "Équilibre",
+        "mercy": "Miséricorde",
+        "transcendence": "Transcendance"
+      },
+      "semantic_context": {
+        "conditions_title": "Conditions sémantiques actives",
+        "readings_title": "Mesures clés",
+        "empty": "Aucun contexte sémantique disponible.",
+        "intensity": "Intensité {value}",
+        "started_month": "Commencée au mois {month}",
+        "definition": "Définition {id}",
+        "source_event": "Événement source {id}",
+        "derived_from": "Entrées dérivées",
+        "unknown_value": "Inconnu",
+        "confidence": "Confiance {value}%",
+        "availability": {
+          "measurable": "Mesurable",
+          "partially_measurable": "Partiellement mesurable",
+          "unmeasurable": "Non mesurable"
+        },
+        "reading_kind": {
+          "exact": "Exacte",
+          "derived": "Dérivée",
+          "estimated": "Estimée",
+          "unknown": "Inconnue"
+        }
+      },
+      "economy": {
+        "title": "Économie régionale",
+        "stocks": "Stocks",
+        "capacities": "Capacités",
+        "production_rates": "Taux de production",
+        "demand_rates": "Taux de demande",
+        "access": "Accès",
+        "dependencies": "Dépendances"
+      },
+      "infrastructure": {
+        "title": "Infrastructure",
+        "capacities": "Capacités",
+        "quality": "Qualité"
+      },
+      "city_state": {
+        "title": "État urbain",
+        "districts": "Districts",
+        "assets": "Infrastructures urbaines",
+        "governance": "Gouvernance",
+        "population_weight": "Part de population : {value}",
+        "tiles": "Cases : {value}",
+        "capacity": "Capacité : {value}",
+        "quality": "Qualité : {value}",
+        "integrity": "Intégrité : {value}",
+        "controller": "Autorité",
+        "administrative_capacity": "Capacité administrative : {value}"
+      },
+      "spiritual_ecology": {
+        "title": "Écologie spirituelle",
+        "grounding_label": "Ancrage",
+        "essence": "Essence",
+        "densities": "Densités des éléments",
+        "formations": "Formations actives",
+        "graves": "Tombes",
+        "treasures": "Trésors",
+        "celestial_context": "Contexte céleste",
+        "state_refs": "Références d’ancrage",
+        "started_month": "Commencée : mois {value}",
+        "expires_month": "Expire : mois {value}",
+        "created_month": "Créée : mois {value}",
+        "location": "Emplacement : {value}",
+        "effects": "Effets enregistrés",
+        "grounding": {
+          "grounded": "Faits ancrés",
+          "unknown": "Ancrage inconnu"
+        }
+      },
+      "collective_health": {
+        "title": "Santé collective",
+        "grounding_label": "Ancrage",
+        "living_avatar_count": "Avatars vivants",
+        "active_wounded_count": "Blessés actifs",
+        "hp_deficit": "Déficit de PV",
+        "healing_capacity": "Capacité de soin",
+        "injuries": "Blessures actives",
+        "healing_assets": "Ressources de soin",
+        "hp_lost": "PV perdus : {value}",
+        "capacity": "Capacité : {value}",
+        "state_refs": "Références d’état"
+      }
     },
     "sect": {
       "stats": {

@@ -1400,6 +1400,15 @@ msgstr ""
 "{winner} đánh bại {loser}. {loser} chịu {loser_dmg} điểm thương hại, còn "
 "{winner} cũng chịu {winner_dmg} điểm thương hại."
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr ""
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr ""
+
+msgid "A causal probe interrupted route {route}."
+msgstr ""
+
 msgid " (and sold old {item} at reduced price)"
 msgstr " (đồng thời bán món {item} cũ với giá chiết khấu)"
 

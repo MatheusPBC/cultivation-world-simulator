@@ -17,9 +17,25 @@ def test_save_and_load_preserves_avatar_sovereign_crisis_and_petition(base_world
         desc="重文轻武，典章繁密，民间书院兴盛。",
         royal_surname="上官",
         current_emperor_id=dummy_avatar.id,
-        imperial_crisis=ImperialCrisis(dummy_avatar.id, "claimant", int(base_world.month_stamp), status="stalemate"),
+        imperial_crisis=ImperialCrisis(
+            dummy_avatar.id,
+            "claimant",
+            int(base_world.month_stamp),
+            status="active",
+            political_positions={"official": "support"},
+        ),
     )
-    base_world.dao_petitions = [DaoPetition("avatar", dummy_avatar.id, 7, DaoTradition.BALANCE, content="Hear me")]
+    base_world.dao_petitions = [
+        DaoPetition(
+            "avatar",
+            dummy_avatar.id,
+            7,
+            DaoTradition.BALANCE,
+            content="Hear me",
+            target_avatar_id="claimant",
+            target_evidence_event_ids=["source-event"],
+        )
+    ]
 
     simulator = Simulator(base_world)
     save_path = Path(tmp_path) / "dynasty_save.json"
@@ -34,5 +50,11 @@ def test_save_and_load_preserves_avatar_sovereign_crisis_and_petition(base_world
     assert new_world.dynasty.title == "宋朝"
     assert new_world.dynasty.current_emperor_id == dummy_avatar.id
     assert new_world.avatar_manager.get_avatar(dummy_avatar.id).name == "上官景天"
-    assert new_world.dynasty.imperial_crisis.status == "stalemate"
+    assert new_world.dynasty.imperial_crisis.status == "active"
+    assert new_world.dynasty.imperial_crisis.political_positions == {
+        "official": "support",
+    }
+    assert "support_avatar_ids" not in new_world.dynasty.imperial_crisis.to_dict()
     assert new_world.dao_petitions[0].tradition is DaoTradition.BALANCE
+    assert new_world.dao_petitions[0].target_avatar_id == "claimant"
+    assert new_world.dao_petitions[0].target_evidence_event_ids == ["source-event"]

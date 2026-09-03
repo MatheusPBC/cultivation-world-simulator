@@ -5,6 +5,7 @@ import random
 from datetime import datetime
 from typing import Any, Callable
 
+from src.systems.city_governance import ground_unclaimed_city_governance
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
@@ -238,6 +239,7 @@ async def perform_game_initialization(
             )
             world.runtime = runtime
             world.dynasty = generate_dynasty()
+            ground_unclaimed_city_governance(world)
             from src.systems.celestial_dao_service import assign_region_traditions
             assign_region_traditions(world)
             sim = simulator_cls(world)

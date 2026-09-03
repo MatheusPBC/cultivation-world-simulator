@@ -764,6 +764,51 @@ msgstr "这位官员已经公开表态支持。"
 msgid "{official} publicly supports the imperial claimant."
 msgstr "{official}公开支持帝统觊觎者。"
 
+# Action: OpposeImperialClaim
+msgid "oppose_imperial_claim_action_name"
+msgstr "反对帝统觊觎者"
+
+msgid "oppose_imperial_claim_description"
+msgstr "公开反对当前帝统觊觎者，并留下可追溯的政治立场。"
+
+msgid "oppose_imperial_claim_requirements"
+msgstr "需为在世人族朝廷官员，且尚未在当前正统危机中表态。"
+
+# Action: WithdrawImperialClaim
+msgid "withdraw_imperial_claim_action_name"
+msgstr "撤回帝统宣称"
+
+msgid "withdraw_imperial_claim_description"
+msgstr "由觊觎者主动撤回帝统宣称，结束当前正统危机。"
+
+msgid "withdraw_imperial_claim_requirements"
+msgstr "仅限当前尚未解决的正统危机中的觊觎者。"
+
+msgid "There is no active imperial crisis"
+msgstr "当前没有正在进行的正统危机。"
+
+msgid "A living human court official is required"
+msgstr "必须是在世的人族朝廷官员。"
+
+msgid "Only court officials can take a political position"
+msgstr "只有朝廷官员可以公开采取政治立场。"
+
+msgid "A contender cannot take a position in their own crisis"
+msgstr "正统竞争者不能在自己的危机中另行表态。"
+
+msgid "This official has already declared a position"
+msgstr "这位官员已经在当前危机中公开表态。"
+
+msgid ""
+"{official} publicly takes a position in the imperial crisis: {position}."
+msgstr "{official}在正统危机中公开表态：{position}。"
+
+msgid "Only the active claimant can withdraw the imperial claim"
+msgstr "只有当前正统危机中的觊觎者可以撤回帝统宣称。"
+
+msgid "The imperial claimant withdraws the imperial pretension."
+msgstr "帝统觊觎者撤回了自己的宣称。"
+
 msgid "excellent progress"
 msgstr "进境颇佳"
 
@@ -1418,6 +1463,53 @@ msgid ""
 "took {winner_dmg} damage."
 msgstr ""
 "{winner} 战胜了 {loser}，{loser} 受伤 {loser_dmg} 点，{winner} 也受伤 {winner_dmg} 点。"
+
+msgid "A causal probe increased population pressure in {region}."
+msgstr "因果探针增加了{region}的人口压力。"
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "因果探针减少了{region}的{resource}供应。"
+
+msgid "A causal probe interrupted route {route}."
+msgstr "因果探针中断了路线{route}。"
+
+msgid "A causal probe injured {avatar} without killing them."
+msgstr ""
+
+msgid "A causal probe strained {service} service in {region}."
+msgstr ""
+
+msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
+msgstr ""
+
+msgid ""
+"The annual legitimacy reading remains unresolved while the throne lacks its "
+"recorded emperor."
+msgstr ""
+
+msgid "The imperial claim fails because the claimant is no longer alive."
+msgstr ""
+
+msgid "The imperial claimant loses eligibility and the imperial claim fails."
+msgstr ""
+
+msgid "{avatar} committed to an action chain"
+msgstr ""
+
+msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
+msgstr ""
+
+msgid "{official} publicly opposes the imperial claimant."
+msgstr ""
+
+msgid "{region} interpreted an urban risk as {decision}: {reason}"
+msgstr ""
+
+msgid "{region} population changed from {before} to {after}"
+msgstr ""
+
+msgid "Unhealed injuries prevent high-risk actions."
+msgstr "伤势未愈，无法进行高风险行动"
 
 msgid "a call to restore rightful order"
 msgstr "这是重建正统秩序的召唤"
@@ -2459,6 +2551,19 @@ msgstr "{avatar} 在 {location} 发现了一座墓碑：{poi}"
 msgid "{avatar} discovered a point of interest at {location}: {poi}"
 msgstr "{avatar} 在 {location} 发现了一个特殊地点：{poi}"
 
+msgid "{region} entered the condition {condition}."
+msgstr "{region}进入了「{condition}」状态。"
+
+msgid "{region} left the condition {condition}."
+msgstr "{region}脱离了「{condition}」状态。"
+
+msgid ""
+"People in {region} hold a popular rite and claim it answers local pressure."
+msgstr "{region}的民众举行地方仪式，声称它回应了当地的压力。"
+
+msgid "{avatar_name}'s {severity} injury has recovered."
+msgstr "{avatar_name}的{severity}伤势已经痊愈。"
+
 # 执行结果
 msgid "{avatar_name} {done} {grade} {label}『{item_name}』."
 msgstr "{avatar_name} {done}{grade}{label}『{item_name}』。"
@@ -2848,6 +2953,31 @@ msgstr "{name} 葬身于秘境【{domain}】。"
 
 msgid "{}: {}"
 msgstr "{}：{}"
+
+msgid ""
+"The dynasty responded to {region}'s condition with {decision}: {reason}"
+msgstr "王朝针对{region}的状况作出{decision}决定：{reason}"
+
+msgid "{sect_name} considered a response to a regional condition."
+msgstr "{sect_name}考虑了如何回应当地状况。"
+
+msgid "{sect_name} supported {avatar_name} with {amount} spirit stones."
+msgstr "{sect_name}拨出{amount}灵石援助{avatar_name}。"
+
+msgid "Sect member support was blocked: {reason}"
+msgstr "宗门成员援助未能执行：{reason}"
+
+msgid "Urban maintenance improved {capability} in {region}."
+msgstr "{region}的{capability}设施经过维护后有所改善。"
+
+msgid "Urban maintenance in {region} was blocked: {reason}"
+msgstr "{region}的城市维护未能执行：{reason}"
+
+msgid "{sect_name} concluded a round of sect decisions"
+msgstr "{sect_name}完成了一轮宗门决策"
+
+msgid "Urban capacity project in {region}: {outcome}."
+msgstr "{region}的城市扩建工程：{outcome}。"
 
 # Item exchange - general
 msgid "decided to equip it"
@@ -3908,6 +4038,15 @@ msgstr "筑基"
 msgid "nascent_soul"
 msgstr "元婴"
 
+msgid "{region} interpreted a population transition as {decision}: {reason}"
+msgstr "{region} 将人口转变解读为{decision}：{reason}"
+
+msgid "population_transfer.completed"
+msgstr "人口从{origin}迁往{destination}，转移了{amount}万人。"
+
+msgid "population_transfer.blocked"
+msgstr "{origin}的人口迁移未能完成。"
+
 msgid "World not initialized"
 msgstr "世界尚未初始化"
 
@@ -4043,6 +4182,21 @@ msgstr "师傅"
 # Realm
 msgid "qi_refinement"
 msgstr "练气"
+
+msgid "{region} could not satisfy demand for {resource}."
+msgstr "{region}无法满足对{resource}的需求。"
+
+msgid "{region} {flow_kind} changed {resource} stock by {amount}."
+msgstr "{region}的{flow_kind}使{resource}库存变化了{amount}。"
+
+msgid "{region} interpreted a resource shortage as {decision}: {reason}"
+msgstr "{region}将资源短缺解读为{decision}：{reason}"
+
+msgid "{resource} moved from {source} to {destination}."
+msgstr "{resource}从{source}运往{destination}。"
+
+msgid "{destination} could not receive {resource}."
+msgstr "{destination}未能接收{resource}。"
 
 msgid "grand_child"
 msgstr "孙辈"
@@ -4729,6 +4883,24 @@ msgid ""
 "for {duration_months} months."
 msgstr ""
 "因{reason_fragment}，{sect_a_name}每地块年收入修正-{value}（持续{duration_months}个月）。"
+
+msgid "No current region is available."
+msgstr "当前没有可用的地区信息。"
+
+msgid "Region: {region}"
+msgstr "地区：{region}"
+
+msgid "Causal evidence: {sources}"
+msgstr "因果证据：{sources}"
+
+msgid "Active conditions: {conditions}"
+msgstr "当前状态：{conditions}"
+
+msgid "Condition evidence: {sources}"
+msgstr "状态证据：{sources}"
+
+msgid "Unknown measurement"
+msgstr "未知测量值"
 
 # Relation & Root & Appearance & Sect (New)
 msgid "comma_separator"

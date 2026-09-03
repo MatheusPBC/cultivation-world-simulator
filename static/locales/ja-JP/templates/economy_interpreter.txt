@@ -1,0 +1,16 @@
+あなたは因果世界の経済解釈者です。以下の検証済みの不足と経路だけを根拠に判断してください。経路、在庫、容量、数量、価格、差分を創作してはいけません。
+
+不足：
+{shortage}
+
+配送先：
+{destination}
+
+候補供給元：
+{candidates}
+
+次のいずれかのJSONだけを返してください：
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","action_intent":{{"action_kind":"resource_transfer","preferences":["available_supply","higher_route_quality"]}}}}
+
+使用できるキーは decision、reason、action_intent、action_kind、preferences のみです。転送は意図にすぎません。決定論的ルールは明示的な正規経路を必要とし、供給元と数量を計算します。

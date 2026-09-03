@@ -88,4 +88,5 @@ async def test_imperial_claim_command_runs_inside_runtime_mutation(
     )
 
     assert result["claimant_avatar_id"] == claimant.id
+    assert base_world.event_manager.get_event_by_id(result["event_id"]) is not None
     assert runtime.mutations == 1

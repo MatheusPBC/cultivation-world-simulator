@@ -1,12 +1,12 @@
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.classes.sect_thinker import SectThinker
 from src.classes.language import language_manager
 from src.i18n import reload_translations
 from src.i18n.locale_registry import get_project_root
 from src.systems.sect_decision_context import SectDecisionContext
+from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
 class _DummySect:
@@ -24,6 +24,7 @@ class _DummyWorld:
     def __init__(self):
         self.current_phenomenon = _DummyPhenomenon("Heaven Tide", "Spiritual qi surges")
         self.world_lore = type("WorldLore", (), {"text": ""})()
+        self.run_config_snapshot = {}
 
     def get_info(self, detailed: bool = False):
         return {"world_state": "stable", "detailed": detailed}
@@ -216,6 +217,43 @@ def test_sect_thinker_serializes_imperial_crisis_as_observation():
     ctx.imperial_crisis = {"claimant": {"id": "c", "name": "Claimant"}, "declared_supporters": []}
 
     assert SectThinker._serialize_context(ctx)["imperial_crisis"] == ctx.imperial_crisis
+
+
+def test_sect_thinker_serializes_regional_semantics_as_read_only_context():
+    semantics = [{"region_id": 7, "conditions": [{"id": "overcrowded"}]}]
+    ctx = _dummy_ctx()
+    ctx.regional_semantics = semantics
+
+    assert SectThinker._serialize_context(ctx)["regional_semantics"] == semantics
+
+
+@pytest.mark.asyncio
+async def test_sect_thinker_world_test_mode_never_calls_provider():
+    sect = _DummySect("Qingyun Sect")
+    world = _DummyWorld()
+    world.run_config_snapshot = {"test_mode": True}
+
+    with patch.object(SectThinker, "_llm_available", return_value=True), patch(
+        "src.classes.sect_thinker.call_llm_with_task_name", new=AsyncMock(side_effect=AssertionError("provider called")),
+    ) as provider:
+        text = await SectThinker.think(sect, _dummy_ctx(), world)
+
+    assert text == SectThinker._fallback(sect)
+    provider.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sect_thinker_scoped_test_mode_never_calls_provider():
+    sect = _DummySect("Qingyun Sect")
+    world = _DummyWorld()
+
+    with patch.object(SectThinker, "_llm_available", return_value=True), patch(
+        "src.classes.sect_thinker.call_llm_with_task_name", new=AsyncMock(side_effect=AssertionError("provider called")),
+    ) as provider, llm_test_mode_scope(True):
+        text = await SectThinker.think(sect, _dummy_ctx(), world)
+
+    assert text == SectThinker._fallback(sect)
+    provider.assert_not_awaited()
 
 
 @pytest.mark.parametrize(

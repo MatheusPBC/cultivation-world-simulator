@@ -28,6 +28,7 @@ llm:
     chronicle_chapter: "fast"
     live_guide_ask: "fast"
     dao_petition: "fast"
+    semantic_discovery: "fast"
     world_lore_style_guide: "normal"
     world_lore_region_rewrite: "normal"
     world_lore_sect_group_rewrite: "normal"

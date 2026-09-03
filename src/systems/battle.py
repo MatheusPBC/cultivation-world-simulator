@@ -9,7 +9,7 @@ from src.classes.close_relation_event_service import (
     append_close_relation_major_observations,
     apply_kill_hatred,
 )
-from src.classes.technique import TechniqueGrade, get_suppression_bonus
+from src.classes.technique import get_suppression_bonus
 from src.systems.formation import get_current_region_formation_effects
 
 if TYPE_CHECKING:
@@ -321,9 +321,9 @@ async def handle_battle_finish(
             "subject_name": loser.name,
         },
     )
-    from src.classes.individual_consequence import record_injury_from_event
-    record_injury_from_event(loser, result_event, loser_damage)
-    record_injury_from_event(winner, result_event, winner_damage)
+    from src.classes.individual_consequence import record_hp_change_from_event
+    record_hp_change_from_event(loser, result_event, _hp_before_damage(loser, loser_damage))
+    record_hp_change_from_event(winner, result_event, _hp_before_damage(winner, winner_damage))
     if transfer is not None:
         from src.classes.state_delta import StateDelta
         payload = result_event.causal_payload or {"deltas": [], "decision": None}
@@ -362,3 +362,10 @@ async def handle_battle_finish(
     if story_event is not None:
         events.append(story_event)
     return events
+
+
+def _hp_before_damage(avatar: "Avatar", damage: int) -> int:
+    current = getattr(getattr(avatar, "hp", None), "cur", None)
+    if current is None:
+        return 0
+    return int(current) + max(0, int(damage))

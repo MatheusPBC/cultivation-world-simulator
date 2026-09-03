@@ -293,7 +293,7 @@ def maybe_request_roleplay_decision(world) -> bool:
 def _prepare_roleplay_decision(runtime, *, avatar_id: str, request_id: str, command_text: str) -> dict[str, Any]:
     from src.classes.actions import get_action_infos_str
     from src.classes.core.avatar.info_presenter import get_avatar_ai_context
-    from src.systems.regional_pressure import build_avatar_regional_context
+    from src.systems.semantic_world.context import build_avatar_semantic_context
 
     world = _require_world(runtime)
     avatar = _find_avatar_or_raise(world, avatar_id)
@@ -325,7 +325,7 @@ def _prepare_roleplay_decision(runtime, *, avatar_id: str, request_id: str, comm
             "player_command": command_text,
             "decision_mode": "player_roleplay",
         },
-        "regional_context": build_avatar_regional_context(avatar),
+        "regional_context": build_avatar_semantic_context(avatar),
         "world_info": world.get_info(avatar=avatar, detailed=True),
         "world_lore": world.world_lore.text,
         "general_action_infos": get_action_infos_str(avatar),

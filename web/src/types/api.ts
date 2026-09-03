@@ -14,6 +14,7 @@ import type {
   POIDetail,
   EffectEntity,
   CultivationDisplay,
+  SemanticReading,
 } from './core';
 
 // --- 通用响应 ---
@@ -129,6 +130,8 @@ export type AvatarDetailDTO = AvatarDetail;
 export type RegionDetailDTO = RegionDetail;
 export type SectDetailDTO = SectDetail;
 export type POIDetailDTO = POIDetail;
+
+export type MetricReadingDTO = SemanticReading;
 
 export type DetailResponseDTO =
   | AvatarDetailDTO
@@ -421,6 +424,12 @@ export type EventSubjectDTO =
     }
 
 export type FactKindDTO = 'occurrence' | 'state_transition' | 'derived_condition' | 'decision';
+export type CausalOriginDTO =
+  | 'deterministic'
+  | 'llm_interpretation'
+  | 'actor_decision'
+  | 'derived_condition'
+  | 'external_event';
 
 export interface EventDTO {
   id: string;
@@ -437,7 +446,8 @@ export interface EventDTO {
   render_key?: string;
   render_params?: Record<string, string | number | boolean | null>;
   created_at: number;
-  fact_kind?: FactKindDTO;
+  fact_kind: FactKindDTO;
+  causal_origin: CausalOriginDTO;
 }
 
 export interface EventsResponseDTO {
@@ -709,6 +719,7 @@ export interface EventCausalDetailDTO {
   causes: CausalEdgeDTO[];
   effects: CausalEdgeDTO[];
   deltas: StateDeltaDTO[];
+  measurements: MetricReadingDTO[];
   decision: AgentDecisionDTO | null;
   decision_appraisals: DecisionAppraisalDTO[];
   truncated: boolean;

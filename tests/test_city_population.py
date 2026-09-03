@@ -19,7 +19,7 @@ class TestCityPopulation:
         assert region.population == 80.0
         assert region.population_capacity == 120.0
 
-    def test_change_population_bounds(self):
+    def test_change_population_allows_overcrowding_but_not_negative_population(self):
         region = CityRegion(
             id=1,
             name="TestCity",
@@ -32,12 +32,13 @@ class TestCityPopulation:
         assert region.population == 50.0
 
         region.change_population(100.0)
-        assert region.population == 100.0
+        assert region.population == 150.0
+        assert region.population_ratio == 1.5
 
         region.change_population(-40.0)
-        assert region.population == 60.0
+        assert region.population == 110.0
 
-        region.change_population(-100.0)
+        region.change_population(-1000.0)
         assert region.population == 0.0
 
     def test_help_people_increases_population(self, avatar_in_city):
@@ -143,6 +144,7 @@ class TestCityPopulation:
             id=city_id,
             name="SaveLoadCity",
             desc="Test",
+            cors=[(0, 0)],
             population=88.8,
             population_capacity=120.0,
         )
@@ -151,6 +153,7 @@ class TestCityPopulation:
         tile.region = city
         base_world.map.tiles[(0, 0)] = tile
         base_world.map.regions[city_id] = city
+        base_world.map.region_cors[city_id] = city.cors
 
         save_path = tmp_path / "test_city_population_save.json"
         success, _ = save_game(base_world, sim, [], save_path=save_path)

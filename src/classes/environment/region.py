@@ -1,20 +1,18 @@
 from dataclasses import dataclass, field
-from typing import Union, TypeVar, Type, Optional, TYPE_CHECKING
-from enum import Enum
+from typing import Optional, TYPE_CHECKING
 from abc import ABC, abstractmethod
+import math
 
-from src.utils.df import game_configs, get_str, get_int, get_list_int
-from src.utils.config import CONFIG
 from src.utils.distance import chebyshev_distance
 from src.classes.essence import EssenceType, Essence
 from src.classes.animal import Animal, animals_by_id
 from src.classes.environment.plant import Plant, plants_by_id
 from src.classes.environment.lode import Lode, lodes_by_id
-from src.classes.core.sect import sects_by_name
 from src.classes.items.store import StoreMixin
 from src.i18n import t
-from src.classes.environment.region_condition import RegionCondition
 from src.classes.celestial_dao import DaoTradition
+from src.classes.regional_economy import InfrastructureState, RegionalEconomyState
+from src.classes.environment.city_state import CityState
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -32,9 +30,6 @@ class Region(ABC):
     
     # 核心坐标数据，由 load_map.py 注入
     cors: list[tuple[int, int]] = field(default_factory=list)
-    # Persistent local state.  This is intentionally owned by Region rather
-    # than by pressure/formation systems.
-    conditions: list[RegionCondition] = field(default_factory=list)
     dao_tradition: DaoTradition = DaoTradition.MANDATE_AND_ORDER
     
     # 计算字段
@@ -60,18 +55,8 @@ class Region(ABC):
         else:
             # Fallback
             self.center_loc = (0, 0)
-        self.conditions = list(self.conditions or [])
-
-    def add_condition(self, condition: RegionCondition) -> None:
-        if not isinstance(condition, RegionCondition):
-            raise TypeError("condition must be a RegionCondition")
-        self.conditions.append(condition)
-
-    def get_active_conditions(self, current_month: int) -> list[RegionCondition]:
-        return [condition for condition in self.conditions if condition.is_active(current_month)]
-
     def to_runtime_dict(self) -> dict:
-        return {"conditions": [condition.to_dict() for condition in self.conditions], "dao_tradition": self.dao_tradition.value}
+        return {"dao_tradition": self.dao_tradition.value}
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -116,7 +101,6 @@ class Region(ABC):
             "desc": self.desc,
             "type": self.get_region_type(),
             "type_name": t("Region"),
-            "conditions": [condition.to_dict() for condition in self.conditions],
             "dao_tradition": self.dao_tradition.value,
         }
 
@@ -154,7 +138,7 @@ class NormalRegion(Region):
         if self.plants:
             info_parts.extend([p.get_info() for p in self.plants])
         if self.lodes:
-            info_parts.extend([l.get_info() for l in self.lodes])
+            info_parts.extend([lode.get_info() for lode in self.lodes])
         return "; ".join(info_parts) if info_parts else t("No special resources")
 
     def _get_desc(self) -> str:
@@ -185,7 +169,7 @@ class NormalRegion(Region):
         # Assuming animals and plants are populated in __post_init__
         info["animals"] = [a.get_structured_info() for a in self.animals] if self.animals else []
         info["plants"] = [p.get_structured_info() for p in self.plants] if self.plants else []
-        info["lodes"] = [l.get_structured_info() for l in self.lodes] if self.lodes else []
+        info["lodes"] = [lode.get_structured_info() for lode in self.lodes] if self.lodes else []
         
         return info
 
@@ -254,22 +238,40 @@ class CityRegion(Region, StoreMixin):
     sell_item_ids: list[int] = field(default_factory=list)
     population: float = 80.0
     population_capacity: float = 120.0
+    economy: RegionalEconomyState = field(default_factory=RegionalEconomyState)
+    infrastructure: InfrastructureState = field(default_factory=InfrastructureState)
+    city_state: CityState = field(default_factory=CityState)
 
     MONTHLY_GROWTH_RATE: float = 0.03
 
     def __post_init__(self):
         super().__post_init__()
         self.init_store(self.sell_item_ids)
+        if not isinstance(self.city_state, CityState):
+            raise TypeError("city_state must be a CityState")
+        if not self.city_state.districts:
+            self.city_state = CityState.default_for_region(self.cors)
+        self.city_state.validate(self.cors)
+
+    def get_district_population(self, district_id: str) -> float:
+        """Return population derived from the district's share of city population."""
+        return self.city_state.district_population(district_id, self.population)
 
     @property
     def population_ratio(self) -> float:
         if self.population_capacity <= 0:
             return 0.0
-        return max(0.0, min(1.0, self.population / self.population_capacity))
+        return max(0.0, self.population / self.population_capacity)
 
     def change_population(self, delta: float) -> None:
-        """安全修改人口，限制在 0 和容量之间。单位：万人。"""
-        self.population = max(0.0, min(self.population_capacity, self.population + delta))
+        """Change population without treating soft capacity as a hard wall."""
+        self.population = max(0.0, self.population + delta)
+
+    def increase_population_capacity(self, delta: float) -> None:
+        """Increase the canonical settlement capacity through its domain owner."""
+        if not math.isfinite(delta) or delta <= 0:
+            raise ValueError("population capacity increase must be finite and positive")
+        self.population_capacity += delta
 
     def get_monthly_natural_growth(self) -> float:
         """返回当前人口状态下的月自然增长量（单位：万人），不修改状态。"""
@@ -317,4 +319,7 @@ class CityRegion(Region, StoreMixin):
         info["store_items"] = store_items_info
         info["population"] = self.population
         info["population_capacity"] = self.population_capacity
+        info["economy"] = self.economy.to_dict()
+        info["infrastructure"] = self.infrastructure.to_dict()
+        info["city_state"] = self.city_state.to_dict()
         return info

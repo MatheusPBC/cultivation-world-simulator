@@ -23,8 +23,12 @@ from src.server.runtime import DEFAULT_GAME_STATE, GameSessionRuntime
 from src.server.services.game_queries import get_chronicle_dossier, get_event_causal_detail, get_world_chronicle
 from src.server.serialization import serialize_events_for_client
 from src.sim.simulator import Simulator
+from src.systems.chronicle_service import ChronicleService
 from src.systems.time import Month, MonthStamp, Year, create_month_stamp
 from src.utils.llm.runtime_mode import llm_test_mode_scope
+
+
+_REAL_MAYBE_GENERATE_CHAPTER = ChronicleService.maybe_generate_chapter
 
 
 @pytest.mark.asyncio
@@ -126,10 +130,8 @@ async def test_persisted_fact_chronicle_dossier_and_why_stay_connected(base_worl
         # deterministic draft before awaiting it.
         provider = AsyncMock(side_effect=AssertionError("provider must not be called in test mode"))
         monkeypatch.setattr("src.utils.llm.client.call_llm_with_template", provider)
-        from src.systems.chronicle_service import ChronicleService
-
         with llm_test_mode_scope(True):
-            chapter = await ChronicleService().maybe_generate_chapter(world, [])
+            chapter = await _REAL_MAYBE_GENERATE_CHAPTER(ChronicleService(), world, [])
 
         assert chapter is not None
         assert chapter.source_event_ids == (fact.id,)

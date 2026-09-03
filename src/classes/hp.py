@@ -13,21 +13,21 @@ class HP:
     max: int 
     cur: int 
 
+    def __post_init__(self) -> None:
+        self.max = max(0, int(self.max))
+        self.cur = max(0, min(self.max, int(self.cur)))
+
     def reduce(self, value_2_reduce:int) -> bool:
-        self.cur -= value_2_reduce
-        is_alive = True
-        if self.cur < 0:
-            is_alive = False
-        return is_alive
+        self.cur = max(0, self.cur - max(0, int(value_2_reduce)))
+        return self.cur > 0
 
     def recover(self, value_2_recover:int) -> bool:
-        self.cur += value_2_recover
-        if self.cur > self.max:
-            self.cur = self.max
+        self.cur = min(self.max, self.cur + max(0, int(value_2_recover)))
         return True
 
     def add_max(self, value_2_add:int) -> bool:
-        self.max += value_2_add
+        self.max = max(0, self.max + int(value_2_add))
+        self.cur = min(self.cur, self.max)
         return True
 
     def __str__(self) -> str:

@@ -1,0 +1,13 @@
+msgid ""
+msgstr ""
+"Language: zh-TW\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "A causal probe increased population pressure in {region}."
+msgstr "因果探針增加了{region}的人口壓力。"
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "因果探針減少了{region}的{resource}供應。"
+
+msgid "A causal probe interrupted route {route}."
+msgstr "因果探針中斷了路線{route}。"

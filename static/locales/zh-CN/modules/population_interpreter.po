@@ -1,0 +1,2 @@
+msgid "{region} interpreted a population transition as {decision}: {reason}"
+msgstr "{region} 将人口转变解读为{decision}：{reason}"

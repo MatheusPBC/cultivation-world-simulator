@@ -38,6 +38,8 @@ export function processNewEvents(rawEvents: EventDTO[], currentYear: number, cur
     }),
     isMajor: e.is_major,
     isStory: e.is_story,
+    factKind: e.fact_kind,
+    causalOrigin: e.causal_origin,
     renderKey: e.render_key,
     renderParams: e.render_params,
     createdAt: e.created_at,
@@ -279,4 +281,3 @@ export function highlightAvatarNames(
     })
     .join('');
 }
-

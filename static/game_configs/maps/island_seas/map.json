@@ -1,10 +1,16 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "id": "island_seas",
   "version": 2,
   "width": 84,
   "height": 60,
   "wilderness_tile": "sea",
+  "routes": [
+    {"id": "island-301-302", "endpoint_region_ids": [301, 302], "mode": "ferry", "capacity": 140.0, "quality": 0.88, "enabled": true, "allowed_resource_ids": []},
+    {"id": "island-302-409", "endpoint_region_ids": [302, 409], "mode": "coastal_route", "capacity": 90.0, "quality": 0.81, "enabled": true, "allowed_resource_ids": ["grain", "medicine"]},
+    {"id": "island-303-404", "endpoint_region_ids": [303, 404], "mode": "sea_lane", "capacity": 110.0, "quality": 0.76, "enabled": true, "allowed_resource_ids": []},
+    {"id": "island-305-407", "endpoint_region_ids": [305, 407], "mode": "ferry", "capacity": 70.0, "quality": 0.94, "enabled": true, "allowed_resource_ids": ["spirit_stone"]}
+  ],
   "region_overrides": {
     "101": {
       "name_id": "MAP_REGION_ISLAND_SEAS_101_NAME",

@@ -6,7 +6,6 @@ from typing import Optional
 
 from src.classes.action import TimedAction
 from src.classes.action.action import can_take_risk
-from src.classes.core.sect import Sect
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.environment.sect_region import SectRegion
@@ -234,12 +233,11 @@ class SectMission(TimedAction):
                     related_sects=related_sect_ids,
                     is_major=False,
                 )
-            from src.classes.individual_consequence import record_injury_from_event
-            record_injury_from_event(self.avatar, result_event, self.fail_damage)
             events.append(result_event)
             story_prompt = t("sect_mission_story_prompt_success")
         else:
             self.fail_damage = self._roll_fail_damage()
+            before_hp = self.avatar.hp.cur
             self.avatar.hp.reduce(self.fail_damage)
             is_dead = self.avatar.hp.cur <= 0 and not self.avatar.is_dead
             result_text = t(
@@ -253,15 +251,16 @@ class SectMission(TimedAction):
             if is_dead:
                 handle_death(self.world, self.avatar, DeathReason(DeathType.SERIOUS_INJURY))
                 result_text += t("sect_mission_result_fail_death_append")
-            events.append(
-                Event(
-                    month_stamp=self.world.month_stamp,
-                    content=result_text,
-                    related_avatars=related_avatar_ids,
-                    related_sects=related_sect_ids,
-                    is_major=False,
-                )
+            result_event = Event(
+                month_stamp=self.world.month_stamp,
+                content=result_text,
+                related_avatars=related_avatar_ids,
+                related_sects=related_sect_ids,
+                is_major=False,
             )
+            from src.classes.individual_consequence import record_hp_change_from_event
+            record_hp_change_from_event(self.avatar, result_event, before_hp)
+            events.append(result_event)
             story_prompt = t("sect_mission_story_prompt_fail")
 
         story_event = await StoryEventService.maybe_create_story(

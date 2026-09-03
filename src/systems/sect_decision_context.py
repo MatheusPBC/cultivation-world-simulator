@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from src.sim.managers.sect_manager import SectManager
 from src.i18n import t
 from src.systems.sect_relations import compute_sect_relations
+from src.systems.semantic_world.context import build_sect_semantic_context
 from src.systems.time import get_date_str
 from src.utils.config import CONFIG
 
@@ -127,6 +128,8 @@ class SectDecisionContext:
     celestial_dao: List[Dict[str, Any]] = field(default_factory=list)
     # A public court crisis may inform policy, but cannot change diplomacy itself.
     imperial_crisis: Dict[str, Any] | None = None
+    # Read-only semantic observations for this sect's canonical regions.
+    regional_semantics: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def build_sect_decision_context(
@@ -500,7 +503,9 @@ def build_sect_decision_context(
         emperor = get_avatar(str(crisis.emperor_avatar_id))
         claimant = get_avatar(str(crisis.claimant_avatar_id))
         supporters = []
-        for supporter_id in getattr(crisis, "support_avatar_ids", []) or []:
+        for supporter_id, position in (getattr(crisis, "political_positions", {}) or {}).items():
+            if position != "support":
+                continue
             supporter = get_avatar(str(supporter_id))
             if supporter is not None:
                 supporters.append(
@@ -513,6 +518,7 @@ def build_sect_decision_context(
             "emperor": {"id": str(crisis.emperor_avatar_id), "name": str(getattr(emperor, "name", "") or "")},
             "claimant": {"id": str(crisis.claimant_avatar_id), "name": str(getattr(claimant, "name", "") or "")},
             "declared_supporters": supporters,
+            "political_positions": dict(getattr(crisis, "political_positions", {}) or {}),
             "evidence_event_ids": list(getattr(crisis, "evidence_event_ids", []) or []),
         }
 
@@ -534,4 +540,5 @@ def build_sect_decision_context(
         history=history,
         celestial_dao=get_dao_context(world),
         imperial_crisis=imperial_crisis,
+        regional_semantics=build_sect_semantic_context(world, sect),
     )

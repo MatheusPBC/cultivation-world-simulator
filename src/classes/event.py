@@ -8,7 +8,8 @@ import uuid
 import time
 
 from src.classes.causal_link import CausalLink
-from src.systems.time import Month, Year, MonthStamp, get_date_str
+from src.classes.causal_origin import CausalOrigin
+from src.systems.time import MonthStamp, get_date_str
 
 if TYPE_CHECKING:
     from src.classes.event_appraisal import EventAppraisal
@@ -52,6 +53,8 @@ class Event:
     appraisals: List["EventAppraisal"] = field(default_factory=list, repr=False, compare=False)
     # 事实类型：发生 / 状态转变 / 派生条件 / 决策；与 event_type 正交，互不覆盖
     fact_kind: FactKind = FactKind.OCCURRENCE
+    # 事实来源：与 fact_kind 正交；调用方必须在语义明确处显式选择。
+    causal_origin: CausalOrigin = CausalOrigin.DETERMINISTIC
     # 因果证据载荷：deltas（StateDelta 列表）+ decision（AgentDecision，仅 DECISION 事件）
     causal_payload: Optional[dict[str, Any]] = None
     # 运行时挂载的因果边，统一由 EventStorage 持久化到 event_causal_links
@@ -76,6 +79,7 @@ class Event:
             "id": self.id,
             "created_at": self.created_at,
             "fact_kind": str(self.fact_kind),
+            "causal_origin": str(self.causal_origin),
             "causal_payload": self.causal_payload,
             "causal_links": [link.to_dict() for link in self.causal_links],
         }
@@ -97,6 +101,7 @@ class Event:
             id=data.get("id", str(uuid.uuid4())),
             created_at=data.get("created_at", time.time()),
             fact_kind=FactKind(data.get("fact_kind", FactKind.OCCURRENCE.value)),
+            causal_origin=CausalOrigin(data.get("causal_origin", CausalOrigin.DETERMINISTIC.value)),
             causal_payload=data.get("causal_payload"),
             causal_links=[CausalLink.from_dict(item) for item in data.get("causal_links") or []],
         )
@@ -124,6 +129,7 @@ class NullEvent:
             cls._instance.observations = []
             cls._instance.appraisals = []
             cls._instance.fact_kind = FactKind.OCCURRENCE
+            cls._instance.causal_origin = CausalOrigin.DETERMINISTIC
             cls._instance.causal_payload = None
             cls._instance.causal_links = []
         return cls._instance
@@ -149,6 +155,10 @@ class NullEvent:
             "render_params": self.render_params,
             "subject_snapshots": {},
             "id": self.id,
+            "fact_kind": str(self.fact_kind),
+            "causal_origin": str(self.causal_origin),
+            "causal_payload": self.causal_payload,
+            "causal_links": [],
         }
 
 # 全局单例实例

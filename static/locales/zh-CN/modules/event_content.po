@@ -104,3 +104,15 @@ msgstr "{avatar} 在 {location} 发现了一座墓碑：{poi}"
 
 msgid "{avatar} discovered a point of interest at {location}: {poi}"
 msgstr "{avatar} 在 {location} 发现了一个特殊地点：{poi}"
+
+msgid "{region} entered the condition {condition}."
+msgstr "{region}进入了「{condition}」状态。"
+
+msgid "{region} left the condition {condition}."
+msgstr "{region}脱离了「{condition}」状态。"
+
+msgid "People in {region} hold a popular rite and claim it answers local pressure."
+msgstr "{region}的民众举行地方仪式，声称它回应了当地的压力。"
+
+msgid "{avatar_name}'s {severity} injury has recovered."
+msgstr "{avatar_name}的{severity}伤势已经痊愈。"

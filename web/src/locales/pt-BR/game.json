@@ -686,11 +686,105 @@
       "no_host": "Sem proprietário",
       "price_meta": "{price} pedras espirituais",
       "formation_remaining": "{months} meses restantes",
+      "regional_context_title": "Contexto regional",
+      "dao_tradition": "Tradição do Dao",
       "dao_traditions": {
         "mandate_and_order": "Mandato e Ordem",
         "balance": "Equilíbrio",
         "mercy": "Misericórdia",
         "transcendence": "Transcendência"
+      },
+      "semantic_context": {
+        "conditions_title": "Condições semânticas ativas",
+        "readings_title": "Leituras principais",
+        "empty": "Nenhum contexto semântico disponível.",
+        "intensity": "Intensidade {value}",
+        "started_month": "Iniciada no mês {month}",
+        "definition": "Definição {id}",
+        "source_event": "Evento-fonte {id}",
+        "derived_from": "Entradas derivadas",
+        "group_id": "Grupo: {id}",
+        "unknown_value": "Desconhecido",
+        "confidence": "Confiança {value}%",
+        "availability": {
+          "measurable": "Mensurável",
+          "partially_measurable": "Parcialmente mensurável",
+          "unmeasurable": "Não mensurável"
+        },
+        "reading_kind": {
+          "exact": "Exata",
+          "derived": "Derivada",
+          "estimated": "Estimada",
+          "unknown": "Desconhecida"
+        }
+      },
+      "economy": {
+        "title": "Economia regional",
+        "stocks": "Estoques",
+        "capacities": "Capacidades",
+        "production_rates": "Taxas de produção",
+        "demand_rates": "Taxas de demanda",
+        "access": "Acesso",
+        "dependencies": "Dependências"
+      },
+      "infrastructure": {
+        "title": "Infraestrutura",
+        "capacities": "Capacidades",
+        "quality": "Qualidade"
+      },
+      "city_state": {
+        "title": "Estado urbano",
+        "districts": "Distritos",
+        "assets": "Ativos urbanos",
+        "urban_services": "Serviços urbanos",
+        "service_demands": "Demandas por serviço",
+        "demand_per_population": "Demanda por população: {value}",
+        "population_groups": "Grupos populacionais",
+        "group_population_weight": "Peso populacional: {value}",
+        "priorities": "Prioridades de serviço",
+        "priority_weight": "Peso: {value}",
+        "governance": "Governança",
+        "population_weight": "Participação populacional: {value}",
+        "tiles": "Células: {value}",
+        "capacity": "Capacidade: {value}",
+        "quality": "Qualidade: {value}",
+        "integrity": "Integridade: {value}",
+        "controller": "Responsável",
+        "administrative_capacity": "Capacidade administrativa: {value}"
+      },
+      "spiritual_ecology": {
+        "title": "Ecologia espiritual",
+        "grounding_label": "Base factual",
+        "essence": "Essência",
+        "densities": "Densidades dos elementos",
+        "formations": "Formações ativas",
+        "graves": "Túmulos",
+        "treasures": "Tesouros",
+        "celestial_context": "Contexto celestial",
+        "state_refs": "Referências de estado",
+        "started_month": "Início: mês {value}",
+        "expires_month": "Expira: mês {value}",
+        "created_month": "Criado: mês {value}",
+        "location": "Localização: {value}",
+        "effects": "Efeitos registrados",
+        "grounding": {
+          "grounded": "Fatos fundamentados",
+          "unknown": "Fundamentação desconhecida"
+        }
+      },
+      "collective_health": {
+        "title": "Saúde coletiva",
+        "grounding_label": "Base factual",
+        "living_avatar_count": "Avatares vivos",
+        "active_wounded_count": "Feridos ativos",
+        "hp_deficit": "Déficit de PV",
+        "healing_capacity": "Capacidade de cura",
+        "healing_access": "Acesso à cura",
+        "injuries": "Ferimentos ativos",
+        "healing_assets": "Recursos de cura",
+        "hp_lost": "PV perdidos: {value}",
+        "capacity": "Capacidade: {value}",
+        "state_refs": "Referências de estado"
       }
     },
     "sect": {

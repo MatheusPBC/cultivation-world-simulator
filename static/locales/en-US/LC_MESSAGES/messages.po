@@ -1401,6 +1401,15 @@ msgstr ""
 "{winner} defeated {loser}. {loser} took {loser_dmg} damage, {winner} also "
 "took {winner_dmg} damage."
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr "A causal probe increased population pressure in {region}."
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "A causal probe reduced {resource} supply in {region}."
+
+msgid "A causal probe interrupted route {route}."
+msgstr "A causal probe interrupted route {route}."
+
 msgid " (and sold old {item} at reduced price)"
 msgstr " (and sold old {item} at reduced price)"
 

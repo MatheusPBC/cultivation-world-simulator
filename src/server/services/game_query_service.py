@@ -137,6 +137,11 @@ class GameQueryService:
             render_config=self._deps.config.get("frontend_defaults", {}),
         )
 
+    def get_world_semantic_model(self) -> dict:
+        from src.server.services.game_queries import get_world_semantic_model
+
+        return get_world_semantic_model(self._deps.runtime)
+
     def get_map_presets(self, *, locale: str | None = None) -> dict:
         return self._deps.get_map_presets_query(locale=locale)
 

@@ -1,6 +1,15 @@
+import json
+from dataclasses import replace
+
 from src.classes.environment.map import Map
 from src.classes.environment.tile import TileType
 from src.classes.environment.region import NormalRegion, CultivateRegion, CityRegion
+from src.classes.environment.city_state import (
+    CityState,
+    UrbanPopulationGroup,
+    UrbanServiceDemand,
+)
+from src.classes.regional_economy import RegionalEconomyState
 from src.classes.environment.sect_region import SectRegion
 from src.utils.df import game_configs, get_str, get_int, get_float
 from src.classes.essence import EssenceType
@@ -62,6 +71,7 @@ def build_map_from_source(
         region_id: override.to_dict()
         for region_id, override in source.region_overrides.items()
     }
+    game_map.set_routes(source.routes)
     game_map.map_source = map_source_to_dict(source)
     return game_map
 
@@ -127,7 +137,10 @@ def _load_and_assign_regions(game_map: Map, region_coords: dict[int, list[tuple[
     """
     读取各 region.csv，创建 Region 对象，并分配给 Map 和 Tile
     """
-    
+    economy_by_region = _load_city_economy()
+    services_by_region = _load_city_services()
+    groups_by_region = _load_city_population_groups()
+
     # 辅助函数：处理 Region 数据
     def process_region_config(df, cls, type_tag):
         for row in df:
@@ -170,6 +183,20 @@ def _load_and_assign_regions(game_map: Map, region_coords: dict[int, list[tuple[
                         print(f"Error parsing sell_item_ids for city {rid}: {e}")
                 params["population"] = get_float(row, "initial_population", 80.0)
                 params["population_capacity"] = get_float(row, "population_capacity", 120.0)
+                params["economy"] = economy_by_region.get(rid, RegionalEconomyState())
+                urban_profile = get_str(row, "urban_profile")
+                if urban_profile:
+                    city_state = CityState.from_profile_dict(
+                        json.loads(urban_profile),
+                        city_tiles=cors,
+                    )
+                else:
+                    city_state = CityState.default_for_region(cors)
+                params["city_state"] = replace(
+                    city_state,
+                    service_demands=services_by_region.get(rid, ()),
+                    population_groups=groups_by_region.get(rid, ()),
+                )
 
             elif type_tag == "sect":
                 sect_id = get_int(row, "sect_id")
@@ -205,8 +232,78 @@ def _load_and_assign_regions(game_map: Map, region_coords: dict[int, list[tuple[
     process_region_config(game_configs["cultivate_region"], CultivateRegion, "cultivate")
     process_region_config(game_configs["sect_region"], SectRegion, "sect")
 
+
+def _load_city_economy() -> dict[int, RegionalEconomyState]:
+    economy_by_region: dict[int, RegionalEconomyState] = {}
+    for row in game_configs.get("city_economy", []):
+        region_id = get_int(row, "region_id")
+        concept_id = get_str(row, "concept_id")
+        if region_id <= 0 or not concept_id:
+            continue
+        economy = economy_by_region.setdefault(region_id, RegionalEconomyState())
+        economy.set_capacity(concept_id, get_float(row, "capacity"))
+        economy.set_stock(concept_id, get_float(row, "stock"))
+        economy.set_production_rate(concept_id, get_float(row, "production_rate"))
+        economy.set_demand_rate(concept_id, get_float(row, "demand_rate"))
+        economy.set_access(concept_id, get_float(row, "access"))
+        economy.set_dependency(concept_id, get_float(row, "dependency"))
+        project_kind = get_str(row, "project_kind")
+        if project_kind:
+            previous_resource_id = economy.project_resources.get(project_kind)
+            if previous_resource_id is not None and previous_resource_id != concept_id:
+                raise ValueError(
+                    "conflicting project resource mapping "
+                    f"for region {region_id} and project kind {project_kind}"
+                )
+            economy.project_resources[project_kind] = concept_id
+    return economy_by_region
+
+
+def _load_city_services() -> dict[int, tuple[UrbanServiceDemand, ...]]:
+    services: dict[int, list[UrbanServiceDemand]] = {}
+    for row in game_configs.get("city_service", []):
+        region_id = get_int(row, "region_id")
+        capability_id = get_str(row, "capability_id")
+        if region_id <= 0 or not capability_id:
+            continue
+        services.setdefault(region_id, []).append(
+            UrbanServiceDemand(
+                capability_id=capability_id,
+                demand_per_population=get_float(row, "demand_per_population"),
+            )
+        )
+    return {
+        region_id: tuple(sorted(items, key=lambda item: item.capability_id))
+        for region_id, items in services.items()
+    }
+
+
+def _load_city_population_groups() -> dict[int, tuple[UrbanPopulationGroup, ...]]:
+    groups: dict[int, list[UrbanPopulationGroup]] = {}
+    for row in game_configs.get("city_population_group", []):
+        region_id = get_int(row, "region_id")
+        group_id = get_str(row, "group_id")
+        if region_id <= 0 or not group_id:
+            continue
+        raw_priorities = get_str(row, "service_priority_weights") or "{}"
+        priorities = json.loads(raw_priorities)
+        if not isinstance(priorities, dict):
+            raise ValueError("city population group priorities must be an object")
+        groups.setdefault(region_id, []).append(
+            UrbanPopulationGroup(
+                id=group_id,
+                population_weight=get_float(row, "population_weight"),
+                service_priority_weights=tuple(priorities.items()),
+            )
+        )
+    return {
+        region_id: tuple(sorted(items, key=lambda item: item.id))
+        for region_id, items in groups.items()
+    }
+
 def _parse_list(s: str) -> list[int]:
-    if not s: return []
+    if not s:
+        return []
     res = []
     for x in s.split(","):
         x = x.strip()

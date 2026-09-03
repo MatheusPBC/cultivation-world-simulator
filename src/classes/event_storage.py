@@ -26,6 +26,7 @@ class EventStorageError(RuntimeError):
     """
 
 if TYPE_CHECKING:
+    from src.classes.chronicle import ChronicleChapter
     from src.classes.event import Event
     from src.classes.event_appraisal import EventAppraisal, ScoredEventAppraisal
     from src.classes.event_observation import EventObservation
@@ -102,7 +103,8 @@ class EventStorage:
                         subject_snapshots TEXT,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         fact_kind TEXT,
-                        causal_payload TEXT
+                        causal_payload TEXT,
+                        causal_origin TEXT
                     );
 
                     CREATE TABLE IF NOT EXISTS event_avatars (
@@ -213,6 +215,8 @@ class EventStorage:
                     self._conn.execute("ALTER TABLE events ADD COLUMN fact_kind TEXT")
                 if "causal_payload" not in columns:
                     self._conn.execute("ALTER TABLE events ADD COLUMN causal_payload TEXT")
+                if "causal_origin" not in columns:
+                    self._conn.execute("ALTER TABLE events ADD COLUMN causal_origin TEXT")
                 self._conn.commit()
             self._logger.info(f"EventStorage initialized: {self._db_path}")
         except Exception as e:
@@ -248,107 +252,147 @@ class EventStorage:
 
         try:
             with self._transaction():
-                # 插入事件主表。
-                self._conn.execute(
-                    """
-                    INSERT OR IGNORE INTO events (
-                        id, month_stamp, content, is_major, is_story, event_type, render_key, render_params, subject_snapshots, created_at, fact_kind, causal_payload
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        event.id,
-                        int(event.month_stamp),
-                        event.content,
-                        event.is_major,
-                        event.is_story,
-                        event.event_type,
-                        event.render_key,
-                        json.dumps(event.render_params, ensure_ascii=False) if event.render_params is not None else None,
-                        json.dumps(getattr(event, "subject_snapshots", {}), ensure_ascii=False),
-                        _format_time(event.created_at),
-                        str(getattr(event, "fact_kind", None)) if getattr(event, "fact_kind", None) is not None else None,
-                        json.dumps(event.causal_payload, ensure_ascii=False) if getattr(event, "causal_payload", None) is not None else None,
-                    )
-                )
-
-                # 插入关联表。
-                if event.related_avatars:
-                    for avatar_id in event.related_avatars:
-                        self._conn.execute(
-                            """
-                            INSERT OR IGNORE INTO event_avatars (event_id, avatar_id)
-                            VALUES (?, ?)
-                            """,
-                            (event.id, str(avatar_id))
-                        )
-                
-                # 插入宗门关联表。
-                if getattr(event, "related_sects", None):
-                    for sect_id in event.related_sects:
-                        self._conn.execute(
-                            """
-                            INSERT OR IGNORE INTO event_sects (event_id, sect_id)
-                            VALUES (?, ?)
-                            """,
-                            (event.id, int(sect_id))
-                        )
-
-                for observation in self._build_observations_for_event(event):
-                    self._conn.execute(
-                        """
-                        INSERT OR IGNORE INTO event_observations (
-                            id, event_id, observer_avatar_id, subject_avatar_id,
-                            propagation_kind, relation_type, created_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            observation.id,
-                            event.id,
-                            str(observation.observer_avatar_id),
-                            str(observation.subject_avatar_id) if observation.subject_avatar_id is not None else None,
-                            str(observation.propagation_kind),
-                            observation.relation_type,
-                            _format_time(observation.created_at),
-                        )
-                    )
-
-                causal_links = getattr(event, "causal_links", None) or []
-                if len(causal_links) > MAX_CAUSAL_LINKS_PER_EVENT:
-                    self._logger.warning(
-                        f"Event {event.id} has {len(causal_links)} causal links; "
-                        f"truncating to {MAX_CAUSAL_LINKS_PER_EVENT}"
-                    )
-                    causal_links = causal_links[:MAX_CAUSAL_LINKS_PER_EVENT]
-
-                for link in causal_links:
-                    self._conn.execute(
-                        """
-                        INSERT OR IGNORE INTO event_causal_links (
-                            id, event_id, cause_event_id, relation, weight, note_key, note_params, created_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            link.id,
-                            event.id,
-                            link.cause_event_id,
-                            str(link.relation),
-                            link.weight,
-                            link.note_key,
-                            json.dumps(link.note_params, ensure_ascii=False) if link.note_params is not None else None,
-                            _format_time(link.created_at),
-                        )
-                    )
-
-                # 插入运行时挂载的 appraisal，与事件主表同一事务，失败时整体回滚。
-                for appraisal in getattr(event, "appraisals", None) or []:
-                    self._insert_event_appraisal_row(appraisal)
+                self._insert_event(event)
             return True
         except Exception as e:
             self._logger.error(f"Failed to write event {event.id}: {e}")
             return False
+
+    def commit_step(
+        self,
+        events: list["Event"],
+        chapter: "ChronicleChapter | None" = None,
+    ) -> bool:
+        """Commit all durable outputs of one simulation step atomically."""
+        if self._conn is None:
+            self._logger.error("EventStorage not initialized")
+            return False
+
+        try:
+            with self._transaction():
+                for event in events:
+                    self._insert_event(event)
+                if chapter is not None:
+                    missing_sources = [
+                        event_id
+                        for event_id in chapter.source_event_ids
+                        if self._conn.execute(
+                            "SELECT 1 FROM events WHERE id = ? LIMIT 1",
+                            (str(event_id),),
+                        ).fetchone()
+                        is None
+                    ]
+                    if missing_sources:
+                        raise EventStorageError(
+                            "chronicle chapter references missing events: "
+                            + ", ".join(missing_sources)
+                        )
+                    self._insert_chronicle_chapter(chapter)
+            return True
+        except Exception as exc:
+            self._logger.error("Failed to commit simulation step: %s", exc)
+            return False
+
+    def _insert_event(self, event: "Event") -> None:
+        """Insert one event and its dependent rows without managing a transaction."""
+        # 插入事件主表。
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO events (
+                id, month_stamp, content, is_major, is_story, event_type, render_key, render_params, subject_snapshots, created_at, fact_kind, causal_payload, causal_origin
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event.id,
+                int(event.month_stamp),
+                event.content,
+                event.is_major,
+                event.is_story,
+                event.event_type,
+                event.render_key,
+                json.dumps(event.render_params, ensure_ascii=False) if event.render_params is not None else None,
+                json.dumps(getattr(event, "subject_snapshots", {}), ensure_ascii=False),
+                _format_time(event.created_at),
+                str(getattr(event, "fact_kind", None)) if getattr(event, "fact_kind", None) is not None else None,
+                json.dumps(event.causal_payload, ensure_ascii=False) if getattr(event, "causal_payload", None) is not None else None,
+                str(getattr(event, "causal_origin", "deterministic")),
+            )
+        )
+
+        # 插入关联表。
+        if event.related_avatars:
+            for avatar_id in event.related_avatars:
+                self._conn.execute(
+                    """
+                    INSERT OR IGNORE INTO event_avatars (event_id, avatar_id)
+                    VALUES (?, ?)
+                    """,
+                    (event.id, str(avatar_id))
+                )
+
+        # 插入宗门关联表。
+        if getattr(event, "related_sects", None):
+            for sect_id in event.related_sects:
+                self._conn.execute(
+                    """
+                    INSERT OR IGNORE INTO event_sects (event_id, sect_id)
+                    VALUES (?, ?)
+                    """,
+                    (event.id, int(sect_id))
+                )
+
+        for observation in self._build_observations_for_event(event):
+            self._conn.execute(
+                """
+                INSERT OR IGNORE INTO event_observations (
+                    id, event_id, observer_avatar_id, subject_avatar_id,
+                    propagation_kind, relation_type, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    observation.id,
+                    event.id,
+                    str(observation.observer_avatar_id),
+                    str(observation.subject_avatar_id) if observation.subject_avatar_id is not None else None,
+                    str(observation.propagation_kind),
+                    observation.relation_type,
+                    _format_time(observation.created_at),
+                )
+            )
+
+        causal_links = getattr(event, "causal_links", None) or []
+        if len(causal_links) > MAX_CAUSAL_LINKS_PER_EVENT:
+            self._logger.warning(
+                f"Event {event.id} has {len(causal_links)} causal links; "
+                f"truncating to {MAX_CAUSAL_LINKS_PER_EVENT}"
+            )
+            causal_links = causal_links[:MAX_CAUSAL_LINKS_PER_EVENT]
+
+        for link in causal_links:
+            self._conn.execute(
+                """
+                INSERT OR IGNORE INTO event_causal_links (
+                    id, event_id, cause_event_id, relation, weight, note_key, note_params, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    link.id,
+                    event.id,
+                    link.cause_event_id,
+                    str(link.relation),
+                    link.weight,
+                    link.note_key,
+                    json.dumps(link.note_params, ensure_ascii=False) if link.note_params is not None else None,
+                    _format_time(link.created_at),
+                )
+            )
+
+        # 插入运行时挂载的 appraisal，与事件主表同一事务，失败时整体回滚。
+        for appraisal in getattr(event, "appraisals", None) or []:
+            self._insert_event_appraisal_row(appraisal)
 
     def _build_observations_for_event(self, event: "Event") -> list["EventObservation"]:
         from src.classes.event_observation import EventObservation
@@ -429,6 +473,7 @@ class EventStorage:
         avatar_map: Optional[dict[str, list[str]]] = None,
         sect_map: Optional[dict[str, list[int]]] = None,
     ) -> "Event":
+        from src.classes.causal_origin import CausalOrigin
         from src.classes.event import Event, FactKind
         from src.systems.time import MonthStamp
 
@@ -456,6 +501,7 @@ class EventStorage:
         row_keys = row.keys()
         fact_kind_value = row["fact_kind"] if "fact_kind" in row_keys else None
         causal_payload_json = row["causal_payload"] if "causal_payload" in row_keys else None
+        causal_origin_value = row["causal_origin"] if "causal_origin" in row_keys else None
         return Event(
             month_stamp=MonthStamp(row["month_stamp"]),
             content=row["content"],
@@ -471,6 +517,7 @@ class EventStorage:
             created_at=_parse_time(row["created_at"]),
             fact_kind=FactKind(fact_kind_value) if fact_kind_value else FactKind.OCCURRENCE,
             causal_payload=json.loads(causal_payload_json) if causal_payload_json else None,
+            causal_origin=CausalOrigin(causal_origin_value) if causal_origin_value else CausalOrigin.DETERMINISTIC,
         )
 
     def _build_events_from_rows(self, rows) -> list["Event"]:
@@ -556,7 +603,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload, e.causal_origin
                         FROM events e
                         JOIN event_avatars ea1 ON e.id = ea1.event_id AND ea1.avatar_id = ?
                         JOIN event_avatars ea2 ON e.id = ea2.event_id AND ea2.avatar_id = ?
@@ -567,7 +614,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload, e.causal_origin
                         FROM events e
                         JOIN event_avatars ea ON e.id = ea.event_id AND ea.avatar_id = ?
                     """
@@ -577,7 +624,7 @@ class EventStorage:
                     base_query = """
                         SELECT DISTINCT
                             e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
+                            e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload, e.causal_origin
                         FROM events e
                         JOIN event_sects es ON e.id = es.event_id AND es.sect_id = ?
                     """
@@ -587,7 +634,7 @@ class EventStorage:
                     base_query = """
                         SELECT
                             rowid, id, month_stamp, content, is_major, is_story,
-                            event_type, render_key, render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload
+                            event_type, render_key, render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload, e.causal_origin
                         FROM events e
                     """
 
@@ -691,7 +738,7 @@ class EventStorage:
             params.extend([cursor_month, cursor_month, cursor_rowid])
         sql = f"""
             SELECT DISTINCT e.rowid, e.id, e.month_stamp, e.content, e.is_major, e.is_story,
-                e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload,
+                e.event_type, e.render_key, e.render_params, e.subject_snapshots, e.created_at, e.fact_kind, e.causal_payload, e.causal_origin,
                 eo.propagation_kind, eo.observer_avatar_id, eo.subject_avatar_id, eo.relation_type
             FROM events e JOIN event_observations eo
                 ON e.id = eo.event_id AND eo.observer_avatar_id = ?
@@ -804,26 +851,30 @@ class EventStorage:
             raise TypeError("chapter must be a ChronicleChapter")
         try:
             with self._transaction():
-                self._conn.execute(
-                    """
-                    INSERT INTO chronicle_chapters (
-                        id, start_month_stamp, end_month_stamp, trigger, payload_json, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        chapter.id,
-                        chapter.start_month_stamp,
-                        chapter.end_month_stamp,
-                        chapter.trigger,
-                        json.dumps(chapter.to_dict(), ensure_ascii=False, separators=(",", ":")),
-                        float(chapter.created_at),
-                    ),
-                )
+                self._insert_chronicle_chapter(chapter)
             return True
         except sqlite3.IntegrityError as exc:
             if "chronicle_chapters.end_month_stamp" in str(exc) or "UNIQUE constraint failed: chronicle_chapters.end_month_stamp" in str(exc):
                 return False
             raise
+
+    def _insert_chronicle_chapter(self, chapter: "ChronicleChapter") -> None:
+        """Insert a Chronicle chapter inside the caller's transaction."""
+        self._conn.execute(
+            """
+            INSERT INTO chronicle_chapters (
+                id, start_month_stamp, end_month_stamp, trigger, payload_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                chapter.id,
+                chapter.start_month_stamp,
+                chapter.end_month_stamp,
+                chapter.trigger,
+                json.dumps(chapter.to_dict(), ensure_ascii=False, separators=(",", ":")),
+                float(chapter.created_at),
+            ),
+        )
 
     @staticmethod
     def _chronicle_row_to_chapter(row) -> "ChronicleChapter":
@@ -888,7 +939,7 @@ class EventStorage:
                 """
                 SELECT rowid, id, month_stamp, content, is_major, is_story,
                     event_type, render_key, render_params, subject_snapshots,
-                    created_at, fact_kind, causal_payload
+                    created_at, fact_kind, causal_payload, causal_origin
                 FROM events
                 WHERE month_stamp BETWEEN ? AND ?
                 ORDER BY month_stamp ASC, created_at ASC, id ASC
@@ -1151,7 +1202,7 @@ class EventStorage:
             row = self._conn.execute(
                 """
                 SELECT id, month_stamp, content, is_major, is_story, event_type, render_key,
-                    render_params, subject_snapshots, created_at, fact_kind, causal_payload
+                    render_params, subject_snapshots, created_at, fact_kind, causal_payload, causal_origin
                 FROM events WHERE id = ?
                 """,
                 (event_id,),

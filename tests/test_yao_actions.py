@@ -25,6 +25,8 @@ async def test_turtle_rest_recovers_hp_and_gains_exp(avatar_in_city):
     events = await action.finish()
 
     assert avatar_in_city.hp.cur > old_hp
+    assert events[0].causal_payload["deltas"][0]["aspect"] == "hp"
+    assert events[0].causal_payload["deltas"][0]["magnitude"] > 0
     assert avatar_in_city.cultivation_progress.exp == old_exp + 90
     assert "修为经验" in events[0].content
 

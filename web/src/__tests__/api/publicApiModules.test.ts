@@ -118,6 +118,7 @@ describe('public api module migration', () => {
       causes: [],
       effects: [],
       deltas: [],
+      measurements: [],
       decision: null,
       decision_appraisals: [],
       truncated: false,

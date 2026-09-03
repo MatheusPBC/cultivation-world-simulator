@@ -1,0 +1,10 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "population_transfer.completed"
+msgstr "人口从{origin}迁往{destination}，转移了{amount}万人。"
+
+msgid "population_transfer.blocked"
+msgstr "{origin}的人口迁移未能完成。"

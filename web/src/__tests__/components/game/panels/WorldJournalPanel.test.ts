@@ -81,6 +81,24 @@ function createJournalI18n() {
             why_causes: 'Causas',
             why_effects: 'Efeitos',
             why_deltas: 'Mudancas de estado',
+            why_measurements: 'Medicoes',
+            why_no_measurements: 'Nenhuma medicao registrada.',
+            why_measurement_unknown: 'Desconhecido',
+            why_measurement_state_refs: 'Referencias de estado',
+            why_measurement_source_events: 'Eventos de origem',
+            why_measurement_derived_from: 'Entradas derivadas',
+            why_measurement_none: 'Nenhuma',
+            why_measurement_availability: {
+              measurable: 'Mensuravel',
+              partially_measurable: 'Parcialmente mensuravel',
+              unmeasurable: 'Inmensuravel',
+            },
+            why_measurement_kind: {
+              exact: 'Exata',
+              derived: 'Derivada',
+              estimated: 'Estimada',
+              unknown: 'Desconhecida',
+            },
             why_decision: 'Decisao por tras disso',
             why_no_causes: 'Nenhuma causa registrada.',
             why_no_effects: 'Nenhum efeito registrado ainda.',
@@ -289,7 +307,7 @@ describe('WorldJournalPanel', () => {
 
   it('loads the Live Guide lazily and opens its source in the existing Why view', async () => {
     fetchEventCausalDetailMock.mockResolvedValue({
-      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], measurements: [], decision: null, decision_appraisals: [], truncated: false,
     })
     const wrapper = mountPanel()
     await settlePromises()
@@ -309,7 +327,7 @@ describe('WorldJournalPanel', () => {
 
   it('asks the Chronicler and keeps the answer citation clickable', async () => {
     fetchEventCausalDetailMock.mockResolvedValue({
-      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], measurements: [], decision: null, decision_appraisals: [], truncated: false,
     })
     const wrapper = mountPanel()
     await settlePromises()
@@ -349,7 +367,7 @@ describe('WorldJournalPanel', () => {
       truncated: false,
     })
     fetchEventCausalDetailMock.mockResolvedValue({
-      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], decision: null, decision_appraisals: [], truncated: false,
+      event: baseJournal.highlights[0], causes: [], effects: [], deltas: [], measurements: [], decision: null, decision_appraisals: [], truncated: false,
     })
 
     const wrapper = mountPanel()
@@ -443,6 +461,33 @@ describe('WorldJournalPanel', () => {
       deltas: [
         { id: 'd1', event_id: 'major-1', owner_kind: 'avatar', owner_id: 'a1', aspect: 'realm', before: 'Qi', after: 'Foundation', magnitude: null },
       ],
+      measurements: [
+        {
+          key: { dimension: 'load', subject_kind: 'region', subject_id: 'r1', concept_id: 'settlement' },
+          derived_from: [
+            { dimension: 'capacity', subject_kind: 'region', subject_id: 'r1', concept_id: 'settlement' },
+            { dimension: 'stock', subject_kind: 'region', subject_id: 'r1', concept_id: 'grain' },
+          ],
+          value: 0.75,
+          unit: 'ratio',
+          availability: 'measurable',
+          reading_kind: 'derived',
+          confidence: null,
+          state_refs: ['region:r1:load'],
+          source_event_ids: ['measurement-source'],
+        },
+        {
+          key: { dimension: 'risk', subject_kind: 'region', subject_id: 'r1', concept_id: 'unknown_risk' },
+          derived_from: [],
+          value: null,
+          unit: 'unknown',
+          availability: 'unmeasurable',
+          reading_kind: 'unknown',
+          confidence: null,
+          state_refs: [],
+          source_event_ids: [],
+        },
+      ],
       decision: null,
       truncated: false,
     })
@@ -460,6 +505,17 @@ describe('WorldJournalPanel', () => {
     expect(overlay.text()).toContain('realm')
     expect(overlay.text()).toContain('Qi')
     expect(overlay.text()).toContain('Foundation')
+    const measurements = overlay.get('[data-testid="why-measurements"]')
+    expect(measurements.text()).toContain('Medicoes')
+    expect(measurements.text()).toContain('load(settlement)')
+    expect(measurements.text()).toContain('0.75 ratio')
+    expect(measurements.text()).toContain('Desconhecido')
+    expect(measurements.text()).toContain('region:r1:load')
+    expect(measurements.text()).toContain('Entradas derivadas')
+    expect(measurements.text()).toContain('capacity(settlement)')
+    expect(measurements.text()).toContain('stock(grain)')
+    await measurements.get('[data-testid="why-measurement-source-event-measurement-source"]').trigger('click')
+    expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('measurement-source')
 
     await overlay.get('.why-close').trigger('click')
     expect(wrapper.find('[data-testid="why-overlay"]').exists()).toBe(false)

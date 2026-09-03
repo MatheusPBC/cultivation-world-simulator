@@ -24,8 +24,7 @@ class SupportImperialClaim(InstantAction):
         return (False, t(blocker)) if blocker is not None else (True, "")
 
     def start(self):
-        support_imperial_claim(self.world, str(self.avatar.id))
-        return None
+        return support_imperial_claim(self.world, str(self.avatar.id))
 
     def _execute(self) -> None:
         return

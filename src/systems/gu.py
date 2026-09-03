@@ -209,15 +209,17 @@ def _tick_qianxin(avatar: "Avatar", effect: dict[str, Any], current_month: int) 
 
 def _tick_shixue(avatar: "Avatar", current_month: int) -> Event | None:
     damage = max(1, int(getattr(avatar.hp, "max", 0) * 0.02))
+    before_hp = avatar.hp.cur
     avatar.hp.reduce(damage)
-    if current_month % 6 != 0:
-        return None
-    return Event(
+    event = Event(
         avatar.world.month_stamp,
         t("{target}'s {gu_name} took effect, losing {amount} HP.",
           target=avatar.name, gu_name=get_gu_type_name(GU_SHIXUE), amount=damage),
         related_avatars=[avatar.id],
     )
+    from src.classes.individual_consequence import record_hp_change_from_event
+    record_hp_change_from_event(avatar, event, before_hp)
+    return event
 
 
 def _tick_shiyuan(avatar: "Avatar", current_month: int) -> Event | None:

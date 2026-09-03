@@ -383,26 +383,222 @@ export interface RegionFormationInfo {
   effects?: Record<string, number | string | boolean | string[]>;
 }
 
-export interface RegionalCondition {
+export interface CityDistrict {
+  id: string;
   kind: string;
+  tile_refs: Array<[number, number]>;
+  population_weight: number;
+}
+
+export interface UrbanAsset {
+  id: string;
+  district_id: string;
+  capability_ids: string[];
+  capacity: number;
+  quality: number;
+  integrity: number;
+}
+
+export interface CityGovernance {
+  controller_kind: string;
+  controller_id: string;
+  administrative_capacity: number;
+}
+
+export interface UrbanServiceDemand {
+  capability_id: string;
+  demand_per_population: number;
+}
+
+export interface UrbanPopulationGroup {
+  id: string;
+  population_weight: number;
+  service_priority_weights: Record<string, number>;
+}
+
+export type UrbanCapacityProjectStatus = 'running' | 'stalled' | 'completed';
+
+export interface UrbanCapacityProject {
+  id: string;
+  kind: 'settlement_capacity_expansion';
+  status: UrbanCapacityProjectStatus;
+  housing_asset_id: string;
+  construction_resource_id: string;
+  construction_work_asset_id: string;
+  started_month: number;
+  required_months: number;
+  completed_months: number;
+  capacity_increase: number;
+  material_required: number;
+  material_consumed: number;
+  motivation_event_ids: string[];
+  last_event_id: string;
+  last_processed_month: number | null;
+  completed_month: number | null;
+}
+
+export interface CityState {
+  districts: CityDistrict[];
+  assets: UrbanAsset[];
+  service_demands: UrbanServiceDemand[];
+  population_groups: UrbanPopulationGroup[];
+  governance: CityGovernance;
+  capacity_projects: UrbanCapacityProject[];
+}
+
+export interface RegionalEconomyState {
+  stocks: Record<string, number>;
+  capacities: Record<string, number>;
+  production_rates: Record<string, number>;
+  demand_rates: Record<string, number>;
+  access: Record<string, number>;
+  dependencies: Record<string, number>;
+}
+
+export interface RegionalInfrastructureState {
+  capacities: Record<string, number>;
+  quality: Record<string, number>;
+}
+
+export interface SemanticReadingKey {
+  dimension: string;
+  subject_kind: string;
+  subject_id: string;
+  concept_id: string;
+  group_id?: string;
+  qualifiers?: Record<string, string>;
+}
+
+export interface SemanticReading {
+  key: SemanticReadingKey;
+  derived_from: SemanticReadingKey[];
+  value: number | null;
+  unit: string;
+  availability: 'measurable' | 'partially_measurable' | 'unmeasurable';
+  reading_kind: 'exact' | 'derived' | 'estimated' | 'unknown';
+  confidence: number | null;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface SemanticCondition {
+  id: string;
+  definition_id: string;
+  label: string;
   intensity: number;
   started_month: number;
-  cause_event_id?: string | null;
-  expires_month?: number | null;
+  cause_event_id: string;
+  source_readings: Array<Record<string, unknown>>;
+  resolved_month?: number | null;
+  resolution_event_id?: string | null;
 }
 
-export interface RegionalPressureSummary {
-  occupancy_ratio: number;
-  condition_pressure: number;
-  level: 'low' | 'medium' | 'high';
-  conditions: RegionalCondition[];
-  phenomenon?: { name: string; desc: string } | null;
+export interface SemanticDefinition {
+  id: string;
+  concept_id: string;
+  dimension: string;
+  unit: string;
+  lifecycle: string;
 }
 
-export interface RegionalCapability {
+export interface CollectiveHealthReading {
+  value: number | null;
+  unit: string;
+  availability: 'measurable' | 'partially_measurable' | 'unmeasurable';
+  reading_kind: 'exact' | 'derived' | 'estimated' | 'unknown';
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface CollectiveHealthInjury {
+  avatar_id: string;
+  severity: string;
+  hp_lost: number;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface CollectiveHealthAsset {
+  asset_id: string;
+  capability_ids: string[];
+  capacity: number;
+  state_refs: string[];
+}
+
+export interface CollectiveHealthView {
+  schema_version: number;
+  region_id: number;
+  grounding_status: string;
+  grounded: boolean;
+  living_avatar_count: CollectiveHealthReading;
+  active_wounded_count: CollectiveHealthReading;
+  hp_deficit: CollectiveHealthReading;
+  healing_capacity: CollectiveHealthReading;
+  healing_access: CollectiveHealthReading;
+  injuries: CollectiveHealthInjury[];
+  healing_assets: CollectiveHealthAsset[];
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface RegionSemanticContext {
+  readings: SemanticReading[];
+  conditions: SemanticCondition[];
+  definitions: SemanticDefinition[];
+  spiritual_ecology?: SpiritualEcologyView | null;
+  collective_health?: CollectiveHealthView | null;
+}
+
+export interface SpiritualEssenceObservation {
+  type: string;
+  density: number;
+  densities: Record<string, number>;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface SpiritualFormationObservation {
+  id: string;
+  type: string;
+  started_month: number;
+  expires_month: number | null;
+  effects: Record<string, number | string | boolean | null>;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface SpiritualPoiObservation {
+  id: string;
   kind: string;
-  value: unknown;
-  reason?: string;
+  name: string;
+  location: [number, number];
+  created_month: number;
+  expires_month: number | null;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface SpiritualCelestialContext {
+  id: string;
+  name: string;
+  description: string;
+  state_refs: string[];
+  source_event_ids: string[];
+}
+
+export interface SpiritualEcologyView {
+  schema_version: number;
+  region_id: number;
+  grounding_status: string;
+  grounded: boolean;
+  risk_level: string | null;
+  essence: SpiritualEssenceObservation | null;
+  formations: SpiritualFormationObservation[];
+  graves: SpiritualPoiObservation[];
+  treasures: SpiritualPoiObservation[];
+  celestial_context: SpiritualCelestialContext | null;
+  state_refs: string[];
+  source_event_ids: string[];
 }
 
 export interface RegionDetail extends EntityBase {
@@ -413,6 +609,9 @@ export interface RegionDetail extends EntityBase {
   sect_id?: number;
   population?: number;
   population_capacity?: number;
+  city_state?: CityState | null;
+  economy?: RegionalEconomyState | null;
+  infrastructure?: RegionalInfrastructureState | null;
   
   essence?: { 
     type: string; 
@@ -430,8 +629,7 @@ export interface RegionDetail extends EntityBase {
   lodes: EffectEntity[];
   store_items?: (EffectEntity & { price: number })[];
   formation?: RegionFormationInfo | null;
-  regional_pressure?: RegionalPressureSummary | null;
-  regional_capabilities?: RegionalCapability[];
+  semantic_context?: RegionSemanticContext | null;
   dao_tradition?: 'mandate_and_order' | 'balance' | 'mercy' | 'transcendence';
 }
 
@@ -589,6 +787,8 @@ export interface GameEvent {
   subjects: EventSubject[];
   isMajor: boolean;
   isStory: boolean;
+  factKind: import('./api').FactKindDTO;
+  causalOrigin: import('./api').CausalOriginDTO;
   renderKey?: string;
   renderParams?: Record<string, string | number | boolean | null>;
   

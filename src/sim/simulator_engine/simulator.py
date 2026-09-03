@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.classes.event import Event
 from src.classes.core.world import World
 from src.config.providers import StaticConfigProvider
+from src.utils.llm.runtime_mode import is_world_test_mode, llm_test_mode_scope
 
 from .phase_runner import SimulationPhaseRunner
 
@@ -45,18 +46,34 @@ class Simulator:
         15. 年龄更新与出生
         16. 身世背景生成
         17. 被动效果与世界性随机事件
-        18. 自定义内容自主创建
-        19. 小型随机事件
-        20. 后台 NPC 事件
-        21. 宗门随机事件
-        22. 宗门战争
-        23. 外号生成
-        24. 天象（大环境气候）更新
-        25. 城市人口更新
-        26. 王朝与官职系统更新
-        27. 按事件处理交互（第二轮，包含后续新事件）
-        28. 计算型关系（如二阶关系）更新
-        29. 每年一月：世界年度维护
-        30. 最终整理事件、入库、写日志并推进月份
+        18. 个人后果与伤势恢复
+        19. 自定义内容自主创建
+        20. 小型随机事件
+        21. 后台 NPC 事件
+        22. 宗门随机事件
+        23. 宗门战争
+        24. 外号生成
+        25. 天象（大环境气候）更新
+        26. 城市人口更新
+        27. 区域经济的确定性生产与需求
+        28. 经济解释器处理真实短缺与显式路线
+        29. 城市容量项目按真实治理和基础设施推进
+        30. 王朝与官职系统更新
+        31. 按事件处理交互（第二轮，包含后续新事件）
+        32. 计算型关系（如二阶关系）更新
+        33. 地方请愿与民间仪式
+        34. 每年一月：世界年度维护
+        35. 机械语言重算与条件转变
+        36. 当前王朝政府处理其明确控制城市的 grounded urban risk
+        37. 宗门组织处理成员所在区域的 grounded adversity
+        38. 无制度控制城市的解释器处理 grounded urban risk
+        39. 人口解释器处理新的、真实的人口压力转变
+        40. 保存晚于重算发生的机械 invalidations 供下月使用
+        41. 事件解读
+        42. 编年史
+        43. 最终入库并推进月份
         """
+        if is_world_test_mode(self.world):
+            with llm_test_mode_scope(True):
+                return await SimulationPhaseRunner(self).run()
         return await SimulationPhaseRunner(self).run()

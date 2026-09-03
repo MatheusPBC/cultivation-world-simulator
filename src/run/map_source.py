@@ -6,10 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from src.classes.environment.tile import TileType
+from src.classes.environment.route import Route
 from src.utils.df import game_configs, get_int, get_str
 
 
-MAP_SOURCE_SCHEMA_VERSION = 3
+MAP_SOURCE_SCHEMA_VERSION = 4
 DEFAULT_WILDERNESS_TILE = "plain"
 
 
@@ -54,6 +55,7 @@ class MapSource:
     region_rows: list[list[int]]
     landmarks: dict[int, MapLandmark]
     region_overrides: dict[int, MapRegionOverride]
+    routes: tuple[Route, ...] = ()
 
 
 def _validate_tile(tile_name: str, *, field_name: str = "tile") -> str:
@@ -118,6 +120,25 @@ def _parse_region_overrides(raw: Any) -> dict[int, MapRegionOverride]:
     return overrides
 
 
+def _parse_routes(raw: Any, *, region_ids: set[int]) -> tuple[Route, ...]:
+    if not isinstance(raw, list):
+        raise ValueError("routes must be a list")
+
+    routes: list[Route] = []
+    route_ids: set[str] = set()
+    for value in raw:
+        route = Route.from_dict(value)
+        if route.id in route_ids:
+            raise ValueError(f"Duplicate route id: {route.id}")
+        missing_regions = set(route.endpoint_region_ids) - region_ids
+        if missing_regions:
+            missing = ", ".join(str(region_id) for region_id in sorted(missing_regions))
+            raise ValueError(f"Route {route.id} references unknown region ids: {missing}")
+        route_ids.add(route.id)
+        routes.append(route)
+    return tuple(routes)
+
+
 def read_map_source(path: Path) -> MapSource:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -143,6 +164,7 @@ def read_map_source(path: Path) -> MapSource:
         region_rows=region_rows,
         landmarks=_parse_landmarks(data.get("landmarks"), width=width, height=height),
         region_overrides=_parse_region_overrides(data.get("region_overrides")),
+        routes=_parse_routes(data.get("routes"), region_ids=set(collect_region_coords(region_rows))),
     )
 
 
@@ -163,6 +185,7 @@ def map_source_to_dict(source: MapSource) -> dict[str, Any]:
             str(region_id): override.to_dict()
             for region_id, override in sorted(source.region_overrides.items())
         },
+        "routes": [route.to_dict() for route in sorted(source.routes, key=lambda item: item.id)],
     }
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from src.classes.action import InstantAction
@@ -154,51 +155,53 @@ class SetFormation(InstantAction):
         )
 
         # A formation is an existing, domain-owned regional effect.  Mirror it
-        # as a semantic condition so regional pressure can consume one stable
+        # as a semantic condition so world interpreters consume one stable
         # representation, while keeping the formation registry as the owner of
         # formation mechanics.  The event id is assigned before the condition
         # is built, making the causal origin navigable from the region state.
         formation = getattr(self.world.map, "region_formations", {}).get(int(region.id))
         if formation:
-            from src.classes.environment.region_condition import RegionCondition
+            from src.classes.mechanical_language import ConditionInstance
 
             kind = f"{self._last_formation_type or formation_type}_formation"
             started_month = int(formation.get("start_month", self.world.month_stamp))
             duration = int(formation.get("duration", 0))
             expires_month = started_month + duration if duration > 0 else None
-            previous = None
-            get_conditions = getattr(region, "get_active_conditions", None)
-            if callable(get_conditions):
-                active_conditions = get_conditions(int(self.world.month_stamp))
-                previous = next(
-                    (item for item in active_conditions
-                     if getattr(item, "kind", "") == kind),
-                    None,
-                )
-                # Map owns the formation record, while Region owns the
-                # semantic condition.  Replacing a formation must therefore
-                # retire the prior active formation condition as well; an
-                # expired condition remains in the historical runtime list.
-                conditions = getattr(region, "conditions", None)
-                if isinstance(conditions, list):
-                    conditions[:] = [
-                        item for item in conditions
-                        if not (
-                            getattr(item, "kind", "").endswith("_formation")
-                            and item in active_conditions
-                        )
-                    ]
+            from src.classes.mechanical_language import EntityRef
 
-            condition = RegionCondition(
-                kind=kind,
+            semantic_state = self.world.mechanical_language
+            active_conditions = semantic_state.get_active_conditions(
+                EntityRef("region", str(region.id)),
+                int(self.world.month_stamp),
+            )
+            previous = next(
+                (item for item in active_conditions
+                 if item.definition_id == f"formation:{kind}"),
+                None,
+            )
+            # Map owns the formation record, while the world semantic registry
+            # owns condition instances. Replacing a formation retires every
+            # active formation condition without creating a second owner.
+            for old_condition in active_conditions:
+                if old_condition.definition_id.startswith("formation:"):
+                    semantic_state.replace_condition_instance(replace(
+                        old_condition,
+                        resolved_month=int(self.world.month_stamp),
+                        resolution_event_id=event.id,
+                    ))
+
+            condition = ConditionInstance(
+                id=f"formation:{region.id}:{event.id}",
+                definition_id=f"formation:{kind}",
+                target_kind="region",
+                target_id=str(region.id),
+                label=kind,
                 intensity=1.0,
                 started_month=started_month,
                 expires_month=expires_month,
                 cause_event_id=event.id,
             )
-            add_condition = getattr(region, "add_condition", None)
-            if callable(add_condition):
-                add_condition(condition)
+            semantic_state.add_condition_instance(condition)
 
             before = previous.to_dict() if previous is not None else None
             event.causal_payload = {

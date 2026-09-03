@@ -64,6 +64,23 @@ def test_shixue_gu_reduces_hp_monthly(base_world):
     assert target.hp.cur == 196
 
 
+def test_shixue_gu_emits_hp_change_evidence(base_world):
+    caster = _avatar(base_world, "Caster")
+    target = _avatar(base_world, "Target")
+    target.hp.max = 100
+    target.hp.cur = 100
+    target.temporary_effects.append(_gu_effect(caster, GU_SHIXUE))
+
+    events = process_avatar_gu_effects(target, 0)
+
+    assert len(events) == 1
+    deltas = events[0].causal_payload["deltas"]
+    assert len(deltas) == 1
+    assert deltas[0]["aspect"] == "hp"
+    assert deltas[0]["before"] == "100"
+    assert deltas[0]["after"] == "98"
+
+
 def test_shiyuan_gu_reduces_exp_without_negative(base_world):
     caster = _avatar(base_world, "Caster")
     target = _avatar(base_world, "Target")

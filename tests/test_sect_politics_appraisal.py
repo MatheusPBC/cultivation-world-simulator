@@ -18,6 +18,7 @@ import pytest
 from src.classes.age import Age
 from src.classes.alignment import Alignment
 from src.classes.causal_link import CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.core.world import World
@@ -26,10 +27,10 @@ from src.classes.event import Event, FactKind
 from src.classes.event_appraisal import AppraisalSource, EventAppraisal
 from src.classes.event_storage import EventStorage
 from src.classes.root import Root
-from src.classes.sect_decider import (
+from src.classes.sect_decider import SectDecider
+from src.systems.sect_decision_context import (
     MIN_APPRAISAL_EFFECTIVE_WEIGHT,
     MAX_APPRAISALS_PER_TARGET,
-    SectDecider,
 )
 from src.classes.sect_ranks import SectRank
 from src.systems.cultivation import Realm
@@ -420,6 +421,7 @@ class TestSectDecisionAudit:
         assert decision["subject_kind"] == "sect"
         assert decision["subject_id"] == "1"
         assert decision["source"] == "llm"
+        assert decision_events[0].causal_origin is CausalOrigin.LLM_INTERPRETATION
 
     @pytest.mark.asyncio
     async def test_rule_fallback_round_is_still_audited_and_never_raises(self, base_world):
@@ -435,6 +437,7 @@ class TestSectDecisionAudit:
         decision_events = [e for e in result.events if e.fact_kind is FactKind.DECISION]
         assert len(decision_events) == 1
         assert decision_events[0].causal_payload["decision"]["source"] == "rule"
+        assert decision_events[0].causal_origin is CausalOrigin.ACTOR_DECISION
         assert result.war_declared_count == 0
 
     @pytest.mark.asyncio

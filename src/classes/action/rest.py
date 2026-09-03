@@ -30,6 +30,7 @@ class Rest(TimedAction):
 
     async def finish(self) -> list[Event]:
         hp_max = int(getattr(getattr(self.avatar, "hp", None), "max", 0) or 0)
+        before_hp = self.avatar.hp.cur
         extra_recovery = float(self.avatar.effects.get("extra_rest_hp_recovery_rate", 0.0) or 0.0)
         recovery = max(1, int(hp_max * (self.BASE_HP_RECOVERY_RATIO + extra_recovery))) if hp_max > 0 else 0
         if recovery > 0 and hasattr(self.avatar.hp, "recover"):
@@ -43,4 +44,7 @@ class Rest(TimedAction):
             content = t("{avatar} finished resting, recovered {hp} HP and gained {exp} cultivation experience.", avatar=self.avatar.name, hp=recovery, exp=exp)
         else:
             content = t("{avatar} finished resting and recovered {hp} HP.", avatar=self.avatar.name, hp=recovery)
-        return [Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])]
+        event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])
+        from src.classes.individual_consequence import record_hp_change_from_event
+        record_hp_change_from_event(self.avatar, event, before_hp)
+        return [event]

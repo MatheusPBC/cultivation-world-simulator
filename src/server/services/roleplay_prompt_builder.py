@@ -6,7 +6,7 @@ from typing import Any
 def build_prompt_context(avatar) -> dict[str, Any]:
     world = avatar.world
     observed = world.get_observable_avatars(avatar)
-    from src.systems.regional_pressure import build_avatar_regional_context
+    from src.systems.semantic_world.context import build_avatar_semantic_context
     return {
         "avatar_id": str(avatar.id),
         "avatar_name": avatar.name,
@@ -27,5 +27,5 @@ def build_prompt_context(avatar) -> dict[str, Any]:
             }
             for other in observed[:8]
         ],
-        "regional_context": build_avatar_regional_context(avatar),
+        "regional_context": build_avatar_semantic_context(avatar),
     }

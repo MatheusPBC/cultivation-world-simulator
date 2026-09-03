@@ -62,7 +62,7 @@ class TestSelfHealAction:
         healing_avatar.sect = None # 散修
         
         # Mock effects 为空
-        with patch.object(type(healing_avatar), 'effects', new_callable=lambda: {}) as mock_effects:
+        with patch.object(type(healing_avatar), 'effects', new_callable=lambda: {}):
              action = SelfHeal(healing_avatar, healing_avatar.world)
              action._execute()
 
@@ -138,3 +138,19 @@ class TestSelfHealAction:
         # 预期：基础回复 10点，但只缺5点 -> 回复5点，当前100
         assert healing_avatar.hp.cur == 100
         assert action._healed_total == 5
+
+    @pytest.mark.asyncio
+    async def test_finish_exposes_hp_recovery_delta(self, healing_avatar, normal_region):
+        healing_avatar.tile = Tile(0, 0, TileType.PLAIN)
+        healing_avatar.tile.region = normal_region
+        action = SelfHeal(healing_avatar, healing_avatar.world)
+
+        action._execute()
+        events = await action.finish()
+
+        assert len(events) == 1
+        delta = events[0].causal_payload["deltas"][0]
+        assert delta["aspect"] == "hp"
+        assert delta["before"] == "50"
+        assert delta["after"] == "60"
+        assert delta["magnitude"] == 10.0

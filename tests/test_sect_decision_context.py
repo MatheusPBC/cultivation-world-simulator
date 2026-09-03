@@ -13,6 +13,8 @@ from src.i18n import reload_translations
 from src.sim.managers.sect_manager import SectManager
 from src.systems.time import MonthStamp
 from src.systems.sect_decision_context import build_sect_decision_context, SectDecisionContext
+from src.systems.semantic_world.context import build_sect_semantic_context
+from src.classes.mechanical_language import ConditionInstance
 from src.classes.official_rank import OFFICIAL_GRAND_COUNCILOR
 from src.systems.imperial_crisis_service import open_imperial_claim, support_imperial_claim
 
@@ -217,3 +219,56 @@ def test_build_sect_decision_context_localizes_runtime_notes(base_world):
     assert all("灵石" not in note for note in ctx.economy["action_cost_notes"])
     assert "spirit stones" in ctx.economy["action_cost_notes"][0]
     assert "[3] E3" in ctx.history["summary_text"]
+
+
+def test_sect_decision_context_exposes_semantics_for_all_canonical_regions(base_world):
+    world, sect1, _ = _create_world_with_sects(base_world)
+    from src.classes.environment.sect_region import SectRegion
+
+    second_region = SectRegion(
+        id=1002,
+        name="R1-Annex",
+        desc="",
+        sect_id=sect1.id,
+        sect_name=sect1.name,
+        cors=[(1, 1)],
+    )
+    unrelated_region = SectRegion(
+        id=1003,
+        name="Other-HQ",
+        desc="",
+        sect_id=999,
+        sect_name="Other",
+        cors=[(2, 2)],
+    )
+    world.map.regions[second_region.id] = second_region
+    world.map.regions[unrelated_region.id] = unrelated_region
+    world.mechanical_language.add_condition_instance(
+        ConditionInstance(
+            id="sect-condition",
+            definition_id="formation:sect_guard",
+            target_kind="region",
+            target_id=str(second_region.id),
+            label="sect_guard",
+            intensity=0.7,
+            started_month=int(world.month_stamp),
+            cause_event_id="formation-event",
+        )
+    )
+
+    direct_context = build_sect_semantic_context(world, sect1)
+    storage = _create_event_storage_with_sect_events(sect1.id)
+    try:
+        decision_context = build_sect_decision_context(sect1, world, storage, history_limit=0)
+    finally:
+        _cleanup_event_storage(storage)
+
+    assert [item["region_id"] for item in direct_context] == [1001, 1002]
+    assert direct_context[1]["conditions"][0]["cause_event_id"] == "formation-event"
+    assert decision_context.regional_semantics == direct_context
+
+
+def test_sect_semantic_context_is_empty_without_a_canonical_sect_region(base_world):
+    world, _, sect2 = _create_world_with_sects(base_world)
+
+    assert build_sect_semantic_context(world, sect2) == []

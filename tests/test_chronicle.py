@@ -84,6 +84,39 @@ def test_storage_append_is_append_only_and_duplicate_end_month_does_not_overwrit
     storage.close()
 
 
+def test_storage_step_commit_rolls_back_events_when_chapter_insert_fails(
+    tmp_path: Path,
+    monkeypatch,
+):
+    storage = EventStorage(tmp_path / "events.db")
+    event = Event(MonthStamp(1), "fact", id="event-1")
+    chapter = make_chapter(1)
+
+    def fail_chapter(_chapter):
+        raise RuntimeError("chapter write failed")
+
+    monkeypatch.setattr(storage, "_insert_chronicle_chapter", fail_chapter, raising=False)
+
+    assert storage.commit_step([event], chapter) is False
+    assert storage.get_event_by_id(event.id) is None
+    assert storage.get_latest_chronicle_chapter() is None
+    storage.close()
+
+
+def test_storage_step_commit_persists_events_and_chapter_together(tmp_path: Path):
+    storage = EventStorage(tmp_path / "events.db")
+    event = Event(MonthStamp(1), "fact", id="event-1")
+    chapter = make_chapter(1)
+
+    assert storage.commit_step([event], chapter) is True
+    restored_event = storage.get_event_by_id(event.id)
+    assert restored_event is not None
+    assert restored_event.id == event.id
+    assert restored_event.content == event.content
+    assert storage.get_latest_chronicle_chapter() == chapter
+    storage.close()
+
+
 def test_storage_paginates_newest_first_and_survives_reopen_and_event_cleanup(tmp_path: Path):
     db_path = tmp_path / "events.db"
     storage = EventStorage(db_path)
@@ -120,16 +153,26 @@ def test_event_manager_delegates_chronicle_and_month_queries(tmp_path: Path):
     manager.close()
 
 
+def test_in_memory_step_commit_rejects_missing_chapter_source_without_partial_event():
+    from src.sim.managers.event_manager import EventManager
+
+    manager = EventManager.create_in_memory()
+    event = Event(MonthStamp(1), "different fact", id="event-2")
+    chapter = make_chapter(1)
+
+    assert manager.commit_step([event], chapter) is False
+    assert manager.get_event_by_id(event.id) is None
+    assert manager.get_latest_chronicle_chapter() is None
+
+
 def test_finalizer_does_not_publish_when_a_chapter_source_failed_to_persist():
     from types import SimpleNamespace
-    from src.sim.simulator_engine.finalizer import finalize_step
+    from src.sim.simulator_engine.finalizer import EventPersistenceError, finalize_step
     from src.sim.simulator_engine.context import SimulationStepContext
 
     chapter = make_chapter(1)
     event_manager = SimpleNamespace(
-        add_event=lambda _event: False,
-        get_event_by_id=lambda _event_id: None,
-        append_chronicle_chapter=lambda _chapter: pytest.fail("chapter must not publish"),
+        commit_step=lambda _events, _chapter: False,
     )
     fake_world = SimpleNamespace(
         avatar_manager=SimpleNamespace(avatars={}),
@@ -142,5 +185,7 @@ def test_finalizer_does_not_publish_when_a_chapter_source_failed_to_persist():
     ctx.causal = SimpleNamespace(attach_to=lambda _events: None)
     ctx.pending_chronicle_chapter = chapter
 
-    finalize_step(ctx)
-    assert ctx.pending_chronicle_chapter is None
+    with pytest.raises(EventPersistenceError):
+        finalize_step(ctx)
+    assert ctx.pending_chronicle_chapter is chapter
+    assert fake_world.month_stamp == MonthStamp(1)

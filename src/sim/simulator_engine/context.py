@@ -7,6 +7,8 @@ from src.classes.core.world import World
 from src.classes.event import Event
 from src.classes.chronicle import ChronicleChapter
 from src.sim.simulator_engine.causal_recorder import CausalRecorder
+from src.sim.simulator_engine.causal_budget import CausalBudget
+from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
 from src.systems.time import Month, MonthStamp
 
 
@@ -22,6 +24,8 @@ class SimulationStepContext:
     month_stamp: MonthStamp | None = None
     # 被动因果记录器：由已经完成变更的领域 owner 写入，finalize_step 统一drain。
     causal: CausalRecorder = field(default_factory=CausalRecorder)
+    invalidations: DomainInvalidationQueue = field(default_factory=DomainInvalidationQueue)
+    causal_budget: CausalBudget | None = None
     pending_chronicle_chapter: ChronicleChapter | None = None
 
     @classmethod
@@ -32,6 +36,7 @@ class SimulationStepContext:
             world=world,
             living_avatars=world.avatar_manager.get_living_avatars(),
             month_stamp=world.month_stamp,
+            causal_budget=CausalBudget.from_world(world),
         )
         # 桥接：部分 owner（如 Action）只能拿到 world，拿不到 ctx 本身，
         # 与 get_decision_boundary_gateway(world) 是同一种挂载方式。

@@ -85,12 +85,19 @@ class WorldSection:
                 if isinstance(region, CultivateRegion) and region.host_avatar:
                     cultivate_regions_hosts[str(rid)] = region.host_avatar.id
                 if isinstance(region, CityRegion):
-                    regions_status[str(rid)] = {"population": region.population}
+                    regions_status[str(rid)] = {
+                        "population": region.population,
+                        "population_capacity": region.population_capacity,
+                        "economy": region.economy.to_dict(),
+                        "infrastructure": region.infrastructure.to_dict(),
+                        "city_state": region.city_state.to_dict(),
+                    }
                 to_runtime_dict = getattr(region, "to_runtime_dict", None)
                 if callable(to_runtime_dict):
                     runtime = to_runtime_dict() or {}
-                    regions_status.setdefault(str(rid), {})["conditions"] = list(
-                        runtime.get("conditions", []) or []
+                    regions_status.setdefault(str(rid), {})["dao_tradition"] = runtime.get(
+                        "dao_tradition",
+                        getattr(region.dao_tradition, "value", region.dao_tradition),
                     )
 
         sect_runtime_states = {
@@ -110,6 +117,13 @@ class WorldSection:
             "month_stamp": int(world.month_stamp),
             "start_year": world.start_year,
             "map_snapshot": serialize_map_snapshot(world.map),
+            "routes": [
+                route.to_dict()
+                for route in sorted(
+                    (getattr(world.map, "routes", {}) or {}).values(),
+                    key=lambda item: item.id,
+                )
+            ],
             "existed_sect_ids": [sect.id for sect in context.existed_sects],
             "dynasty": world.dynasty.to_dict() if getattr(world, "dynasty", None) is not None else None,
             "dao_petitions": [petition.to_dict() for petition in getattr(world, "dao_petitions", [])],
@@ -129,6 +143,7 @@ class WorldSection:
             "sect_relation_modifiers": list(getattr(world, "sect_relation_modifiers", []) or []),
             "sect_wars": list(getattr(world, "sect_wars", []) or []),
             "opportunities": serialize_opportunities(world),
+            "mechanical_language": world.mechanical_language.to_dict(),
             "deceased_records": world.deceased_manager.to_save_list(),
             "pois": world.poi_manager.to_save_list(),
         }
@@ -148,7 +163,10 @@ class EventsSection:
         max_events = app_config.CONFIG.save.max_events_to_save
         return [
             event.to_dict()
-            for event in context.world.event_manager.get_recent_events(limit=max_events)
+            for event in context.world.event_manager.get_recent_events(
+                limit=max_events,
+                include_decisions=True,
+            )
         ]
 
 

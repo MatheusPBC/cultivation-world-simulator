@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 import random
 
 from src.i18n import t
@@ -14,10 +13,6 @@ from src.systems.battle import decide_battle, get_assassination_success_rate
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.kill_and_grab import kill_and_grab
-
-if TYPE_CHECKING:
-    from src.classes.core.avatar import Avatar
-
 
 @cooldown_action
 class Assassinate(InstantAction, TargetingMixin):
@@ -62,7 +57,8 @@ class Assassinate(InstantAction, TargetingMixin):
         
         if is_success:
             # 暗杀成功，目标直接死亡
-            target.hp.current = 0
+            self._assassination_before_hp = target.hp.cur
+            target.hp.reduce(target.hp.cur)
             self._last_result = None # 不需要战斗结果
         else:
             # 暗杀失败，转入正常战斗
@@ -113,12 +109,20 @@ class Assassinate(InstantAction, TargetingMixin):
             result_text += loot_text
             
             result_event = Event(self.world.month_stamp, result_text, related_avatars=rel_ids, is_major=True)
+            from src.classes.individual_consequence import record_hp_change_from_event
+            record_hp_change_from_event(
+                target,
+                result_event,
+                int(getattr(self, "_assassination_before_hp", target.hp.cur)),
+            )
             if transfer is not None:
                 from src.classes.state_delta import StateDelta
-                result_event.causal_payload = {"deltas": [
+                payload = result_event.causal_payload or {"deltas": [], "decision": None}
+                payload["deltas"].extend([
                     StateDelta(owner_kind="avatar", owner_id=transfer.loser_id, aspect="equipment_transfer", before=str(transfer.item_snapshot), after=None).to_dict(),
                     StateDelta(owner_kind="avatar", owner_id=transfer.winner_id, aspect="equipment_transfer", before=None, after=str(transfer.item_snapshot)).to_dict(),
-                ], "decision": None}
+                ])
+                result_event.causal_payload = payload
             
             story_event = await StoryEventService.maybe_create_story(
                 kind=StoryEventKind.COMBAT,

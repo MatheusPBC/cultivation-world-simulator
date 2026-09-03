@@ -597,7 +597,98 @@
       "host_meta": "主人",
       "no_host": "無主（可佔據）",
       "price_meta": "{price}靈石",
-      "formation_remaining": "剩餘 {months} 個月"
+      "formation_remaining": "剩餘 {months} 個月",
+      "regional_context_title": "區域態勢",
+      "dao_tradition": "天道詮釋",
+      "dao_traditions": {
+        "mandate_and_order": "天命與秩序",
+        "balance": "均衡",
+        "mercy": "慈悲",
+        "transcendence": "超脫"
+      },
+      "semantic_context": {
+        "conditions_title": "活動中的語義條件",
+        "readings_title": "關鍵讀數",
+        "empty": "暫無可用語義上下文。",
+        "intensity": "強度 {value}",
+        "started_month": "始於第 {month} 月",
+        "definition": "定義 {id}",
+        "source_event": "來源事件 {id}",
+        "derived_from": "推導輸入",
+        "unknown_value": "未知",
+        "confidence": "置信度 {value}%",
+        "availability": {
+          "measurable": "可測量",
+          "partially_measurable": "部分可測量",
+          "unmeasurable": "不可測量"
+        },
+        "reading_kind": {
+          "exact": "精確",
+          "derived": "推導",
+          "estimated": "估計",
+          "unknown": "未知"
+        }
+      },
+      "economy": {
+        "title": "區域經濟",
+        "stocks": "庫存",
+        "capacities": "容量",
+        "production_rates": "生產速率",
+        "demand_rates": "需求速率",
+        "access": "可獲得性",
+        "dependencies": "依賴度"
+      },
+      "infrastructure": {
+        "title": "基礎設施",
+        "capacities": "容量",
+        "quality": "品質"
+      },
+      "city_state": {
+        "title": "城市狀態",
+        "districts": "區域",
+        "assets": "城市資產",
+        "governance": "治理",
+        "population_weight": "人口比例：{value}",
+        "tiles": "地圖格：{value}",
+        "capacity": "容量：{value}",
+        "quality": "品質：{value}",
+        "integrity": "完整度：{value}",
+        "controller": "管理者",
+        "administrative_capacity": "行政能力：{value}"
+      },
+      "spiritual_ecology": {
+        "title": "靈性生態",
+        "grounding_label": "根據",
+        "essence": "靈氣",
+        "densities": "五行密度",
+        "formations": "生效中的陣法",
+        "graves": "墓地",
+        "treasures": "寶物",
+        "celestial_context": "天象脈絡",
+        "state_refs": "根據參照",
+        "started_month": "開始：第 {value} 個月",
+        "expires_month": "到期：第 {value} 個月",
+        "created_month": "建立：第 {value} 個月",
+        "location": "位置：{value}",
+        "effects": "已記錄效果",
+        "grounding": {
+          "grounded": "有根據的事實",
+          "unknown": "根據未知"
+        }
+      },
+      "collective_health": {
+        "title": "群體健康",
+        "grounding_label": "根據",
+        "living_avatar_count": "存活修士",
+        "active_wounded_count": "目前受傷",
+        "hp_deficit": "生命值缺口",
+        "healing_capacity": "療癒能力",
+        "injuries": "目前傷勢",
+        "healing_assets": "療癒資產",
+        "hp_lost": "損失生命值：{value}",
+        "capacity": "容量：{value}",
+        "state_refs": "狀態參照"
+      }
     },
     "sect": {
       "stats": {

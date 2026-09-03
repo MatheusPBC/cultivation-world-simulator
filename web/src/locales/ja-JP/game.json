@@ -597,7 +597,98 @@
       "host_meta": "所有者",
       "no_host": "無主",
       "price_meta": "{price} 霊石",
-      "formation_remaining": "残り {months} か月"
+      "formation_remaining": "残り {months} か月",
+      "regional_context_title": "地域の状況",
+      "dao_tradition": "道統",
+      "dao_traditions": {
+        "mandate_and_order": "天命と秩序",
+        "balance": "均衡",
+        "mercy": "慈悲",
+        "transcendence": "超脱"
+      },
+      "semantic_context": {
+        "conditions_title": "有効な意味条件",
+        "readings_title": "主要な測定値",
+        "empty": "利用可能な意味コンテキストはありません。",
+        "intensity": "強度 {value}",
+        "started_month": "{month}か月目に開始",
+        "definition": "定義 {id}",
+        "source_event": "出典イベント {id}",
+        "derived_from": "導出元",
+        "unknown_value": "不明",
+        "confidence": "信頼度 {value}%",
+        "availability": {
+          "measurable": "測定可能",
+          "partially_measurable": "一部測定可能",
+          "unmeasurable": "測定不能"
+        },
+        "reading_kind": {
+          "exact": "正確",
+          "derived": "導出",
+          "estimated": "推定",
+          "unknown": "不明"
+        }
+      },
+      "economy": {
+        "title": "地域経済",
+        "stocks": "在庫",
+        "capacities": "容量",
+        "production_rates": "生産率",
+        "demand_rates": "需要率",
+        "access": "アクセス",
+        "dependencies": "依存度"
+      },
+      "infrastructure": {
+        "title": "インフラ",
+        "capacities": "容量",
+        "quality": "品質"
+      },
+      "city_state": {
+        "title": "都市状態",
+        "districts": "地区",
+        "assets": "都市設備",
+        "governance": "統治",
+        "population_weight": "人口比率: {value}",
+        "tiles": "タイル: {value}",
+        "capacity": "容量: {value}",
+        "quality": "品質: {value}",
+        "integrity": "完全性: {value}",
+        "controller": "統治者",
+        "administrative_capacity": "行政能力: {value}"
+      },
+      "spiritual_ecology": {
+        "title": "霊的生態",
+        "grounding_label": "根拠",
+        "essence": "精気",
+        "densities": "五行密度",
+        "formations": "有効な陣法",
+        "graves": "墓",
+        "treasures": "宝物",
+        "celestial_context": "天象の文脈",
+        "state_refs": "根拠参照",
+        "started_month": "開始: {value}か月目",
+        "expires_month": "終了: {value}か月目",
+        "created_month": "作成: {value}か月目",
+        "location": "場所: {value}",
+        "effects": "記録された効果",
+        "grounding": {
+          "grounded": "根拠のある事実",
+          "unknown": "根拠不明"
+        }
+      },
+      "collective_health": {
+        "title": "集団の健康",
+        "grounding_label": "根拠",
+        "living_avatar_count": "生存中のアバター",
+        "active_wounded_count": "負傷中のアバター",
+        "hp_deficit": "HP不足",
+        "healing_capacity": "治療能力",
+        "injuries": "現在の負傷",
+        "healing_assets": "治療設備",
+        "hp_lost": "失ったHP: {value}",
+        "capacity": "容量: {value}",
+        "state_refs": "状態参照"
+      }
     },
     "sect": {
       "stats": {

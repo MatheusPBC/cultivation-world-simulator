@@ -1,0 +1,13 @@
+msgid ""
+msgstr ""
+"Language: en-US\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "A causal probe increased population pressure in {region}."
+msgstr "A causal probe increased population pressure in {region}."
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "A causal probe reduced {resource} supply in {region}."
+
+msgid "A causal probe interrupted route {route}."
+msgstr "A causal probe interrupted route {route}."

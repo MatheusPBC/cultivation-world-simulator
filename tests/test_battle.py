@@ -1,5 +1,5 @@
 import pytest
-import math
+from copy import copy
 from unittest.mock import MagicMock, AsyncMock, patch
 from src.systems.battle import (
     get_base_strength, 
@@ -7,13 +7,13 @@ from src.systems.battle import (
     _strength_diff, 
     calc_win_rate,
     handle_battle_finish,
-    _REALM_BASE_STRENGTH,
-    _STAGE_BONUS_STRENGTH,
     _SUPPRESSION_POINTS
 )
 from src.systems.cultivation import Realm, Stage
 from src.classes.technique import TechniqueAttribute
 from src.classes.death_reason import DeathType
+from src.classes.hp import HP
+from src.classes.individual_consequence import IndividualConsequenceState
 
 # Helper to create a mock avatar
 def create_mock_avatar(level, realm=None, stage=None, effects=None, technique_attr=None):
@@ -152,6 +152,46 @@ class TestCombatMechanics:
         assert diff == pytest.approx(expected_diff)
 
 class TestBattleResolution:
+    @pytest.mark.asyncio
+    async def test_nonfatal_battle_attaches_one_hp_and_injury_delta_per_avatar(
+        self, dummy_avatar
+    ):
+        attacker = dummy_avatar
+        attacker.id = "attacker"
+        attacker.name = "Attacker"
+        attacker.hp = HP(100, 50)
+
+        target = copy(attacker)
+        target.id = "target"
+        target.name = "Target"
+        target.hp = HP(100, 40)
+        target.individual_consequences = IndividualConsequenceState()
+
+        async def outcome_text(*_args):
+            return "A nonfatal battle"
+
+        with patch(
+            "src.classes.story_event_service.StoryEventService.maybe_create_story",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            events = await handle_battle_finish(
+                attacker.world,
+                attacker,
+                target,
+                (attacker, target, 30, 20),
+                "Battle start",
+                "Story prompt",
+                outcome_text_func=outcome_text,
+            )
+
+        assert len(events) == 1
+        deltas = events[0].causal_payload["deltas"]
+        assert sum(delta["owner_id"] == target.id and delta["aspect"] == "hp" for delta in deltas) == 1
+        assert sum(delta["owner_id"] == attacker.id and delta["aspect"] == "hp" for delta in deltas) == 1
+        assert target.individual_consequences.active_injury is not None
+        assert attacker.individual_consequences.active_injury is None
+
     @pytest.mark.asyncio
     async def test_attacker_dies_killer_is_winner(self):
         # Setup mocks

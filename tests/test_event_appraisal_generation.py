@@ -581,9 +581,12 @@ class TestAppraisalPhaseWiring:
 
         indexes = {phase.name: phase.index for phase in get_simulation_phases()}
 
-        assert indexes["annual_maintenance"] == 29
-        assert indexes["generate_event_appraisals"] == 30
-        assert indexes["finalize_step"] == 31
+        assert (
+            indexes["annual_maintenance"]
+            < indexes["generate_event_appraisals"]
+            < indexes["generate_chronicle"]
+            < indexes["finalize_step"]
+        )
         assert get_simulation_phases()[-1].name == "finalize_step"
 
     @pytest.mark.asyncio

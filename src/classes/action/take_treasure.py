@@ -99,6 +99,7 @@ class TakeTreasure(InstantAction):
         content = t("{avatar} failed to claim {treasure}.", avatar=self.avatar.name, treasure=treasure.name)
         if random.random() < float(_config_value("backlash_probability", 0.10)):
             damage = max(1, int(getattr(self.avatar.hp, "max", 100) * float(_config_value("backlash_hp_ratio", 0.12))))
+            before_hp = self.avatar.hp.cur
             self.avatar.hp.reduce(damage)
             content = t(
                 "{avatar} triggered the treasure's restriction at {treasure} and was injured for {damage} HP.",
@@ -108,8 +109,8 @@ class TakeTreasure(InstantAction):
             )
         self._last_event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id], is_major=False)
         if "damage" in locals():
-            from src.classes.individual_consequence import record_injury_from_event
-            record_injury_from_event(self.avatar, self._last_event, damage)
+            from src.classes.individual_consequence import record_hp_change_from_event
+            record_hp_change_from_event(self.avatar, self._last_event, before_hp)
 
     def step(self, **params) -> ActionResult:
         self._execute(**params)

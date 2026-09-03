@@ -15,6 +15,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
+import json
 
 from src.classes.causal_link import CausalLink, MAX_CAUSAL_LINKS_PER_EVENT
 from src.classes.event import Event
@@ -52,13 +53,45 @@ class CausalRecorder:
         for event in events:
             links = self._links.get(event.id)
             if links:
-                ranked = sorted(links, key=lambda pair: pair[0], reverse=True)
-                event.causal_links = [link for _, link in ranked[:MAX_CAUSAL_LINKS_PER_EVENT]]
+                ranked = [
+                    (0, link) for link in (event.causal_links or [])
+                ] + sorted(links, key=lambda pair: pair[0], reverse=True)
+                merged_links: list[CausalLink] = []
+                seen_links: set[tuple[Any, ...]] = set()
+                for _, link in ranked:
+                    identity = (
+                        link.cause_event_id,
+                        link.relation,
+                        link.note_key,
+                        json.dumps(link.note_params, sort_keys=True, default=str),
+                    )
+                    if identity in seen_links:
+                        continue
+                    seen_links.add(identity)
+                    merged_links.append(link)
+                event.causal_links = merged_links[:MAX_CAUSAL_LINKS_PER_EVENT]
 
             deltas = self._deltas.get(event.id)
             if deltas:
                 payload: dict[str, Any] = dict(event.causal_payload or {})
-                payload["deltas"] = [delta.to_dict() for delta in deltas]
+                existing = [dict(item) for item in payload.get("deltas", [])]
+                combined = [*existing, *(delta.to_dict() for delta in deltas)]
+                merged_deltas: list[dict[str, Any]] = []
+                seen_deltas: set[tuple[Any, ...]] = set()
+                for delta in combined:
+                    identity = (
+                        delta.get("owner_kind"),
+                        delta.get("owner_id"),
+                        delta.get("aspect"),
+                        delta.get("before"),
+                        delta.get("after"),
+                        delta.get("magnitude"),
+                    )
+                    if identity in seen_deltas:
+                        continue
+                    seen_deltas.add(identity)
+                    merged_deltas.append(delta)
+                payload["deltas"] = merged_deltas
                 event.causal_payload = payload
 
 

@@ -4,6 +4,7 @@ import inspect
 from typing import Any
 
 from .context import SimulationStepContext
+from .month_transaction import SimulationMonthCheckpoint
 from .phase_registry import SimulationPhase, get_simulation_phases
 
 
@@ -27,6 +28,7 @@ class SimulationPhaseRunner:
             raise SimulationStepAborted()
 
     async def run(self) -> list[Any]:
+        checkpoint = SimulationMonthCheckpoint.capture(self.world)
         ctx = SimulationStepContext.create(self.world)
         try:
             self.raise_if_reset_requested()
@@ -40,7 +42,11 @@ class SimulationPhaseRunner:
                     return result or []
             return []
         except SimulationStepAborted:
+            checkpoint.restore()
             return []
+        except BaseException:
+            checkpoint.restore()
+            raise
         finally:
             # 因果记录器只在本轮 step 内有效：无论成功收尾、reset 中止还是
             # 任意异常向外传播，都要在这里统一清理，不依赖只在成功路径上

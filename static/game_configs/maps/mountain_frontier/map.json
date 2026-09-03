@@ -1,10 +1,17 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "id": "mountain_frontier",
   "version": 2,
   "width": 84,
   "height": 60,
   "wilderness_tile": "plain",
+  "routes": [
+    {"id": "mountain-301-405", "endpoint_region_ids": [301, 405], "mode": "mountain_road", "capacity": 75.0, "quality": 0.73, "enabled": true, "allowed_resource_ids": []},
+    {"id": "mountain-302-414", "endpoint_region_ids": [302, 414], "mode": "frontier_pass", "capacity": 55.0, "quality": 0.62, "enabled": true, "allowed_resource_ids": ["grain", "medicine"]},
+    {"id": "mountain-303-403", "endpoint_region_ids": [303, 403], "mode": "mountain_road", "capacity": 65.0, "quality": 0.79, "enabled": true, "allowed_resource_ids": []},
+    {"id": "mountain-304-409", "endpoint_region_ids": [304, 409], "mode": "ridge_pass", "capacity": 40.0, "quality": 0.58, "enabled": true, "allowed_resource_ids": ["spirit_stone"]},
+    {"id": "mountain-305-412", "endpoint_region_ids": [305, 412], "mode": "mountain_pass", "capacity": 50.0, "quality": 0.71, "enabled": true, "allowed_resource_ids": []}
+  ],
   "region_overrides": {
     "104": {
       "name_id": "MAP_REGION_MOUNTAIN_FRONTIER_104_NAME",

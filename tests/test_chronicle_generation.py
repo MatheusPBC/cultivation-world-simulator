@@ -11,6 +11,19 @@ from src.utils.llm.runtime_mode import llm_test_mode_scope
 from src.utils.llm.exceptions import ProviderCallError, ProviderFailureKind
 
 
+_REAL_MAYBE_GENERATE_CHAPTER = ChronicleService.maybe_generate_chapter
+
+
+@pytest.fixture(autouse=True)
+def exercise_real_chronicle_generation(mock_llm_managers, monkeypatch):
+    """Keep the global provider guard while exercising the real service method."""
+    monkeypatch.setattr(
+        ChronicleService,
+        "maybe_generate_chapter",
+        _REAL_MAYBE_GENERATE_CHAPTER,
+    )
+
+
 def event(month: int, event_id: str, *, major: bool = False, story: bool = False) -> Event:
     return Event(MonthStamp(month), event_id, is_major=major, is_story=story, id=event_id, created_at=float(month))
 

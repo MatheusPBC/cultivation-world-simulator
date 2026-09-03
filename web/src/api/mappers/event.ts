@@ -21,6 +21,8 @@ export function mapEventDtoToGameEvent(event: EventDTO): GameEvent {
     subjects: mapEventSubjects(event.subjects),
     isMajor: event.is_major,
     isStory: event.is_story,
+    factKind: event.fact_kind,
+    causalOrigin: event.causal_origin,
     renderKey: event.render_key,
     renderParams: event.render_params,
     createdAt: event.created_at,
@@ -63,6 +65,7 @@ export function normalizeEventCausalDetail(
     causes: Array.isArray(input.causes) ? input.causes : [],
     effects: Array.isArray(input.effects) ? input.effects : [],
     deltas: Array.isArray(input.deltas) ? input.deltas : [],
+    measurements: Array.isArray(input.measurements) ? input.measurements : [],
     decision: input.decision ?? null,
     decision_appraisals: Array.isArray(input.decision_appraisals) ? input.decision_appraisals : [],
     truncated: Boolean(input.truncated),
@@ -78,4 +81,3 @@ export function normalizeEventsResponse(
     hasMore: input?.has_more ?? false,
   }
 }
-

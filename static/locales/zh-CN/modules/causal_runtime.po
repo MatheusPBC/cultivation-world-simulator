@@ -1,0 +1,40 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "A causal probe injured {avatar} without killing them."
+msgstr ""
+
+msgid "A causal probe strained {service} service in {region}."
+msgstr ""
+
+msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
+msgstr ""
+
+msgid "The annual legitimacy reading remains unresolved while the throne lacks its recorded emperor."
+msgstr ""
+
+msgid "The imperial claim fails because the claimant is no longer alive."
+msgstr ""
+
+msgid "The imperial claimant loses eligibility and the imperial claim fails."
+msgstr ""
+
+msgid "{avatar} committed to an action chain"
+msgstr ""
+
+msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
+msgstr ""
+
+msgid "{official} publicly opposes the imperial claimant."
+msgstr ""
+
+msgid "{region} interpreted an urban risk as {decision}: {reason}"
+msgstr ""
+
+msgid "{region} population changed from {before} to {after}"
+msgstr ""
+
+msgid "Unhealed injuries prevent high-risk actions."
+msgstr "伤势未愈，无法进行高风险行动"

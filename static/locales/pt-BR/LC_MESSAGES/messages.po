@@ -1428,6 +1428,57 @@ msgstr ""
 "{winner} derrotou {loser}. {loser} sofreu {loser_dmg} de dano, e {winner} "
 "também sofreu {winner_dmg} de dano."
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr "Uma sonda causal aumentou a pressão populacional em {region}."
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr "Uma sonda causal reduziu o abastecimento de {resource} em {region}."
+
+msgid "A causal probe interrupted route {route}."
+msgstr "Uma sonda causal interrompeu a rota {route}."
+
+msgid "A causal probe strained {service} service in {region}."
+msgstr "Uma sonda causal sobrecarregou o serviço {service} em {region}."
+
+msgid "A causal probe injured {avatar} without killing them."
+msgstr "Uma sonda causal feriu {avatar} sem causar sua morte."
+
+msgid "The annual legitimacy reading leaves the imperial crisis unresolved."
+msgstr ""
+"A leitura anual de legitimidade mantém a crise imperial sem resolução."
+
+msgid ""
+"The annual legitimacy reading remains unresolved while the throne lacks its "
+"recorded emperor."
+msgstr ""
+"A leitura anual de legitimidade permanece inconclusiva enquanto o trono não "
+"possui um imperador registrado."
+
+msgid "The imperial claim fails because the claimant is no longer alive."
+msgstr ""
+"A pretensão imperial fracassa porque o pretendente não está mais vivo."
+
+msgid "The imperial claimant loses eligibility and the imperial claim fails."
+msgstr ""
+"O pretendente imperial perde a elegibilidade e sua pretensão fracassa."
+
+msgid "{avatar} committed to an action chain"
+msgstr "{avatar} comprometeu-se com uma cadeia de ações"
+
+msgid "{name} was injured in the hidden domain {domain} for {damage} HP."
+msgstr ""
+"{name} sofreu um ferimento no domínio oculto {domain}, perdendo {damage} de "
+"HP."
+
+msgid "{official} publicly opposes the imperial claimant."
+msgstr "{official} declarou publicamente oposição ao pretendente imperial."
+
+msgid "{region} population changed from {before} to {after}"
+msgstr "A população de {region} mudou de {before} para {after}"
+
+msgid "Unhealed injuries prevent high-risk actions."
+msgstr "Ferimentos ainda não curados impedem ações de alto risco."
+
 msgid " (and sold old {item} at reduced price)"
 msgstr " (e vendeu o item antigo {item} por um preço reduzido)"
 
@@ -2858,6 +2909,34 @@ msgstr "{name} pereceu no domínio oculto {domain}."
 
 msgid "{}: {}"
 msgstr "{}: {}"
+
+msgid ""
+"The dynasty responded to {region}'s condition with {decision}: {reason}"
+msgstr "A dinastia respondeu à condição de {region} com {decision}: {reason}"
+
+msgid "{sect_name} considered a response to a regional condition."
+msgstr "{sect_name} considerou uma resposta a uma condição regional."
+
+msgid "{sect_name} supported {avatar_name} with {amount} spirit stones."
+msgstr "{sect_name} apoiou {avatar_name} com {amount} pedras espirituais."
+
+msgid "Sect member support was blocked: {reason}"
+msgstr "O apoio ao membro da seita foi bloqueado: {reason}"
+
+msgid "Urban maintenance improved {capability} in {region}."
+msgstr "A manutenção urbana melhorou {capability} em {region}."
+
+msgid "Urban maintenance in {region} was blocked: {reason}"
+msgstr "A manutenção urbana em {region} foi bloqueada: {reason}"
+
+msgid "{sect_name} concluded a round of sect decisions"
+msgstr "{sect_name} concluiu uma rodada de decisões da seita"
+
+msgid "Urban capacity project in {region}: {outcome}."
+msgstr "Projeto de capacidade urbana em {region}: {outcome}."
+
+msgid "{region} interpreted an urban risk as {decision}: {reason}"
+msgstr "{region} interpretou um risco urbano como {decision}: {reason}"
 
 msgid "decided to equip it"
 msgstr "decidiu equipá-lo"

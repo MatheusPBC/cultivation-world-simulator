@@ -10,6 +10,8 @@ from src.run.log import get_logger
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.runtime_mode import is_test_mode_enabled, is_world_test_mode
+from src.utils.llm.test_mode_fallbacks import resolve_test_mode_task
 from src.utils.llm.validation import is_llm_runtime_configured
 from src.utils.strings import to_json_str_with_intent
 
@@ -39,10 +41,6 @@ class SectThinker:
         *,
         decision_summary: str = "",
     ) -> str:
-        if not cls._llm_available():
-            cls._warn_fallback(sect, "LLM runtime config unavailable")
-            return cls._fallback(sect)
-
         infos = {
             "sect_name": sect.name,
             "world_info": to_json_str_with_intent(cls._serialize_world_info(world)),
@@ -53,6 +51,15 @@ class SectThinker:
             ),
             "decision_summary": str(decision_summary or ""),
         }
+
+        if is_world_test_mode(world) or is_test_mode_enabled():
+            result = resolve_test_mode_task("sect_thinker", infos)
+            raw = str(result.get("sect_thinking", "")).strip() if isinstance(result, dict) else ""
+            return cls._normalize(raw, sect)
+
+        if not cls._llm_available():
+            cls._warn_fallback(sect, "LLM runtime config unavailable")
+            return cls._fallback(sect)
 
         try:
             result = await call_llm_with_task_name(
@@ -135,6 +142,8 @@ class SectThinker:
             "relations_summary": ctx.relations_summary,
             "celestial_dao": list(ctx.celestial_dao),
             "imperial_crisis": dict(ctx.imperial_crisis) if ctx.imperial_crisis else None,
+            # Read-only regional observations for the sect's canonical regions.
+            "regional_semantics": list(ctx.regional_semantics),
             "history": {
                 "summary_text": str(ctx.history.get("summary_text", "")),
                 "recent_events": recent,

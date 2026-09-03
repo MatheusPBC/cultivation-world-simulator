@@ -3,7 +3,7 @@ import random
 from typing import TYPE_CHECKING
 from src.classes.event import Event
 from src.i18n import t
-from .config import _cooldown_after_dissipated, _cooldown_after_resolved, _opportunity_probability
+from .config import _cooldown_after_dissipated, _cooldown_after_resolved
 from .events import _event
 from .manager import _get_manager
 from .outcomes import _resolve_opportunity
@@ -31,7 +31,7 @@ async def try_generate_opportunity(avatar: "Avatar", world: "World") -> list[Eve
     if record is None:
         return []
     manager.add(record)
-    return [_event(avatar, record.hint_text)]
+    return [_event(avatar, record.hint_text, source_event_ids=record.source_event_ids)]
 
 async def phase_generate_opportunities(world: "World", living_avatars: list["Avatar"]) -> list[Event]:
     events: list[Event] = []
@@ -57,7 +57,7 @@ async def phase_check_opportunities(world: "World", living_avatars: list["Avatar
             events.append(
                 _event(
                     owner,
-                    t("{avatar_name}'s opportunity sense gradually faded away.", avatar_name=owner.name),
+                    t("{avatar_name}'s opportunity sense gradually faded away.", avatar_name=owner.name), source_event_ids=record.source_event_ids,
                 )
             )
             continue
@@ -67,7 +67,7 @@ async def phase_check_opportunities(world: "World", living_avatars: list["Avatar
             events.append(
                 _event(
                     owner,
-                    t("{avatar_name}'s opportunity sense suddenly broke, leaving nowhere to seek.", avatar_name=owner.name),
+                    t("{avatar_name}'s opportunity sense suddenly broke, leaving nowhere to seek.", avatar_name=owner.name), source_event_ids=record.source_event_ids,
                 )
             )
             continue

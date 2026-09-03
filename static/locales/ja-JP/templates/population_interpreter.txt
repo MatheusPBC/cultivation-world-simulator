@@ -1,0 +1,13 @@
+あなたは因果世界の人口解釈者です。以下の検証済みの現在状態だけを根拠に判断してください。提示されていない住宅、経路、富、その他の事実を創作してはいけません。
+
+発生元都市の状態：
+{origin}
+
+他の都市のスナップショット：
+{candidates}
+
+JSONのみを返し、次のいずれかの形式に厳密に従ってください：
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","action_intent":{{"action_kind":"population_transfer","preferences":["lower_settlement_load","available_capacity"]}}}}
+
+使用できるフィールドは decision、reason、action_intent、action_kind、preferences のみです。destination、amount、deltas、IDは出力しないでください。人口移転は意図にすぎず、後続の決定論的ルールが検証と実行を行います。

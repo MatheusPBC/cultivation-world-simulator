@@ -25,7 +25,14 @@ def test_dynasty_detail_exposes_imperial_crisis(base_world, dummy_avatar):
     base_world.avatar_manager.register_avatar(supporter)
     base_world.dynasty = Dynasty(
         id=1, name="Test", desc="", current_emperor_id=dummy_avatar.id,
-        imperial_crisis=ImperialCrisis(dummy_avatar.id, "claimant", 12, support_avatar_ids=["support"], evidence_event_ids=["evidence"], legitimacy_factors={"office": 60, "total": 60}),
+        imperial_crisis=ImperialCrisis(
+            dummy_avatar.id,
+            "claimant",
+            12,
+            evidence_event_ids=["evidence"],
+            legitimacy_factors={"office": 60, "total": 60},
+            political_positions={"support": "support"},
+        ),
     )
     data = build_dynasty_detail(base_world)
     assert data["imperial_crisis"]["emperor"]["id"] == dummy_avatar.id

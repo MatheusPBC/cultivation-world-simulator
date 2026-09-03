@@ -27,6 +27,7 @@ class SelfHeal(TimedAction):
 
     def _execute(self) -> None:
         hp_obj = self.avatar.hp
+        before_hp = hp_obj.cur
         
         # 基础回复比例 (10%)
         base_ratio = 0.1
@@ -61,6 +62,7 @@ class SelfHeal(TimedAction):
             hp_obj.recover(heal_amount)
             
         self._healed_total = heal_amount
+        self._hp_before_execute = before_hp
 
     def _is_in_own_sect_headquarter(self) -> bool:
         sect = getattr(self.avatar, "sect", None)
@@ -94,4 +96,11 @@ class SelfHeal(TimedAction):
         # 统一用一次事件简要反馈
         content = t("{avatar} healing completed (recovered {amount} HP, current HP {hp})",
                    avatar=self.avatar.name, amount=healed_total, hp=self.avatar.hp)
-        return [Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])]
+        event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])
+        from src.classes.individual_consequence import record_hp_change_from_event
+        record_hp_change_from_event(
+            self.avatar,
+            event,
+            int(getattr(self, "_hp_before_execute", self.avatar.hp.cur)),
+        )
+        return [event]

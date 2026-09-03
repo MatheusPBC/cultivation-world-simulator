@@ -1,0 +1,28 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "The dynasty responded to {region}'s condition with {decision}: {reason}"
+msgstr "王朝针对{region}的状况作出{decision}决定：{reason}"
+
+msgid "{sect_name} considered a response to a regional condition."
+msgstr "{sect_name}考虑了如何回应当地状况。"
+
+msgid "{sect_name} supported {avatar_name} with {amount} spirit stones."
+msgstr "{sect_name}拨出{amount}灵石援助{avatar_name}。"
+
+msgid "Sect member support was blocked: {reason}"
+msgstr "宗门成员援助未能执行：{reason}"
+
+msgid "Urban maintenance improved {capability} in {region}."
+msgstr "{region}的{capability}设施经过维护后有所改善。"
+
+msgid "Urban maintenance in {region} was blocked: {reason}"
+msgstr "{region}的城市维护未能执行：{reason}"
+
+msgid "{sect_name} concluded a round of sect decisions"
+msgstr "{sect_name}完成了一轮宗门决策"
+
+msgid "Urban capacity project in {region}: {outcome}."
+msgstr "{region}的城市扩建工程：{outcome}。"

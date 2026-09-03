@@ -7,7 +7,6 @@ from src.classes.core.sect import sects_by_id
 from src.classes.effect.consts import EXTRA_SECT_MISSION_SUCCESS_RATE
 from src.classes.environment.sect_region import SectRegion
 from src.classes.environment.tile import Tile, TileType
-from src.classes.event import Event
 from src.systems.cultivation import Realm
 
 
@@ -135,6 +134,32 @@ async def test_sect_mission_finish_failure_can_kill(sect_mission_avatar):
     assert sect_mission_avatar.is_dead is True
     assert sect_mission_avatar.id in sect_mission_avatar.world.avatar_manager.dead_avatars
     assert "殒命" in events[0].content
+
+
+@pytest.mark.asyncio
+async def test_sect_mission_finish_failure_records_nonfatal_hp_and_injury(sect_mission_avatar):
+    action = SectMission(sect_mission_avatar, sect_mission_avatar.world)
+    action.task_title = "调查夜间异动"
+    action.task_id = "sect_task_investigate_night_anomaly"
+    action.task_category = "investigate"
+    action.issuer_type = "headquarter"
+    action.duration_months = 5
+    action.base_success_rate = 0.2
+    action.reward_magic_stones = 0
+    action.reward_contribution = 0
+    action.fail_damage_ratio = 0.3
+    action._start_event_content = "开始事件"
+    sect_mission_avatar.hp.cur = 80
+
+    with patch("src.classes.action.sect_mission.random.random", return_value=0.95), \
+         patch("src.classes.action.sect_mission.random.uniform", return_value=1.0), \
+         patch("src.classes.story_event_service.StoryEventService.should_trigger", return_value=False):
+        events = await action.finish()
+
+    assert len(events) == 1
+    assert sect_mission_avatar.hp.cur == 50
+    assert sect_mission_avatar.individual_consequences.active_injury is not None
+    assert [delta["aspect"] for delta in events[0].causal_payload["deltas"]] == ["hp", "active_injury"]
 
 
 @pytest.mark.asyncio

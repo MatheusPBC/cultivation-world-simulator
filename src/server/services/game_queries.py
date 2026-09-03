@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from fastapi import Query
-
 from src.classes.causal_link import CausalRelation
 from src.i18n import t
 from src.server.services.public_api_contract import raise_public_error
@@ -248,6 +246,11 @@ def _require_world(runtime):
             message="World not initialized",
         )
     return world
+
+
+def get_world_semantic_model(runtime) -> dict[str, Any]:
+    world = _require_world(runtime)
+    return world.mechanical_language.to_public_dict()
 
 
 def get_deceased_list(runtime) -> dict[str, Any]:
@@ -765,12 +768,14 @@ def get_event_causal_detail(
             break
 
     deltas = list((event.causal_payload or {}).get("deltas") or [])
+    measurements = list((event.causal_payload or {}).get("measurements") or [])
 
     return {
         "event": serialize_events_for_client([event], world=world)[0],
         "causes": causes,
         "effects": effects,
         "deltas": deltas,
+        "measurements": measurements,
         "decision": decision_dto,
         "decision_appraisals": _resolve_decision_appraisals(world, event_manager, decision_dto),
         "truncated": truncated,
@@ -1012,8 +1017,6 @@ def get_detail(
     language_manager: Any,
     resolve_avatar_pic_id: Callable[[Any], int],
 ) -> dict[str, Any]:
-    from fastapi import HTTPException
-
     world = _require_world(runtime)
     target = None
     if target_type == "avatar":
@@ -1059,19 +1062,9 @@ def get_detail(
         from src.systems.formation import get_formation_display_info
 
         info["formation"] = get_formation_display_info(world, getattr(target, "id", None))
-        from src.systems.regional_pressure import (
-            resolve_region_capabilities,
-            summarize_regional_pressure,
-        )
+        from src.systems.semantic_world.context import build_region_semantic_context
 
-        capabilities = resolve_region_capabilities(target, world=world)
-        info["regional_pressure"] = summarize_regional_pressure(
-            target,
-            current_month=int(world.month_stamp),
-            phenomenon=getattr(world, "current_phenomenon", None),
-            capabilities=capabilities,
-        )
-        info["regional_capabilities"] = capabilities
+        info["semantic_context"] = build_region_semantic_context(world, target)
         return info
     if target_type == "avatar":
         from src.server.assemblers.avatar_detail import build_avatar_detail

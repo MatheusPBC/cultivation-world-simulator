@@ -43,6 +43,24 @@
     "why_causes": "起因",
     "why_effects": "后续影响",
     "why_deltas": "状态变化",
+    "why_measurements": "测量",
+    "why_no_measurements": "没有记录到测量。",
+    "why_measurement_unknown": "未知",
+    "why_measurement_state_refs": "状态引用",
+    "why_measurement_source_events": "来源事件",
+    "why_measurement_derived_from": "推导输入",
+    "why_measurement_none": "无",
+    "why_measurement_availability": {
+      "measurable": "可测量",
+      "partially_measurable": "部分可测量",
+      "unmeasurable": "不可测量"
+    },
+    "why_measurement_kind": {
+      "exact": "精确",
+      "derived": "推导",
+      "estimated": "估计",
+      "unknown": "未知"
+    },
     "why_decision": "背后的决策",
     "why_no_causes": "没有记录到起因。",
     "why_no_effects": "暂无记录的后续影响。",
@@ -728,9 +746,89 @@
         "mercy": "慈悲",
         "transcendence": "超脱"
       },
-      "pressure": "当前压力",
-      "capabilities": "可用能力",
-      "causal_event": "因果事件"
+      "semantic_context": {
+        "conditions_title": "活动中的语义条件",
+        "readings_title": "关键读数",
+        "empty": "暂无可用语义上下文。",
+        "intensity": "强度 {value}",
+        "started_month": "始于第 {month} 月",
+        "definition": "定义 {id}",
+        "source_event": "来源事件 {id}",
+        "derived_from": "推导输入",
+        "unknown_value": "未知",
+        "confidence": "置信度 {value}%",
+        "availability": {
+          "measurable": "可测量",
+          "partially_measurable": "部分可测量",
+          "unmeasurable": "不可测量"
+        },
+        "reading_kind": {
+          "exact": "精确",
+          "derived": "推导",
+          "estimated": "估计",
+          "unknown": "未知"
+        }
+      },
+      "economy": {
+        "title": "区域经济",
+        "stocks": "库存",
+        "capacities": "容量",
+        "production_rates": "生产速率",
+        "demand_rates": "需求速率",
+        "access": "可获得性",
+        "dependencies": "依赖度"
+      },
+      "infrastructure": {
+        "title": "基础设施",
+        "capacities": "容量",
+        "quality": "质量"
+      },
+      "city_state": {
+        "title": "城市状态",
+        "districts": "城区",
+        "assets": "城市资产",
+        "governance": "治理",
+        "population_weight": "人口占比：{value}",
+        "tiles": "地图格：{value}",
+        "capacity": "容量：{value}",
+        "quality": "质量：{value}",
+        "integrity": "完整度：{value}",
+        "controller": "管理者",
+        "administrative_capacity": "行政能力：{value}"
+      },
+      "spiritual_ecology": {
+        "title": "灵性生态",
+        "grounding_label": "依据",
+        "essence": "灵气",
+        "densities": "五行密度",
+        "formations": "生效中的阵法",
+        "graves": "墓葬",
+        "treasures": "宝物",
+        "celestial_context": "天象背景",
+        "state_refs": "依据引用",
+        "started_month": "开始：第 {value} 月",
+        "expires_month": "到期：第 {value} 月",
+        "created_month": "创建：第 {value} 月",
+        "location": "位置：{value}",
+        "effects": "已记录效果",
+        "grounding": {
+          "grounded": "有依据的事实",
+          "unknown": "依据未知"
+        }
+      },
+      "collective_health": {
+        "title": "群体健康",
+        "grounding_label": "依据",
+        "living_avatar_count": "存活修士",
+        "active_wounded_count": "当前受伤",
+        "hp_deficit": "生命值缺口",
+        "healing_capacity": "疗愈能力",
+        "injuries": "当前伤势",
+        "healing_assets": "疗愈资产",
+        "hp_lost": "损失生命值：{value}",
+        "capacity": "容量：{value}",
+        "state_refs": "状态引用"
+      }
     },
     "sect": {
       "stats": {

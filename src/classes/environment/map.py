@@ -1,6 +1,8 @@
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional
 
 from src.classes.environment.tile import Tile, TileType
+from src.classes.environment.route import Route
 from src.classes.environment.sect_region import SectRegion
 
 if TYPE_CHECKING:
@@ -42,10 +44,41 @@ class Map():
         self.normal_regions = {}
         self.cultivate_regions = {}
         self.city_regions = {}
+        self.routes: dict[str, Route] = {}
 
     def update_sect_regions(self) -> None:
         """根据当前 self.regions 动态刷新宗门总部区域字典。"""
         self.sect_regions = {rid: r for rid, r in self.regions.items() if isinstance(r, SectRegion)}
+
+    def set_routes(self, routes: Iterable[Route]) -> None:
+        """Replace the explicit route registry after validating stable IDs."""
+        route_registry: dict[str, Route] = {}
+        for route in routes:
+            if not isinstance(route, Route):
+                raise TypeError("routes must contain Route instances")
+            if route.id in route_registry:
+                raise ValueError(f"Duplicate route id: {route.id}")
+            route_registry[route.id] = route
+        self.routes = route_registry
+
+    def get_routes_between(
+        self,
+        region_a: int,
+        region_b: int,
+        *,
+        resource_id: str | None = None,
+    ) -> list[Route]:
+        """Return enabled explicit routes between two regions in stable order."""
+        if region_a == region_b:
+            return []
+        routes = [
+            route
+            for route in self.routes.values()
+            if route.enabled
+            and route.connects(region_a, region_b)
+            and route.allows_resource(resource_id)
+        ]
+        return sorted(routes, key=lambda route: route.id)
 
     def is_in_bounds(self, x: int, y: int) -> bool:
         """
@@ -97,9 +130,6 @@ class Map():
                1. 过滤仅返回 avatar.known_regions 中的区域
                2. 计算并在描述中追加从 avatar 当前位置到各区域的距离
         """
-        if TYPE_CHECKING:
-             from src.classes.core.avatar import Avatar
-
         from src.classes.environment.region import NormalRegion, CultivateRegion, CityRegion
         
         known_region_ids = avatar.known_regions if avatar else None

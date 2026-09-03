@@ -7,6 +7,10 @@ from src.run.log import get_logger
 from .context import SimulationStepContext
 
 
+class EventPersistenceError(RuntimeError):
+    pass
+
+
 def log_events(events: list[Event]) -> None:
     logger = get_logger().logger
     for event in events:
@@ -49,17 +53,16 @@ def finalize_step(ctx: SimulationStepContext) -> list[Event]:
     ctx.causal.attach_to(final_events)
 
     if ctx.world.event_manager:
-        for event in final_events:
-            ctx.world.event_manager.add_event(event)
-        if ctx.pending_chronicle_chapter is not None:
-            source_ids = ctx.pending_chronicle_chapter.source_event_ids
-            sources_persisted = all(
-                ctx.world.event_manager.get_event_by_id(event_id) is not None
-                for event_id in source_ids
+        persisted = ctx.world.event_manager.commit_step(
+            final_events,
+            ctx.pending_chronicle_chapter,
+        )
+        if not persisted:
+            failed_event_id = final_events[0].id if final_events else "unknown"
+            raise EventPersistenceError(
+                f"failed to persist causal event {failed_event_id}; month was not advanced"
             )
-            if sources_persisted:
-                ctx.world.event_manager.append_chronicle_chapter(ctx.pending_chronicle_chapter)
-            ctx.pending_chronicle_chapter = None
+        ctx.pending_chronicle_chapter = None
 
     log_events(final_events)
     ctx.world.month_stamp = ctx.world.month_stamp + 1

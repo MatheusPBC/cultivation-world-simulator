@@ -19,6 +19,7 @@ class WorldCoreLoadSection:
         from src.sim.load.load_game import get_events_db_path
         from src.systems.time import MonthStamp
         from src.systems.world_secret import load_world_secret_from_save
+        from src.classes.mechanical_language import MechanicalLanguageState
 
         world_data = context.world_data or {}
         run_config_snapshot = context.run_config_snapshot or {}
@@ -52,6 +53,8 @@ class WorldCoreLoadSection:
         world.world_lore.text = world_lore_data.get("text", "")
         world.world_lore_snapshot = world_data.get("world_lore_snapshot", {}) or {}
         apply_world_lore_snapshot(world, world.world_lore_snapshot)
+        world.mechanical_language = MechanicalLanguageState.from_dict(world_data["mechanical_language"])
+        world.mechanical_language.bind_world(world)
         load_world_secret_from_save(world, world_data.get("world_secret"))
 
         from src.classes.celestial_phenomenon import celestial_phenomena_by_id

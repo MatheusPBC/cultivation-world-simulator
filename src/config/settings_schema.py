@@ -105,7 +105,40 @@ class NewGameDefaultsPatch(BaseModel):
 
 
 class RunConfig(NewGameDefaults):
-    pass
+    semantic_discovery_budget_per_month: int = Field(default=2, ge=0, le=20)
+    semantic_evaluation_budget_per_month: int = Field(default=256, ge=1, le=10000)
+    semantic_max_ast_nodes: int = Field(default=32, ge=4, le=256)
+    semantic_max_ast_depth: int = Field(default=8, ge=2, le=32)
+    semantic_dormant_after_months: int = Field(default=24, ge=1, le=1200)
+    semantic_discovery_retry_after_months: int = Field(default=12, ge=1, le=1200)
+    population_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
+    population_reaction_evaluation_budget_per_month: int = Field(
+        default=8, ge=1, le=256
+    )
+    domain_interpreter_budget_per_month: int = Field(default=8, ge=0, le=256)
+    causal_propagation_budget_per_month: int = Field(default=32, ge=1, le=4096)
+    domain_mutation_budget_per_month: int = Field(default=32, ge=1, le=4096)
+    population_transfer_max_fraction_per_reaction: float = Field(
+        default=0.20, ge=0.0, le=1.0
+    )
+    population_failed_transfer_retry_after_months: int = Field(
+        default=12, ge=1, le=1200
+    )
+    economy_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
+    economy_reaction_evaluation_budget_per_month: int = Field(default=8, ge=1, le=256)
+    city_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
+    city_reaction_evaluation_budget_per_month: int = Field(default=8, ge=1, le=256)
+    city_blocked_retry_months: int = Field(default=12, ge=1, le=1200)
+    government_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
+    government_reaction_evaluation_budget_per_month: int = Field(
+        default=8, ge=1, le=256
+    )
+    government_blocked_project_retry_months: int = Field(default=12, ge=1, le=1200)
+    government_blocked_maintenance_retry_months: int = Field(default=1, ge=1, le=1200)
+    organization_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
+    organization_reaction_evaluation_budget_per_month: int = Field(
+        default=8, ge=1, le=256
+    )
 
 
 class AppSettings(BaseModel):

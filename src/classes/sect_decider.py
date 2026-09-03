@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.classes.agent_decision import AgentDecision
 from src.classes.alignment import Alignment
 from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import Event, FactKind
 from src.classes.sect_ranks import get_rank_from_realm
 from src.classes.state_delta import StateDelta
@@ -20,17 +22,16 @@ from src.classes.technique import (
     is_attribute_compatible_with_root,
     techniques_by_name,
 )
-from src.systems.sect_decision_context import (
-    MAX_APPRAISALS_PER_TARGET,
-    MIN_APPRAISAL_EFFECTIVE_WEIGHT,
-)
 from src.systems.single_choice import (
     SectRecruitmentRequest,
     resolve_sect_recruitment,
 )
+from src.systems.sect_member_support import transfer_sect_member_support
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.runtime_mode import is_test_mode_enabled, is_world_test_mode
+from src.utils.llm.test_mode_fallbacks import resolve_test_mode_task
 from src.utils.llm.validation import is_llm_runtime_configured
 from src.utils.strings import to_json_str_with_intent
 
@@ -43,7 +44,9 @@ if TYPE_CHECKING:
 
 DIPLOMACY_ACTION_DECLARE_WAR = "declare_war"
 DIPLOMACY_ACTION_SEEK_PEACE = "seek_peace"
-_VALID_DIPLOMACY_ACTIONS = frozenset({DIPLOMACY_ACTION_DECLARE_WAR, DIPLOMACY_ACTION_SEEK_PEACE})
+_VALID_DIPLOMACY_ACTIONS = frozenset(
+    {DIPLOMACY_ACTION_DECLARE_WAR, DIPLOMACY_ACTION_SEEK_PEACE}
+)
 
 # 语义外交状态，用于 StateDelta 的 before/after。
 _DIPLOMACY_STATUS_WAR = "war"
@@ -109,7 +112,17 @@ class SectDecider:
 
         recruit_cost = int(getattr(CONFIG.sect, "recruit_cost", 500))
         support_amount = int(getattr(CONFIG.sect, "support_amount", 300))
-        plan = await cls._plan(sect, decision_context, world, recruit_cost=recruit_cost, support_amount=support_amount)
+        plan = await cls._plan(
+            sect,
+            decision_context,
+            world,
+            recruit_cost=recruit_cost,
+            support_amount=support_amount,
+        )
+
+        deterministic_plan = bool(
+            plan is not None and (is_world_test_mode(world) or is_test_mode_enabled())
+        )
 
         # 每一轮都要留下一条审计记录，包括规则兜底与“本轮什么都不做”。
         # 决策事件先建立，后续制度动作才能把 MOTIVATED_BY 指向它。
@@ -117,7 +130,7 @@ class SectDecider:
             month_stamp=int(world.month_stamp),
             subject_kind="sect",
             subject_id=str(sect.id),
-            source="llm" if plan is not None else "rule",
+            source="rule" if deterministic_plan or plan is None else "llm",
             considered_count=len(decision_context.diplomacy_targets),
             thinking=str(getattr(plan, "thinking", "") or ""),
         )
@@ -127,6 +140,15 @@ class SectDecider:
             related_sects=[int(sect.id)],
             is_major=False,
             fact_kind=FactKind.DECISION,
+            causal_origin=(
+                CausalOrigin.DETERMINISTIC
+                if deterministic_plan
+                else (
+                    CausalOrigin.LLM_INTERPRETATION
+                    if plan is not None
+                    else CausalOrigin.ACTOR_DECISION
+                )
+            ),
             causal_payload={"deltas": [], "decision": decision.to_dict()},
         )
         result.decision_event = decision_event
@@ -160,6 +182,7 @@ class SectDecider:
             reward_ids=set(plan.reward_avatar_ids) if plan is not None else None,
             support_ids=set(plan.support_avatar_ids) if plan is not None else None,
             decision=decision,
+            decision_event=decision_event,
         )
 
         result.summary_text = cls._build_summary(sect, result)
@@ -178,19 +201,27 @@ class SectDecider:
         recruit_cost: int,
         support_amount: int,
     ) -> SectDecisionPlan | None:
-        if not cls._llm_available():
-            cls._warn_plan_skip(sect, "LLM runtime config unavailable")
-            return None
-
         infos = {
             "sect_name": sect.name,
             "world_info": to_json_str_with_intent(cls._serialize_world_info(world)),
             "world_lore": world.world_lore.text,
-            "decision_context_info": to_json_str_with_intent(cls._serialize_context(decision_context)),
-            "decision_interval_years": int(getattr(CONFIG.sect, "decision_interval_years", 5)),
+            "decision_context_info": to_json_str_with_intent(
+                cls._serialize_context(decision_context)
+            ),
+            "decision_interval_years": int(
+                getattr(CONFIG.sect, "decision_interval_years", 5)
+            ),
             "recruit_cost": recruit_cost,
             "support_amount": support_amount,
         }
+
+        if is_world_test_mode(world) or is_test_mode_enabled():
+            fallback = resolve_test_mode_task("sect_decider", infos)
+            return cls._parse_plan(fallback, decision_context)
+
+        if not cls._llm_available():
+            cls._warn_plan_skip(sect, "LLM runtime config unavailable")
+            return None
 
         try:
             result = await call_llm_with_task_name(
@@ -255,7 +286,12 @@ class SectDecider:
             # relation or create an institutional action by themselves.
             "celestial_dao": list(ctx.celestial_dao),
             # A public court conflict is context for judgment, not a diplomacy command.
-            "imperial_crisis": dict(ctx.imperial_crisis) if ctx.imperial_crisis else None,
+            "imperial_crisis": dict(ctx.imperial_crisis)
+            if ctx.imperial_crisis
+            else None,
+            # Read-only regional observations; these never authorize or execute
+            # a new action by themselves.
+            "regional_semantics": list(ctx.regional_semantics),
             "history": {
                 "summary_text": str(ctx.history.get("summary_text", "")),
             },
@@ -270,8 +306,12 @@ class SectDecider:
         if not isinstance(payload, dict):
             return None
 
-        recruit_valid = {str(item["avatar_id"]) for item in decision_context.recruitment_candidates}
-        member_valid = {str(item["avatar_id"]) for item in decision_context.member_candidates}
+        recruit_valid = {
+            str(item["avatar_id"]) for item in decision_context.recruitment_candidates
+        }
+        member_valid = {
+            str(item["avatar_id"]) for item in decision_context.member_candidates
+        }
 
         def _pick_ids(key: str, valid_ids: set[str]) -> list[str]:
             raw = payload.get(key, [])
@@ -347,10 +387,14 @@ class SectDecider:
                 continue
             citations: list[str] = [str(item) for item in raw_ids]
             if len(set(citations)) != len(citations):
-                cls._warn_invalid_citation(other_sect_id, "duplicated appraisal citation")
+                cls._warn_invalid_citation(
+                    other_sect_id, "duplicated appraisal citation"
+                )
                 continue
             if any(citation not in allowed_appraisals for citation in citations):
-                cls._warn_invalid_citation(other_sect_id, "unknown or mismatched appraisal citation")
+                cls._warn_invalid_citation(
+                    other_sect_id, "unknown or mismatched appraisal citation"
+                )
                 continue
 
             seen_targets.add(other_sect_id)
@@ -366,7 +410,9 @@ class SectDecider:
     @classmethod
     def _warn_invalid_citation(cls, other_sect_id: int, reason: str) -> None:
         get_logger().logger.warning(
-            "Discarding sect diplomacy action against sect %s: %s", other_sect_id, reason
+            "Discarding sect diplomacy action against sect %s: %s",
+            other_sect_id,
+            reason,
         )
 
     @classmethod
@@ -398,9 +444,14 @@ class SectDecider:
             # 另一个宗门可能已经改变了这对关系，用快照会写出错误的
             # before 值，或重复执行一次已经成立的状态转移。
             live_state = world.get_sect_diplomacy_state(
-                int(sect.id), int(action.other_sect_id), current_month=int(world.month_stamp)
+                int(sect.id),
+                int(action.other_sect_id),
+                current_month=int(world.month_stamp),
             )
-            before_status = str(live_state.get("status", _DIPLOMACY_STATUS_PEACE) or _DIPLOMACY_STATUS_PEACE)
+            before_status = str(
+                live_state.get("status", _DIPLOMACY_STATUS_PEACE)
+                or _DIPLOMACY_STATUS_PEACE
+            )
 
             if action.action == DIPLOMACY_ACTION_DECLARE_WAR:
                 if before_status == _DIPLOMACY_STATUS_WAR:
@@ -485,7 +536,9 @@ class SectDecider:
             )
 
     @classmethod
-    def _record_institutional_step(cls, decision: AgentDecision, action_name: str, avatar_id: str) -> None:
+    def _record_institutional_step(
+        cls, decision: AgentDecision, action_name: str, avatar_id: str
+    ) -> None:
         """把一次已经执行的非外交制度动作记入审计链。
 
         `appraisal_ids` 恒为空：个人解读只是外交证据，不参与人事决策。
@@ -499,7 +552,9 @@ class SectDecider:
         )
 
     @classmethod
-    def _map_appraisal_to_source_event(cls, decision_context: "SectDecisionContext") -> dict[str, str]:
+    def _map_appraisal_to_source_event(
+        cls, decision_context: "SectDecisionContext"
+    ) -> dict[str, str]:
         mapping: dict[str, str] = {}
         for item in decision_context.diplomacy_targets:
             for entry in item.get("personal_appraisals") or []:
@@ -563,7 +618,9 @@ class SectDecider:
                 continue
 
             sect.magic_stone -= recruit_cost
-            avatar.join_sect(sect, get_rank_from_realm(avatar.cultivation_progress.realm))
+            avatar.join_sect(
+                sect, get_rank_from_realm(avatar.cultivation_progress.realm)
+            )
             result.recruitment_count += 1
             cls._record_institutional_step(decision, "recruit", avatar.id)
             result.events.append(
@@ -593,14 +650,18 @@ class SectDecider:
         reward_ids: set[str] | None,
         support_ids: set[str] | None,
         decision: AgentDecision,
+        decision_event: Event,
     ) -> None:
         sorted_members = sect.get_living_members_sorted_by_status()
         if support_ids is None:
-            support_limit = max(1, int(getattr(CONFIG.sect, "support_top_n_per_cycle", 2) or 2))
+            support_limit = max(
+                1, int(getattr(CONFIG.sect, "support_top_n_per_cycle", 2) or 2)
+            )
             support_candidates = [
                 avatar
                 for avatar in sorted_members
-                if int(getattr(getattr(avatar, "magic_stone", None), "value", 0)) < support_amount
+                if int(getattr(getattr(avatar, "magic_stone", None), "value", 0))
+                < support_amount
             ]
             support_ids = {
                 str(getattr(avatar, "id", ""))
@@ -613,7 +674,9 @@ class SectDecider:
 
             avatar_id = str(getattr(avatar, "id", ""))
 
-            if sect.is_member_rule_breaker(avatar) and (expel_ids is None or avatar_id in expel_ids):
+            if sect.is_member_rule_breaker(avatar) and (
+                expel_ids is None or avatar_id in expel_ids
+            ):
                 avatar.leave_sect()
                 result.expulsion_count += 1
                 cls._record_institutional_step(decision, "expel", avatar_id)
@@ -634,8 +697,10 @@ class SectDecider:
 
             reward_technique = cls._pick_reward_technique(sect, avatar)
             if (
-                reward_ids is None or avatar_id in reward_ids
-            ) and reward_technique is not None and cls._can_replace_technique(avatar, reward_technique):
+                (reward_ids is None or avatar_id in reward_ids)
+                and reward_technique is not None
+                and cls._can_replace_technique(avatar, reward_technique)
+            ):
                 avatar.technique = reward_technique
                 result.technique_reward_count += 1
                 cls._record_institutional_step(decision, "reward_technique", avatar_id)
@@ -643,7 +708,7 @@ class SectDecider:
                     Event(
                         month_stamp=world.month_stamp,
                         content=t(
-                            "{sect_name} bestowed the technique \"{technique_name}\" upon {avatar_name}.",
+                            '{sect_name} bestowed the technique "{technique_name}" upon {avatar_name}.',
                             sect_name=sect.name,
                             technique_name=reward_technique.name,
                             avatar_name=avatar.name,
@@ -656,30 +721,58 @@ class SectDecider:
 
             if support_ids is not None and avatar_id not in support_ids:
                 continue
-            if int(getattr(sect, "magic_stone", 0)) < support_amount:
+            before_sect = int(getattr(sect, "magic_stone", 0))
+            before_avatar = int(
+                getattr(getattr(avatar, "magic_stone", None), "value", 0)
+            )
+            if not transfer_sect_member_support(sect, avatar, amount=support_amount):
                 continue
-            current_stones = int(getattr(getattr(avatar, "magic_stone", None), "value", 0))
-            if current_stones >= support_amount:
-                continue
-
-            sect.magic_stone -= support_amount
-            avatar.magic_stone += support_amount
             result.support_count += 1
             cls._record_institutional_step(decision, "support", avatar_id)
-            result.events.append(
-                Event(
-                    month_stamp=world.month_stamp,
-                    content=t(
-                        "{sect_name} granted {amount} spirit stones to {avatar_name} in support of their cultivation.",
-                        sect_name=sect.name,
-                        amount=support_amount,
-                        avatar_name=avatar.name,
-                    ),
-                    related_avatars=[avatar.id],
-                    related_sects=[int(sect.id)],
-                    is_major=False,
+            support_event = Event(
+                month_stamp=world.month_stamp,
+                content=t(
+                    "{sect_name} granted {amount} spirit stones to {avatar_name} in support of their cultivation.",
+                    sect_name=sect.name,
+                    amount=support_amount,
+                    avatar_name=avatar.name,
+                ),
+                related_avatars=[avatar.id],
+                related_sects=[int(sect.id)],
+                is_major=False,
+                fact_kind=FactKind.STATE_TRANSITION,
+                causal_origin=CausalOrigin.ACTOR_DECISION,
+            )
+            support_event.causal_payload = {
+                "deltas": [
+                    StateDelta(
+                        event_id=support_event.id,
+                        owner_kind="sect",
+                        owner_id=str(sect.id),
+                        aspect="magic_stone",
+                        before=str(before_sect),
+                        after=str(sect.magic_stone),
+                        magnitude=-support_amount,
+                    ).to_dict(),
+                    StateDelta(
+                        event_id=support_event.id,
+                        owner_kind="avatar",
+                        owner_id=str(avatar.id),
+                        aspect="magic_stone",
+                        before=str(before_avatar),
+                        after=str(avatar.magic_stone.value),
+                        magnitude=support_amount,
+                    ).to_dict(),
+                ]
+            }
+            support_event.causal_links.append(
+                CausalLink(
+                    event_id=support_event.id,
+                    cause_event_id=decision_event.id,
+                    relation=CausalRelation.MOTIVATED_BY,
                 )
             )
+            result.events.append(support_event)
 
     @classmethod
     def _pick_reward_technique(cls, sect: "Sect", avatar: "Avatar") -> Technique | None:
@@ -690,7 +783,10 @@ class SectDecider:
                 continue
             if not technique.is_allowed_for(avatar):
                 continue
-            if technique.attribute == TechniqueAttribute.EVIL and getattr(avatar, "alignment", None) != Alignment.EVIL:
+            if (
+                technique.attribute == TechniqueAttribute.EVIL
+                and getattr(avatar, "alignment", None) != Alignment.EVIL
+            ):
                 continue
             if not is_attribute_compatible_with_root(technique.attribute, avatar.root):
                 continue
@@ -715,20 +811,39 @@ class SectDecider:
     def _build_summary(cls, sect: "Sect", result: SectDecisionResult) -> str:
         parts = []
         if result.recruitment_count:
-            parts.append(t("recruited {count} rogue cultivators", count=result.recruitment_count))
+            parts.append(
+                t("recruited {count} rogue cultivators", count=result.recruitment_count)
+            )
         if result.war_declared_count:
-            parts.append(t("declared war {count} times", count=result.war_declared_count))
+            parts.append(
+                t("declared war {count} times", count=result.war_declared_count)
+            )
         if result.peace_made_count:
             parts.append(t("made peace {count} times", count=result.peace_made_count))
         if result.expulsion_count:
             parts.append(t("expelled {count} members", count=result.expulsion_count))
         if result.technique_reward_count:
-            parts.append(t("bestowed techniques {count} times", count=result.technique_reward_count))
+            parts.append(
+                t(
+                    "bestowed techniques {count} times",
+                    count=result.technique_reward_count,
+                )
+            )
         if result.support_count:
-            parts.append(t("granted spirit-stone support {count} times", count=result.support_count))
+            parts.append(
+                t(
+                    "granted spirit-stone support {count} times",
+                    count=result.support_count,
+                )
+            )
         if not parts:
             return t(
                 "{sect_name} focused this round of sect decisions on consolidation and observation, with no major adjustments made.",
                 sect_name=sect.name,
             )
-        return t("{sect_name} this round of sect decisions:", sect_name=sect.name) + " " + "、".join(parts) + "。"
+        return (
+            t("{sect_name} this round of sect decisions:", sect_name=sect.name)
+            + " "
+            + "、".join(parts)
+            + "。"
+        )

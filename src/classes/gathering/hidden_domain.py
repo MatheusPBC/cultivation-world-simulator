@@ -1,6 +1,5 @@
-from typing import List, Dict, Optional, Any, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING
 import random
-import asyncio
 from dataclasses import dataclass
 
 from src.classes.gathering.gathering import Gathering, register_gathering
@@ -212,7 +211,8 @@ class HiddenDomain(Gathering):
                 triggered_event = True
                 loss_percent = domain.hp_loss_percent
                 damage = int(av.hp.max * loss_percent)
-                av.hp.cur -= damage
+                before_hp = av.hp.cur
+                av.hp.reduce(damage)
                 
                 if av.hp.cur <= 0:
                     # 死亡结算
@@ -233,6 +233,14 @@ class HiddenDomain(Gathering):
                     event_texts.append(event_content)
                     related_avatars_set.add(av)
                     continue # 死了就不能拿奖励了
+
+                event_content = t("{name} was injured in the hidden domain {domain} for {damage} HP.", name=av.name, domain=domain.name, damage=damage)
+                injury_event = Event(month_stamp, event_content, related_avatars=[av.id], is_major=False)
+                from src.classes.individual_consequence import record_hp_change_from_event
+                record_hp_change_from_event(av, injury_event, before_hp)
+                events.append(injury_event)
+                event_texts.append(event_content)
+                related_avatars_set.add(av)
             
             # --- 机缘判定 ---
             if random.random() < drop_prob:

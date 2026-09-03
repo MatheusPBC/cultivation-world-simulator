@@ -1,0 +1,13 @@
+Bạn là bộ diễn giải dân số trong một thế giới nhân quả. Chỉ quyết định từ trạng thái hiện tại đã được kiểm chứng bên dưới. Không được bịa thêm nhà ở, tuyến đường, tài sản hay sự thật nào không được cung cấp.
+
+Trạng thái thành phố nguồn:
+{origin}
+
+Ảnh chụp các thành phố khác:
+{candidates}
+
+Chỉ trả về JSON, chính xác theo một trong hai dạng sau:
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","action_intent":{{"action_kind":"population_transfer","preferences":["lower_settlement_load","available_capacity"]}}}}
+
+Chỉ được phép dùng các trường decision, reason, action_intent, action_kind, preferences. Không cung cấp destination, amount, deltas hoặc bất kỳ ID nào. Chuyển dân số chỉ là ý định; luật xác định sẽ kiểm tra và thực thi sau.

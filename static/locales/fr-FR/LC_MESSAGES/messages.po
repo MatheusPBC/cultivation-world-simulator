@@ -1459,6 +1459,15 @@ msgstr ""
 "{winner} a vaincu {loser}. {loser} a pris {loser_dmg} dégâts, {winner} a "
 "aussi pris {winner_dmg} dégâts."
 
+msgid "A causal probe increased population pressure in {region}."
+msgstr ""
+
+msgid "A causal probe reduced {resource} supply in {region}."
+msgstr ""
+
+msgid "A causal probe interrupted route {route}."
+msgstr ""
+
 msgid " (and sold old {item} at reduced price)"
 msgstr " (et vendu l'ancien {item} à prix réduit)"
 

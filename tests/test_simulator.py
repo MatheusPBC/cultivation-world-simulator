@@ -12,10 +12,14 @@ from src.classes.sect_decider import SectDecisionResult
 from src.classes.sect_ranks import get_rank_from_realm
 from src.server.runtime import DEFAULT_GAME_STATE, GameSessionRuntime
 from src.sim.simulator import Simulator
+from src.sim.simulator_engine.causal_recorder import CausalRecorder
+from src.sim.simulator_engine.context import SimulationStepContext
+from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.sim.simulator_engine.phases import annual, sect_war, world as world_phases
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.systems.cultivation import Realm
 from src.systems.time import Month, Year, create_month_stamp
+from src.utils.llm.client import call_llm_with_task_name
 
 
 @pytest.mark.asyncio
@@ -39,6 +43,30 @@ async def test_simulator_step_moves_avatar_and_sets_tile(base_world, dummy_avata
     assert dummy_avatar.tile is not None
     assert dummy_avatar.tile.x == 3
     assert dummy_avatar.tile.y == 1
+
+
+@pytest.mark.asyncio
+async def test_simulator_step_enforces_world_test_mode_for_direct_calls(
+    base_world,
+    monkeypatch,
+):
+    base_world.run_config_snapshot = {"test_mode": True}
+    provider = AsyncMock(side_effect=AssertionError("real provider must not run"))
+    monkeypatch.setattr("src.utils.llm.client.call_llm_with_template", provider)
+
+    async def _run(_runner):
+        return [await call_llm_with_task_name(
+            "action_decision",
+            "unused-template.txt",
+            {"avatar_name": "DirectStep"},
+        )]
+
+    monkeypatch.setattr(SimulationPhaseRunner, "run", _run)
+
+    result = await Simulator(base_world).step()
+
+    assert result[0]["DirectStep"]["action_name_params_pairs"] == []
+    provider.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -120,13 +148,16 @@ async def test_simulator_event_deduplication(base_world, dummy_avatar, mock_llm_
         new=AsyncMock(return_value=[ev]),
     ):
 
-        base_world.event_manager.add_event = MagicMock()
+        base_world.event_manager.commit_step = MagicMock(return_value=True)
         await sim.step()
 
-    target_calls = [
-        call for call in base_world.event_manager.add_event.call_args_list if call.args[0].id == ev_id
+    persisted_events = [
+        event
+        for call in base_world.event_manager.commit_step.call_args_list
+        for event in call.args[0]
+        if event.id == ev_id
     ]
-    assert len(target_calls) == 1
+    assert len(persisted_events) == 1
 
 
 @pytest.mark.asyncio
@@ -382,9 +413,6 @@ async def test_phase_handle_sect_wars_auto_battles_and_teleports_loser(base_worl
 
 # --- Task 3 acceptance: passive causal recorder must not alter step() behavior ---
 
-from src.sim.simulator_engine.context import SimulationStepContext
-from src.sim.simulator_engine.causal_recorder import CausalRecorder
-
 
 def test_context_create_bridges_and_step_clears_the_causal_recorder(base_world):
     ctx = SimulationStepContext.create(base_world)
@@ -397,6 +425,58 @@ def test_context_create_bridges_and_step_clears_the_causal_recorder(base_world):
     finalize_step(ctx)
 
     assert base_world.step_causal_recorder is None
+
+
+def test_finalize_does_not_advance_month_when_event_persistence_fails(base_world):
+    from src.classes.event import Event
+    from src.sim.simulator_engine.finalizer import EventPersistenceError, finalize_step
+
+    class RejectingEventManager:
+        def commit_step(self, _events, _chapter):
+            return False
+
+    before = base_world.month_stamp
+    base_world.event_manager = RejectingEventManager()
+    ctx = SimulationStepContext.create(base_world)
+    ctx.events.append(Event(before, "must persist"))
+
+    with pytest.raises(EventPersistenceError, match="month was not advanced"):
+        finalize_step(ctx)
+
+    assert base_world.month_stamp == before
+
+
+def test_finalize_persists_sqlite_step_events_as_one_batch(base_world, tmp_path, monkeypatch):
+    from src.classes.event_storage import EventStorage
+    from src.sim.managers.event_manager import EventManager
+    from src.sim.simulator_engine.finalizer import EventPersistenceError, finalize_step
+
+    storage = EventStorage(tmp_path / "events.db")
+    base_world.event_manager = EventManager(storage=storage)
+    original_insert = storage._insert_event
+    insert_count = 0
+
+    def fail_on_second_event(event):
+        nonlocal insert_count
+        insert_count += 1
+        if insert_count == 2:
+            raise RuntimeError("injected finalizer failure")
+        original_insert(event)
+
+    monkeypatch.setattr(storage, "_insert_event", fail_on_second_event)
+    before = base_world.month_stamp
+    ctx = SimulationStepContext.create(base_world)
+    first = Event(before, "first event")
+    second = Event(before, "second event")
+    ctx.events.extend([first, second])
+
+    try:
+        with pytest.raises(EventPersistenceError, match="month was not advanced"):
+            finalize_step(ctx)
+        assert storage.count() == 0
+        assert base_world.month_stamp == before
+    finally:
+        storage.close()
 
 
 @pytest.mark.asyncio
