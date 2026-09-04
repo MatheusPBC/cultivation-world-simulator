@@ -11,8 +11,9 @@ INIT_PHASE_NAMES = {
     2: "shaping_world_lore",
     3: "initializing_sects",
     4: "generating_avatars",
-    5: "preparing_character_profiles",
-    6: "generating_initial_events",
+    5: "generating_institutional_history",
+    6: "preparing_character_profiles",
+    7: "generating_initial_events",
 }
 
 INIT_PROGRESS_MAP = {
@@ -22,7 +23,8 @@ INIT_PROGRESS_MAP = {
     3: 40,
     4: 55,
     5: 70,
-    6: 85,
+    6: 80,
+    7: 90,
 }
 
 

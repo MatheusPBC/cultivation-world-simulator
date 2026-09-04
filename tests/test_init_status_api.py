@@ -11,11 +11,13 @@ These tests verify the loading screen backend functionality:
 import pytest
 import asyncio
 import time
+from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 
 from src.server import main
 from src.server.main import app, game_instance, update_init_progress, INIT_PHASE_NAMES
+from src.systems.time import MonthStamp
 
 
 @pytest.fixture
@@ -273,6 +275,60 @@ class TestMapAndStateAPIDuringInit:
 class TestInitGameAsync:
     """Tests for the async initialization flow."""
 
+    @pytest.fixture(autouse=True)
+    def _isolate_candidate_world_dependencies(self, monkeypatch):
+        """Keep status tests focused on init publication, not domain setup."""
+        from src.server import init_flow
+
+        async def advance_candidate_to_playable(sim, *, playable_start_month):
+            sim.world.month_stamp = MonthStamp(int(playable_start_month))
+
+        monkeypatch.setattr(
+            init_flow,
+            "run_institutional_prehistory",
+            advance_candidate_to_playable,
+        )
+        monkeypatch.setattr(init_flow, "bootstrap_institutional_authority", lambda _world: None)
+        monkeypatch.setattr(init_flow, "ground_unclaimed_city_governance", lambda _world: None)
+        monkeypatch.setattr(
+            "src.systems.celestial_dao_service.assign_region_traditions",
+            lambda _world: None,
+        )
+        monkeypatch.setattr(
+            "src.systems.world_secret.initialize_world_secret",
+            lambda _world, _secret_id: None,
+        )
+        monkeypatch.setattr(
+            init_flow,
+            "_create_save_slot",
+            lambda **_kwargs: (
+                Path("/tmp/cws-init-status-candidate.json"),
+                Path("/tmp/cws-init-status-candidate.events.sqlite"),
+            ),
+        )
+        monkeypatch.setattr(main, "generate_dynasty", lambda: MagicMock(title="Test Dynasty"))
+        monkeypatch.setattr(main, "generate_emperor_avatar", lambda _world, _dynasty: MagicMock(name="Test Emperor"))
+
+    @staticmethod
+    def _candidate_sim(world, *, observe_step=None):
+        sim = MagicMock()
+        sim.world = world
+
+        async def step():
+            if observe_step is not None:
+                await observe_step()
+            world.month_stamp = MonthStamp(int(world.month_stamp) + 1)
+
+        sim.step = AsyncMock(side_effect=step)
+        return sim
+
+    @staticmethod
+    def _candidate_world():
+        world = MagicMock()
+        world.month_stamp = MonthStamp(0)
+        world.avatar_manager.avatars = {}
+        return world
+
     @pytest.mark.asyncio
     async def test_init_sets_status_to_in_progress(self, reset_game_instance, mock_llm_managers):
         """Test initialization sets status to in_progress immediately."""
@@ -284,11 +340,9 @@ class TestInitGameAsync:
             
             mock_map = MagicMock()
             mock_load_map.return_value = mock_map
-            mock_world = MagicMock()
-            mock_world.avatar_manager.avatars = {}
-            mock_world_class.return_value = mock_world
-            mock_sim = MagicMock()
-            mock_sim.step = AsyncMock()
+            mock_world = self._candidate_world()
+            mock_world_class.create_with_db.return_value = mock_world
+            mock_sim = self._candidate_sim(mock_world)
             mock_sim_class.return_value = mock_sim
             
             # Start init but check status immediately.
@@ -319,16 +373,13 @@ class TestInitGameAsync:
              patch('src.server.main.sects_by_id', {}), \
              patch('src.server.main.CONFIG') as mock_config:
             
-            mock_config.game.sect_num = 0
-            mock_config.game.init_npc_num = 0
+            mock_config.world.start_year = 100
             
             mock_map = MagicMock()
             mock_load_map.return_value = mock_map
-            mock_world = MagicMock()
-            mock_world.avatar_manager.avatars = {}
-            mock_world_class.return_value = mock_world
-            mock_sim = MagicMock()
-            mock_sim.step = AsyncMock()
+            mock_world = self._candidate_world()
+            mock_world_class.create_with_db.return_value = mock_world
+            mock_sim = self._candidate_sim(mock_world)
             mock_sim_class.return_value = mock_sim
             
             await main.init_game_async()
@@ -341,7 +392,7 @@ class TestInitGameAsync:
         """Ready should not be exposed until the initial simulator step has finished."""
         observed_status_during_step = None
 
-        async def step():
+        async def observe_step():
             nonlocal observed_status_during_step
             observed_status_during_step = game_instance["init_status"]
 
@@ -353,16 +404,13 @@ class TestInitGameAsync:
              patch('src.server.main.sects_by_id', {}), \
              patch('src.server.main.CONFIG') as mock_config:
 
-            mock_config.game.sect_num = 0
-            mock_config.game.init_npc_num = 0
+            mock_config.world.start_year = 100
 
             mock_map = MagicMock()
             mock_load_map.return_value = mock_map
-            mock_world = MagicMock()
-            mock_world.avatar_manager.avatars = {}
-            mock_world_class.return_value = mock_world
-            mock_sim = MagicMock()
-            mock_sim.step = AsyncMock(side_effect=step)
+            mock_world = self._candidate_world()
+            mock_world_class.create_with_db.return_value = mock_world
+            mock_sim = self._candidate_sim(mock_world, observe_step=observe_step)
             mock_sim_class.return_value = mock_sim
 
             await main.init_game_async()
@@ -381,16 +429,13 @@ class TestInitGameAsync:
              patch('src.server.main.sects_by_id', {}), \
              patch('src.server.main.CONFIG') as mock_config:
             
-            mock_config.game.sect_num = 0
-            mock_config.game.init_npc_num = 0
+            mock_config.world.start_year = 100
             
             mock_map = MagicMock()
             mock_load_map.return_value = mock_map
-            mock_world = MagicMock()
-            mock_world.avatar_manager.avatars = {}
-            mock_world_class.return_value = mock_world
-            mock_sim = MagicMock()
-            mock_sim.step = AsyncMock()
+            mock_world = self._candidate_world()
+            mock_world_class.create_with_db.return_value = mock_world
+            mock_sim = self._candidate_sim(mock_world)
             mock_sim_class.return_value = mock_sim
             
             await main.init_game_async()
@@ -413,19 +458,41 @@ class TestInitGameAsync:
              patch('src.server.main.sects_by_id', {}), \
              patch('src.server.main.CONFIG') as mock_config:
             
-            mock_config.game.sect_num = 0
-            mock_config.game.init_npc_num = 0
+            mock_config.world.start_year = 100
             
             mock_map = MagicMock()
             mock_load_map.return_value = mock_map
-            mock_world = MagicMock()
-            mock_world.avatar_manager.avatars = {}
-            mock_world_class.return_value = mock_world
-            mock_sim = MagicMock()
-            mock_sim.step = AsyncMock()
+            mock_world = self._candidate_world()
+            mock_world_class.create_with_db.return_value = mock_world
+            mock_sim = self._candidate_sim(mock_world)
             mock_sim_class.return_value = mock_sim
-            
+
             await main.init_game_async()
-            
-            # Game should be paused after initialization.
-            assert game_instance["is_paused"] is True
+
+            # The candidate is published only after the first playable step.
+            assert game_instance["world"] is mock_world
+            assert game_instance["sim"] is mock_sim
+            assert int(mock_world.month_stamp) == 100 * 12 + 1
+
+    @pytest.mark.asyncio
+    async def test_initial_step_failure_leaves_candidate_unpublished(self, reset_game_instance, mock_llm_managers):
+        """A cancelled/non-advancing first step is not a playable world."""
+        candidate = self._candidate_world()
+        sim = MagicMock(world=candidate)
+        sim.step = AsyncMock(return_value=[])
+
+        with patch.object(main, "scan_avatar_assets"), \
+             patch.object(main, "load_cultivation_world_map", return_value=MagicMock()), \
+             patch("src.server.main.World") as mock_world_class, \
+             patch("src.server.main.Simulator", return_value=sim), \
+             patch("src.server.main.CONFIG") as mock_config, \
+             patch("src.server.main.sects_by_id", {}):
+            mock_config.world.start_year = 100
+            mock_world_class.create_with_db.return_value = candidate
+
+            await main.init_game_async()
+
+        assert game_instance["init_status"] == "error"
+        assert "did not advance" in game_instance["init_error"]
+        assert game_instance["world"] is None
+        assert game_instance.get("current_save_path") is None

@@ -1,58 +1,13 @@
-"""
-Integration tests for game initialization flow.
+"""Wiring tests for the game initialization flow.
 
-## Coverage
+These exercise `init_game_async()` and `update_init_progress()` against a mock
+world: phase order and progress, world lore handling, sect selection, avatar
+generation, error paths, and the fact that a candidate world is published only
+after the institutional prehistory and the first playable month both succeed.
 
-- `init_game_async()` (lines 310-453): **100%**
-- `update_init_progress()` (lines 300-308): **100%**
-
-## Test Summary (33 tests)
-
-| Category              | Tests |
-|-----------------------|-------|
-| Progress Updates      | 4     |
-| Success Path          | 2     |
-| World Lore Processing    | 4     |
-| LLM Check             | 1     |
-| Avatar Generation     | 6     |
-| Error Handling        | 6     |
-| Sects Initialization  | 3     |
-| State Verification    | 5     |
-| Phase Names           | 2     |
-
-## Code Paths Covered
-
-| Path                                      | Test                                                  |
-|-------------------------------------------|-------------------------------------------------------|
-| Phase 0: Asset scan success               | test_full_init_success                                |
-| Phase 0: Asset scan failure               | test_init_handles_asset_scan_error                    |
-| Phase 0: reload_all_static_data failure   | test_init_handles_reload_static_data_error            |
-| Phase 1: Map load success                 | test_full_init_success                                |
-| Phase 1: Map load failure                 | test_init_handles_map_load_error                      |
-| World creation failure                    | test_init_handles_world_creation_error                |
-| Simulator creation failure                | test_init_handles_simulator_creation_error            |
-| Phase 2: World lore applied                  | test_init_applies_history                             |
-| Phase 2: World lore failure (continues)      | test_init_continues_if_history_fails                  |
-| Phase 2: Empty history skipped            | test_init_empty_history_skips_history_manager         |
-| Phase 2: Whitespace history skipped       | test_init_whitespace_only_history_skips_history_manager |
-| Phase 3: Sects selected                   | test_init_selects_random_sects                        |
-| Phase 3: No sects available               | test_init_no_sects_available                          |
-| Phase 3: More sects than available        | test_init_more_sects_requested_than_available         |
-| Phase 4: Zero NPC count                   | test_init_zero_npc_count                              |
-| Phase 5: LLM check success                | test_full_init_success                                |
-| Phase 5: LLM check failure                | test_init_records_llm_failure                         |
-| Phase 6: Initial events success           | test_full_init_success                                |
-| Phase 6: Initial events failure           | test_init_continues_if_initial_events_fail            |
-| State: current_save_path set              | test_init_sets_current_save_path                      |
-| State: init_start_time set                | test_init_sets_start_time                             |
-| State: previous error cleared             | test_init_clears_previous_error                       |
-| State: status in_progress                 | test_init_sets_status_to_in_progress                  |
-
-## What's NOT Tested Here
-
-- Actual LLM API calls (mocked).
-- Actual file I/O for map loading (mocked).
-- WebSocket broadcasting during game loop.
+The institutional prehistory is stubbed here to advance only the clock, because
+a mock world cannot run canonical phases; the end-to-end initialization with the
+real World, Simulator and phases lives in `tests/test_institutional_prehistory.py`.
 """
 
 import pytest
@@ -70,6 +25,50 @@ from src.server.main import (
     INIT_PHASE_NAMES,
 )
 from src.config import RunConfig
+from src.classes.institution import InstitutionalAuthorityState
+from src.systems.time import MonthStamp
+
+
+def _mock_world_and_sim(*, avatars=None, step_error=None):
+    """A mock world that still satisfies what initialization really reads.
+
+    Institutional bootstrap, the prehistory clock and the first playable month
+    all read canonical structures, so the mock provides real ones instead of
+    bypassing the steps they guard.
+    """
+    mock_world = MagicMock()
+    mock_world.avatar_manager.avatars = {} if avatars is None else avatars
+    mock_world.avatar_manager.get_living_avatars.return_value = []
+    mock_world.map.regions = {}
+    mock_world.sect_context.get_active_sects.return_value = []
+    mock_world.institutional_authority = InstitutionalAuthorityState()
+    mock_world.month_stamp = MonthStamp(0)
+
+    mock_sim = MagicMock()
+    mock_sim.world = mock_world
+
+    async def _step():
+        if step_error is not None:
+            raise step_error
+        mock_world.month_stamp = MonthStamp(int(mock_world.month_stamp) + 1)
+        return []
+
+    mock_sim.step = AsyncMock(side_effect=_step)
+    return mock_world, mock_sim
+
+
+@pytest.fixture(autouse=True)
+def stub_institutional_prehistory():
+    """Simulate only the prehistory clock: a mock world has no real phases."""
+
+    async def _run(simulator, *, playable_start_month):
+        simulator.world.month_stamp = MonthStamp(int(playable_start_month))
+        return []
+
+    with patch(
+        "src.server.init_flow.run_institutional_prehistory", side_effect=_run
+    ) as stub:
+        yield stub
 
 
 def set_runtime_run_config(
@@ -143,7 +142,7 @@ class TestUpdateInitProgress:
 
     def test_update_progress_calculates_percentage(self, reset_game_instance):
         """Test that progress percentage is calculated correctly."""
-        progress_map = {0: 0, 1: 10, 2: 25, 3: 40, 4: 55, 5: 70, 6: 85}
+        progress_map = {0: 0, 1: 10, 2: 25, 3: 40, 4: 55, 5: 70, 6: 80, 7: 90}
 
         for phase, expected_progress in progress_map.items():
             update_init_progress(phase)
@@ -151,7 +150,7 @@ class TestUpdateInitProgress:
 
     def test_all_phase_names_defined(self):
         """Test that all phases have names defined."""
-        for phase in range(7):
+        for phase in range(8):
             assert phase in INIT_PHASE_NAMES
 
 
@@ -165,12 +164,7 @@ class TestInitGameAsyncSuccess:
         mock_map.width = 100
         mock_map.height = 100
 
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -207,10 +201,7 @@ class TestInitGameAsyncSuccess:
             original_update(phase, phase_name)
 
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -239,10 +230,7 @@ class TestInitGameAsyncWithWorldLore:
     async def test_init_applies_history(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that world history is applied when configured."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         mock_history_mgr = MagicMock()
         mock_history_mgr.apply_world_lore = AsyncMock()
@@ -272,10 +260,7 @@ class TestInitGameAsyncWithWorldLore:
     async def test_init_continues_if_history_fails(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that init continues even if history application fails."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         mock_history_mgr = MagicMock()
         mock_history_mgr.apply_world_lore = AsyncMock(side_effect=Exception("World lore failed"))
@@ -308,10 +293,7 @@ class TestInitGameAsyncWithLLMFailure:
     async def test_init_records_llm_failure(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that LLM check failure is recorded but doesn't stop init."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -343,13 +325,9 @@ class TestInitGameAsyncWithAvatars:
     async def test_init_generates_npcs(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that NPCs are generated."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
         # Use a real dict to track what gets added.
         avatars_dict = {}
-        mock_world.avatar_manager.avatars = avatars_dict
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim(avatars=avatars_dict)
 
         mock_avatars = {"npc1": MagicMock(), "npc2": MagicMock(), "npc3": MagicMock()}
 
@@ -408,13 +386,12 @@ class TestInitGameAsyncErrors:
             assert "Asset scan failed" in game_instance["init_error"]
 
     @pytest.mark.asyncio
-    async def test_init_continues_if_initial_events_fail(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
-        """Test that init completes even if initial event generation fails."""
+    async def test_init_fails_if_initial_events_fail(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
+        """A failed first playable month fails init and publishes nothing."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock(side_effect=Exception("Event generation failed"))
+        mock_world, mock_sim = _mock_world_and_sim(
+            step_error=Exception("Event generation failed")
+        )
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -431,9 +408,51 @@ class TestInitGameAsyncErrors:
 
             await init_game_async()
 
-            # Should still complete (initial events failure is not fatal).
-            assert game_instance["init_status"] == "ready"
-            # Game should be paused.
+            # The candidate world is incomplete, so it is never published.
+            assert game_instance["init_status"] == "error"
+            assert "Event generation failed" in game_instance["init_error"]
+            assert game_instance["world"] is None
+            assert game_instance["sim"] is None
+            assert game_instance["current_save_path"] is None
+            assert game_instance["is_paused"] is True
+
+    @pytest.mark.asyncio
+    async def test_init_fails_if_prehistory_fails(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
+        """A failed prehistory leaves the previous world and save path bound."""
+        previous_world = MagicMock()
+        previous_sim = MagicMock()
+        previous_save_path = Path("/previous/save.json")
+        game_instance["world"] = previous_world
+        game_instance["sim"] = previous_sim
+        game_instance["current_save_path"] = previous_save_path
+
+        mock_map = MagicMock()
+        mock_world, mock_sim = _mock_world_and_sim()
+
+        with patch.object(main, "reload_all_static_data"), \
+             patch.object(main, "scan_avatar_assets"), \
+             patch.object(main, "load_cultivation_world_map", return_value=mock_map), \
+             patch.object(main, "check_llm_connectivity", return_value=(True, "")), \
+             patch("src.server.main.World") as mock_world_class, \
+             patch("src.server.main.Simulator", return_value=mock_sim), \
+             patch("src.server.main.CONFIG") as mock_config, \
+             patch("src.server.main.sects_by_id", {}), \
+             patch(
+                 "src.server.init_flow.run_institutional_prehistory",
+                 side_effect=RuntimeError("prehistory month failed"),
+             ):
+
+            mock_config.paths.saves = temp_saves_dir
+            set_runtime_run_config()
+            mock_world_class.create_with_db.return_value = mock_world
+
+            await init_game_async()
+
+            assert game_instance["init_status"] == "error"
+            assert "prehistory month failed" in game_instance["init_error"]
+            assert game_instance["world"] is previous_world
+            assert game_instance["sim"] is previous_sim
+            assert game_instance["current_save_path"] == previous_save_path
             assert game_instance["is_paused"] is True
 
 
@@ -444,11 +463,7 @@ class TestInitGameAsyncWithSects:
     async def test_init_selects_random_sects(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that random sects are selected from available sects."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         mock_sect1 = MagicMock()
         mock_sect2 = MagicMock()
@@ -483,11 +498,7 @@ class TestInitGameAsyncWithSects:
     async def test_init_sets_world_existed_sects(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """新开档时 world.existed_sects 必须被设置，否则每年一月宗门结算不会产生事件。"""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         mock_sect1 = MagicMock()
         mock_sect2 = MagicMock()
@@ -525,11 +536,7 @@ class TestInitGameAsyncEdgeCases:
     async def test_init_no_sects_available(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test initialization when no sects are available."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -695,11 +702,7 @@ class TestInitGameAsyncEdgeCases:
     async def test_init_sets_current_save_path(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test that current_save_path is set during initialization."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -764,11 +767,7 @@ class TestInitGameAsyncEdgeCases:
         game_instance["init_error"] = "Previous error"
 
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -806,11 +805,7 @@ class TestInitGameAsyncEdgeCases:
     async def test_init_zero_npc_count(self, reset_game_instance, temp_saves_dir, mock_llm_managers):
         """Test initialization with zero NPC count."""
         mock_map = MagicMock()
-        mock_world = MagicMock()
-        mock_world.avatar_manager.avatars = {}
-        mock_world.month_stamp = MagicMock()
-        mock_sim = MagicMock()
-        mock_sim.step = AsyncMock()
+        mock_world, mock_sim = _mock_world_and_sim()
 
         with patch.object(main, "reload_all_static_data"), \
              patch.object(main, "scan_avatar_assets"), \
@@ -848,4 +843,3 @@ class TestInitPhaseNames:
         for name in INIT_PHASE_NAMES.values():
             assert name == name.lower()
             assert " " not in name
-

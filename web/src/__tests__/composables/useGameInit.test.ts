@@ -5,6 +5,7 @@ import { useSystemStore } from '@/stores/system'
 import { useWorldStore } from '@/stores/world'
 import { useSocketStore } from '@/stores/socket'
 import type { InitStatusDTO } from '@/types/api'
+import { worldApi } from '@/api'
 
 // Use vi.hoisted to define mocks before vi.mock is hoisted.
 const { mockLoadBaseTextures, mockPreloadRegionTextures, mockPreloadAvatarTextures } = vi.hoisted(() => ({
@@ -126,20 +127,10 @@ describe('useGameInit', () => {
       wrapper.unmount()
     })
 
-    it('should have mapPreloaded initially false', () => {
+    it('should expose frontend initialization state', () => {
       const TestComponent = createTestComponent()
       const wrapper = mount(TestComponent)
 
-      expect(wrapper.vm.mapPreloaded).toBe(false)
-
-      wrapper.unmount()
-    })
-
-    it('should have avatarsPreloaded initially false', () => {
-      const TestComponent = createTestComponent()
-      const wrapper = mount(TestComponent)
-
-      expect(wrapper.vm.avatarsPreloaded).toBe(false)
       expect(wrapper.vm.initializeDurationMs).toBe(0)
       expect(wrapper.vm.lastPollDurationMs).toBeGreaterThanOrEqual(0)
 
@@ -230,60 +221,14 @@ describe('useGameInit', () => {
       wrapper.unmount()
     })
 
-    it('should preload map when phase is in MAP_READY', async () => {
+    it('should only warm independent textures during backend initialization', async () => {
       const preloadMapSpy = vi.spyOn(worldStore, 'preloadMap')
-
-      vi.spyOn(systemStore, 'fetchInitStatus')
-        .mockResolvedValue(createMockStatus({
-          status: 'initializing',
-          phase_name: 'initializing_sects' // This is in MAP_READY.
-        }))
-
-      const TestComponent = createTestComponent()
-      const wrapper = mount(TestComponent)
-
-      await vi.advanceTimersByTimeAsync(0)
-      await nextTick()
-
-      expect(preloadMapSpy).toHaveBeenCalled()
-      expect(wrapper.vm.mapPreloaded).toBe(true)
-
-      wrapper.unmount()
-    })
-
-    it('should not preload map twice', async () => {
-      const preloadMapSpy = vi.spyOn(worldStore, 'preloadMap')
-
-      vi.spyOn(systemStore, 'fetchInitStatus')
-        .mockResolvedValue(createMockStatus({
-          status: 'initializing',
-          phase_name: 'initializing_sects'
-        }))
-
-      const TestComponent = createTestComponent()
-      const wrapper = mount(TestComponent)
-
-      // First poll.
-      await vi.advanceTimersByTimeAsync(0)
-      await nextTick()
-
-      // Second poll.
-      await vi.advanceTimersByTimeAsync(1000)
-      await nextTick()
-
-      // Should only be called once.
-      expect(preloadMapSpy).toHaveBeenCalledTimes(1)
-
-      wrapper.unmount()
-    })
-
-    it('should preload avatars when phase is in AVATAR_READY', async () => {
       const preloadAvatarsSpy = vi.spyOn(worldStore, 'preloadAvatars')
 
       vi.spyOn(systemStore, 'fetchInitStatus')
         .mockResolvedValue(createMockStatus({
-          status: 'initializing',
-          phase_name: 'preparing_character_profiles' // This is in AVATAR_READY.
+          status: 'in_progress',
+          phase_name: 'generating_institutional_history'
         }))
 
       const TestComponent = createTestComponent()
@@ -292,8 +237,11 @@ describe('useGameInit', () => {
       await vi.advanceTimersByTimeAsync(0)
       await nextTick()
 
-      expect(preloadAvatarsSpy).toHaveBeenCalled()
-      expect(wrapper.vm.avatarsPreloaded).toBe(true)
+      expect(preloadMapSpy).not.toHaveBeenCalled()
+      expect(preloadAvatarsSpy).not.toHaveBeenCalled()
+      expect(worldApi.fetchMap).not.toHaveBeenCalled()
+      expect(worldApi.fetchInitialState).not.toHaveBeenCalled()
+      expect(mockLoadBaseTextures).toHaveBeenCalled()
 
       wrapper.unmount()
     })
@@ -324,6 +272,29 @@ describe('useGameInit', () => {
       expect(setInitializedSpy).toHaveBeenCalledWith(true)
       expect(mockLoadBaseTextures).toHaveBeenCalled()
       expect(mockPreloadAvatarTextures).toHaveBeenCalled()
+
+      wrapper.unmount()
+    })
+
+    it('should retry authoritative initialization when the first ready attempt fails', async () => {
+      const initializeSpy = vi.spyOn(worldStore, 'initialize')
+        .mockRejectedValueOnce(new Error('world publication is still settling'))
+        .mockImplementationOnce(async () => {
+          worldStore.isLoaded = true
+        })
+      vi.spyOn(systemStore, 'fetchInitStatus')
+        .mockResolvedValue(createMockStatus({ status: 'ready' }))
+
+      const TestComponent = createTestComponent()
+      const wrapper = mount(TestComponent)
+
+      await vi.advanceTimersByTimeAsync(0)
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(1000)
+      await nextTick()
+
+      expect(initializeSpy).toHaveBeenCalledTimes(2)
+      expect(systemStore.isInitialized).toBe(true)
 
       wrapper.unmount()
     })

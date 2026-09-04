@@ -40,8 +40,43 @@ Both
 still contain 147 untyped events and 27 conditions activated/0 resolved, so this is
 not full production-world quality proof. No whole-roadmap claim is valid.
 
-Factual prehistory and commerce/war/religion/civil-disorder composition remain
-deferred and are not completed waves 8+. The working-tree hydrology correction
+Wave 8 has a first, deliberately narrow slice, still local WIP on top of the
+committed checkpoint 07330fb5: a fixed
+institutional prehistory of at most three months, clamped to the calendar that
+exists before the playable January (a year-0 world legitimately gets zero
+months). The world, dynasty, avatars and institutional authority are all
+constructed at that genesis month before any event exists, so prehistory runs
+forward and never backdates a fact; `world.start_year` still anchors the
+playable year. Each prehistory month runs a filtered subset of the canonical
+phase registry -- regional economy update, economy reactivity, late mechanical
+invalidation carry-forward, and the shared finalizer -- with its own
+`CausalBudget` and test-mode isolation. No avatar action, birth, death, war,
+climate or narration phase runs, and nothing forces resources, pressure or a
+positive decision: a silent prehistory is a valid world. This is institutional
+history only, not a simulation of the world's past life, and it adds no run
+config field, episode template or second owner. The new world is published to
+the runtime (world, simulator and save path together) only after the prehistory
+and the first playable month both succeed; a failed month restores that month
+alone, earlier committed months stay in their own database, and the incomplete
+candidate is never published. Save slots now carry a unique suffix so two
+worlds created in the same minute cannot share an events database.
+Initialization progress now reports 5 `generating_institutional_history`,
+6 `preparing_character_profiles` and 7 `generating_initial_events`.
+The frontend no longer preloads world data early: only static textures load
+while initialization is in progress, world data loads once status is ready, and
+the new phase label exists in all 7 locales.
+Verified by focused runs only: 88 backend tests pass in 13.90 s (17 prehistory,
+29 init integration, 7 init status, and the aid/relations/month-transaction/
+phase/schema remainder), plus frontend 18 `useGameInit` and 47 world tests
+(65 passed), `npm run build` in 10.27 s with typecheck and one pre-existing
+large-chunk warning, and a clean git diff check. The end-to-end initialization
+test needed host execution: under sandboxed execution it stalls to a 50 s
+timeout with an idle thread pool and asyncio selector, while the same isolated
+test passes on the host in 0.89 s. No whole-suite or long-smoke claim is made
+for this block, and nothing was deployed or run against real data.
+
+Commerce/war/religion/civil-disorder composition remains
+deferred and is not a completed wave 8+. The committed hydrology correction
 now applies a nonlinear severe-weather and soil response, then a bounded
 geography susceptibility multiplier, and finally drainage as subtractive
 resistance; a known Region footprint composed only of open water (SEA/WATER)

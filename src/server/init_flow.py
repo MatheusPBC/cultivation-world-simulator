@@ -2,22 +2,35 @@ from __future__ import annotations
 
 import asyncio
 import random
+import uuid
 from datetime import datetime
 from typing import Any, Callable
 
 from src.systems.city_governance import ground_unclaimed_city_governance
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.sim.simulator_engine.prehistory import (
+    genesis_month_stamp,
+    run_institutional_prehistory,
+)
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
 def _create_save_slot(*, config, get_events_db_path) -> tuple[Any, Any]:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    save_name = f"save_{timestamp}"
     saves_dir = config.paths.saves
     saves_dir.mkdir(parents=True, exist_ok=True)
-    save_path = saves_dir / f"{save_name}.json"
-    events_db_path = get_events_db_path(save_path)
-    return save_path, events_db_path
+    # The minute stamp alone collides when a world is created twice in the same
+    # minute (a failed initialization retried, for example), which would point
+    # the new candidate at the previous world's events database and append its
+    # prehistory to that history.  The suffix makes each candidate exclusive;
+    # nothing existing is overwritten, migrated or deleted.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    for _ in range(16):
+        save_name = f"save_{timestamp}_{uuid.uuid4().hex[:8]}"
+        save_path = saves_dir / f"{save_name}.json"
+        events_db_path = get_events_db_path(save_path)
+        if not save_path.exists() and not events_db_path.exists():
+            return save_path, events_db_path
+    raise RuntimeError("could not reserve an unused save slot for the new world")
 
 
 def _select_existed_sects(*, sects_by_id, needed_sects: int) -> list[Any]:
@@ -172,13 +185,35 @@ async def _run_llm_check_background(
         print(f"[Warning] LLM connectivity check failed: {exc}")
 
 
+def _refresh_derived_avatar_ages(*, world) -> None:
+    """Recompute the derived age after the prehistory months.
+
+    Age is derived from the birth month, so refreshing it keeps the playable
+    start consistent without running lifecycle, birth or death phases.
+    """
+    avatar_manager = getattr(world, "avatar_manager", None)
+    if avatar_manager is None:
+        return
+    for avatar in getattr(avatar_manager, "avatars", {}).values():
+        avatar.update_age(world.month_stamp)
+
+
 async def _generate_initial_events(*, sim) -> None:
+    """Run the first playable month; failure or cancellation fails init.
+
+    A cancelled step restores its checkpoint and returns no events without
+    advancing the clock, so the month cursor -- not the return value -- is what
+    says the first playable month actually happened.
+    """
+    world = sim.world
+    month = int(world.month_stamp)
     print("Generating initial events...")
-    try:
-        await sim.step()
-        print("Initial events generation completed")
-    except Exception as exc:
-        print(f"[Warning] Initial events generation failed: {exc}")
+    await sim.step()
+    if int(world.month_stamp) != month + 1:
+        raise RuntimeError(
+            f"the first playable month {month} did not advance the world clock"
+        )
+    print("Initial events generation completed")
 
 
 async def perform_game_initialization(
@@ -234,13 +269,18 @@ async def perform_game_initialization(
             config=config,
             get_events_db_path=get_events_db_path,
             )
-            runtime.set_current_save_path(save_path)
             print(f"Events database: {events_db_path}")
 
             start_year = getattr(config.world, "start_year", 100)
+            playable_start_month = create_month_stamp(
+                year_cls(start_year), month_enum.JANUARY
+            )
+            # Everything below is constructed at the genesis month, before any
+            # event exists, so the prehistory runs forward into the playable
+            # January instead of backdating facts.
             world = world_cls.create_with_db(
             map=game_map,
-            month_stamp=create_month_stamp(year_cls(start_year), month_enum.JANUARY),
+            month_stamp=genesis_month_stamp(playable_start_month),
             events_db_path=events_db_path,
             start_year=start_year,
             )
@@ -286,14 +326,27 @@ async def perform_game_initialization(
             bootstrap_institutional_authority(world)
             from src.systems.world_secret import initialize_world_secret
             initialize_world_secret(world, getattr(run_config, "world_secret_id", "none"))
-            runtime.set_world_and_sim(world, sim)
 
-            update_init_progress(5, "preparing_character_profiles")
+            update_init_progress(5, "generating_institutional_history")
+            runtime.set_paused(True)
+            await run_institutional_prehistory(
+                sim,
+                playable_start_month=playable_start_month,
+            )
+            _refresh_derived_avatar_ages(world=world)
+
+            update_init_progress(6, "preparing_character_profiles")
             await _prepare_initial_character_profiles(world=world)
 
-            update_init_progress(6, "generating_initial_events")
-            runtime.set_paused(True)
+            update_init_progress(7, "generating_initial_events")
             await _generate_initial_events(sim=sim)
+
+            # The candidate world becomes the runtime's world only once its
+            # prehistory and first playable month have both succeeded.
+            # The save path moves with it: a failed candidate must never leave
+            # the previous world bound to the new slot.
+            runtime.set_current_save_path(save_path)
+            runtime.set_world_and_sim(world, sim)
             runtime.finish_initialization(phase_name="complete")
             runtime.set_initialization_progress(progress=100)
             runtime.set_llm_check_state(

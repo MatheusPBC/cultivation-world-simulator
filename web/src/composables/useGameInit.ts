@@ -4,7 +4,6 @@ import { useWorldStore } from '@/stores/world'
 import { useSocketStore } from '@/stores/socket'
 import { useMapStore } from '@/stores/map'
 import { useAvatarStore } from '@/stores/avatar'
-import { GAME_PHASES } from '@/constants/game'
 import { storeToRefs } from 'pinia'
 
 import { useTextures } from '@/components/game/composables/useTextures'
@@ -12,15 +11,6 @@ import { logError, logWarn } from '@/utils/appError'
 
 interface UseGameInitOptions {
   onIdle?: () => void
-}
-
-type InitPhaseName =
-  | (typeof GAME_PHASES.MAP_READY)[number]
-  | (typeof GAME_PHASES.AVATAR_READY)[number]
-  | (typeof GAME_PHASES.TEXTURES_READY)[number]
-
-function isPhaseIn(list: readonly string[], phaseName: string): phaseName is InitPhaseName {
-  return list.includes(phaseName)
 }
 
 export function useGameInit(options: UseGameInitOptions = {}) {
@@ -34,8 +24,6 @@ export function useGameInit(options: UseGameInitOptions = {}) {
   const { initStatus, isInitialized, isLoading } = storeToRefs(systemStore)
   
   // 内部变量
-  const mapPreloaded = ref(false)
-  const avatarsPreloaded = ref(false)
   const texturesPreloaded = ref(false)
   const isInitializingFrontend = ref(false)
   const frontendInitError = ref<string | null>(null)
@@ -48,11 +36,6 @@ export function useGameInit(options: UseGameInitOptions = {}) {
     if (texturesPreloaded.value) return
     texturesPreloaded.value = true
     Promise.resolve(loadBaseTextures()).catch((e) => logWarn('GameInit preload textures', e))
-  }
-
-  async function preloadMapAndRegionTextures() {
-    await worldStore.preloadMap()
-    await preloadRegionTextures(mapStore.regions.values())
   }
 
   // Methods
@@ -115,28 +98,13 @@ export function useGameInit(options: UseGameInitOptions = {}) {
             worldStore.reset()
         }
         // 重置预加载标记
-        mapPreloaded.value = false
-        avatarsPreloaded.value = false
         texturesPreloaded.value = false
       }
 
-      // 提前加载地图
-      if (!mapPreloaded.value && isPhaseIn(GAME_PHASES.MAP_READY, res.phase_name)) {
-        mapPreloaded.value = true
-        Promise.resolve(preloadMapAndRegionTextures()).catch((e) => logWarn('GameInit preload map textures', e))
-        preloadBaseTexturesOnce()
-      }
-      
-      // 提前加载角色
-      if (!avatarsPreloaded.value && isPhaseIn(GAME_PHASES.AVATAR_READY, res.phase_name)) {
-        avatarsPreloaded.value = true
-        worldStore.preloadAvatars()
-      }
-      
-      // 提前加载纹理资源（利用后端生成事件等待期）
-      if (!texturesPreloaded.value && isPhaseIn(GAME_PHASES.TEXTURES_READY, res.phase_name)) {
-        preloadBaseTexturesOnce()
-      }
+      // Base textures are independent of the candidate world and can warm up
+      // while the backend is still building it. Map/avatar data must wait for
+      // the ready state because the candidate is not published before then.
+      if (res.status === 'in_progress') preloadBaseTexturesOnce()
       
       if (res.status === 'ready' && !isInitialized.value && !isInitializingFrontend.value) {
         try {
@@ -179,8 +147,6 @@ export function useGameInit(options: UseGameInitOptions = {}) {
     initStatus,
     gameInitialized: isInitialized, // Alias for compatibility
     showLoading: isLoading,
-    mapPreloaded,
-    avatarsPreloaded,
     isInitializingFrontend,
     frontendInitError,
     initializeDurationMs,
