@@ -53,5 +53,193 @@ function statusLabel(status: string): string {
 </template>
 
 <style scoped>
-.dao-view{--ink:#eee7d8;--muted:#aca493;--line:#39342b;--gold:#c8a96a;--jade:#78cbb1;padding:24px;color:var(--ink);background:#121211}.dao-view header{padding-bottom:18px;border-bottom:1px solid var(--line)}header span,.petition-meta{color:var(--gold);font-size:11px;letter-spacing:.09em;text-transform:uppercase}h3{margin:7px 0;font-size:25px}h4{margin:0;color:var(--ink);font-size:15px}header p,.petition p{color:var(--muted);line-height:1.55}.petition{padding:20px 0;border-bottom:1px solid var(--line)}.history{margin-top:28px;padding-top:20px;border-top:1px solid var(--line)}.history-item{padding:15px 0}.response{margin-top:12px!important;padding-left:12px;border-left:2px solid var(--jade);color:var(--ink)!important}.response span{display:block;margin-bottom:4px;color:var(--jade);font-size:11px;letter-spacing:.08em;text-transform:uppercase}.favor-expiry{margin:10px 0 0;color:var(--gold)!important;font-size:13px}.rite-evidence{margin:10px 0!important;color:var(--jade)!important;font-size:12px}.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.actions button,.why{min-height:44px;border:1px solid var(--line);background:#1b1916;color:var(--ink);font:inherit;cursor:pointer}.actions .favor{border-color:var(--gold);color:var(--gold)}.why{margin-top:10px;border:0;color:var(--jade);text-align:left}.state{padding:32px 0;color:var(--muted)}button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}@media(max-width:600px){.dao-view{padding:16px}.actions{grid-template-columns:1fr}.actions button{min-height:48px}}
+/*
+ * Dao petitions: an audience record. Already editorial in shape, but it carried
+ * its own five-value palette and a 25px title, which is oversized inside a
+ * ~380px column. Now on the shared tokens at the panel's compact scale.
+ */
+.dao-view {
+  padding: var(--s-6);
+  color: var(--text-secondary);
+  background: var(--surface-panel);
+  font-family: var(--font-ui);
+}
+
+.dao-view header {
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Eyebrow and per-petition meta share one tracked, gold caption style. */
+header span,
+.petition-meta {
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+h3 {
+  margin: var(--s-3) 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+h4 {
+  margin: 0 0 var(--s-3);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+header p,
+.petition p {
+  color: var(--text-secondary);
+  font-size: var(--t-md);
+  line-height: 1.6;
+}
+
+.petition {
+  padding: var(--s-6) 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.history {
+  margin-top: var(--s-7);
+  padding-top: var(--s-6);
+  border-top: 1px solid var(--rule);
+}
+
+.history-item {
+  padding: var(--s-5) 0;
+}
+
+/* Heaven's answer is a quotation from the world itself. */
+.response {
+  margin-top: var(--s-5) !important;
+  padding-left: var(--s-5);
+  border-left: 2px solid var(--jade-600);
+  color: var(--text-primary) !important;
+  font-family: var(--font-display);
+}
+
+.response span {
+  display: block;
+  margin-bottom: var(--s-1);
+  color: var(--jade-300);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.favor-expiry {
+  margin: var(--s-4) 0 0;
+  color: var(--accent-strong) !important;
+  font-family: var(--font-numeric);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.rite-evidence {
+  margin: var(--s-4) 0 !important;
+  color: var(--jade-300) !important;
+  font-family: var(--font-numeric);
+  font-size: var(--t-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Three canonical responses. Silence and sign are equals; favor is the
+ * committing choice, so it alone carries the gold.
+ */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.actions button,
+.why {
+  min-height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast),
+    border-color var(--motion-fast);
+}
+
+.actions button:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+}
+
+.actions button:disabled {
+  color: var(--paper-700);
+  cursor: not-allowed;
+}
+
+.actions .favor {
+  border-color: var(--gold-600);
+  color: var(--accent-strong);
+}
+
+.actions .favor:hover:not(:disabled) {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
+.why {
+  margin-top: var(--s-4);
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-bottom: 1px solid var(--jade-600);
+  border-radius: 0;
+  color: var(--jade-300);
+  font-size: var(--t-xs);
+  text-align: left;
+}
+
+.why:hover {
+  color: var(--paper-100);
+  border-bottom-color: var(--jade-400);
+}
+
+.state {
+  padding: var(--s-7) 0;
+  color: var(--text-muted);
+  font-size: var(--t-sm);
+  font-style: italic;
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 600px) {
+  .dao-view {
+    padding: var(--s-6) var(--s-5);
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .actions button,
+  .why {
+    min-height: 48px;
+  }
+}
 </style>

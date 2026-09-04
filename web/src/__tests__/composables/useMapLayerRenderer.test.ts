@@ -42,6 +42,13 @@ const containerDestroyMock = vi.hoisted(() => vi.fn())
 
 vi.mock('pixi.js', () => ({
   Container: class {
+    x = 0
+    y = 0
+    alpha = 1
+    zIndex = 0
+    eventMode = 'none'
+    sortableChildren = false
+    scale = { set: vi.fn() }
     children: Array<{ destroy?: (options?: unknown) => void }> = []
     addChild(child: { destroy?: (options?: unknown) => void }) {
       this.children.push(child)
@@ -63,13 +70,28 @@ vi.mock('pixi.js', () => ({
     width = 0
     height = 0
     roundPixels = false
+    tint = 0xffffff
     eventMode = 'none'
     constructor(public texture: unknown) {}
     destroy = spriteDestroyMock
   },
   Graphics: class {
     eventMode = 'none'
+    cursor = 'default'
+    zIndex = 0
+    clear() {
+      return this
+    }
     rect() {
+      return this
+    }
+    roundRect() {
+      return this
+    }
+    circle() {
+      return this
+    }
+    ellipse() {
       return this
     }
     fill() {
@@ -85,9 +107,20 @@ vi.mock('pixi.js', () => ({
       graphicsStrokeMock(options)
       return this
     }
+    on() {
+      return this
+    }
     destroy = graphicsDestroyMock
   },
+  Text: class {
+    anchor = { set: vi.fn() }
+    eventMode = 'none'
+    texture = { source: { scaleMode: 'nearest' } }
+    constructor(public options: unknown) {}
+    destroy = vi.fn()
+  },
   TilingSprite: class {
+    tint = 0xffffff
     tileScale = { set: vi.fn() }
     tilePosition = { x: 0, y: 0 }
     mask: unknown = null
@@ -102,6 +135,7 @@ vi.mock('pixi.js', () => ({
   },
 }))
 
+import { MAP_ROUTE, TERRAIN_TINT } from '@/constants/mapTheme'
 import {
   buildMapLayerRenderPlan,
   DEFAULT_MAP_LAYER_VISIBILITY,
@@ -410,10 +444,46 @@ describe('useMapLayerRenderer', () => {
     await nextTick()
 
     expect(emit).toHaveBeenCalledTimes(2)
+    // 20/(100*0.8) = 0.25 availability -> still a land route, dimmed.
     expect(graphicsStrokeMock).toHaveBeenCalledWith(expect.objectContaining({
-      color: 0xd8b36a,
-      alpha: 0.38,
+      color: MAP_ROUTE.landColor,
+      alpha: 0.45 + 0.25 * 0.5,
     }))
+  })
+
+  it('derives a coastline from every land cell that touches water', () => {
+    const plan = buildMapLayerRenderPlan({
+      mapData: [['SEA', 'PLAIN'], ['PLAIN', 'PLAIN']],
+      geography: { elevationRows: [], waterBodies: [] },
+      territoryRows: [[1, 1], [1, 1]],
+      regions: [],
+      routes: [],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    })
+
+    // (1,0) is land with sea to its left; (0,1) is land with sea above it.
+    expect(plan.coast).toEqual(expect.arrayContaining([
+      { x: 1, y: 0, side: 'left' },
+      { x: 0, y: 1, side: 'top' },
+    ]))
+    // A water cell never contributes a coast edge of its own.
+    expect(plan.coast.some(edge => edge.x === 0 && edge.y === 0)).toBe(false)
+  })
+
+  it('tints terrain into the shared tonal family instead of leaving raw tile art', () => {
+    const plan = buildMapLayerRenderPlan({
+      mapData: [['PLAIN', 'DESERT']],
+      geography: { elevationRows: [], waterBodies: [] },
+      territoryRows: [[1, 1]],
+      regions: [],
+      routes: [],
+      visibility: DEFAULT_MAP_LAYER_VISIBILITY,
+    })
+
+    expect(plan.terrain).toEqual([
+      { x: 0, y: 0, type: 'PLAIN', tint: TERRAIN_TINT.PLAIN },
+      { x: 1, y: 0, type: 'DESERT', tint: TERRAIN_TINT.DESERT },
+    ])
   })
 
   it('assigns elevation colors deterministically and omits the overlay when hidden', () => {

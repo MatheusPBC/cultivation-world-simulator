@@ -91,36 +91,45 @@ const {
   min-height: 0;
 }
 
+/* Timeline tab header: a hairline rule over the panel surface, not a lighter
+   grey bar, so the tab does not introduce a fourth background value. */
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
-  background: #222;
-  border-bottom: 1px solid #333;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--rule);
 }
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 13px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .filter-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-2);
 }
 
 .roleplay-event-lock {
   max-width: 160px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  border: 1px solid rgba(208, 180, 124, 0.24);
-  color: #dec48b;
-  background: rgba(86, 61, 23, 0.32);
-  font-size: 11px;
-  line-height: 1.5;
+  padding: 0 var(--s-3);
+  border-radius: var(--r-1);
+  border: 1px solid var(--gold-600);
+  color: var(--accent-strong);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  line-height: 1.6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -135,29 +144,33 @@ const {
   width: 100%;
   min-width: 0;
   overflow-y: auto;
-  padding: 8px 12px;
+  padding: var(--s-4) var(--s-5);
 }
 
 .empty, .loading {
-  padding: 20px;
+  padding: var(--s-7) 0;
   text-align: center;
-  color: #666;
-  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  font-style: italic;
 }
 
 .loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--s-4);
+  font-style: normal;
 }
 
 .load-more-hint {
   text-align: center;
-  padding: 8px;
-  color: #666;
-  font-size: 11px;
-  border-bottom: 1px solid #2a2a2a;
+  padding: var(--s-4);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 @media (max-width: 760px) {
@@ -174,6 +187,7 @@ const {
   .filter-group {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-3);
     width: 100%;
   }
 

@@ -51,20 +51,35 @@
     "why_considered_count": "{count} options envisagées",
     "why_rejected": "Options rejetées",
     "guide": {
-      "loading": "Lecture du monde actuel...", "error": "Impossible de créer le Guide vivant.", "retry": "Réessayer",
-      "date": "An {year}, mois {month}", "world_in_one_sentence": "Le monde en une phrase",
-      "no_headline": "Les premières histoires du monde prennent encore forme.", "sources": "{count} sources",
-      "happening": "Ce qui se passe", "happening_hint": "Les fils narratifs les plus importants du moment",
-      "empty": "Aucun événement n'est encore assez important pour former un fil narratif.", "understand_why": "Comprendre pourquoi",
-      "people": "Qui compte maintenant", "people_empty": "Aucun personnage ne s'est distingué durant cette période.",
-      "no_current_action": "Aucune action actuelle enregistrée", "no_ambition": "Aucune ambition connue", "concept": "Concept à retenir",
-      "ask_eyebrow": "Demander au Chroniqueur", "ask_title": "Interroger ce monde",
-      "grounded_note": "Les réponses se limitent aux faits et aux sources du monde", "question_label": "Question au Chroniqueur",
-      "question_placeholder": "Pourquoi ce conflit compte-t-il ? Qui pourrait en changer le cours ?", "ask_button": "Demander",
-      "answering": "Consultation...", "suggestion_people": "Qui transforme le monde ?",
-      "suggestion_conflict": "Quel conflit mérite l'attention ?", "suggestion_change": "Qu'est-ce qui a changé récemment ?",
+      "loading": "Lecture du monde actuel...",
+      "error": "Impossible de créer le Guide vivant.",
+      "retry": "Réessayer",
+      "date": "An {year}, mois {month}",
+      "world_in_one_sentence": "Le monde en une phrase",
+      "no_headline": "Les premières histoires du monde prennent encore forme.",
+      "sources": "{count} sources",
+      "happening": "Ce qui se passe",
+      "happening_hint": "Les fils narratifs les plus importants du moment",
+      "empty": "Aucun événement n'est encore assez important pour former un fil narratif.",
+      "understand_why": "Comprendre pourquoi",
+      "people": "Qui compte maintenant",
+      "people_empty": "Aucun personnage ne s'est distingué durant cette période.",
+      "no_current_action": "Aucune action actuelle enregistrée",
+      "no_ambition": "Aucune ambition connue",
+      "concept": "Concept à retenir",
+      "ask_eyebrow": "Demander au Chroniqueur",
+      "ask_title": "Interroger ce monde",
+      "grounded_note": "Les réponses se limitent aux faits et aux sources du monde",
+      "question_label": "Question au Chroniqueur",
+      "question_placeholder": "Pourquoi ce conflit compte-t-il ? Qui pourrait en changer le cours ?",
+      "ask_button": "Demander",
+      "answering": "Consultation...",
+      "suggestion_people": "Qui transforme le monde ?",
+      "suggestion_conflict": "Quel conflit mérite l'attention ?",
+      "suggestion_change": "Qu'est-ce qui a changé récemment ?",
       "answer_error": "Le Chroniqueur ne peut pas répondre maintenant. Réessayez.",
-      "answer_unavailable": "Les sources sont encore insuffisantes pour répondre.", "answer_sources": "Sources de la réponse",
+      "answer_unavailable": "Les sources sont encore insuffisantes pour répondre.",
+      "answer_sources": "Sources de la réponse",
       "source_number": "Source {number}"
     },
     "why_relation": {
@@ -75,7 +90,8 @@
       "resolves": "résout",
       "prevented_by": "empêché par",
       "contributed_to": "a contribué à"
-    }
+    },
+    "title_short": "Journal"
   },
   "status_bar": {
     "phenomenon": "Phénomène du monde",
@@ -123,7 +139,17 @@
       "war_none": "Aucune guerre de sectes pour le moment"
     },
     "world_secret": {
-      "label": "[Secret]"
+      "label": "Secret"
+    },
+    "nav_label": "Panneaux du monde",
+    "menu": "Menu système",
+    "time_detail": "Détails du temps",
+    "connected": "Connecté",
+    "disconnected": "Déconnecté",
+    "groups": {
+      "world": "Monde",
+      "powers": "Puissances",
+      "records": "Annales"
     }
   },
   "world_info": {
@@ -197,7 +223,8 @@
     "resume": "Reprendre la partie",
     "pause": "Mettre en pause",
     "paused": "En pause",
-    "closed_msg": "Partie fermée. Vous pouvez fermer cet onglet en toute sécurité."
+    "closed_msg": "Partie fermée. Vous pouvez fermer cet onglet en toute sécurité.",
+    "running": "En cours"
   },
   "event_panel": {
     "title": "Événements",
@@ -299,7 +326,8 @@
     "fallback": {
       "avatar_name": "Personnage",
       "counterpart_name": "L'autre partie"
-    }
+    },
+    "title_short": "Incarner"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name} s'est fait un nom dans le monde de cultivation et fut désormais connu sous le nom de « {nickname} »."
@@ -790,5 +818,63 @@
     "decision_keep": "Gardé secret",
     "decision_none": "Aucun choix",
     "empty": "Aucune donnée de secret"
+  },
+  "map": {
+    "tab": "Carte",
+    "sheet_close": "Fermer le panneau",
+    "layers": {
+      "title": "Calques",
+      "groups": {
+        "physical": "Physique",
+        "territorial": "Territorial",
+        "organizational": "Organisations"
+      },
+      "terrain": {
+        "label": "Relief"
+      },
+      "water": {
+        "label": "Eaux"
+      },
+      "elevation": {
+        "label": "Altitude"
+      },
+      "borders": {
+        "label": "Frontières"
+      },
+      "names": {
+        "label": "Toponymes"
+      },
+      "routes": {
+        "label": "Routes",
+        "hint": "Liens entre régions ; les lignes ne sont pas le tracé réel"
+      },
+      "sects": {
+        "label": "Sectes"
+      },
+      "infrastructure": {
+        "label": "Sites"
+      },
+      "institutionalPresence": {
+        "label": "Présence institutionnelle"
+      }
+    },
+    "view": {
+      "group": "Commandes d'affichage",
+      "zoom_in": "Zoom avant",
+      "zoom_out": "Zoom arrière",
+      "fit": "Vue globale",
+      "zoom_level": "Niveau de zoom"
+    },
+    "legend": {
+      "title": "Légende",
+      "coast": "Littoral",
+      "flow": "Courant",
+      "border": "Frontière régionale",
+      "route_land": "Route terrestre",
+      "route_water": "Voie d’eau",
+      "route_severed": "Route coupée",
+      "sect": "Territoire de secte",
+      "site": "Site d’infrastructure"
+    }
   }
 }

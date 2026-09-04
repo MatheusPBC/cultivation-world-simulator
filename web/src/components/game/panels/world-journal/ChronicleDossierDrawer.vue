@@ -75,20 +75,183 @@ function eventDate(event: EventDTO) {
 </template>
 
 <style scoped>
-.chronicle-dossier-overlay { position: fixed; inset: 0; z-index: 55; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, .62); }
-.chronicle-dossier { width: min(520px, 100%); height: 100%; display: flex; flex-direction: column; background: #161616; box-shadow: -8px 0 28px rgba(0, 0, 0, .45); }
-.chronicle-dossier__header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 13px 15px; border-bottom: 1px solid #303030; }
-.chronicle-dossier__header h3 { margin: 0; color: #f3e9cf; font-size: 15px; }
-.chronicle-dossier__close { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: #bbb; font-size: 22px; }
-.chronicle-dossier__body { min-height: 0; overflow-y: auto; padding: 15px; }
-.chronicle-dossier__claim { margin: 0; padding: 11px 12px; border-left: 3px solid #b99652; background: #1d1d1d; color: #f1dfb9; line-height: 1.55; }
-.chronicle-dossier__note, .chronicle-dossier__state { margin: 10px 0 0; padding: 10px 12px; border: 1px dashed #484036; border-radius: 8px; color: #c6af82; font-size: 11px; line-height: 1.5; }
-.chronicle-dossier__state--error { color: #d28d84; }
-.chronicle-dossier__section { margin-top: 17px; }
-.chronicle-dossier__section h4 { margin: 0 0 8px; color: #bdb6a9; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.chronicle-dossier__event { position: relative; margin-top: 8px; padding: 11px 70px 11px 12px; border: 1px solid #303030; border-radius: 9px; background: #1b1b1b; }
-.chronicle-dossier__event time { color: #817b71; font-size: 10px; }
-.chronicle-dossier__event p { margin: 5px 0 0; color: #ded8ca; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
-.chronicle-dossier__why { position: absolute; top: 10px; right: 8px; min-height: 30px; padding: 4px 8px; border: 1px solid rgba(197, 166, 107, .5); border-radius: 999px; background: rgba(85, 63, 27, .28); color: #f1dfb9; font-size: 10px; }
-@media (max-width: 760px) { .chronicle-dossier { width: 100%; } .chronicle-dossier__event p { font-size: 16px; line-height: 1.6; } .chronicle-dossier__why { min-height: 44px; } }
+/*
+ * The dossier is the evidence behind a chronicle claim: a lacquered drawer with
+ * the claim as its dateline and the source sequence as a ruled ledger.
+ */
+.chronicle-dossier-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--surface-scrim);
+}
+
+.chronicle-dossier {
+  width: min(520px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-panel);
+  border-left: 1px solid var(--rule-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+.chronicle-dossier__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-5) var(--s-6);
+  border-bottom: 1px solid var(--rule);
+}
+
+.chronicle-dossier__header h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.chronicle-dossier__close {
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  transition: color var(--motion-fast);
+}
+
+.chronicle-dossier__close:hover {
+  color: var(--text-primary);
+}
+
+.chronicle-dossier__close:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.chronicle-dossier__body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s-6);
+}
+
+.chronicle-dossier__claim {
+  margin: 0;
+  padding: 0 0 var(--s-5) var(--s-5);
+  border-left: 2px solid var(--accent);
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  line-height: 1.6;
+}
+
+/* Pruning and truncation are epistemic caveats: gold rule, quiet copy. */
+.chronicle-dossier__note,
+.chronicle-dossier__state {
+  margin: var(--s-5) 0 0;
+  padding: 0 0 0 var(--s-4);
+  border: 0;
+  border-left: 2px solid var(--gold-600);
+  border-radius: 0;
+  color: var(--text-muted);
+  font-size: var(--t-xs);
+  line-height: 1.55;
+}
+
+.chronicle-dossier__state--error {
+  border-left-color: var(--cinnabar-400);
+  color: var(--state-alert);
+}
+
+.chronicle-dossier__section {
+  margin-top: var(--s-7);
+}
+
+.chronicle-dossier__section h4 {
+  margin: 0 0 var(--s-4);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+}
+
+.chronicle-dossier__event {
+  position: relative;
+  margin-top: 0;
+  padding: var(--s-5) 64px var(--s-5) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.chronicle-dossier__event + .chronicle-dossier__event {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.chronicle-dossier__event time {
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chronicle-dossier__event p {
+  margin: var(--s-2) 0 0;
+  color: var(--text-primary);
+  font-size: var(--t-md);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.chronicle-dossier__why {
+  position: absolute;
+  top: var(--s-5);
+  right: 0;
+  min-height: 26px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-bottom: 1px solid var(--gold-600);
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
+}
+
+.chronicle-dossier__why:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent);
+}
+
+.chronicle-dossier__why:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 760px) {
+  .chronicle-dossier {
+    width: 100%;
+  }
+
+  .chronicle-dossier__event p {
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .chronicle-dossier__why {
+    min-height: 44px;
+  }
+}
 </style>

@@ -4,6 +4,7 @@ import { Container, Graphics, Rectangle } from 'pixi.js'
 import { useMapStore } from '@/stores/map'
 import { useAudio } from '@/composables/useAudio'
 import { buildInfrastructureSiteRenderPlan } from './utils/infrastructureSites'
+import { MAP_SITE } from '@/constants/mapTheme'
 
 const props = withDefaults(defineProps<{
   visible?: boolean
@@ -24,18 +25,33 @@ let markerLayer: Container | null = null
 
 const sites = computed(() => Array.from(mapStore.infrastructureSites.values()))
 
+/**
+ * Sites are engraved survey marks: a dark plate, a paper rim and a status
+ * glyph. The old solid colored disc competed with the characters for
+ * attention while carrying far less meaning.
+ */
 function drawMarker(graphics: Graphics, color: number, status: string) {
   graphics.clear()
-  graphics.circle(0, 0, 15).fill({ color, alpha: 0.9 })
-  graphics.circle(0, 0, 15).stroke({ color: 0x201b16, width: 3, alpha: 0.9 })
+  const r = MAP_SITE.radius
+
+  graphics.circle(0, 0, r + 2).fill({ color: MAP_SITE.casingColor, alpha: 0.85 })
+  graphics.circle(0, 0, r).fill({ color: MAP_SITE.plateColor, alpha: 0.95 })
+  // The owner/kind color survives as a thin rim, so identity is kept.
+  graphics.circle(0, 0, r).stroke({ color, width: 2, alpha: 0.9 })
+
   if (status === 'destroyed') {
-    graphics.moveTo(-7, -7).lineTo(7, 7).stroke({ color: 0x201b16, width: 3 })
-    graphics.moveTo(7, -7).lineTo(-7, 7).stroke({ color: 0x201b16, width: 3 })
-  } else if (status === 'impaired') {
-    graphics.moveTo(-7, 0).lineTo(7, 0).stroke({ color: 0x201b16, width: 3 })
-  } else {
-    graphics.circle(0, 0, 5).fill({ color: 0xfff1c2, alpha: 0.95 })
+    graphics.moveTo(-4.5, -4.5).lineTo(4.5, 4.5)
+      .stroke({ color: MAP_SITE.destroyedAccent, width: 2.4, cap: 'round' })
+    graphics.moveTo(4.5, -4.5).lineTo(-4.5, 4.5)
+      .stroke({ color: MAP_SITE.destroyedAccent, width: 2.4, cap: 'round' })
+    return
   }
+  if (status === 'impaired') {
+    graphics.moveTo(-5, 0).lineTo(5, 0)
+      .stroke({ color: MAP_SITE.impairedAccent, width: 2.4, cap: 'round' })
+    return
+  }
+  graphics.circle(0, 0, 3).fill({ color: MAP_SITE.activeAccent, alpha: 0.95 })
 }
 
 function handleSiteSelect(site: { id: string; name: string; kind: string; clickable: boolean }) {
@@ -58,7 +74,7 @@ function renderSites() {
     marker.y = item.position.y
     marker.eventMode = item.clickable ? 'static' : 'none'
     marker.cursor = item.clickable ? 'pointer' : 'default'
-    marker.hitArea = new Rectangle(-20, -20, 40, 40)
+    marker.hitArea = new Rectangle(-24, -24, 48, 48)
     marker.on('pointertap', () => handleSiteSelect(site))
 
     const graphics = new Graphics()

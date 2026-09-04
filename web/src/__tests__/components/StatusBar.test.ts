@@ -157,16 +157,26 @@ vi.mock('naive-ui', () => ({
 // Stub StatusWidget.
 const StatusWidgetStub = defineComponent({
   name: 'StatusWidget',
-  props: ['label', 'icon', 'color', 'mode', 'disablePopover', 'title', 'items', 'emptyText'],
+  props: ['label', 'icon', 'accent', 'disablePopover'],
   emits: ['trigger-click'],
   setup(props, { emit }) {
     return () => h('div', {
       class: 'status-widget-stub',
       'data-label': props.label,
       'data-icon': props.icon,
-      'data-color': props.color,
+      'data-accent': props.accent,
       onClick: () => emit('trigger-click'),
     }, props.label)
+  },
+})
+
+// Stub SimClock: the clock owns date, run state and the pause control.
+const SimClockStub = defineComponent({
+  name: 'SimClock',
+  props: ['year', 'month', 'paused', 'connected', 'compact'],
+  emits: ['toggle-pause', 'open-time'],
+  setup(props) {
+    return () => h('div', { class: 'sim-clock-stub' }, `${props.year}/${props.month}`)
   },
 })
 
@@ -180,6 +190,7 @@ describe('StatusBar', () => {
       },
       stubs: {
         StatusWidget: StatusWidgetStub,
+        SimClock: SimClockStub,
         TimeOverviewModal: true,
         AvatarOverviewModal: true,
         WorldSecretModal: true,
@@ -227,118 +238,113 @@ describe('StatusBar', () => {
     vi.unstubAllGlobals()
   })
 
-  it('should display year and month from worldStore', () => {
+  it('shows the simulation date through the clock', () => {
     mockYear = 200
     mockMonth = 12
 
     const wrapper = mount(StatusBar, globalConfig)
 
-    expect(wrapper.text()).toContain('200')
-    expect(wrapper.text()).toContain('12')
+    const clock = wrapper.getComponent(SimClockStub)
+    expect(clock.props('year')).toBe(200)
+    expect(clock.props('month')).toBe(12)
   })
 
-  it('should show connected status when socketStore.isConnected is true', () => {
-    mockIsConnected = true
+  it('binds the run/pause control to the clock rather than a detached corner button', () => {
+    const wrapper = mount(StatusBar, { ...globalConfig, props: { paused: true } })
 
-    const wrapper = mount(StatusBar, globalConfig)
+    const clock = wrapper.getComponent(SimClockStub)
+    expect(clock.props('paused')).toBe(true)
 
-    expect(wrapper.find('.status-dot.connected').exists()).toBe(true)
+    clock.vm.$emit('toggle-pause')
+    expect(wrapper.emitted('toggle-pause')).toHaveLength(1)
   })
 
-  it('should show disconnected status when socketStore.isConnected is false', () => {
+  it('passes connection state to the clock', () => {
     mockIsConnected = false
 
     const wrapper = mount(StatusBar, globalConfig)
 
-    expect(wrapper.find('.status-dot.connected').exists()).toBe(false)
-    expect(wrapper.find('.status-dot').exists()).toBe(true)
+    expect(wrapper.getComponent(SimClockStub).props('connected')).toBe(false)
   })
 
-  describe('phenomenonColor', () => {
-    it('should return #9aa4b2 for N rarity', () => {
-      mockCurrentPhenomenon = { id: 1, name: 'Test', rarity: 'N' }
+  it('opens the time panel from the clock readout', async () => {
+    const wrapper = mount(StatusBar, globalConfig)
 
+    wrapper.getComponent(SimClockStub).vm.$emit('open-time')
+    await settleAsyncPanels()
+
+    expect(wrapper.find('time-overview-modal-stub').exists()).toBe(true)
+  })
+
+  describe('navigation rail', () => {
+    it('organises the panels into world, powers and records groups', () => {
       const wrapper = mount(StatusBar, globalConfig)
 
-      const widget = wrapper.findAll('.status-widget-stub')[1]
-      expect(widget.attributes('data-color')).toBe('#9aa4b2')
+      const groups = wrapper.findAll('.hud__group')
+      expect(groups).toHaveLength(3)
+
+      // World: phenomenon + hidden domain + world secret + world info.
+      expect(groups[0].findAll('.status-widget-stub')).toHaveLength(4)
+      // Powers: sect relations + dynasty + mortals.
+      expect(groups[1].findAll('.status-widget-stub')).toHaveLength(3)
+      // Records: characters + rankings + tournament.
+      expect(groups[2].findAll('.status-widget-stub')).toHaveLength(3)
     })
 
-    it('should return #63a3ff for R rarity', () => {
-      mockCurrentPhenomenon = { id: 1, name: 'Test', rarity: 'R' }
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const widget = wrapper.findAll('.status-widget-stub')[1]
-      expect(widget.attributes('data-color')).toBe('#63a3ff')
-    })
-
-    it('should return #63c28b for SR rarity', () => {
-      mockCurrentPhenomenon = { id: 1, name: 'Test', rarity: 'SR' }
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const widget = wrapper.findAll('.status-widget-stub')[1]
-      expect(widget.attributes('data-color')).toBe('#63c28b')
-    })
-
-    it('should return #e1ab52 for SSR rarity', () => {
-      mockCurrentPhenomenon = { id: 1, name: 'Test', rarity: 'SSR' }
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const widget = wrapper.findAll('.status-widget-stub')[1]
-      expect(widget.attributes('data-color')).toBe('#e1ab52')
-    })
-
-    it('should return #8c8c8c for unknown rarity', () => {
-      mockCurrentPhenomenon = { id: 1, name: 'Test', rarity: 'UNKNOWN' }
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const widget = wrapper.findAll('.status-widget-stub')[1]
-      expect(widget.attributes('data-color')).toBe('#8c8c8c')
-    })
-
-    it('should hide phenomenon widget when currentPhenomenon is null', () => {
+    it('drops the phenomenon entry when no phenomenon is active', () => {
       mockCurrentPhenomenon = null
 
       const wrapper = mount(StatusBar, globalConfig)
 
-      // time + domain/sect-relations/dynasty/mortal/ranking/tournament/avatar-overview/world-secret/world-info
-      const widgets = wrapper.findAll('.status-widget-stub')
-      expect(widgets.length).toBe(10)
+      expect(wrapper.findAll('.status-widget-stub')).toHaveLength(9)
     })
 
-    it('should place time widget before phenomenon widget and world info widget last', () => {
+    it('spends colour only on the phenomenon, whose rarity is real state', () => {
       const wrapper = mount(StatusBar, globalConfig)
 
       const widgets = wrapper.findAll('.status-widget-stub')
-      expect(widgets[0]?.attributes('data-label')).toBe('100common.year5common.month')
-      expect(widgets[0]?.attributes('data-icon')).toBeTruthy()
-      expect(widgets[1]?.attributes('data-label')).toBe('[Test Phenomenon]')
-      expect(widgets[10]?.attributes('data-label')).toBe('game.status_bar.world_info.label')
+      const accented = widgets.filter(widget => widget.attributes('data-accent'))
+      expect(accented).toHaveLength(1)
+      // R rarity -> jade from the shared palette.
+      expect(accented[0].attributes('data-accent')).toBe('#6fb3a3')
     })
-  })
 
-  describe('phenomenon selector', () => {
-    it('should call getPhenomenaList when opening selector', async () => {
+    it('names the phenomenon without decorative brackets', () => {
+      mockCurrentPhenomenon = { id: 1, name: 'Ano da Hostilidade', rarity: 'SSR' }
+
       const wrapper = mount(StatusBar, globalConfig)
 
-      // Trigger click on phenomenon widget.
-      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      const widget = wrapper.findAll('.status-widget-stub')[0]
+      expect(widget.attributes('data-label')).toBe('Ano da Hostilidade')
+      expect(widget.attributes('data-accent')).toBe('#d9b877')
+    })
+
+    it('gives every entry an icon so the rail stays readable when labels collapse', () => {
+      const wrapper = mount(StatusBar, globalConfig)
+
+      for (const widget of wrapper.findAll('.status-widget-stub')) {
+        expect(widget.attributes('data-icon')).toBeTruthy()
+      }
+    })
+
+    it('opens the phenomenon selector after loading the list', async () => {
+      const wrapper = mount(StatusBar, globalConfig)
+
+      await wrapper.findAll('.status-widget-stub')[0].trigger('click')
       await settleAsyncPanels()
 
       expect(mockGetPhenomenaList).toHaveBeenCalled()
+      expect(wrapper.find('.n-modal-stub').exists()).toBe(true)
     })
 
-    it('should show selector modal after getPhenomenaList', async () => {
+    it('fetches the avatar overview before opening its panel', async () => {
       const wrapper = mount(StatusBar, globalConfig)
 
-      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
-      await settleAsyncPanels()
+      const records = wrapper.findAll('.hud__group')[2]
+      await records.findAll('.status-widget-stub')[0].trigger('click')
+      await nextTick()
 
-      expect(wrapper.find('.n-modal-stub').exists()).toBe(true)
+      expect(refreshAvatarOverviewMock).toHaveBeenCalled()
     })
   })
 
@@ -346,11 +352,9 @@ describe('StatusBar', () => {
     it('should call changePhenomenon on selection', async () => {
       const wrapper = mount(StatusBar, globalConfig)
 
-      // Open selector.
-      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      await wrapper.findAll('.status-widget-stub')[0].trigger('click')
       await settleAsyncPanels()
 
-      // Find and click a list item.
       const listItems = wrapper.findAll('.n-list-item-stub')
       expect(listItems.length).toBeGreaterThan(0)
 
@@ -365,13 +369,10 @@ describe('StatusBar', () => {
 
       const wrapper = mount(StatusBar, globalConfig)
 
-      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      await wrapper.findAll('.status-widget-stub')[0].trigger('click')
       await settleAsyncPanels()
 
-      const listItems = wrapper.findAll('.n-list-item-stub')
-      expect(listItems.length).toBeGreaterThan(0)
-
-      await listItems[0].trigger('click')
+      await wrapper.findAll('.n-list-item-stub')[0].trigger('click')
       await settleAsyncPanels()
 
       expect(mockSuccess).toHaveBeenCalled()
@@ -382,132 +383,21 @@ describe('StatusBar', () => {
 
       const wrapper = mount(StatusBar, globalConfig)
 
-      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      await wrapper.findAll('.status-widget-stub')[0].trigger('click')
       await settleAsyncPanels()
 
-      const listItems = wrapper.findAll('.n-list-item-stub')
-      expect(listItems.length).toBeGreaterThan(0)
-
-      await listItems[0].trigger('click')
+      await wrapper.findAll('.n-list-item-stub')[0].trigger('click')
       await settleAsyncPanels()
 
       expect(mockError).toHaveBeenCalled()
     })
   })
 
-  describe('domain color', () => {
-    it('should use the same hidden domain color when any domain is open', () => {
-      mockActiveDomains = [
-        { id: 1, name: 'D1' },
-        { id: 2, name: 'D2' },
-      ]
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const domainWidget = wrapper.findAll('.status-widget-stub')[2]
-      expect(domainWidget.attributes('data-color')).toBe('#b78a52')
-    })
-
-    it('should use the same hidden domain color when all domains are closed', () => {
-      mockActiveDomains = [
-        { id: 1, name: 'D1' },
-        { id: 2, name: 'D2' },
-      ]
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const domainWidget = wrapper.findAll('.status-widget-stub')[2]
-      expect(domainWidget.attributes('data-color')).toBe('#b78a52')
-    })
-
-    it('should use the same hidden domain color when there are no domains', () => {
-      mockActiveDomains = []
-
-      const wrapper = mount(StatusBar, globalConfig)
-
-      const domainWidget = wrapper.findAll('.status-widget-stub')[2]
-      expect(domainWidget.attributes('data-color')).toBe('#b78a52')
-    })
-  })
-
-  it('should render external links', () => {
+  it('exposes the system menu from the bar instead of a floating map button', async () => {
     const wrapper = mount(StatusBar, globalConfig)
 
-    const links = wrapper.findAll('a.author-link')
-    expect(links.length).toBe(1)
-    expect(links[0].attributes('href')).toContain('github')
-  })
+    await wrapper.get('.hud__menu').trigger('click')
 
-  it('should pass correct props to phenomenon StatusWidget', () => {
-    mockCurrentPhenomenon = { id: 1, name: 'TestPhenomenon', rarity: 'SR' }
-
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const phenomenonWidget = wrapper.findAll('.status-widget-stub')[1]
-    expect(phenomenonWidget.attributes('data-label')).toBe('[TestPhenomenon]')
-    expect(phenomenonWidget.attributes('data-color')).toBe('#63c28b')
-  })
-
-  it('should pass correct props to domain StatusWidget', () => {
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const domainWidget = wrapper.findAll('.status-widget-stub')[2]
-    expect(domainWidget.attributes('data-label')).toBe('game.status_bar.hidden_domain.label')
-  })
-
-  it('should render sect relations StatusWidget', () => {
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const widgets = wrapper.findAll('.status-widget-stub')
-    // time + currentPhenomenon + domain + sect_relations + dynasty + mortal + ranking + tournament + avatar-overview + world-secret + world-info
-    expect(widgets.length).toBe(11)
-    const sectRelationsWidget = widgets[3]
-    expect(sectRelationsWidget.attributes('data-label')).toBe('game.sect_relations.title_short')
-  })
-
-  it('should render dynasty StatusWidget', () => {
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const widgets = wrapper.findAll('.status-widget-stub')
-    const dynastyWidget = widgets[4]
-    expect(dynastyWidget.attributes('data-label')).toBe('game.dynasty.title_short')
-  })
-
-  it('should render deceased StatusWidget', () => {
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const widgets = wrapper.findAll('.status-widget-stub')
-    const deceasedWidget = widgets[8]
-    expect(deceasedWidget.attributes('data-label')).toBe('game.status_bar.avatar_overview.label')
-    expect(deceasedWidget.attributes('data-color')).toBe('#8c8c8c')
-  })
-
-  it('should keep avatar overview label fixed when loaded', () => {
-    mockAvatarOverviewLoaded = true
-    mockAvatarOverview = {
-      summary: {
-        totalCount: 128,
-        aliveCount: 93,
-        deadCount: 35,
-        sectMemberCount: 70,
-        rogueCount: 23,
-      },
-      realmDistribution: [],
-    }
-
-    const wrapper = mount(StatusBar, globalConfig)
-
-    const widgets = wrapper.findAll('.status-widget-stub')
-    const overviewWidget = widgets[8]
-    expect(overviewWidget.attributes('data-label')).toBe('game.status_bar.avatar_overview.label')
-  })
-
-  it('should fetch avatar overview before opening modal if not loaded', async () => {
-    const wrapper = mount(StatusBar, globalConfig)
-
-    await wrapper.findAll('.status-widget-stub')[8].trigger('click')
-    await nextTick()
-
-    expect(refreshAvatarOverviewMock).toHaveBeenCalled()
+    expect(wrapper.emitted('open-menu')).toHaveLength(1)
   })
 })

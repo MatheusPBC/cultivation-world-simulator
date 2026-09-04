@@ -16,9 +16,6 @@ import WorldJournalPanel from './components/game/panels/WorldJournalPanel.vue'
 import SystemMenu from './components/SystemMenu.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
 import MobileGameShell from './components/mobile/MobileGameShell.vue'
-import menuIcon from '@/assets/icons/ui/lucide/menu.svg'
-import playIcon from '@/assets/icons/ui/lucide/play.svg'
-import pauseIcon from '@/assets/icons/ui/lucide/pause.svg'
 
 // Composables
 import { useGameInit } from './composables/useGameInit'
@@ -225,40 +222,24 @@ watch(sidebarWidth, width => {
         <MobileGameShell v-else-if="canRenderGameShell && isMobile" />
 
         <div v-else-if="canRenderGameShell" class="app-layout">
-          <StatusBar />
-          
+          <StatusBar
+            :paused="isManualPaused"
+            @toggle-pause="toggleManualPause"
+            @open-menu="openGameMenu()"
+          />
+
           <div class="main-content">
             <div class="map-container">
               <div class="map-stage">
-                <!-- 顶部控制栏 -->
-                <div class="top-controls">
-                  <!-- 暂停/播放按钮 -->
-                  <button class="control-btn pause-toggle" @click="toggleManualPause" :title="isManualPaused ? t('game.controls.resume') : t('game.controls.pause')">
-                    <span
-                      class="control-btn-icon"
-                      :style="{ '--icon-url': `url(${isManualPaused ? playIcon : pauseIcon})` }"
-                      aria-hidden="true"
-                    ></span>
-                  </button>
-
-                  <!-- 菜单按钮 -->
-                  <button class="control-btn menu-toggle" @click="openGameMenu()">
-                    <span
-                      class="control-btn-icon"
-                      :style="{ '--icon-url': `url(${menuIcon})` }"
-                      aria-hidden="true"
-                    ></span>
-                  </button>
-                </div>
-
-                <!-- 暂停状态提示 -->
-                <div v-if="isManualPaused" class="pause-indicator">
-                  <div class="pause-text">{{ t('game.controls.paused') }}</div>
-                </div>
-
+                <!--
+                  The pause state is expressed by the clock in the HUD, so the
+                  map surface no longer carries a floating "paused" pill on top
+                  of the band where city names sit. Only the roleplay prompt —
+                  which is actionable — still surfaces over the map.
+                -->
                 <button
                   v-if="roleplayPauseText"
-                  class="roleplay-pause-indicator"
+                  class="roleplay-prompt"
                   type="button"
                   @click="focusRoleplayDock"
                 >
@@ -313,14 +294,14 @@ watch(sidebarWidth, width => {
   flex-direction: column;
   width: 100vw;
   height: 100vh;
-  background: #000;
-  color: #eee;
+  background: var(--ink-void);
+  color: var(--text-primary);
   overflow: hidden;
   position: relative;
 }
 
 .app-layout--shell {
-  background: #000;
+  background: var(--ink-void);
 }
 
 .main-content {
@@ -328,151 +309,83 @@ watch(sidebarWidth, width => {
   display: flex;
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
 .map-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #111;
+  background: var(--ink-void);
   overflow: hidden;
+  min-width: 0;
 }
 
 .map-stage {
   flex: 1;
   position: relative;
-  background: #111;
+  background: var(--ink-void);
   overflow: hidden;
   min-height: 0;
 }
 
-.top-controls {
+/*
+ * The only overlay left on the map surface, because it is a call to action
+ * rather than a status readout.
+ */
+.roleplay-prompt {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 100;
-  display: flex;
-  gap: 10px;
-}
-
-.control-btn {
-  background: rgba(0,0,0,0.5);
-  border: 1px solid #444;
-  color: #ddd;
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s ease;
-}
-
-.control-btn-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  background-color: currentColor;
-  -webkit-mask-image: var(--icon-url);
-  mask-image: var(--icon-url);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-.control-btn:hover {
-  background: rgba(32, 28, 20, 0.82);
-  border-color: rgba(232, 202, 143, 0.56);
-  box-shadow: 0 0 0 1px rgba(232, 202, 143, 0.1), 0 6px 16px rgba(0, 0, 0, 0.32);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-.control-btn:active {
-  background: rgba(20, 18, 14, 0.9);
-  transform: translateY(0);
-}
-
-.control-btn:focus-visible {
-  outline: 2px solid rgba(232, 202, 143, 0.74);
-  outline-offset: 2px;
-}
-
-.pause-indicator {
-  position: absolute;
-  top: 20px;
+  top: var(--s-5);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 90;
-  pointer-events: none;
-}
-
-.pause-text {
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  letter-spacing: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(4px);
-}
-
-.roleplay-pause-indicator {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 91;
-  max-width: min(460px, calc(100% - 180px));
-  border: 1px solid rgba(212, 185, 133, 0.32);
-  border-radius: 20px;
-  padding: 6px 16px;
-  color: #f6ecd2;
-  background: rgba(42, 31, 14, 0.78);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
-  font-size: 13px;
-  line-height: 1.35;
+  z-index: 30;
+  max-width: min(460px, calc(100% - 240px));
+  min-height: 36px;
+  padding: 0 var(--s-6);
+  border: 1px solid var(--gold-600);
+  border-radius: var(--r-2);
+  color: var(--gold-200);
+  background: var(--surface-chrome);
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-ui);
+  font-size: var(--t-md);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  backdrop-filter: blur(4px);
   cursor: pointer;
+  transition: border-color var(--motion-fast), color var(--motion-fast);
 }
 
-.roleplay-pause-indicator:hover {
-  border-color: rgba(232, 202, 143, 0.52);
-  background: rgba(58, 41, 17, 0.86);
+.roleplay-prompt:hover {
+  border-color: var(--gold-400);
+  color: var(--paper-100);
+}
+
+.roleplay-prompt:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .sidebar-resizer {
   width: 4px;
   background: transparent;
   cursor: col-resize;
-  transition: background 0.15s;
+  transition: background var(--motion-fast);
   flex-shrink: 0;
 }
 
 .sidebar-resizer:hover,
 .sidebar-resizer.is-resizing {
-  background: #555;
+  background: var(--gold-600);
 }
 
 .sidebar {
-  background: #181818;
-  border-left: 1px solid #333;
+  background: var(--surface-panel);
+  border-left: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   z-index: 20;
   flex-shrink: 0;
+  min-width: 0;
 }
 </style>

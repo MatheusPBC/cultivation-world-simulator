@@ -51,20 +51,36 @@
     "why_considered_count": "Đã cân nhắc {count} lựa chọn",
     "why_rejected": "Các lựa chọn bị từ chối",
     "guide": {
-      "loading": "Đang đọc trạng thái thế giới...", "error": "Không thể tạo Cẩm nang Sống.", "retry": "Thử lại",
-      "date": "Năm {year}, tháng {month}", "world_in_one_sentence": "Thế giới trong một câu",
-      "no_headline": "Những câu chuyện đầu tiên của thế giới vẫn đang thành hình.", "sources": "{count} nguồn",
-      "happening": "Điều gì đang xảy ra", "happening_hint": "Những mạch truyện quan trọng nhất lúc này",
-      "empty": "Chưa có sự kiện nào đủ quan trọng để tạo thành một mạch truyện.", "understand_why": "Hiểu nguyên nhân",
-      "people": "Ai quan trọng lúc này", "people_empty": "Không có nhân vật nào nổi bật trong giai đoạn này.",
-      "no_current_action": "Chưa ghi nhận hành động hiện tại", "no_ambition": "Chưa biết chí hướng", "concept": "Khái niệm trọng tâm",
-      "ask_eyebrow": "Hỏi Người chép sử", "ask_title": "Hỏi về thế giới này",
-      "grounded_note": "Câu trả lời chỉ dựa trên sự thật và nguồn của thế giới", "question_label": "Câu hỏi cho Người chép sử",
-      "question_placeholder": "Vì sao tranh chấp này quan trọng? Ai có thể đổi hướng nó?", "ask_button": "Hỏi",
-      "answering": "Đang tra cứu...", "suggestion_people": "Ai đang thay đổi thế giới?",
-      "suggestion_conflict": "Xung đột nào đáng chú ý?", "suggestion_change": "Gần đây có gì thay đổi?",
-      "answer_error": "Người chép sử chưa thể trả lời. Hãy thử lại.", "answer_unavailable": "Chưa có đủ nguồn để trả lời.",
-      "answer_sources": "Nguồn trả lời", "source_number": "Nguồn {number}"
+      "loading": "Đang đọc trạng thái thế giới...",
+      "error": "Không thể tạo Cẩm nang Sống.",
+      "retry": "Thử lại",
+      "date": "Năm {year}, tháng {month}",
+      "world_in_one_sentence": "Thế giới trong một câu",
+      "no_headline": "Những câu chuyện đầu tiên của thế giới vẫn đang thành hình.",
+      "sources": "{count} nguồn",
+      "happening": "Điều gì đang xảy ra",
+      "happening_hint": "Những mạch truyện quan trọng nhất lúc này",
+      "empty": "Chưa có sự kiện nào đủ quan trọng để tạo thành một mạch truyện.",
+      "understand_why": "Hiểu nguyên nhân",
+      "people": "Ai quan trọng lúc này",
+      "people_empty": "Không có nhân vật nào nổi bật trong giai đoạn này.",
+      "no_current_action": "Chưa ghi nhận hành động hiện tại",
+      "no_ambition": "Chưa biết chí hướng",
+      "concept": "Khái niệm trọng tâm",
+      "ask_eyebrow": "Hỏi Người chép sử",
+      "ask_title": "Hỏi về thế giới này",
+      "grounded_note": "Câu trả lời chỉ dựa trên sự thật và nguồn của thế giới",
+      "question_label": "Câu hỏi cho Người chép sử",
+      "question_placeholder": "Vì sao tranh chấp này quan trọng? Ai có thể đổi hướng nó?",
+      "ask_button": "Hỏi",
+      "answering": "Đang tra cứu...",
+      "suggestion_people": "Ai đang thay đổi thế giới?",
+      "suggestion_conflict": "Xung đột nào đáng chú ý?",
+      "suggestion_change": "Gần đây có gì thay đổi?",
+      "answer_error": "Người chép sử chưa thể trả lời. Hãy thử lại.",
+      "answer_unavailable": "Chưa có đủ nguồn để trả lời.",
+      "answer_sources": "Nguồn trả lời",
+      "source_number": "Nguồn {number}"
     },
     "why_relation": {
       "triggered_by": "được kích hoạt bởi",
@@ -74,7 +90,8 @@
       "resolves": "giải quyết",
       "prevented_by": "bị ngăn cản bởi",
       "contributed_to": "góp phần vào"
-    }
+    },
+    "title_short": "Nhật ký"
   },
   "status_bar": {
     "phenomenon": "Thiên Tượng Thế Giới",
@@ -87,7 +104,7 @@
     "click_to_change": "(Nhấn để thay đổi thiên tượng)",
     "author_github": "Star us on GitHub",
     "hidden_domain": {
-      "label": "[Bí Cảnh]",
+      "label": "Bí Cảnh",
       "title": "Danh Sách Bí Cảnh",
       "empty": "Không có dữ liệu bí cảnh",
       "required_realm": "Cảnh Giới Yêu Cầu",
@@ -97,13 +114,13 @@
       "open_chance": "Tỷ Lệ Xuất Hiện"
     },
     "world_info": {
-      "label": "[Thong Tin The Gioi]",
+      "label": "Thong Tin The Gioi",
       "title": "Thong Tin The Gioi",
       "ai_knowledge_note": "Nhung gi AI tu si biet ve gioi tu tien",
       "empty": "Khong co thong tin the gioi"
     },
     "avatar_overview": {
-      "label": "[Tổng Quan Nhân Vật]"
+      "label": "Tổng Quan Nhân Vật"
     },
     "time": {
       "title": "Tong Quan Thoi Gian",
@@ -122,7 +139,17 @@
       "war_none": "Hien khong co chien tranh tong mon"
     },
     "world_secret": {
-      "label": "[Bí Mật]"
+      "label": "Bí Mật"
+    },
+    "nav_label": "Bảng thế giới",
+    "menu": "Menu hệ thống",
+    "time_detail": "Chi tiết thời gian",
+    "connected": "Đã kết nối",
+    "disconnected": "Mất kết nối",
+    "groups": {
+      "world": "Thế giới",
+      "powers": "Thế lực",
+      "records": "Ghi chép"
     }
   },
   "world_info": {
@@ -196,7 +223,8 @@
     "resume": "Tiếp Tục Trò Chơi",
     "pause": "Tạm Dừng Trò Chơi",
     "paused": "Đã Tạm Dừng",
-    "closed_msg": "Trò chơi đã đóng. Bạn có thể yên tâm đóng tab này."
+    "closed_msg": "Trò chơi đã đóng. Bạn có thể yên tâm đóng tab này.",
+    "running": "Đang chạy"
   },
   "event_panel": {
     "title": "Sự kiện",
@@ -298,7 +326,8 @@
     "fallback": {
       "avatar_name": "Nhân vật",
       "counterpart_name": "Bên kia"
-    }
+    },
+    "title_short": "Nhập vai"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name} đã gây dựng danh tiếng trong tu tiên giới, được người đời gọi là \"{nickname}\"."
@@ -309,8 +338,8 @@
       "middle": "Trung Kỳ",
       "late": "Hậu Kỳ"
     },
-    "title_short": "[Bảng Xếp Hạng]",
-    "tournament_short": "[Luận Võ]",
+    "title_short": "Bảng Xếp Hạng",
+    "tournament_short": "Luận Võ",
     "title": "Thiên Địa Nhân Bảng",
     "heaven": "Thiên Bảng (Nguyên Anh)",
     "earth": "Địa Bảng (Kim Đan)",
@@ -333,7 +362,7 @@
     "human_first": "Nhân Bảng Đệ Nhất"
   },
   "sect_relations": {
-    "title_short": "[Quan Hệ Tông Môn]",
+    "title_short": "Quan Hệ Tông Môn",
     "title": "Quan Hệ Tông Môn",
     "sect_a": "Tông Môn A",
     "sect_b": "Tông Môn B",
@@ -363,7 +392,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[Phàm Nhân]",
+    "title_short": "Phàm Nhân",
     "title": "Hệ Thống Phàm Nhân",
     "empty": "Không có dữ liệu",
     "population_value": "{value}",
@@ -394,7 +423,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[Vương Triều]",
+    "title_short": "Vương Triều",
     "title": "Vương Triều",
     "name": "Tên Vương Triều",
     "royal_house": "Hoàng Tộc",
@@ -789,5 +818,63 @@
     "decision_keep": "Giữ bí mật",
     "decision_none": "Chưa chọn",
     "empty": "Chưa có dữ liệu bí mật thế giới"
+  },
+  "map": {
+    "tab": "Bản đồ",
+    "sheet_close": "Đóng bảng",
+    "layers": {
+      "title": "Lớp",
+      "groups": {
+        "physical": "Tự nhiên",
+        "territorial": "Lãnh địa",
+        "organizational": "Thế lực"
+      },
+      "terrain": {
+        "label": "Địa hình"
+      },
+      "water": {
+        "label": "Vùng nước"
+      },
+      "elevation": {
+        "label": "Độ cao"
+      },
+      "borders": {
+        "label": "Biên giới"
+      },
+      "names": {
+        "label": "Địa danh"
+      },
+      "routes": {
+        "label": "Tuyến đường",
+        "hint": "Kết nối giữa các vùng; đường vẽ không phải lộ trình thực"
+      },
+      "sects": {
+        "label": "Tông môn"
+      },
+      "infrastructure": {
+        "label": "Công trình"
+      },
+      "institutionalPresence": {
+        "label": "Hiện diện thể chế"
+      }
+    },
+    "view": {
+      "group": "Điều khiển hiển thị",
+      "zoom_in": "Phóng to",
+      "zoom_out": "Thu nhỏ",
+      "fit": "Toàn bản đồ",
+      "zoom_level": "Mức thu phóng"
+    },
+    "legend": {
+      "title": "Chú giải",
+      "coast": "Đường bờ biển",
+      "flow": "Dòng chảy",
+      "border": "Biên giới vùng",
+      "route_land": "Đường bộ",
+      "route_water": "Đường thủy",
+      "route_severed": "Tuyến bị cắt",
+      "sect": "Lãnh địa tông môn",
+      "site": "Công trình hạ tầng"
+    }
   }
 }

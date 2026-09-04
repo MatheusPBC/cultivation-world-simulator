@@ -129,7 +129,8 @@
       "resolves": "resolve",
       "prevented_by": "impedido por",
       "contributed_to": "contribuiu para"
-    }
+    },
+    "title_short": "Diário"
   },
   "status_bar": {
     "phenomenon": "Fenômeno Mundial",
@@ -142,7 +143,7 @@
     "click_to_change": "(Clique para alterar o fenômeno)",
     "author_github": "Dê uma estrela no GitHub",
     "hidden_domain": {
-      "label": "[Domínios Ocultos]",
+      "label": "Domínios Ocultos",
       "title": "Lista de Domínios Ocultos",
       "empty": "Nenhum domínio oculto disponível",
       "required_realm": "Reino necessário",
@@ -152,13 +153,13 @@
       "open_chance": "Chance de surgir"
     },
     "world_info": {
-      "label": "[Informações do Mundo]",
+      "label": "Informações do Mundo",
       "title": "Informações do Mundo",
       "ai_knowledge_note": "O que a IA dos cultivadores sabe sobre o mundo da cultivação",
       "empty": "Nenhuma informação do mundo disponível"
     },
     "avatar_overview": {
-      "label": "[Personagens]"
+      "label": "Personagens"
     },
     "time": {
       "title": "Visão Geral do Tempo",
@@ -177,7 +178,17 @@
       "war_none": "Nenhuma guerra entre seitas no momento"
     },
     "world_secret": {
-      "label": "[Segredo do Mundo]"
+      "label": "Segredo do Mundo"
+    },
+    "nav_label": "Painéis do mundo",
+    "menu": "Menu do sistema",
+    "time_detail": "Detalhes do tempo",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "groups": {
+      "world": "Mundo",
+      "powers": "Poderes",
+      "records": "Registros"
     }
   },
   "world_info": {
@@ -251,7 +262,8 @@
     "resume": "Continuar jogo",
     "pause": "Pausar jogo",
     "paused": "Pausado",
-    "closed_msg": "O jogo foi encerrado. Você já pode fechar esta aba com segurança."
+    "closed_msg": "O jogo foi encerrado. Você já pode fechar esta aba com segurança.",
+    "running": "Em curso"
   },
   "event_panel": {
     "title": "Eventos",
@@ -353,7 +365,8 @@
     "fallback": {
       "avatar_name": "Personagem",
       "counterpart_name": "Outro personagem"
-    }
+    },
+    "title_short": "Interpretar"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name} ganhou fama no mundo da cultivação e passou a ser conhecido como \"{nickname}\"."
@@ -364,8 +377,8 @@
       "middle": "Estágio Intermediário",
       "late": "Estágio Avançado"
     },
-    "title_short": "[Rankings]",
-    "tournament_short": "[Torneio]",
+    "title_short": "Rankings",
+    "tournament_short": "Torneio",
     "title": "Rankings do Céu, da Terra e dos Homens",
     "heaven": "Céu (Alma Nascente)",
     "earth": "Terra (Formação do Núcleo)",
@@ -388,7 +401,7 @@
     "human_first": "1º dos Homens"
   },
   "sect_relations": {
-    "title_short": "[Relações entre Seitas]",
+    "title_short": "Relações entre Seitas",
     "title": "Relações entre Seitas",
     "sect_a": "Seita A",
     "sect_b": "Seita B",
@@ -418,7 +431,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[Mortais]",
+    "title_short": "Mortais",
     "title": "Sistema de Mortais",
     "empty": "Nenhum dado disponível",
     "population_value": "{value}",
@@ -449,7 +462,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[Dinastia]",
+    "title_short": "Dinastia",
     "title": "Dinastia",
     "name": "Nome da dinastia",
     "royal_house": "Casa real",
@@ -926,5 +939,63 @@
     "decision_keep": "Manteve em segredo",
     "decision_none": "Nenhuma decisão",
     "empty": "Nenhum dado sobre o segredo do mundo"
+  },
+  "map": {
+    "tab": "Mapa",
+    "sheet_close": "Fechar painel",
+    "layers": {
+      "title": "Camadas",
+      "groups": {
+        "physical": "Físico",
+        "territorial": "Territorial",
+        "organizational": "Organizacional"
+      },
+      "terrain": {
+        "label": "Terreno"
+      },
+      "water": {
+        "label": "Águas"
+      },
+      "elevation": {
+        "label": "Elevação"
+      },
+      "borders": {
+        "label": "Fronteiras"
+      },
+      "names": {
+        "label": "Topônimos"
+      },
+      "routes": {
+        "label": "Rotas",
+        "hint": "Ligações entre regiões; as linhas não representam o trajeto físico exato"
+      },
+      "sects": {
+        "label": "Seitas"
+      },
+      "infrastructure": {
+        "label": "Sítios"
+      },
+      "institutionalPresence": {
+        "label": "Presença institucional"
+      }
+    },
+    "view": {
+      "group": "Controles de visualização",
+      "zoom_in": "Aproximar",
+      "zoom_out": "Afastar",
+      "fit": "Enquadrar o mundo",
+      "zoom_level": "Nível de zoom"
+    },
+    "legend": {
+      "title": "Legenda",
+      "coast": "Litoral",
+      "flow": "Corrente fluvial",
+      "border": "Fronteira regional",
+      "route_land": "Rota terrestre",
+      "route_water": "Travessia de água",
+      "route_severed": "Rota interrompida",
+      "sect": "Território de seita",
+      "site": "Sítio de infraestrutura"
+    }
   }
 }

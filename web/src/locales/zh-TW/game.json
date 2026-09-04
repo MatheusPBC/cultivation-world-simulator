@@ -51,20 +51,36 @@
     "why_considered_count": "當時考慮了 {count} 個選項",
     "why_rejected": "被放棄的選項",
     "guide": {
-      "loading": "正在閱讀目前世界狀態...", "error": "無法建立世界指南。", "retry": "重試",
-      "date": "第 {year} 年，第 {month} 月", "world_in_one_sentence": "一句話看世界",
-      "no_headline": "這個世界的第一批故事仍在形成。", "sources": "{count} 個來源",
-      "happening": "正在發生什麼", "happening_hint": "此刻最重要的故事線",
-      "empty": "尚無足以形成故事線的重要事件。", "understand_why": "了解原因",
-      "people": "此刻的重要人物", "people_empty": "本階段尚無突出人物。",
-      "no_current_action": "沒有記錄目前行動", "no_ambition": "尚無已知志向", "concept": "目前概念",
-      "ask_eyebrow": "詢問編年史作者", "ask_title": "詢問這個世界",
-      "grounded_note": "回答僅限世界事實與可查來源", "question_label": "向編年史作者提問",
-      "question_placeholder": "這場爭端為何重要？誰能改變它的走向？", "ask_button": "提問",
-      "answering": "查閱中...", "suggestion_people": "誰正在改變世界？",
-      "suggestion_conflict": "哪場衝突值得關注？", "suggestion_change": "最近發生了什麼變化？",
-      "answer_error": "編年史作者暫時無法回答，請重試。", "answer_unavailable": "現有來源不足以回答。",
-      "answer_sources": "回答來源", "source_number": "來源 {number}"
+      "loading": "正在閱讀目前世界狀態...",
+      "error": "無法建立世界指南。",
+      "retry": "重試",
+      "date": "第 {year} 年，第 {month} 月",
+      "world_in_one_sentence": "一句話看世界",
+      "no_headline": "這個世界的第一批故事仍在形成。",
+      "sources": "{count} 個來源",
+      "happening": "正在發生什麼",
+      "happening_hint": "此刻最重要的故事線",
+      "empty": "尚無足以形成故事線的重要事件。",
+      "understand_why": "了解原因",
+      "people": "此刻的重要人物",
+      "people_empty": "本階段尚無突出人物。",
+      "no_current_action": "沒有記錄目前行動",
+      "no_ambition": "尚無已知志向",
+      "concept": "目前概念",
+      "ask_eyebrow": "詢問編年史作者",
+      "ask_title": "詢問這個世界",
+      "grounded_note": "回答僅限世界事實與可查來源",
+      "question_label": "向編年史作者提問",
+      "question_placeholder": "這場爭端為何重要？誰能改變它的走向？",
+      "ask_button": "提問",
+      "answering": "查閱中...",
+      "suggestion_people": "誰正在改變世界？",
+      "suggestion_conflict": "哪場衝突值得關注？",
+      "suggestion_change": "最近發生了什麼變化？",
+      "answer_error": "編年史作者暫時無法回答，請重試。",
+      "answer_unavailable": "現有來源不足以回答。",
+      "answer_sources": "回答來源",
+      "source_number": "來源 {number}"
     },
     "why_relation": {
       "triggered_by": "觸發於",
@@ -74,7 +90,8 @@
       "resolves": "解決了",
       "prevented_by": "被阻止於",
       "contributed_to": "促成了"
-    }
+    },
+    "title_short": "日誌"
   },
   "status_bar": {
     "phenomenon": "天地靈機",
@@ -87,7 +104,7 @@
     "click_to_change": "（點擊可更易天象）",
     "author_github": "GitHub倉庫（求star）",
     "hidden_domain": {
-      "label": "[祕境]",
+      "label": "祕境",
       "title": "祕境列表",
       "empty": "暫無祕境數據",
       "required_realm": "準入境界",
@@ -97,13 +114,13 @@
       "open_chance": "出現機率"
     },
     "world_info": {
-      "label": "[世界資訊]",
+      "label": "世界資訊",
       "title": "世界資訊",
       "ai_knowledge_note": "修仙者AI關於修仙界的知識",
       "empty": "暫無世界資訊"
     },
     "avatar_overview": {
-      "label": "[角色總覽]"
+      "label": "角色總覽"
     },
     "time": {
       "title": "時間總覽",
@@ -122,7 +139,17 @@
       "war_none": "當前無宗門戰爭"
     },
     "world_secret": {
-      "label": "[世界秘密]"
+      "label": "世界秘密"
+    },
+    "nav_label": "世界面板",
+    "menu": "系統菜單",
+    "time_detail": "時間詳情",
+    "connected": "已連接",
+    "disconnected": "已斷開",
+    "groups": {
+      "world": "天地",
+      "powers": "勢力",
+      "records": "記錄"
     }
   },
   "world_info": {
@@ -196,7 +223,8 @@
     "resume": "繼續遊戲",
     "pause": "暫停遊戲",
     "paused": "已暫停",
-    "closed_msg": "遊戲已關閉，您可以安全關閉此標籤頁。"
+    "closed_msg": "遊戲已關閉，您可以安全關閉此標籤頁。",
+    "running": "運行中"
   },
   "event_panel": {
     "title": "事件",
@@ -298,7 +326,8 @@
     "fallback": {
       "avatar_name": "角色",
       "counterpart_name": "對方"
-    }
+    },
+    "title_short": "扮演"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name}在修仙界中闖出名號，被人稱為「{nickname}」。"
@@ -309,8 +338,8 @@
       "middle": "中期",
       "late": "後期"
     },
-    "title_short": "[天地人榜]",
-    "tournament_short": "[武道會]",
+    "title_short": "天地人榜",
+    "tournament_short": "武道會",
     "title": "天地人榜",
     "heaven": "天榜 (元嬰)",
     "earth": "地榜 (金丹)",
@@ -333,7 +362,7 @@
     "human_first": "人榜第一"
   },
   "sect_relations": {
-    "title_short": "[宗門關係]",
+    "title_short": "宗門關係",
     "title": "宗門關係",
     "sect_a": "宗門 A",
     "sect_b": "宗門 B",
@@ -363,7 +392,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[凡人]",
+    "title_short": "凡人",
     "title": "凡人系統",
     "empty": "暫無資料",
     "population_value": "{value} 萬",
@@ -394,7 +423,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[王朝]",
+    "title_short": "王朝",
     "title": "王朝",
     "name": "王朝名",
     "royal_house": "皇族",
@@ -789,5 +818,63 @@
     "decision_keep": "保守秘密",
     "decision_none": "未選擇",
     "empty": "暫無世界秘密資料"
+  },
+  "map": {
+    "tab": "地圖",
+    "sheet_close": "收起面板",
+    "layers": {
+      "title": "圖層",
+      "groups": {
+        "physical": "自然",
+        "territorial": "疆域",
+        "organizational": "勢力"
+      },
+      "terrain": {
+        "label": "地形"
+      },
+      "water": {
+        "label": "水域"
+      },
+      "elevation": {
+        "label": "海拔"
+      },
+      "borders": {
+        "label": "邊界"
+      },
+      "names": {
+        "label": "地名"
+      },
+      "routes": {
+        "label": "路線",
+        "hint": "表示地區之間的連接，連線並非真實路徑"
+      },
+      "sects": {
+        "label": "宗門"
+      },
+      "infrastructure": {
+        "label": "設施"
+      },
+      "institutionalPresence": {
+        "label": "治理存在"
+      }
+    },
+    "view": {
+      "group": "視圖控制",
+      "zoom_in": "放大",
+      "zoom_out": "縮小",
+      "fit": "全圖",
+      "zoom_level": "縮放級別"
+    },
+    "legend": {
+      "title": "圖例",
+      "coast": "海岸線",
+      "flow": "水流",
+      "border": "地區邊界",
+      "route_land": "陸路",
+      "route_water": "水路",
+      "route_severed": "中斷路線",
+      "sect": "宗門領地",
+      "site": "基礎設施"
+    }
   }
 }

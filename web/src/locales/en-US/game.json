@@ -52,20 +52,35 @@
     "why_rejected": "Rejected options",
     "why_decision_appraisals": "Personal memories cited",
     "guide": {
-      "loading": "Reading the current world...", "error": "Couldn't build the Live Guide.", "retry": "Retry",
-      "date": "Year {year}, month {month}", "world_in_one_sentence": "The world in one sentence",
-      "no_headline": "The world's first stories are still taking shape.", "sources": "{count} sources",
-      "happening": "What is happening", "happening_hint": "The most important story threads right now",
-      "empty": "No event is relevant enough to form a story thread yet.", "understand_why": "Understand why",
-      "people": "Who matters now", "people_empty": "No character stood out in this period.",
-      "no_current_action": "No current action recorded", "no_ambition": "No known ambition", "concept": "Concept in focus",
-      "ask_eyebrow": "Ask the Chronicler", "ask_title": "Ask about this world",
-      "grounded_note": "Answers are limited to world facts and sources", "question_label": "Question for the Chronicler",
-      "question_placeholder": "Why does this dispute matter? Who could change its course?", "ask_button": "Ask",
-      "answering": "Consulting...", "suggestion_people": "Who is changing the world?",
-      "suggestion_conflict": "Which conflict deserves attention?", "suggestion_change": "What changed recently?",
+      "loading": "Reading the current world...",
+      "error": "Couldn't build the Live Guide.",
+      "retry": "Retry",
+      "date": "Year {year}, month {month}",
+      "world_in_one_sentence": "The world in one sentence",
+      "no_headline": "The world's first stories are still taking shape.",
+      "sources": "{count} sources",
+      "happening": "What is happening",
+      "happening_hint": "The most important story threads right now",
+      "empty": "No event is relevant enough to form a story thread yet.",
+      "understand_why": "Understand why",
+      "people": "Who matters now",
+      "people_empty": "No character stood out in this period.",
+      "no_current_action": "No current action recorded",
+      "no_ambition": "No known ambition",
+      "concept": "Concept in focus",
+      "ask_eyebrow": "Ask the Chronicler",
+      "ask_title": "Ask about this world",
+      "grounded_note": "Answers are limited to world facts and sources",
+      "question_label": "Question for the Chronicler",
+      "question_placeholder": "Why does this dispute matter? Who could change its course?",
+      "ask_button": "Ask",
+      "answering": "Consulting...",
+      "suggestion_people": "Who is changing the world?",
+      "suggestion_conflict": "Which conflict deserves attention?",
+      "suggestion_change": "What changed recently?",
       "answer_error": "The Chronicler couldn't answer right now. Try again.",
-      "answer_unavailable": "There are not enough sources to answer yet.", "answer_sources": "Answer sources",
+      "answer_unavailable": "There are not enough sources to answer yet.",
+      "answer_sources": "Answer sources",
       "source_number": "Source {number}"
     },
     "why_relation": {
@@ -76,7 +91,8 @@
       "resolves": "resolves",
       "prevented_by": "prevented by",
       "contributed_to": "contributed to"
-    }
+    },
+    "title_short": "Journal"
   },
   "status_bar": {
     "phenomenon": "World Phenomenon",
@@ -89,7 +105,7 @@
     "click_to_change": "(Click to change phenomenon)",
     "author_github": "Star us on GitHub",
     "hidden_domain": {
-      "label": "[Hidden Domain]",
+      "label": "Hidden Domain",
       "title": "Hidden Domains List",
       "empty": "No hidden domains data",
       "required_realm": "Required Realm",
@@ -99,13 +115,13 @@
       "open_chance": "Spawn Chance"
     },
     "world_info": {
-      "label": "[World Info]",
+      "label": "World Info",
       "title": "World Info",
       "ai_knowledge_note": "What the cultivator AI knows about the cultivation world",
       "empty": "No world info available"
     },
     "avatar_overview": {
-      "label": "[Characters]"
+      "label": "Characters"
     },
     "time": {
       "title": "Time Overview",
@@ -124,7 +140,17 @@
       "war_none": "No sect wars at the moment"
     },
     "world_secret": {
-      "label": "[World Secret]"
+      "label": "World Secret"
+    },
+    "nav_label": "World panels",
+    "menu": "System menu",
+    "time_detail": "Time details",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "groups": {
+      "world": "World",
+      "powers": "Powers",
+      "records": "Records"
     }
   },
   "world_info": {
@@ -198,7 +224,8 @@
     "resume": "Resume Game",
     "pause": "Pause Game",
     "paused": "Paused",
-    "closed_msg": "Game closed. You can safely close this tab."
+    "closed_msg": "Game closed. You can safely close this tab.",
+    "running": "Running"
   },
   "event_panel": {
     "title": "Events",
@@ -300,7 +327,8 @@
     "fallback": {
       "avatar_name": "Avatar",
       "counterpart_name": "Other Side"
-    }
+    },
+    "title_short": "Roleplay"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name} made a name in the cultivation world and came to be known as \"{nickname}\"."
@@ -311,8 +339,8 @@
       "middle": "Middle Stage",
       "late": "Late Stage"
     },
-    "title_short": "[Rankings]",
-    "tournament_short": "[Tournament]",
+    "title_short": "Rankings",
+    "tournament_short": "Tournament",
     "title": "Heaven, Earth & Human Rankings",
     "heaven": "Heaven (Nascent Soul)",
     "earth": "Earth (Core Formation)",
@@ -335,7 +363,7 @@
     "human_first": "Human 1st"
   },
   "sect_relations": {
-    "title_short": "[Sect Relations]",
+    "title_short": "Sect Relations",
     "title": "Sect Relations",
     "sect_a": "Sect A",
     "sect_b": "Sect B",
@@ -365,7 +393,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[Mortals]",
+    "title_short": "Mortals",
     "title": "Mortal System",
     "empty": "No data",
     "population_value": "{value}",
@@ -396,7 +424,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[Dynasty]",
+    "title_short": "Dynasty",
     "title": "Dynasty",
     "name": "Dynasty Name",
     "royal_house": "Royal House",
@@ -800,5 +828,63 @@
     "decision_keep": "Kept secret",
     "decision_none": "No choice",
     "empty": "No world secret data"
+  },
+  "map": {
+    "tab": "Map",
+    "sheet_close": "Close panel",
+    "layers": {
+      "title": "Layers",
+      "groups": {
+        "physical": "Physical",
+        "territorial": "Territorial",
+        "organizational": "Organizational"
+      },
+      "terrain": {
+        "label": "Terrain"
+      },
+      "water": {
+        "label": "Waters"
+      },
+      "elevation": {
+        "label": "Elevation"
+      },
+      "borders": {
+        "label": "Borders"
+      },
+      "names": {
+        "label": "Place names"
+      },
+      "routes": {
+        "label": "Routes",
+        "hint": "Links between regions; the lines are not the exact physical path"
+      },
+      "sects": {
+        "label": "Sects"
+      },
+      "infrastructure": {
+        "label": "Sites"
+      },
+      "institutionalPresence": {
+        "label": "Institutional presence"
+      }
+    },
+    "view": {
+      "group": "View controls",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "fit": "Fit world",
+      "zoom_level": "Zoom level"
+    },
+    "legend": {
+      "title": "Legend",
+      "coast": "Coastline",
+      "flow": "River current",
+      "border": "Region border",
+      "route_land": "Overland route",
+      "route_water": "Water crossing",
+      "route_severed": "Severed route",
+      "sect": "Sect territory",
+      "site": "Infrastructure site"
+    }
   }
 }

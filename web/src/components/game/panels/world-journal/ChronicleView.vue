@@ -109,23 +109,214 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
 </template>
 
 <style scoped>
-.chronicle-view { min-width: 0; padding: 12px; overflow-y: auto; color: #e8e2d4; }
-.chronicle-state { margin: 0; padding: 14px; border: 1px dashed #303030; border-radius: 9px; color: #777; font-size: 12px; }
-.chronicle-state--error { color: #d28d84; }
-.chronicle-chapter { margin-bottom: 14px; padding: 13px; border: 1px solid #36322a; border-radius: 11px; background: #191817; }
-.chronicle-chapter__header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.chronicle-chapter h3 { margin: 0; color: #f3e9cf; font-size: 15px; }
-.chronicle-trigger { flex: 0 0 auto; color: #9d927d; font-size: 10px; }
-.chronicle-paragraph { margin: 13px 0 0; color: #ddd5c7; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
-.chronicle-reference { display: inline; padding: 1px 3px; border: 0; border-bottom: 1px solid #b99652; background: transparent; color: #f1dfb9; font: inherit; text-align: left; cursor: pointer; }
-.chronicle-reference--avatar { border-bottom-color: #65bba1; color: #8fe1c4; }
-.chronicle-reference--sect { border-bottom-color: #b99edc; color: #ceb6ed; }
-.chronicle-reference--region { border-bottom-color: #8db1db; color: #a9c9ee; }
-.chronicle-badge { margin-left: 5px; padding: 1px 4px; border-radius: 4px; font-size: 9px; letter-spacing: .04em; }
-.chronicle-badge--fact { background: rgba(110, 175, 147, .18); color: #9be0c3; }
-.chronicle-badge--inference { background: rgba(190, 154, 91, .18); color: #e5c58f; }
-.chronicle-reference__label { margin-left: 4px; color: #a39b8d; font-size: 10px; }
-.chronicle-source-count { display: block; margin-top: 8px; color: #7d776c; font-size: 10px; }
-.chronicle-load-more { width: 100%; min-height: 44px; border: 1px solid #474032; border-radius: 8px; background: #211e19; color: #e5c58f; }
-@media (max-width: 760px) { .chronicle-view { padding: 12px 14px 24px; } .chronicle-paragraph { font-size: 16px; line-height: 1.65; } .chronicle-reference, .chronicle-load-more { min-height: 48px; } }
+/*
+ * The chronicle is the panel's long-form register: running prose in the display
+ * serif, with each chapter separated by a rule instead of sitting in its own
+ * rounded card.
+ */
+.chronicle-view {
+  min-width: 0;
+  padding: var(--s-5);
+  overflow-y: auto;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+}
+
+.chronicle-state {
+  margin: 0;
+  padding: var(--s-5) 0;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--text-muted);
+  font-size: var(--t-sm);
+  font-style: italic;
+}
+
+.chronicle-state--error {
+  color: var(--state-alert);
+  font-style: normal;
+}
+
+.chronicle-chapter {
+  margin-bottom: 0;
+  padding: var(--s-6) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.chronicle-chapter + .chronicle-chapter {
+  border-top: 1px solid var(--rule);
+}
+
+.chronicle-chapter__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+}
+
+/* Chapter title: the largest type in the sidebar, and the only display serif
+   heading — this is the register's byline. */
+.chronicle-chapter h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.chronicle-trigger {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.chronicle-paragraph {
+  margin: var(--s-5) 0 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--t-lg);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Reference kind is meaningful, so it keeps four distinguishable marks — but
+ * drawn from the palette: gold for the event itself, jade for a person,
+ * cinnabar for an organization, paper for a place.
+ */
+.chronicle-reference {
+  display: inline;
+  padding: 1px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--gold-600);
+  background: transparent;
+  color: var(--gold-300);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.chronicle-reference:hover {
+  background: var(--accent-wash);
+}
+
+.chronicle-reference:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.chronicle-reference--avatar {
+  border-bottom-color: var(--jade-600);
+  color: var(--jade-300);
+}
+
+.chronicle-reference--avatar:hover {
+  background: var(--jade-wash);
+}
+
+.chronicle-reference--sect {
+  border-bottom-color: var(--cinnabar-400);
+  color: var(--cinnabar-300);
+}
+
+.chronicle-reference--sect:hover {
+  background: var(--cinnabar-wash);
+}
+
+.chronicle-reference--region {
+  border-bottom-color: var(--paper-700);
+  color: var(--paper-200);
+}
+
+.chronicle-reference--region:hover {
+  background: var(--surface-raised);
+}
+
+/* Fact vs inference is an epistemic distinction: it stays legible as a tracked
+   caption, not as a coloured pill. */
+.chronicle-badge {
+  margin-left: var(--s-2);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-1);
+  font-family: var(--font-ui);
+  font-size: 9px;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.chronicle-badge--fact {
+  border: 1px solid var(--jade-600);
+  color: var(--jade-300);
+}
+
+.chronicle-badge--inference {
+  border: 1px dashed var(--gold-600);
+  color: var(--gold-300);
+}
+
+.chronicle-reference__label {
+  margin-left: var(--s-1);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.chronicle-source-count {
+  display: block;
+  margin-top: var(--s-4);
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chronicle-load-more {
+  width: 100%;
+  min-height: 36px;
+  margin-top: var(--s-5);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--accent-strong);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.chronicle-load-more:hover:not(:disabled) {
+  background: var(--accent-wash);
+  border-color: var(--gold-600);
+}
+
+.chronicle-load-more:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.chronicle-load-more:disabled {
+  color: var(--paper-700);
+  cursor: not-allowed;
+}
+
+@media (max-width: 760px) {
+  .chronicle-view {
+    padding: var(--s-5) var(--s-6) var(--s-7);
+  }
+
+  .chronicle-paragraph {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  .chronicle-load-more {
+    min-height: 48px;
+  }
+}
 </style>

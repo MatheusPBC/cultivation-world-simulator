@@ -1,13 +1,17 @@
 import type { RegionSummary } from '@/types/core';
-import { getRegionTextMetrics, usesCompactMapLabels } from '@/utils/mapStyles';
+import { resolveLabelTier, type MapLabelTierName } from '@/constants/mapTheme';
+import {
+  getRegionTextMetrics,
+  isTierVisibleAtScale,
+  usesCompactMapLabels
+} from '@/utils/mapStyles';
 
 const TILE_SIZE = 64;
-const LATIN_WRAP_TARGET = 16;
-const AVG_LATIN_GLYPH_WIDTH_RATIO = 0.58;
-const AVG_COMPACT_GLYPH_WIDTH_RATIO = 0.96;
-const LABEL_BOX_PADDING_X = 10;
-const LABEL_BOX_PADDING_Y = 6;
-const LABEL_COLLISION_PADDING = 8;
+const AVG_LATIN_GLYPH_WIDTH_RATIO = 0.62;
+const AVG_COMPACT_GLYPH_WIDTH_RATIO = 0.98;
+const LABEL_BOX_PADDING_X = 8;
+const LABEL_BOX_PADDING_Y = 4;
+const LABEL_COLLISION_PADDING = 9;
 const SPATIAL_BUCKET_SIZE = 256;
 
 export type MapRegionLabel = RegionSummary & {
@@ -15,6 +19,7 @@ export type MapRegionLabel = RegionSummary & {
   labelX: number;
   labelY: number;
   priority: number;
+  tier: MapLabelTierName;
 };
 
 type LabelBounds = {
@@ -40,17 +45,8 @@ type AcceptedLabel = {
   bounds: LabelBounds;
 };
 
-function getRegionPriority(region: RegionSummary): number {
-  switch (region.type) {
-    case 'city':
-      return 4;
-    case 'sect':
-      return 3;
-    case 'cultivate':
-      return 2;
-    default:
-      return 1;
-  }
+export function getRegionPriority(region: RegionSummary): number {
+  return resolveLabelTier(region.type).priority;
 }
 
 function splitLatinWords(name: string): string[] {
@@ -65,14 +61,24 @@ function truncateWithEllipsis(text: string, maxChars: number): string {
   return `${text.slice(0, Math.max(1, maxChars - 1)).trimEnd()}…`;
 }
 
-export function formatRegionDisplayName(name: string, locale: string): string {
-  if (usesCompactMapLabels(locale)) {
+/**
+ * Wraps a name to at most two lines. The wrap target is per-tier: a city name
+ * gets to stay wide, a cultivation site wraps sooner, so the label block scales
+ * with the label's importance.
+ */
+export function formatRegionDisplayName(
+  name: string,
+  locale: string,
+  type = 'normal'
+): string {
+  if (usesCompactMapLabels(locale, name)) {
     return name;
   }
 
+  const wrapTarget = resolveLabelTier(type).wrapTarget;
   const words = splitLatinWords(name);
   if (words.length <= 1) {
-    return truncateWithEllipsis(name, LATIN_WRAP_TARGET);
+    return truncateWithEllipsis(name, wrapTarget);
   }
 
   let firstLine = '';
@@ -80,7 +86,7 @@ export function formatRegionDisplayName(name: string, locale: string): string {
 
   for (const word of words) {
     const candidate = firstLine ? `${firstLine} ${word}` : word;
-    if (candidate.length <= LATIN_WRAP_TARGET || firstLine.length === 0) {
+    if (candidate.length <= wrapTarget || firstLine.length === 0) {
       firstLine = candidate;
       continue;
     }
@@ -92,25 +98,32 @@ export function formatRegionDisplayName(name: string, locale: string): string {
     return firstLine;
   }
 
-  const secondLine = truncateWithEllipsis(secondLineWords.join(' '), LATIN_WRAP_TARGET);
+  const secondLine = truncateWithEllipsis(secondLineWords.join(' '), wrapTarget);
   return `${firstLine}\n${secondLine}`;
 }
 
+/**
+ * Label footprint in *screen* px.
+ *
+ * Labels are counter-scaled to hold a constant on-screen size, so collision has
+ * to be resolved in screen space too. Callers convert to world units with the
+ * current viewport scale.
+ */
 export function estimateRegionLabelSize(
   displayName: string,
   type: string,
   locale: string
 ): RegionLabelSize {
-  const metrics = getRegionTextMetrics(type, locale);
+  const metrics = getRegionTextMetrics(type, locale, displayName);
   const lines = displayName.split('\n');
   const maxChars = Math.max(...lines.map((line) => line.length), 1);
-  const widthRatio = usesCompactMapLabels(locale)
-    ? AVG_COMPACT_GLYPH_WIDTH_RATIO
-    : AVG_LATIN_GLYPH_WIDTH_RATIO;
+  const compact = usesCompactMapLabels(locale, displayName);
+  const widthRatio = compact ? AVG_COMPACT_GLYPH_WIDTH_RATIO : AVG_LATIN_GLYPH_WIDTH_RATIO;
+  const perGlyph = metrics.screenSize * widthRatio + metrics.letterSpacing / 3;
 
   return {
-    width: maxChars * metrics.fontSize * widthRatio + LABEL_BOX_PADDING_X * 2,
-    height: lines.length * metrics.lineHeight + LABEL_BOX_PADDING_Y * 2
+    width: maxChars * perGlyph + LABEL_BOX_PADDING_X * 2,
+    height: lines.length * (metrics.screenSize * (compact ? 1.18 : 1.28)) + LABEL_BOX_PADDING_Y * 2
   };
 }
 
@@ -118,21 +131,26 @@ function estimateLabelPlacement(
   region: RegionSummary,
   displayName: string,
   locale: string,
+  worldScale: number,
   offsetX = 0,
   offsetY = 0
 ): LabelPlacement {
-  const { width, height } = estimateRegionLabelSize(displayName, region.type, locale);
+  const screen = estimateRegionLabelSize(displayName, region.type, locale);
+  // Convert the screen footprint into world units for collision in map space.
+  const width = screen.width * worldScale;
+  const height = screen.height * worldScale;
   const labelX = region.x * TILE_SIZE + TILE_SIZE / 2 + offsetX;
   const labelY = region.y * TILE_SIZE + TILE_SIZE * 1.5 + offsetY;
+  const pad = LABEL_COLLISION_PADDING * worldScale;
 
   return {
     labelX,
     labelY,
     bounds: {
-      left: labelX - width / 2 - LABEL_COLLISION_PADDING,
-      right: labelX + width / 2 + LABEL_COLLISION_PADDING,
-      top: labelY - height / 2 - LABEL_COLLISION_PADDING,
-      bottom: labelY + height / 2 + LABEL_COLLISION_PADDING
+      left: labelX - width / 2 - pad,
+      right: labelX + width / 2 + pad,
+      top: labelY - height / 2 - pad,
+      bottom: labelY + height / 2 + pad
     }
   };
 }
@@ -191,11 +209,14 @@ function addToSpatialIndex(entry: AcceptedLabel, spatialIndex: Map<string, Accep
   }
 }
 
-function getPlacementOffsets(region: RegionSummary, locale: string): Array<[number, number]> {
-  const metrics = getRegionTextMetrics(region.type, locale);
-  const compact = usesCompactMapLabels(locale);
-  const stepX = compact ? Math.round(metrics.fontSize * 1.9) : Math.round(metrics.fontSize * 2.8);
-  const stepY = compact ? Math.round(metrics.lineHeight * 1.25) : Math.round(metrics.lineHeight * 1.2);
+function getPlacementOffsets(
+  region: RegionSummary,
+  locale: string,
+  worldScale: number
+): Array<[number, number]> {
+  const metrics = getRegionTextMetrics(region.type, locale, region.name);
+  const stepX = Math.round(metrics.screenSize * 3.2 * worldScale);
+  const stepY = Math.round(metrics.screenSize * 1.6 * worldScale);
 
   return [
     [0, 0],
@@ -219,10 +240,6 @@ function getPlacementOffsets(region: RegionSummary, locale: string): Array<[numb
     [stepX * 2, -stepY],
     [-stepX * 2, stepY],
     [-stepX * 2, -stepY],
-    [stepX * 2, stepY * 2],
-    [-stepX * 2, stepY * 2],
-    [stepX * 2, -stepY * 2],
-    [-stepX * 2, -stepY * 2],
     [0, stepY * 3],
     [0, -stepY * 3],
     [stepX * 3, 0],
@@ -230,30 +247,68 @@ function getPlacementOffsets(region: RegionSummary, locale: string): Array<[numb
   ];
 }
 
+export interface BuildLabelOptions {
+  /**
+   * Current viewport zoom. Drives both tier disclosure (LOD) and the world-space
+   * size of each label's collision box. Defaults to 1 (world units == screen px).
+   */
+  viewportScale?: number;
+  /**
+   * When true, a label that cannot find a free placement is dropped instead of
+   * being stacked on top of a higher-priority name. This is what keeps the
+   * fit-zoom view readable.
+   */
+  dropOnCollision?: boolean;
+}
+
+/**
+ * Chooses which region names to draw and where.
+ *
+ * Ordering is by canonical tier priority (city > sect > territory > site), so a
+ * contested spot always resolves in favour of the more important place. Tiers
+ * below their `minScale` are not considered at all.
+ */
 export function buildVisibleRegionLabels(
   regions: RegionSummary[],
-  locale: string
+  locale: string,
+  options: BuildLabelOptions = {}
 ): MapRegionLabel[] {
-  const sortedRegions = [...regions].sort((a, b) => {
-    const priorityDiff = getRegionPriority(b) - getRegionPriority(a);
-    if (priorityDiff !== 0) return priorityDiff;
+  const viewportScale = options.viewportScale ?? 1;
+  const dropOnCollision = options.dropOnCollision ?? true;
+  const worldScale = viewportScale > 0 ? 1 / viewportScale : 1;
 
-    const nameLengthDiff = a.name.length - b.name.length;
-    if (nameLengthDiff !== 0) return nameLengthDiff;
+  const sortedRegions = [...regions]
+    .filter((region) => isTierVisibleAtScale(region.type, viewportScale))
+    .sort((a, b) => {
+      const priorityDiff = getRegionPriority(b) - getRegionPriority(a);
+      if (priorityDiff !== 0) return priorityDiff;
 
-    return String(a.id).localeCompare(String(b.id));
-  });
+      const nameLengthDiff = a.name.length - b.name.length;
+      if (nameLengthDiff !== 0) return nameLengthDiff;
+
+      return String(a.id).localeCompare(String(b.id));
+    });
 
   const accepted: AcceptedLabel[] = [];
   const spatialIndex = new Map<string, AcceptedLabel[]>();
 
   for (const region of sortedRegions) {
-    const displayName = formatRegionDisplayName(region.name, locale);
-    const placements = getPlacementOffsets(region, locale)
-      .map(([offsetX, offsetY]) => estimateLabelPlacement(region, displayName, locale, offsetX, offsetY));
+    const tier = resolveLabelTier(region.type);
+    const displayName = formatRegionDisplayName(region.name, locale, region.type);
+    const placements = getPlacementOffsets(region, locale, worldScale).map(
+      ([offsetX, offsetY]) =>
+        estimateLabelPlacement(region, displayName, locale, worldScale, offsetX, offsetY)
+    );
 
-    const chosenPlacement =
-      placements.find((placement) => !findCollision(placement.bounds, spatialIndex)) ?? placements[0];
+    const freePlacement = placements.find(
+      (placement) => !findCollision(placement.bounds, spatialIndex)
+    );
+
+    if (!freePlacement && dropOnCollision) {
+      continue;
+    }
+
+    const chosenPlacement = freePlacement ?? placements[0];
 
     const entry: AcceptedLabel = {
       label: {
@@ -261,7 +316,8 @@ export function buildVisibleRegionLabels(
         displayName,
         labelX: chosenPlacement.labelX,
         labelY: chosenPlacement.labelY,
-        priority: getRegionPriority(region)
+        priority: tier.priority,
+        tier: tier.tier
       },
       bounds: chosenPlacement.bounds
     };

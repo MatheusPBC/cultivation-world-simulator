@@ -1,12 +1,12 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useWorldStore } from '../../stores/world'
 import { useSocketStore } from '../../stores/socket'
-import { ref, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 import StatusWidget from './StatusWidget.vue'
 import StatusBarPanels from './StatusBarPanels.vue'
-import { PHENOMENON_RARITY_COLORS, STATUS_BAR_COLORS } from '@/constants/uiColors'
-import calendarIcon from '@/assets/icons/ui/lucide/calendar.svg'
+import SimClock from './SimClock.vue'
+import { PHENOMENON_RARITY_COLORS } from '@/constants/uiColors'
 import bookOpenIcon from '@/assets/icons/ui/lucide/book-open.svg'
 import sparklesIcon from '@/assets/icons/ui/lucide/sparkles.svg'
 import shieldIcon from '@/assets/icons/ui/lucide/shield.svg'
@@ -14,13 +14,25 @@ import trophyIcon from '@/assets/icons/ui/lucide/trophy.svg'
 import swordsIcon from '@/assets/icons/ui/lucide/swords.svg'
 import usersIcon from '@/assets/icons/ui/lucide/users.svg'
 import landmarkIcon from '@/assets/icons/ui/lucide/landmark.svg'
-import clock3Icon from '@/assets/icons/ui/lucide/clock-3.svg'
+import mountainIcon from '@/assets/icons/ui/lucide/mountain.svg'
 import scrollTextIcon from '@/assets/icons/ui/lucide/scroll-text.svg'
+import menuIcon from '@/assets/icons/ui/lucide/menu.svg'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const store = useWorldStore()
 const socketStore = useSocketStore()
 const panelsRef = ref<InstanceType<typeof StatusBarPanels> | null>(null)
+
+const props = withDefaults(defineProps<{
+  paused?: boolean
+}>(), {
+  paused: false,
+})
+
+const emit = defineEmits<{
+  (e: 'toggle-pause'): void
+  (e: 'open-menu'): void
+}>()
 
 type StatusBarPanelKey =
   | 'time'
@@ -35,32 +47,64 @@ type StatusBarPanelKey =
   | 'avatarOverview'
   | 'worldSecret'
 
-const phenomenonColor = computed(() => {
-  const p = store.currentPhenomenon
-  if (!p) return STATUS_BAR_COLORS.neutral
-  return getRarityColor(p.rarity)
-})
-
-const domainLabel = computed(() => {
-  return t('game.status_bar.hidden_domain.label')
-})
-
-const avatarOverviewLabel = computed(() => {
-  return t('game.status_bar.avatar_overview.label')
-})
-
-const timeLabel = computed(() => {
-  const yearPart = `${store.year}${t('common.year')}`
-  const monthPart = `${store.month}${t('common.month')}`
-  if (locale.value.startsWith('ja') || locale.value.startsWith('zh')) {
-    return `${yearPart}${monthPart}`
-  }
-  return `${yearPart} ${monthPart}`
-})
-
-function getRarityColor(rarity: string) {
-  return PHENOMENON_RARITY_COLORS[rarity] ?? STATUS_BAR_COLORS.neutral
+/*
+ * Eleven equally-weighted, differently-coloured entries separated by `|` gave
+ * the player no map of the interface. The same eleven destinations are now one
+ * clock plus three semantic groups — the world itself, the powers acting in it,
+ * and the records kept about it — separated by hairlines instead of glyphs.
+ */
+interface NavEntry {
+  key: StatusBarPanelKey
+  label: string
+  icon: string
+  accent?: string
+  onSelect?: () => void
 }
+
+const phenomenonAccent = computed(() => {
+  const phenomenon = store.currentPhenomenon
+  if (!phenomenon) return undefined
+  // Rarity is genuine live state, so this is the one entry that keeps a hue.
+  return PHENOMENON_RARITY_COLORS[phenomenon.rarity] ?? undefined
+})
+
+const worldGroup = computed<NavEntry[]>(() => {
+  const entries: NavEntry[] = []
+  if (store.currentPhenomenon) {
+    entries.push({
+      key: 'phenomenonSelector',
+      label: store.currentPhenomenon.name,
+      icon: sparklesIcon,
+      accent: phenomenonAccent.value,
+      onSelect: openPhenomenonSelector,
+    })
+  }
+  entries.push(
+    { key: 'hiddenDomain', label: t('game.status_bar.hidden_domain.label'), icon: mountainIcon },
+    { key: 'worldSecret', label: t('game.status_bar.world_secret.label'), icon: scrollTextIcon },
+    { key: 'worldInfo', label: t('game.status_bar.world_info.label'), icon: bookOpenIcon },
+  )
+  return entries
+})
+
+const powerGroup = computed<NavEntry[]>(() => ([
+  { key: 'sectRelations', label: t('game.sect_relations.title_short'), icon: shieldIcon },
+  { key: 'dynastyOverview', label: t('game.dynasty.title_short'), icon: landmarkIcon },
+  { key: 'mortalOverview', label: t('game.mortal_system.title_short'), icon: usersIcon },
+]))
+
+const recordGroup = computed<NavEntry[]>(() => ([
+  { key: 'avatarOverview', label: t('game.status_bar.avatar_overview.label'), icon: usersIcon },
+  { key: 'ranking', label: t('game.ranking.title_short'), icon: trophyIcon },
+  { key: 'tournament', label: t('game.ranking.tournament_short'), icon: swordsIcon },
+]))
+
+const navGroups = computed(() => ([
+  { key: 'world', entries: worldGroup.value },
+  { key: 'powers', entries: powerGroup.value },
+  { key: 'records', entries: recordGroup.value },
+]))
+
 async function openPhenomenonSelector() {
   await store.getPhenomenaList()
   void openPanel('phenomenonSelector')
@@ -69,205 +113,140 @@ async function openPhenomenonSelector() {
 function openPanel(panel: StatusBarPanelKey) {
   void panelsRef.value?.open(panel)
 }
+
+function selectEntry(entry: NavEntry) {
+  if (entry.onSelect) {
+    void entry.onSelect()
+    return
+  }
+  openPanel(entry.key)
+}
 </script>
 
 <template>
-  <header class="top-bar">
-    <div class="left">
-      <span class="title">{{ t('splash.title') }}</span>
-      <span class="status-dot" :class="{ connected: socketStore.isConnected }"></span>
-    </div>
-    <div class="center">
-      <StatusWidget
-        :label="timeLabel"
-        :icon="calendarIcon"
-        :color="STATUS_BAR_COLORS.time"
-        :disable-popover="true"
-        @trigger-click="openPanel('time')"
-      />
+  <header class="hud">
+    <SimClock
+      :year="store.year"
+      :month="store.month"
+      :paused="props.paused"
+      :connected="socketStore.isConnected"
+      @toggle-pause="emit('toggle-pause')"
+      @open-time="openPanel('time')"
+    />
 
-      <StatusWidget
-        v-if="store.currentPhenomenon"
-        :label="`[${store.currentPhenomenon.name}]`"
-        :icon="sparklesIcon"
-        :color="phenomenonColor"
-        :disable-popover="true"
-        @trigger-click="openPhenomenonSelector"
-      />
-
-      <StatusWidget
-        :label="domainLabel"
-        :icon="shieldIcon"
-        :color="STATUS_BAR_COLORS.hiddenDomain"
-        :disable-popover="true"
-        @trigger-click="openPanel('hiddenDomain')"
-      />
-
-      <StatusWidget
-        :label="t('game.sect_relations.title_short')"
-        :icon="shieldIcon"
-        :color="STATUS_BAR_COLORS.sectRelations"
-        :disable-popover="true"
-        @trigger-click="openPanel('sectRelations')"
-      />
-
-      <StatusWidget
-        :label="t('game.dynasty.title_short')"
-        :icon="landmarkIcon"
-        :color="STATUS_BAR_COLORS.dynasty"
-        :disable-popover="true"
-        @trigger-click="openPanel('dynastyOverview')"
-      />
-
-      <StatusWidget
-        :label="t('game.mortal_system.title_short')"
-        :icon="usersIcon"
-        :color="STATUS_BAR_COLORS.mortal"
-        :disable-popover="true"
-        @trigger-click="openPanel('mortalOverview')"
-      />
-
-      <StatusWidget
-        :label="t('game.ranking.title_short')"
-        :icon="trophyIcon"
-        :color="STATUS_BAR_COLORS.ranking"
-        :disable-popover="true"
-        @trigger-click="openPanel('ranking')"
-      />
-
-      <StatusWidget
-        :label="t('game.ranking.tournament_short')"
-        :icon="swordsIcon"
-        :color="STATUS_BAR_COLORS.tournament"
-        :disable-popover="true"
-        @trigger-click="openPanel('tournament')"
-      />
-
-      <StatusWidget
-        :label="avatarOverviewLabel"
-        :icon="clock3Icon"
-        :color="STATUS_BAR_COLORS.neutral"
-        :disable-popover="true"
-        @trigger-click="openPanel('avatarOverview')"
-      />
-
-      <StatusWidget
-        :label="t('game.status_bar.world_secret.label')"
-        :icon="scrollTextIcon"
-        :color="STATUS_BAR_COLORS.worldSecret"
-        :disable-popover="true"
-        @trigger-click="openPanel('worldSecret')"
-      />
-
-      <StatusWidget
-        :label="t('game.status_bar.world_info.label')"
-        :icon="bookOpenIcon"
-        :color="STATUS_BAR_COLORS.worldInfo"
-        :disable-popover="true"
-        @trigger-click="openPanel('worldInfo')"
-      />
-    </div>
+    <nav class="hud__rail" :aria-label="t('game.status_bar.nav_label')">
+      <div
+        v-for="group in navGroups"
+        :key="group.key"
+        class="hud__group"
+        role="group"
+        :aria-label="t(`game.status_bar.groups.${group.key}`)"
+      >
+        <StatusWidget
+          v-for="entry in group.entries"
+          :key="entry.key"
+          :label="entry.label"
+          :icon="entry.icon"
+          :accent="entry.accent"
+          :disable-popover="true"
+          @trigger-click="selectEntry(entry)"
+        />
+      </div>
+    </nav>
 
     <StatusBarPanels ref="panelsRef" />
 
-    <div class="author">
-      <a
-        class="author-link"
-        href="https://github.com/4thfever/cultivation-world-simulator"
-        target="_blank"
-        rel="noopener"
+    <div class="hud__end">
+      <button
+        type="button"
+        class="hud__menu"
+        :title="t('game.status_bar.menu')"
+        :aria-label="t('game.status_bar.menu')"
+        @click="emit('open-menu')"
       >
-        {{ t('game.status_bar.author_github') }}
-      </a>
+        <span class="cw-icon" :style="{ '--icon-url': `url(${menuIcon})` }" aria-hidden="true" />
+      </button>
     </div>
   </header>
 </template>
 
 <style scoped>
-.top-bar {
-  height: 36px;
-  background:
-    linear-gradient(180deg, rgba(34, 34, 34, 0.98), rgba(22, 22, 22, 0.98)),
-    linear-gradient(90deg, rgba(120, 182, 255, 0.08), rgba(227, 179, 65, 0.04) 38%, rgba(95, 191, 122, 0.06) 100%);
-  border-bottom: 1px solid #2f2f2f;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  font-size: 14px;
-  z-index: 10;
-  gap: 16px;
-  min-width: 0;
-}
-
-.top-bar .title {
-  font-weight: bold;
-  margin-right: 8px;
-  color: #e8dcc0;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.center {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.center::-webkit-scrollbar {
-  display: none;
-}
-
-.center :deep(.status-widget) {
+.hud {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-5);
+  height: var(--hud-height);
+  padding: 0 var(--s-5);
+  /* Lacquered iron: one opaque surface, one engraved rule. No gradient stack. */
+  background: var(--surface-chrome);
+  border-bottom: 1px solid var(--rule-strong);
+  z-index: 10;
+  min-width: 0;
 }
 
-.left {
+.hud__rail {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   min-width: 0;
-  flex: 0 1 auto;
+  overflow: hidden;
 }
 
-.status-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #ff4d4f;
-}
-
-.status-dot.connected {
-  background: #52c41a;
-}
-
-.author {
+.hud__group {
   display: flex;
   align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  color: #bbb;
-  display: none; /* 暂时隐藏，因为空间可能不够 */
+  gap: var(--s-1);
+  padding: 0 var(--s-4);
+  min-width: 0;
 }
 
-@media (min-width: 1024px) {
-  .author {
-    display: flex;
+/* Hairline separators replace the literal `|` characters. */
+.hud__group + .hud__group {
+  border-left: 1px solid var(--rule);
+}
+
+.hud__end {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.hud__menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: 36px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-2);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast),
+    border-color var(--motion-fast);
+}
+
+.hud__menu:hover {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  border-color: var(--rule-strong);
+}
+
+.hud__menu:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 720px) {
+  .hud {
+    gap: var(--s-3);
+    padding: 0 var(--s-4);
   }
-}
 
-.author-link {
-  color: #4dabf7;
-  text-decoration: none;
-}
-
-.author-link:hover {
-  color: #8bc6ff;
-  text-decoration: underline;
+  .hud__group {
+    padding: 0 var(--s-2);
+  }
 }
 </style>

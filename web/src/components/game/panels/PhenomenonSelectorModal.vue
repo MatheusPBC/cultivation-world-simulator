@@ -2,7 +2,7 @@
 import { NModal, NList, NListItem, NTag, NEmpty, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useWorldStore } from '@/stores/world'
-import { PHENOMENON_RARITY_COLORS, STATUS_BAR_COLORS } from '@/constants/uiColors'
+import { PHENOMENON_RARITY_COLORS, SHARED_UI_COLORS } from '@/constants/uiColors'
 
 defineProps<{
   show: boolean
@@ -17,7 +17,7 @@ const store = useWorldStore()
 const message = useMessage()
 
 function getRarityColor(rarity: string) {
-  return PHENOMENON_RARITY_COLORS[rarity] ?? STATUS_BAR_COLORS.neutral
+  return PHENOMENON_RARITY_COLORS[rarity] ?? SHARED_UI_COLORS.textMuted
 }
 
 function handleShowChange(value: boolean) {

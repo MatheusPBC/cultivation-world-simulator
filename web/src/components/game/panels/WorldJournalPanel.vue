@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
@@ -63,6 +63,32 @@ const periods: Array<{ months: WorldJournalPeriodMonths; labelKey: string }> = [
   { months: 3, labelKey: 'game.world_journal.periods.three' },
   { months: 12, labelKey: 'game.world_journal.periods.twelve' },
 ]
+
+const tabButtons = ref<HTMLButtonElement[]>([])
+
+/**
+ * Roving tabindex: a tablist must be reachable with one Tab stop and traversed
+ * with the arrow keys. The tabs were plain buttons with no role, so a keyboard
+ * user had to step through all seven.
+ */
+function onTabKeydown(event: KeyboardEvent) {
+  const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+    ? 1
+    : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+      ? -1
+      : 0
+  if (direction === 0 && event.key !== 'Home' && event.key !== 'End') return
+
+  event.preventDefault()
+  const current = Math.max(0, tabs.findIndex(tab => tab.key === activeTab.value))
+  const next = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? tabs.length - 1
+      : (current + direction + tabs.length) % tabs.length
+  selectTab(tabs[next].key)
+  tabButtons.value[next]?.focus()
+}
 
 function selectTab(tab: WorldJournalTab) {
   journalStore.selectTab(tab)
@@ -148,14 +174,23 @@ onMounted(() => {
 <template>
   <section class="world-journal-panel">
     <header class="journal-header">
-      <h2>{{ t('game.world_journal.title') }}</h2>
-      <div class="journal-tabs" role="tablist">
+      <h2 class="journal-title">{{ t('game.world_journal.title') }}</h2>
+      <div
+        class="journal-tabs"
+        role="tablist"
+        :aria-label="t('game.world_journal.title')"
+        @keydown="onTabKeydown"
+      >
         <button
           v-for="tab in tabs"
           :key="tab.key"
+          ref="tabButtons"
           type="button"
+          role="tab"
           class="journal-tab"
           :class="{ 'journal-tab--active': activeTab === tab.key }"
+          :aria-selected="activeTab === tab.key"
+          :tabindex="activeTab === tab.key ? 0 : -1"
           :data-testid="`journal-tab-${tab.key}`"
           @click="selectTab(tab.key)"
         >
@@ -165,46 +200,71 @@ onMounted(() => {
     </header>
 
     <div v-if="activeTab === 'now'" class="journal-body" data-testid="journal-now">
-      <div class="period-selector" aria-label="periodo do diario">
-        <button
-          v-for="period in periods"
-          :key="period.months"
-          type="button"
-          class="period-button"
-          :class="{ 'period-button--active': periodMonths === period.months }"
-          :data-testid="`journal-period-${period.months}`"
-          @click="journalStore.setPeriod(period.months)"
-        >
-          {{ t(period.labelKey) }}
-        </button>
-      </div>
-
       <p v-if="loading && !journal" class="journal-state">{{ t('game.world_journal.loading') }}</p>
       <p v-else-if="hasError" class="journal-state journal-state--error">
         {{ t('game.world_journal.error') }}
       </p>
 
       <template v-if="journal">
-        <section class="journal-section">
-          <h3>{{ t('game.world_journal.activity') }}</h3>
-          <div class="activity-grid">
-            <div class="activity-stat">
-              <strong>{{ journal.activity.total_events }}</strong>
-              <span>{{ t('game.world_journal.total_events') }}</span>
-            </div>
-            <div class="activity-stat activity-stat--major">
-              <strong>{{ journal.activity.major_events }}</strong>
-              <span>{{ t('game.world_journal.major_events') }}</span>
-            </div>
-            <div class="activity-stat">
-              <strong>{{ journal.activity.story_events }}</strong>
-              <span>{{ t('game.world_journal.story_events') }}</span>
-            </div>
-            <div class="activity-stat">
-              <strong>{{ journal.activity.active_avatar_count }}</strong>
-              <span>{{ t('game.world_journal.active_avatars') }}</span>
+        <section class="journal-section journal-section--activity">
+          <div class="journal-section-head">
+            <h3>{{ t('game.world_journal.activity') }}</h3>
+            <div
+              class="period-selector"
+              role="group"
+              :aria-label="t('game.world_journal.activity')"
+            >
+              <button
+                v-for="period in periods"
+                :key="period.months"
+                type="button"
+                class="period-button"
+                :class="{ 'period-button--active': periodMonths === period.months }"
+                :aria-pressed="periodMonths === period.months"
+                :data-testid="`journal-period-${period.months}`"
+                @click="journalStore.setPeriod(period.months)"
+              >
+                {{ t(period.labelKey) }}
+              </button>
             </div>
           </div>
+
+          <!--
+            Four stat cards in a 2x2 grid spent ~180px of the most valuable
+            column in the game on four zeroes. The same four canonical counts
+            now read as one dateline, with zero values de-emphasised so a quiet
+            month looks quiet instead of looking broken.
+          -->
+          <dl class="activity-line">
+            <div
+              class="activity-metric"
+              :class="{ 'activity-metric--zero': journal.activity.total_events === 0 }"
+            >
+              <dt>{{ t('game.world_journal.total_events') }}</dt>
+              <dd>{{ journal.activity.total_events }}</dd>
+            </div>
+            <div
+              class="activity-metric activity-metric--major"
+              :class="{ 'activity-metric--zero': journal.activity.major_events === 0 }"
+            >
+              <dt>{{ t('game.world_journal.major_events') }}</dt>
+              <dd>{{ journal.activity.major_events }}</dd>
+            </div>
+            <div
+              class="activity-metric"
+              :class="{ 'activity-metric--zero': journal.activity.story_events === 0 }"
+            >
+              <dt>{{ t('game.world_journal.story_events') }}</dt>
+              <dd>{{ journal.activity.story_events }}</dd>
+            </div>
+            <div
+              class="activity-metric"
+              :class="{ 'activity-metric--zero': journal.activity.active_avatar_count === 0 }"
+            >
+              <dt>{{ t('game.world_journal.active_avatars') }}</dt>
+              <dd>{{ journal.activity.active_avatar_count }}</dd>
+            </div>
+          </dl>
         </section>
 
         <section class="journal-section">
@@ -526,6 +586,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/*
+ * World Journal — editorial column in "Tinta e Jade".
+ *
+ * Read as a printed gazette rather than a dashboard: one narrow measure, a
+ * tracked eyebrow per section, hairline rules instead of card borders, and
+ * numerals in a tabular face. Rounded 9-10px cards with their own background
+ * are gone — a stack of them inside a 380px column produced nested boxes and
+ * no hierarchy.
+ */
+
 .world-journal-panel {
   min-height: 0;
   height: 100%;
@@ -533,8 +603,17 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: #111;
-  color: #e8e2d4;
+  background: var(--surface-panel);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  /*
+   * The sidebar is user-resizable, so its children must respond to the column
+   * width rather than to the window. `LiveGuideView` keys its two-column split
+   * off this container; a viewport media query cannot see a 380px sidebar
+   * inside a 1680px window.
+   */
+  container-type: inline-size;
+  container-name: journal;
 }
 
 .journal-header {
@@ -542,42 +621,64 @@ onMounted(() => {
   top: 0;
   z-index: 3;
   flex-shrink: 0;
-  padding: 10px 10px 0;
-  background: rgba(17, 17, 17, 0.97);
-  border-bottom: 1px solid #303030;
+  padding: var(--s-5) var(--s-5) 0;
+  background: var(--surface-panel);
+  border-bottom: 1px solid var(--rule);
 }
 
-.journal-header h2 {
-  margin: 0 0 9px;
-  color: #f3e9cf;
-  font-size: 14px;
-  letter-spacing: 0.02em;
+/* The panel title is an eyebrow, not a heading competing with the content. */
+.journal-title {
+  margin: 0 0 var(--s-4);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
 }
 
+/*
+ * One wrapping row of text tabs. The old `repeat(6)` grid put seven tabs into
+ * a rigid six-column grid, so the seventh dropped to a second row of one and
+ * every label was clipped to ~55px.
+ */
 .journal-tabs {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-2);
 }
 
 .journal-tab {
   min-width: 0;
-  min-height: 42px;
-  padding: 6px 3px;
+  /* 40px keeps a comfortable target while fitting two rows in the header. */
+  min-height: 40px;
+  padding: 0 var(--s-3);
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: #969696;
-  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
   line-height: 1.1;
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
 }
 
 .journal-tab span {
   display: block;
 }
 
+.journal-tab:hover {
+  color: var(--text-primary);
+}
+
+.journal-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .journal-tab--active {
-  border-bottom-color: #c5a66b;
-  color: #f1dfb9;
+  border-bottom-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 .journal-body {
@@ -585,122 +686,220 @@ onMounted(() => {
   min-width: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--s-5);
 }
 
 .journal-body--guide {
   padding: 0;
 }
 
+/* Section header carries its own inline controls, so the period selector no
+   longer occupies a navigation row of its own. */
+.journal-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
 .period-selector {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  margin-bottom: 14px;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  overflow: hidden;
 }
 
 .period-button {
-  min-height: 34px;
-  padding: 6px;
-  border: 1px solid #363636;
-  border-radius: 7px;
-  background: #1a1a1a;
-  color: #aaa;
-  font-size: 11px;
+  min-height: 26px;
+  padding: 0 var(--s-4);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast);
+}
+
+.period-button + .period-button {
+  border-left: 1px solid var(--rule-soft);
+}
+
+.period-button:hover {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+}
+
+.period-button:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .period-button--active {
-  border-color: rgba(197, 166, 107, 0.72);
-  background: rgba(85, 63, 27, 0.38);
-  color: #f2dfb7;
+  color: var(--ink-900);
+  background: var(--accent);
 }
 
 .journal-section + .journal-section {
-  margin-top: 18px;
+  margin-top: var(--s-7);
 }
 
 .journal-section h3 {
-  margin: 0 0 9px;
-  color: #bdb6a9;
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  margin: 0 0 var(--s-4);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
 }
 
-.activity-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+.journal-section-head h3 {
+  margin-bottom: 0;
 }
 
-.activity-stat {
+.journal-section--activity {
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+/*
+ * Activity dateline: four counts on one line. Replaces a 2x2 grid of bordered
+ * cards that reserved ~180px to show four zeroes.
+ */
+.activity-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--s-5);
+  margin: var(--s-4) 0 0;
+}
+
+.activity-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-3);
   min-width: 0;
-  padding: 10px;
-  border: 1px solid #2e2e2e;
-  border-radius: 9px;
-  background: #181818;
 }
 
-.activity-stat strong,
-.activity-stat span {
-  display: block;
+/* Own gap so the drawn separator is evenly spaced from both neighbours. */
+.activity-metric + .activity-metric {
+  gap: var(--s-3);
+  padding-left: 0;
 }
 
-.activity-stat strong {
-  color: #eee6d6;
-  font-size: 18px;
+/*
+ * Separator is drawn, not typed, so it never lands in copied text. The flex
+ * gap supplies the space on both sides, keeping it optically centred.
+ */
+.activity-metric + .activity-metric::before {
+  content: '';
+  align-self: center;
+  width: 1px;
+  height: 9px;
+  background: var(--rule-strong);
 }
 
-.activity-stat span {
-  margin-top: 2px;
-  color: #898989;
-  font-size: 10px;
+.activity-metric dd {
+  order: -1;
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-numeric);
+  font-size: var(--t-lg);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
-.activity-stat--major {
-  border-color: rgba(197, 166, 107, 0.46);
+.activity-metric dt {
+  color: var(--text-muted);
+  font-size: var(--t-xs);
 }
 
+/* Major events keep the gold accent the old card border carried. */
+.activity-metric--major dd {
+  color: var(--accent-strong);
+}
+
+/*
+ * A quiet month should look quiet, not broken. A zero drops to the decorative
+ * ink value — including for major events, because "no important changes" is
+ * not something to accent.
+ */
+.activity-metric--zero dd,
+.activity-metric--zero.activity-metric--major dd {
+  color: var(--paper-700);
+}
+
+.activity-metric--zero dt {
+  color: var(--paper-700);
+}
+
+/*
+ * Entries are separated by a rule and a gold ledger mark, not by a card. This
+ * is what lets a stack of them read as a column of copy.
+ */
 .highlight-card {
   display: block;
   width: 100%;
-  margin-top: 8px;
-  padding: 12px;
-  border: 1px solid #303030;
-  border-left: 3px solid #b99652;
-  border-radius: 10px;
-  background: #191919;
+  padding: var(--s-5) 0 var(--s-5) var(--s-5);
+  border: 0;
+  border-left: 2px solid var(--gold-600);
+  background: transparent;
   text-align: left;
 }
 
+.highlight-card + .highlight-card {
+  border-top: 1px solid var(--rule-soft);
+}
+
 .highlight-card time {
-  color: #817b71;
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .event-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s-4);
 }
 
+/* "Why" is the panel's primary verb: a quiet text action, not a gold pill. */
 .why-button {
   flex-shrink: 0;
-  min-height: 30px;
-  padding: 4px 10px;
-  border: 1px solid rgba(197, 166, 107, 0.5);
-  border-radius: 999px;
-  background: rgba(85, 63, 27, 0.28);
-  color: #f1dfb9;
-  font-size: 11px;
+  min-height: 28px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-bottom: 1px solid var(--gold-600);
+  border-radius: 0;
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  cursor: pointer;
+  transition: color var(--motion-fast), border-color var(--motion-fast);
 }
 
+.why-button:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent);
+}
+
+.why-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Body copy: the one place in the panel that gets a generous measure. */
 .highlight-card p {
-  margin: 7px 0 0;
-  color: #ded8ca;
-  font-size: 13px;
-  line-height: 1.55;
+  margin: var(--s-3) 0 0;
+  color: var(--text-primary);
+  font-size: var(--t-md);
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -709,30 +908,56 @@ onMounted(() => {
 .subject-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 9px;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
 }
 
 .subject-chip {
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid #3b4d47;
-  border-radius: 999px;
-  background: #17201d;
-  color: #7dd9bd;
+  min-height: 26px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--jade-600);
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--jade-300);
+  font-family: var(--font-ui);
   font-size: 10px;
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast);
+}
+
+.subject-chip:hover {
+  color: var(--paper-100);
+  background: var(--jade-wash);
+}
+
+.subject-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .ongoing-card {
   display: block;
   width: 100%;
   position: relative;
-  margin-top: 8px;
-  padding: 11px 78px 11px 12px;
-  border: 1px solid #303030;
-  border-radius: 10px;
-  background: #191919;
+  padding: var(--s-4) 72px var(--s-4) 0;
+  border: 0;
+  background: transparent;
   text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+
+.ongoing-card + .ongoing-card {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.ongoing-card:hover {
+  background: var(--surface-raised);
+}
+
+.ongoing-card:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .ongoing-avatar,
@@ -742,51 +967,56 @@ onMounted(() => {
 }
 
 .ongoing-avatar {
-  color: #79d5b9;
-  font-size: 12px;
+  color: var(--jade-300);
+  font-size: var(--t-sm);
   font-weight: 600;
 }
 
 .ongoing-action {
-  margin-top: 4px;
-  color: #d0cbc0;
-  font-size: 12px;
+  margin-top: var(--s-1);
+  color: var(--text-secondary);
+  font-size: var(--t-sm);
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .ongoing-card small {
   position: absolute;
-  top: 12px;
-  right: 10px;
-  max-width: 65px;
-  color: #777;
+  top: var(--s-4);
+  right: 0;
+  max-width: 64px;
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
   font-size: 9px;
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
+/* Empty and loading states: a hairline rule and quiet copy, no dashed box. */
 .journal-empty,
 .journal-state {
   margin: 0;
-  padding: 14px;
-  border: 1px dashed #303030;
-  border-radius: 9px;
-  color: #777;
-  font-size: 12px;
+  padding: var(--s-5) 0;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--text-muted);
+  font-size: var(--t-sm);
+  font-style: italic;
 }
 
 .journal-state--error {
-  color: #d28d84;
+  color: var(--state-alert);
+  font-style: normal;
 }
 
 .journal-note {
-  margin: 10px 0 0;
-  padding: 10px 12px;
-  border: 1px dashed rgba(197, 166, 107, 0.4);
-  border-radius: 9px;
-  color: #bdb6a9;
-  font-size: 11px;
-  line-height: 1.5;
+  margin: var(--s-5) 0 0;
+  padding: 0 0 0 var(--s-4);
+  border: 0;
+  border-left: 2px solid var(--gold-600);
+  color: var(--text-muted);
+  font-size: var(--t-xs);
+  line-height: 1.55;
 }
 
 .journal-timeline {
@@ -800,51 +1030,62 @@ onMounted(() => {
 /* --- Focus tab: people and objectives --- */
 
 .focus-card {
-  margin-top: 8px;
-  padding: 12px;
-  border: 1px solid #303030;
-  border-radius: 10px;
-  background: #191919;
+  padding: var(--s-5) 0;
+  border: 0;
+  background: transparent;
+}
+
+.focus-card + .focus-card {
+  border-top: 1px solid var(--rule-soft);
 }
 
 .focus-card-header {
   display: block;
   width: 100%;
-  min-height: 48px;
+  min-height: 40px;
   padding: 0;
   border: 0;
   background: transparent;
   text-align: left;
+  cursor: pointer;
+}
+
+.focus-card-header:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .focus-objectives {
-  margin: 10px 0 0;
+  margin: var(--s-4) 0 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--s-4);
 }
 
+/* Objectives read as a definition list: tracked term, indented answer. */
 .focus-objective dt {
-  color: #8a8478;
+  color: var(--text-muted);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .focus-objective dd {
-  margin: 3px 0 0;
-  color: #ded8ca;
-  font-size: 13px;
-  line-height: 1.5;
+  margin: var(--s-1) 0 0;
+  color: var(--text-primary);
+  font-size: var(--t-md);
+  line-height: 1.55;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .focus-card > small {
   display: block;
-  margin-top: 10px;
-  color: #777;
+  margin-top: var(--s-4);
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- "Why" causal drill-down overlay --- */
@@ -855,7 +1096,7 @@ onMounted(() => {
   z-index: 50;
   display: flex;
   align-items: flex-end;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--surface-scrim);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
@@ -869,10 +1110,11 @@ onMounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #161616;
-  border-top: 1px solid #383838;
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  background: var(--surface-panel);
+  border-top: 1px solid var(--rule-strong);
+  /* Lacquered panel, not a rounded mobile sheet. */
+  border-radius: 0;
+  box-shadow: var(--shadow-panel);
 }
 
 .why-header {
@@ -880,107 +1122,137 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #2c2c2c;
+  padding: var(--s-5) var(--s-6);
+  border-bottom: 1px solid var(--rule);
 }
 
 .why-header h3 {
   margin: 0;
-  color: #f3e9cf;
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
 }
 
 .why-close {
-  min-width: 48px;
-  min-height: 48px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
   border: 0;
   background: transparent;
-  color: #bbb;
-  font-size: 22px;
+  color: var(--text-secondary);
+  font-size: 20px;
   line-height: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast);
+}
+
+.why-close:hover {
+  color: var(--text-primary);
+}
+
+.why-close:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .why-body {
   min-height: 0;
   overflow-y: auto;
-  padding: 14px;
+  padding: var(--s-6);
 }
 
+/* The event under investigation: the drill-down's dateline. */
 .why-subject {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-left: 3px solid #b99652;
-  background: #1d1d1d;
-  color: #f1dfb9;
-  font-size: 14px;
+  margin: 0 0 var(--s-6);
+  padding: 0 0 var(--s-5) var(--s-5);
+  border-left: 2px solid var(--accent);
+  border-bottom: 1px solid var(--rule);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 15px;
   line-height: 1.55;
 }
 
 .why-section + .why-section {
-  margin-top: 16px;
+  margin-top: var(--s-7);
 }
 
 .why-section h4 {
-  margin: 0 0 8px;
-  color: #bdb6a9;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  margin: 0 0 var(--s-4);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
 }
 
+/*
+ * Causal edges are a ledger: a tracked relation term over the event text,
+ * separated by rules. Each edge used to be its own bordered, rounded box, so a
+ * chain of five causes produced five nested boxes inside the overlay.
+ */
 .why-edge-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .why-edge {
-  padding: 9px 10px;
-  border: 1px solid #2e2e2e;
-  border-radius: 8px;
-  background: #1a1a1a;
+  padding: var(--s-4) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.why-edge + .why-edge {
+  border-top: 1px solid var(--rule-soft);
 }
 
 .why-relation {
   display: block;
-  color: #7dd9bd;
+  color: var(--jade-300);
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .why-edge-text {
   display: block;
-  margin-top: 4px;
-  color: #ded8ca;
-  font-size: 13px;
-  line-height: 1.5;
+  margin-top: var(--s-2);
+  color: var(--text-primary);
+  font-size: var(--t-md);
+  line-height: 1.55;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+/* A pruned edge is absence of evidence, and must read as such. */
 .why-edge-text--pruned {
-  color: #8a8478;
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .why-measurement-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .why-measurement {
-  padding: 9px 10px;
-  border: 1px solid #2e2e2e;
-  border-radius: 8px;
-  background: #1a1a1a;
+  padding: var(--s-4) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.why-measurement + .why-measurement {
+  border-top: 1px solid var(--rule-soft);
 }
 
 .why-measurement__header,
@@ -989,18 +1261,22 @@ onMounted(() => {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s-4);
 }
 
 .why-measurement__header strong {
-  color: #ded8ca;
-  font-size: 13px;
+  color: var(--text-primary);
+  font-size: var(--t-md);
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 
+/* Readings are data: tabular numerals, gold so the value is findable. */
 .why-measurement__header span {
-  color: #f1dfb9;
-  font-size: 12px;
+  color: var(--accent-strong);
+  font-family: var(--font-numeric);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
   text-align: right;
   overflow-wrap: anywhere;
 }
@@ -1009,16 +1285,16 @@ onMounted(() => {
 .why-measurement__refs,
 .why-measurement__derived-from,
 .why-measurement__sources {
-  margin-top: 5px;
-  color: #918b7f;
-  font-size: 11px;
+  margin-top: var(--s-2);
+  color: var(--text-muted);
+  font-size: var(--t-xs);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .why-measurement__derived-from-label {
   display: block;
-  color: #bdb6a9;
+  color: var(--text-secondary);
 }
 
 .why-measurement__derived-from ul {
@@ -1049,39 +1325,43 @@ onMounted(() => {
   font-size: 10px;
 }
 
+/* The agent's reasoning is a quotation, so it is set in the display serif. */
 .why-decision-thinking {
   margin: 0;
-  color: #ded8ca;
-  font-size: 13px;
-  line-height: 1.55;
+  padding-left: var(--s-5);
+  border-left: 2px solid var(--rule-strong);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  line-height: 1.6;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .why-decision-meta {
-  margin: 6px 0 0;
-  color: #918b7f;
-  font-size: 11px;
+  margin: var(--s-3) 0 0;
+  color: var(--text-muted);
+  font-size: var(--t-xs);
   line-height: 1.5;
 }
 
 .why-appraisals {
-  margin-top: 8px;
+  margin-top: var(--s-5);
   min-width: 0;
 }
 
 .why-appraisals h5 {
-  margin: 0 0 6px;
-  color: #9f9380;
-  font-size: 11px;
+  margin: 0 0 var(--s-3);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
 }
 
 .why-appraisal-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   min-width: 0;
   list-style: none;
   margin: 0;
@@ -1092,33 +1372,43 @@ onMounted(() => {
   min-width: 0;
 }
 
+.why-appraisal-item + .why-appraisal-item {
+  border-top: 1px solid var(--rule-soft);
+}
+
 .why-appraisal-button {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--s-2);
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid #2e2e2e;
-  border-radius: 8px;
-  background: #1a1a1a;
-  color: #ded8ca;
+  min-height: var(--touch-target);
+  padding: var(--s-4) var(--s-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
   font: inherit;
+  font-family: var(--font-ui);
+  transition: background var(--motion-fast);
 }
 
-.why-appraisal-button:hover,
+.why-appraisal-button:hover {
+  background: var(--surface-raised);
+}
+
 .why-appraisal-button:focus-visible {
-  background: #222;
+  outline: none;
+  box-shadow: inset var(--focus-ring);
 }
 
 .why-appraisal-line {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s-4);
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -1126,53 +1416,72 @@ onMounted(() => {
 .why-appraisal-focus {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: var(--t-sm);
   font-weight: 600;
-  color: #ddd;
+  color: var(--text-primary);
 }
 
 .why-appraisal-pruned {
   display: block;
   width: 100%;
   min-width: 0;
-  padding: 8px 10px;
-  border: 1px dashed #2e2e2e;
-  border-radius: 8px;
-  background: #161616;
+  padding: var(--s-4) var(--s-3);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .why-appraisal-emotion {
   flex: 0 0 auto;
-  color: #7dd9bd;
+  color: var(--jade-300);
   font-size: 10px;
 }
 
 .why-appraisal-date {
   flex: 0 0 auto;
-  color: #918b7f;
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
   font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .why-appraisal-summary {
   min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
-  font-size: 12px;
+  font-size: var(--t-sm);
   line-height: 1.5;
-  color: #bbb;
+  color: var(--text-secondary);
 }
 
 .why-retry {
-  margin-top: 10px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid #3b3b3b;
-  border-radius: 8px;
-  background: #1f1f1f;
-  color: #f1dfb9;
-  font-size: 12px;
+  margin-top: var(--s-5);
+  min-height: 36px;
+  padding: 0 var(--s-6);
+  border: 1px solid var(--gold-600);
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--accent-strong);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
 }
 
+.why-retry:hover {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+
+.why-retry:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/*
+ * Touch: the same editorial column, with every target lifted to 48px and body
+ * copy at 16px. The panel is shared with the mobile sheet, so these rules stay.
+ */
 @media (max-width: 760px) {
   .world-journal-panel {
     min-height: 100%;
@@ -1180,25 +1489,18 @@ onMounted(() => {
   }
 
   .journal-header {
-    padding-top: 8px;
-  }
-
-  .journal-header h2 {
-    font-size: 13px;
+    padding-top: var(--s-4);
   }
 
   .journal-body {
     overflow: visible;
-    padding: 12px 14px 24px;
+    padding: var(--s-5) var(--s-6) var(--s-7);
   }
 
   .journal-tab {
     min-height: 48px;
-    font-size: 10px;
-  }
-
-  .journal-tabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0 var(--s-4);
+    font-size: var(--t-sm);
   }
 
   .journal-body--guide {
@@ -1206,7 +1508,8 @@ onMounted(() => {
   }
 
   .period-button {
-    min-height: 48px;
+    min-height: 40px;
+    font-size: var(--t-xs);
   }
 
   .why-button,
@@ -1224,6 +1527,10 @@ onMounted(() => {
   .focus-objective dd {
     font-size: 16px;
     line-height: 1.6;
+  }
+
+  .activity-metric dd {
+    font-size: var(--t-display);
   }
 
   .why-panel {

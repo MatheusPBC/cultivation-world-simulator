@@ -157,7 +157,8 @@
       "resolves": "解决了",
       "prevented_by": "被阻止于",
       "contributed_to": "促成了"
-    }
+    },
+    "title_short": "日志"
   },
   "status_bar": {
     "phenomenon": "天地灵机",
@@ -170,7 +171,7 @@
     "click_to_change": "（点击可更易天象）",
     "author_github": "GitHub仓库（求star）",
     "hidden_domain": {
-      "label": "[秘境]",
+      "label": "秘境",
       "title": "秘境列表",
       "empty": "暂无秘境数据",
       "required_realm": "准入境界",
@@ -180,16 +181,16 @@
       "open_chance": "出现概率"
     },
     "world_info": {
-      "label": "[世界信息]",
+      "label": "世界信息",
       "title": "世界信息",
       "ai_knowledge_note": "修仙者AI关于修仙界的知识",
       "empty": "暂无世界信息"
     },
     "world_secret": {
-      "label": "[世界秘密]"
+      "label": "世界秘密"
     },
     "avatar_overview": {
-      "label": "[角色总览]"
+      "label": "角色总览"
     },
     "time": {
       "title": "时间总览",
@@ -206,6 +207,16 @@
       "sect_war": "宗门战争",
       "war_active": "当前有 {count} 场宗门战争",
       "war_none": "当前无宗门战争"
+    },
+    "nav_label": "世界面板",
+    "menu": "系统菜单",
+    "time_detail": "时间详情",
+    "connected": "已连接",
+    "disconnected": "已断开",
+    "groups": {
+      "world": "天地",
+      "powers": "势力",
+      "records": "记录"
     }
   },
   "world_info": {
@@ -298,7 +309,8 @@
     "resume": "继续游戏",
     "pause": "暂停游戏",
     "paused": "已暂停",
-    "closed_msg": "游戏已关闭，您可以安全关闭此标签页。"
+    "closed_msg": "游戏已关闭，您可以安全关闭此标签页。",
+    "running": "运行中"
   },
   "event_panel": {
     "title": "",
@@ -400,7 +412,8 @@
     "fallback": {
       "avatar_name": "角色",
       "counterpart_name": "对方"
-    }
+    },
+    "title_short": "扮演"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name}在修仙界中闯出名号，被人称为「{nickname}」。"
@@ -411,8 +424,8 @@
       "middle": "中期",
       "late": "后期"
     },
-    "title_short": "[天地人榜]",
-    "tournament_short": "[武道会]",
+    "title_short": "天地人榜",
+    "tournament_short": "武道会",
     "title": "天地人榜",
     "heaven": "天榜 (元婴)",
     "earth": "地榜 (金丹)",
@@ -435,7 +448,7 @@
     "human_first": "人榜第一"
   },
   "sect_relations": {
-    "title_short": "[宗门关系]",
+    "title_short": "宗门关系",
     "title": "宗门关系",
     "sect_a": "宗门 A",
     "sect_b": "宗门 B",
@@ -465,7 +478,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[凡人]",
+    "title_short": "凡人",
     "title": "凡人系统",
     "empty": "暂无数据",
     "population_value": "{value} 万",
@@ -496,7 +509,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[王朝]",
+    "title_short": "王朝",
     "title": "王朝",
     "name": "王朝名",
     "royal_house": "皇族",
@@ -910,5 +923,63 @@
     "rogue": "散修",
     "status_alive": "在世",
     "status_dead": "已故"
+  },
+  "map": {
+    "tab": "地图",
+    "sheet_close": "收起面板",
+    "layers": {
+      "title": "图层",
+      "groups": {
+        "physical": "自然",
+        "territorial": "疆域",
+        "organizational": "势力"
+      },
+      "terrain": {
+        "label": "地形"
+      },
+      "water": {
+        "label": "水域"
+      },
+      "elevation": {
+        "label": "海拔"
+      },
+      "borders": {
+        "label": "边界"
+      },
+      "names": {
+        "label": "地名"
+      },
+      "routes": {
+        "label": "路线",
+        "hint": "表示地区之间的连接，连线并非真实路径"
+      },
+      "sects": {
+        "label": "宗门"
+      },
+      "infrastructure": {
+        "label": "设施"
+      },
+      "institutionalPresence": {
+        "label": "治理存在"
+      }
+    },
+    "view": {
+      "group": "视图控制",
+      "zoom_in": "放大",
+      "zoom_out": "缩小",
+      "fit": "全图",
+      "zoom_level": "缩放级别"
+    },
+    "legend": {
+      "title": "图例",
+      "coast": "海岸线",
+      "flow": "水流",
+      "border": "地区边界",
+      "route_land": "陆路",
+      "route_water": "水路",
+      "route_severed": "中断路线",
+      "sect": "宗门领地",
+      "site": "基础设施"
+    }
   }
 }

@@ -5,13 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import WorldJournalPanel from '@/components/game/panels/WorldJournalPanel.vue'
 
-const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock, fetchLiveGuideMock, askLiveGuideMock } = vi.hoisted(() => ({
+const { fetchWorldJournalMock, fetchEventCausalDetailMock, fetchWorldChronicleMock, fetchChronicleDossierMock, fetchLiveGuideMock, askLiveGuideMock, fetchDaoPetitionsMock } = vi.hoisted(() => ({
   fetchWorldJournalMock: vi.fn(),
   fetchEventCausalDetailMock: vi.fn(),
   fetchWorldChronicleMock: vi.fn(),
   fetchChronicleDossierMock: vi.fn(),
   fetchLiveGuideMock: vi.fn(),
   askLiveGuideMock: vi.fn(),
+  fetchDaoPetitionsMock: vi.fn(),
 }))
 
 vi.mock('@/api', () => ({
@@ -22,6 +23,11 @@ vi.mock('@/api', () => ({
     fetchChronicleDossier: fetchChronicleDossierMock,
     fetchLiveGuide: fetchLiveGuideMock,
     askLiveGuide: askLiveGuideMock,
+  },
+  // The Dao tab is reachable by keyboard (End jumps to the last tab), so its
+  // query has to be stubbed for the tablist tests to exercise a real path.
+  worldApi: {
+    fetchDaoPetitions: fetchDaoPetitionsMock,
   },
   avatarApi: {
     fetchDetailInfo: vi.fn(),
@@ -241,6 +247,8 @@ describe('WorldJournalPanel', () => {
     fetchChronicleDossierMock.mockReset()
     fetchLiveGuideMock.mockReset()
     askLiveGuideMock.mockReset()
+    fetchDaoPetitionsMock.mockReset()
+    fetchDaoPetitionsMock.mockResolvedValue({ pending: [], history: [] })
     fetchWorldJournalMock.mockResolvedValue(baseJournal)
     fetchWorldChronicleMock.mockResolvedValue({ chapters: [], next_cursor: null, has_more: false })
     fetchLiveGuideMock.mockResolvedValue(baseGuide)
@@ -303,6 +311,131 @@ describe('WorldJournalPanel', () => {
 
     expect(fetchWorldChronicleMock).toHaveBeenCalledWith({ limit: 20 })
     expect(wrapper.get('[data-testid="journal-chronicle"]').exists()).toBe(true)
+  })
+
+  describe('activity dateline', () => {
+    it('still projects all four canonical counts, as one line instead of four cards', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      // The 2x2 grid of stat cards is gone.
+      expect(wrapper.find('.activity-grid').exists()).toBe(false)
+      expect(wrapper.find('.activity-stat').exists()).toBe(false)
+
+      const metrics = wrapper.get('.activity-line').findAll('.activity-metric')
+      expect(metrics).toHaveLength(4)
+      // total 3 / major 1 / stories 1 / active avatars 2, from the fixture.
+      expect(metrics.map((metric) => metric.get('dd').text())).toEqual(['3', '1', '1', '2'])
+      expect(metrics.map((metric) => metric.get('dt').text())).toEqual([
+        'Eventos',
+        'Importantes',
+        'Historias',
+        'Personagens ativos',
+      ])
+    })
+
+    it('de-emphasises a zero so a quiet month does not read as broken', async () => {
+      fetchWorldJournalMock.mockResolvedValue({
+        ...baseJournal,
+        activity: {
+          total_events: 0,
+          major_events: 0,
+          story_events: 0,
+          routine_events: 0,
+          active_avatar_count: 4,
+        },
+      })
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      const metrics = wrapper.get('.activity-line').findAll('.activity-metric')
+      expect(metrics[0].classes()).toContain('activity-metric--zero')
+      expect(metrics[1].classes()).toContain('activity-metric--zero')
+      // A non-zero count keeps full emphasis.
+      expect(metrics[3].classes()).not.toContain('activity-metric--zero')
+    })
+
+    it('moves the period control into the activity header instead of its own row', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      const head = wrapper.get('.journal-section-head')
+      const selector = head.get('.period-selector')
+      expect(selector.attributes('role')).toBe('group')
+
+      const active = selector.get('[data-testid="journal-period-1"]')
+      expect(active.attributes('aria-pressed')).toBe('true')
+      expect(selector.get('[data-testid="journal-period-3"]').attributes('aria-pressed')).toBe('false')
+    })
+  })
+
+  describe('tablist accessibility', () => {
+    it('exposes the tabs as a tablist with a single tab stop', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      expect(wrapper.get('[role="tablist"]').exists()).toBe(true)
+
+      const tabs = wrapper.findAll('.journal-tab')
+      expect(tabs.every((tab) => tab.attributes('role') === 'tab')).toBe(true)
+
+      // Roving tabindex: only the selected tab is in the tab order.
+      const focusable = tabs.filter((tab) => tab.attributes('tabindex') === '0')
+      expect(focusable).toHaveLength(1)
+      expect(focusable[0].attributes('data-testid')).toBe('journal-tab-now')
+      expect(wrapper.get('[data-testid="journal-tab-now"]').attributes('aria-selected')).toBe('true')
+      expect(wrapper.get('[data-testid="journal-tab-focus"]').attributes('aria-selected')).toBe('false')
+    })
+
+    it('moves between tabs with the arrow keys', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-focus"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="journal-tab-focus"]').attributes('aria-selected')).toBe('true')
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-now"]').exists()).toBe(true)
+    })
+
+    it('wraps arrow navigation at the ends of the tablist', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-tab-dao"]').attributes('aria-selected')).toBe('true')
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-tab-now"]').attributes('aria-selected')).toBe('true')
+    })
+
+    it('jumps to the first and last tab with Home and End', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'End' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-tab-dao"]').attributes('aria-selected')).toBe('true')
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'Home' })
+      await settlePromises()
+      expect(wrapper.get('[data-testid="journal-tab-now"]').attributes('aria-selected')).toBe('true')
+    })
+
+    it('does not swallow keys it has no business handling', async () => {
+      const wrapper = mountPanel()
+      await settlePromises()
+
+      await wrapper.get('[role="tablist"]').trigger('keydown', { key: 'a' })
+      await settlePromises()
+      // Still on the first tab.
+      expect(wrapper.get('[data-testid="journal-tab-now"]').attributes('aria-selected')).toBe('true')
+    })
   })
 
   it('loads the Live Guide lazily and opens its source in the existing Why view', async () => {

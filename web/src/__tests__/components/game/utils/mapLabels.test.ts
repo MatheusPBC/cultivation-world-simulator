@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildVisibleRegionLabels,
   estimateRegionLabelSize,
-  formatRegionDisplayName
+  formatRegionDisplayName,
+  getRegionPriority
 } from '@/components/game/utils/mapLabels';
 import type { RegionSummary } from '@/types/core';
 
@@ -32,32 +33,61 @@ describe('mapLabels', () => {
     expect(formatRegionDisplayName('紫竹幽境', 'zh-CN')).toBe('紫竹幽境');
   });
 
-  it('estimates label hit size from rendered map text metrics', () => {
+  it('wraps Latin toponyms even when the interface locale is CJK', () => {
+    expect(formatRegionDisplayName('Falésias do Mar Sereno de Nanling', 'zh-CN', 'city'))
+      .toContain('\n');
+  });
+
+  it('lets a city name run wider before wrapping than a cultivation site', () => {
+    const city = formatRegionDisplayName('Qingyun Riverside Market', 'en-US', 'city');
+    const site = formatRegionDisplayName('Qingyun Riverside Market', 'en-US', 'cultivate');
+    expect(city.split('\n')[0].length).toBeLessThanOrEqual(15);
+    expect(site.split('\n')[0].length).toBeLessThanOrEqual(16);
+  });
+
+  it('estimates the label footprint in on-screen pixels', () => {
     const compactSize = estimateRegionLabelSize('紫竹幽境', 'normal', 'zh-CN');
     const latinSize = estimateRegionLabelSize('Purple Bamboo\nSecluded Realm', 'normal', 'en-US');
 
-    expect(compactSize.width).toBeGreaterThan(240);
-    expect(compactSize.height).toBeGreaterThan(70);
-    expect(latinSize.width).toBeGreaterThan(300);
-    expect(latinSize.height).toBeGreaterThan(140);
+    // Screen-space, not the old ~64px world-space font: a four-glyph CJK name
+    // occupies tens of pixels, not hundreds.
+    expect(compactSize.width).toBeGreaterThan(40);
+    expect(compactSize.width).toBeLessThan(140);
+    expect(latinSize.height).toBeGreaterThan(compactSize.height);
   });
 
-  it('avoids overlaps by moving lower-priority labels', () => {
+  it('ranks the canonical region taxonomy by cartographic importance', () => {
+    expect(getRegionPriority(createRegion({ type: 'city' }))).toBeGreaterThan(
+      getRegionPriority(createRegion({ type: 'sect' }))
+    );
+    expect(getRegionPriority(createRegion({ type: 'sect' }))).toBeGreaterThan(
+      getRegionPriority(createRegion({ type: 'normal' }))
+    );
+    expect(getRegionPriority(createRegion({ type: 'normal' }))).toBeGreaterThan(
+      getRegionPriority(createRegion({ type: 'cultivate' }))
+    );
+  });
+
+  it('resolves a contested spot in favour of the more important place', () => {
     const labels = buildVisibleRegionLabels(
       [
         createRegion({ id: 'normal', type: 'normal', name: 'Purple Bamboo Secluded Realm', x: 10, y: 10 }),
         createRegion({ id: 'city', type: 'city', name: 'Qingyun City', x: 10, y: 10 })
       ],
-      'en-US'
+      'en-US',
+      { viewportScale: 1 }
     );
 
-    expect(labels).toHaveLength(2);
-    expect(labels.map((label) => label.id)).toEqual(['city', 'normal']);
+    // The city keeps the anchor; the wilderness name is displaced, not stacked.
+    expect(labels[0]?.id).toBe('city');
     expect(labels[0]?.labelX).toBe((10 * 64) + (64 / 2));
     expect(labels[0]?.labelY).toBe((10 * 64) + (64 * 1.5));
-    expect(
-      labels[1]?.labelX !== labels[0]?.labelX || labels[1]?.labelY !== labels[0]?.labelY
-    ).toBe(true);
+    const wilderness = labels.find((label) => label.id === 'normal');
+    if (wilderness) {
+      expect(
+        wilderness.labelX !== labels[0]?.labelX || wilderness.labelY !== labels[0]?.labelY
+      ).toBe(true);
+    }
   });
 
   it('keeps separated labels visible', () => {
@@ -66,24 +96,76 @@ describe('mapLabels', () => {
         createRegion({ id: 'a', type: 'city', name: 'Qingyun City', x: 2, y: 2 }),
         createRegion({ id: 'b', type: 'sect', name: 'Echo Valley', x: 12, y: 8 })
       ],
-      'en-US'
+      'en-US',
+      { viewportScale: 1 }
     );
 
     expect(labels.map((label) => label.id)).toEqual(['a', 'b']);
   });
 
-  it('moves long English labels before allowing overlap', () => {
+  it('tags each label with its tier so the renderer can style it', () => {
     const labels = buildVisibleRegionLabels(
       [
-        createRegion({ id: '414', type: 'sect', name: 'Asura Blood Pool', x: 10, y: 22 }),
-        createRegion({ id: '102', type: 'normal', name: 'Western Quicksand', x: 4, y: 23 })
+        createRegion({ id: 'a', type: 'city', name: 'Qingyun', x: 2, y: 2 }),
+        createRegion({ id: 'b', type: 'cultivate', sub_type: 'cave', name: 'Golden Grotto', x: 14, y: 9 })
       ],
-      'en-US'
+      'en-US',
+      { viewportScale: 1 }
     );
 
-    expect(labels.map((label) => label.id)).toEqual(['414', '102']);
-    expect(labels[1]?.labelX).toBe((4 * 64) + (64 / 2));
-    expect(labels[1]?.labelY).not.toBe((23 * 64) + (64 * 1.5));
+    expect(labels.find((label) => label.id === 'a')?.tier).toBe('settlement');
+    expect(labels.find((label) => label.id === 'b')?.tier).toBe('site');
+  });
+
+  describe('level of detail', () => {
+    const regions = [
+      createRegion({ id: 'city', type: 'city', name: 'Qingyun City', x: 4, y: 4 }),
+      createRegion({ id: 'sect', type: 'sect', name: 'Echo Valley', x: 20, y: 4 }),
+      createRegion({ id: 'wild', type: 'normal', name: 'Western Quicksand', x: 36, y: 4 }),
+      createRegion({ id: 'cave', type: 'cultivate', name: 'Golden Grotto', x: 52, y: 4 })
+    ];
+
+    it('shows only the loudest tiers when the whole world is on screen', () => {
+      const ids = buildVisibleRegionLabels(regions, 'en-US', { viewportScale: 0.24 })
+        .map((label) => label.id);
+      expect(ids).toContain('city');
+      expect(ids).toContain('sect');
+      expect(ids).not.toContain('wild');
+      expect(ids).not.toContain('cave');
+    });
+
+    it('reveals the remaining tiers as the player zooms in', () => {
+      const ids = buildVisibleRegionLabels(regions, 'en-US', { viewportScale: 1 })
+        .map((label) => label.id);
+      expect(ids).toEqual(expect.arrayContaining(['city', 'sect', 'wild', 'cave']));
+    });
+  });
+
+  it('drops a label that cannot be placed rather than overlapping a better one', () => {
+    const crowded = Array.from({ length: 6 }, (_, index) =>
+      createRegion({
+        id: `wild-${index}`,
+        type: 'normal',
+        name: 'Western Quicksand Reach',
+        x: 10,
+        y: 10
+      })
+    );
+
+    const labels = buildVisibleRegionLabels(crowded, 'en-US', { viewportScale: 1 });
+    expect(labels.length).toBeLessThan(crowded.length);
+  });
+
+  it('can be asked to keep every label when overlap is acceptable', () => {
+    const crowded = Array.from({ length: 6 }, (_, index) =>
+      createRegion({ id: `wild-${index}`, type: 'normal', name: 'Western Quicksand Reach', x: 10, y: 10 })
+    );
+
+    const labels = buildVisibleRegionLabels(crowded, 'en-US', {
+      viewportScale: 1,
+      dropOnCollision: false
+    });
+    expect(labels).toHaveLength(crowded.length);
   });
 
   it('also avoids overlap for compact-script locales', () => {
@@ -92,11 +174,11 @@ describe('mapLabels', () => {
         createRegion({ id: 'a', type: 'sect', name: '修罗血池', x: 10, y: 22 }),
         createRegion({ id: 'b', type: 'normal', name: '西域流沙', x: 10, y: 22 })
       ],
-      'ja-JP'
+      'ja-JP',
+      { viewportScale: 1, dropOnCollision: false }
     );
 
     expect(labels).toHaveLength(2);
-    expect(labels.map((label) => label.id)).toEqual(['a', 'b']);
     expect(
       labels[1]?.labelX !== labels[0]?.labelX || labels[1]?.labelY !== labels[0]?.labelY
     ).toBe(true);

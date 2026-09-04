@@ -4,8 +4,10 @@ import { ref, watch, computed } from 'vue'
 import { Graphics, Rectangle, type TextStyle } from 'pixi.js'
 import type { AvatarSummary } from '../../types/core'
 import { useSharedTicker } from './composables/useSharedTicker'
-import { avatarIdToColor } from '../../utils/eventHelper'
 import { useAudio } from '../../composables/useAudio'
+import { useUiStore } from '../../stores/ui'
+import { useMapViewport } from './composables/useMapViewport'
+import { MAP_GOLD, MAP_INK, MAP_PAPER } from '../../constants/mapTheme'
 
 const props = defineProps<{
   avatar: AvatarSummary
@@ -18,6 +20,13 @@ const emit = defineEmits<{
 }>()
 
 const { availableAvatars, ensureAvatarTexture } = useTextures()
+const uiStore = useUiStore()
+const { scale: viewportScale } = useMapViewport()
+
+const isSelected = computed(() => (
+  uiStore.selectedTarget?.type === 'avatar' && uiStore.selectedTarget.id === props.avatar.id
+))
+const isEmphasized = computed(() => isHovered.value || isSelected.value)
 
 // Target position (grid coordinates)
 const targetX = ref(props.avatar.x)
@@ -98,34 +107,80 @@ function getScale() {
 }
 
 function getAvatarSpriteScale() {
-  return getScale() * (isHovered.value ? 1.05 : 1)
+  return getScale() * (isEmphasized.value ? 1.05 : 1)
 }
 
 const drawFallback = (g: Graphics) => {
     g.clear()
-    const radius = props.tileSize * (isHovered.value ? 0.56 : 0.5)
+    const radius = props.tileSize * (isEmphasized.value ? 0.56 : 0.5)
     g.circle(0, 0, radius)
     g.fill({ color: props.avatar.gender === 'female' ? 0xffaaaa : 0xaaaaff })
-    g.stroke({ width: isHovered.value ? 4 : 2, color: isHovered.value ? 0xffe2a7 : 0x000000 })
+    g.stroke({ width: isEmphasized.value ? 4 : 2, color: isEmphasized.value ? MAP_GOLD[300] : MAP_INK.void })
 }
 
+/*
+ * Character names sit on the same plate system as map labels, in paper rather
+ * than a per-avatar hue: eleven differently-coloured 56px names with a 4px
+ * black outline were the noisiest layer on the map, and the colour carried no
+ * meaning a player could read.
+ */
+const NAME_FONT_SIZE = 34
+/** On-screen size the name is held at, independent of zoom. */
+const NAME_TARGET_SCREEN_SIZE = 12
+
+/*
+ * Same counter-scale as the region labels: the glyph texture is rasterized
+ * large and scaled down, so the name stays readable at fit-zoom without
+ * becoming a billboard when the player zooms in.
+ */
+const nameScale = computed(() => {
+  const scale = viewportScale.value
+  if (!Number.isFinite(scale) || scale <= 0) return 1
+  return Math.min(1, Math.max(0.25, NAME_TARGET_SCREEN_SIZE / (NAME_FONT_SIZE * scale)))
+})
+
 const nameStyle = computed<TextStyle>(() => ({
-    fontFamily: '"Microsoft YaHei", sans-serif',
-    fontSize: 56,
-    fontWeight: 'bold',
-    fill: avatarIdToColor(props.avatar.id),
-    stroke: { color: '#000000', width: 4 },
+    fontFamily: '"HarmonyOS Sans", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif',
+    fontSize: NAME_FONT_SIZE,
+    fontWeight: isEmphasized.value ? 'bold' : 'normal',
+    fill: isSelected.value ? MAP_GOLD[200] : MAP_PAPER[100],
     align: 'center',
-    dropShadow: {
-        color: '#000000',
-        blur: 2,
-        angle: Math.PI / 6,
-        distance: 2,
-        alpha: 0.8
-    }
+    letterSpacing: 0.5,
 }))
 
-const hoverRingAlpha = computed(() => isHovered.value ? 0.72 : 0)
+const drawNamePlate = (g: Graphics) => {
+    g.clear()
+    const label = props.avatar.name ?? ''
+    if (!label) return
+    // Rough advance width; the plate only has to sit behind the glyphs.
+    const width = label.length * NAME_FONT_SIZE * 0.72 + 16
+    const height = NAME_FONT_SIZE * 1.34
+    g.roundRect(-width / 2, 0, width, height, 3)
+      .fill({ color: MAP_INK.deep, alpha: isEmphasized.value ? 0.86 : 0.7 })
+    if (isSelected.value) {
+        g.roundRect(-width / 2, 0, width, height, 3)
+          .stroke({ width: 1.5, color: MAP_GOLD[400], alpha: 0.9 })
+    }
+}
+
+/**
+ * Contact shadow and footing ring. Without a base the portraits read as
+ * stickers pasted onto the terrain rather than figures standing at a place.
+ */
+const drawGroundAnchor = (g: Graphics) => {
+    g.clear()
+    const radiusX = props.tileSize * 0.58
+    const radiusY = props.tileSize * 0.2
+    g.ellipse(0, 0, radiusX, radiusY).fill({ color: MAP_INK.void, alpha: 0.42 })
+    if (isSelected.value) {
+        g.ellipse(0, 0, radiusX * 1.35, radiusY * 1.35)
+          .stroke({ width: 3, color: MAP_GOLD[300], alpha: 0.95 })
+        g.ellipse(0, 0, radiusX * 1.35, radiusY * 1.35)
+          .fill({ color: MAP_GOLD[400], alpha: 0.12 })
+    }
+}
+
+const hoverRingAlpha = computed(() => isHovered.value && !isSelected.value ? 0.72 : 0)
 const hoverRingScale = computed(() => isHovered.value ? 1.04 : 0.92)
 const interactionHitArea = computed(() =>
     new Rectangle(
@@ -138,12 +193,12 @@ const interactionHitArea = computed(() =>
 
 const drawHoverRing = (g: Graphics) => {
     g.clear()
-    if (!isHovered.value) return
+    if (!isHovered.value || isSelected.value) return
     const radiusX = props.tileSize * 0.82
     const radiusY = props.tileSize * 0.34
     g.ellipse(0, 0, radiusX, radiusY)
-    g.fill({ color: 0xf6d68a, alpha: 0.12 })
-    g.stroke({ width: 3, color: 0xf6d68a, alpha: 0.76 })
+    g.fill({ color: MAP_PAPER[200], alpha: 0.1 })
+    g.stroke({ width: 2.5, color: MAP_PAPER[100], alpha: 0.7 })
 }
 
 function handlePointerTap() {
@@ -212,7 +267,7 @@ const drawEmojiBg = (g: Graphics) => {
     :x="currentX" 
     :y="currentY" 
     :z-index="Math.floor(currentY)"
-    :alpha="isHovered ? 1 : 0.98"
+    :alpha="isEmphasized ? 1 : 0.94"
     :hitArea="interactionHitArea"
     event-mode="static"
     cursor="pointer"
@@ -228,7 +283,14 @@ const drawEmojiBg = (g: Graphics) => {
     @pointertap="handlePointerTap"
   >
     <graphics
-      v-if="isHovered"
+      :key="`${avatar.id}-ground-${isSelected ? 'sel' : 'base'}`"
+      :y="tileSize * 0.18"
+      event-mode="none"
+      @effect="drawGroundAnchor"
+    />
+
+    <graphics
+      v-if="isHovered && !isSelected"
       :key="`${avatar.id}-hover-ring`"
       :y="tileSize * 0.18"
       :alpha="hoverRingAlpha"
@@ -239,7 +301,7 @@ const drawEmojiBg = (g: Graphics) => {
 
     <sprite
       v-if="getTexture()"
-      :key="`${avatar.id}-${isHovered ? 'hover' : 'normal'}`"
+      :key="`${avatar.id}-${isEmphasized ? 'hover' : 'normal'}`"
       :texture="getTexture()"
       :anchor-x="0.5"
       :anchor-y="0.9" 
@@ -272,14 +334,21 @@ const drawEmojiBg = (g: Graphics) => {
         />
     </container>
 
-    <text
-      :key="`${avatar.id}-name-${isHovered ? 'hover' : 'normal'}`"
-      :text="avatar.name"
-      :style="nameStyle"
-      :anchor-x="0.5"
-      :anchor-y="0"
-      :y="isHovered ? 6 : 10"
-      event-mode="none"
-    />
+    <container :y="isEmphasized ? 6 : 10" :scale="nameScale" event-mode="none">
+      <graphics
+        :key="`${avatar.id}-name-plate-${isSelected ? 'sel' : isHovered ? 'hover' : 'base'}`"
+        event-mode="none"
+        @effect="drawNamePlate"
+      />
+      <text
+        :key="`${avatar.id}-name-${isSelected ? 'sel' : isHovered ? 'hover' : 'base'}`"
+        :text="avatar.name"
+        :style="nameStyle"
+        :anchor-x="0.5"
+        :anchor-y="0"
+        :y="4"
+        event-mode="none"
+      />
+    </container>
   </container>
 </template>

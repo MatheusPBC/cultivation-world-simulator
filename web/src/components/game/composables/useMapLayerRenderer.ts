@@ -1,17 +1,37 @@
 import { computed, onMounted, onUnmounted, ref, unref, watch, type MaybeRef } from 'vue'
-import { Container, Graphics, Sprite, Ticker, TilingSprite } from 'pixi.js'
+import { Container, Graphics, Sprite, Text, Ticker, TilingSprite } from 'pixi.js'
 import { useI18n } from 'vue-i18n'
 import { useTextures } from './useTextures'
+import { useMapViewport } from './useMapViewport'
 import { useMapStore } from '@/stores/map'
+import { useUiStore } from '@/stores/ui'
 import { useAudio } from '@/composables/useAudio'
 import type { PhysicalGeographySnapshot, RegionSummary, RouteSummary } from '@/types/core'
-import { getRegionTextStyle } from '@/utils/mapStyles'
-import { buildVisibleRegionLabels } from '../utils/mapLabels'
+import {
+  MAP_BORDER,
+  MAP_COAST,
+  MAP_LABEL_PLATE,
+  MAP_LABEL_TEXT_RESOLUTION,
+  MAP_ROUTE,
+  MAP_SELECTION,
+  MAP_SURFACE,
+  MAP_WATER_BODY,
+  TERRAIN_TINT,
+  TERRAIN_TINT_DEFAULT,
+  TERRAIN_WASH_ALPHA,
+  WATER_TINT,
+  resolveLabelTier,
+} from '@/constants/mapTheme'
+import { getLabelCounterScale, getRegionTextStyle } from '@/utils/mapStyles'
+import { buildVisibleRegionLabels, estimateRegionLabelSize } from '../utils/mapLabels'
 
 const TILE_SIZE = 64
+const WATER_TYPES = new Set(['SEA', 'WATER'])
 
 export const MAP_LAYER_Z_INDEX = Object.freeze({
   physical: 0,
+  regionPick: 90,
+  selection: 120,
   sects: 150,
   institutionalPresence: 175,
   labels: 200,
@@ -50,8 +70,10 @@ export interface MapLayerRenderInput {
   visibility: MapLayerVisibility
 }
 
+export type EdgeSide = 'left' | 'right' | 'top' | 'bottom'
+
 export interface MapLayerRenderPlan {
-  terrain: Array<{ x: number; y: number; type: string }>
+  terrain: Array<{ x: number; y: number; type: string; tint: number }>
   elevation: Array<{ x: number; y: number; color: number; alpha: number }>
   waterBodies: Array<{
     id: string
@@ -60,7 +82,9 @@ export interface MapLayerRenderPlan {
     navigable: boolean
     flowDirection?: [number, number]
   }>
-  borders: Array<{ x: number; y: number; side: 'left' | 'right' | 'top' | 'bottom' }>
+  /** Land/water boundary. Gives the landmass a drawn outline. */
+  coast: Array<{ x: number; y: number; side: EdgeSide }>
+  borders: Array<{ x: number; y: number; side: EdgeSide }>
   routes: Array<{
     id: string
     from: { x: number; y: number }
@@ -70,13 +94,15 @@ export interface MapLayerRenderPlan {
     capacity: number
     operationalCapacity: number
     enabled: boolean
+    availability: number
   }>
 }
 
 function elevationColor(ratio: number): number {
   const normalized = Math.max(0, Math.min(1, ratio))
-  const low = { r: 35, g: 82, b: 125 }
-  const high = { r: 215, g: 166, b: 75 }
+  // Ink-to-gold ramp, matching the palette instead of the old blue-to-orange.
+  const low = { r: 32, g: 44, b: 44 }
+  const high = { r: 217, g: 184, b: 119 }
   return (
     (Math.round(low.r + (high.r - low.r) * normalized) << 16)
     | (Math.round(low.g + (high.g - low.g) * normalized) << 8)
@@ -107,9 +133,49 @@ function buildBorders(rows: number[][]): MapLayerRenderPlan['borders'] {
   return borders
 }
 
+function isWater(type: string | undefined): boolean {
+  return !!type && WATER_TYPES.has(type)
+}
+
+/**
+ * Land cells that touch water, edge by edge. Drawing this as a weighted ink line
+ * is what turns a grid of tiles into a coastline.
+ */
+function buildCoast(mapData: string[][]): MapLayerRenderPlan['coast'] {
+  const coast: MapLayerRenderPlan['coast'] = []
+  const height = mapData.length
+  const width = mapData[0]?.length ?? 0
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (isWater(mapData[y]?.[x])) continue
+      if (x === 0 || isWater(mapData[y]?.[x - 1])) coast.push({ x, y, side: 'left' })
+      if (x === width - 1 || isWater(mapData[y]?.[x + 1])) coast.push({ x, y, side: 'right' })
+      if (y === 0 || isWater(mapData[y - 1]?.[x])) coast.push({ x, y, side: 'top' })
+      if (y === height - 1 || isWater(mapData[y + 1]?.[x])) coast.push({ x, y, side: 'bottom' })
+    }
+  }
+  return coast
+}
+
 function isWaterRouteMode(mode: string): boolean {
   const normalized = mode.toLowerCase()
   return ['river', 'water', 'sea', 'ferry', 'coastal'].some(token => normalized.includes(token))
+}
+
+export function terrainTint(type: string): number {
+  return TERRAIN_TINT[type] ?? TERRAIN_TINT_DEFAULT
+}
+
+export function edgeToSegment(x: number, y: number, side: EdgeSide): [number, number, number, number] {
+  const px = x * TILE_SIZE
+  const py = y * TILE_SIZE
+  const right = px + TILE_SIZE
+  const bottom = py + TILE_SIZE
+  if (side === 'left') return [px, py, px, bottom]
+  if (side === 'right') return [right, py, right, bottom]
+  if (side === 'top') return [px, py, right, py]
+  return [px, bottom, right, bottom]
 }
 
 export function buildMapLayerRenderPlan(input: MapLayerRenderInput): MapLayerRenderPlan {
@@ -120,7 +186,7 @@ export function buildMapLayerRenderPlan(input: MapLayerRenderInput): MapLayerRen
     ? mapData.flatMap((row, y) => row.flatMap((type, x) => (
       type === 'SEA' || type === 'WATER' || type === 'SECT'
         ? []
-        : [{ x, y, type }]
+        : [{ x, y, type, tint: terrainTint(type) }]
     )))
     : []
 
@@ -145,6 +211,7 @@ export function buildMapLayerRenderPlan(input: MapLayerRenderInput): MapLayerRen
     }))
     : []
 
+  const coast = visibility.water && mapData.length ? buildCoast(mapData) : []
   const borders = visibility.borders ? buildBorders(territoryRows) : []
   const anchors = new Map(regions.map(region => [String(region.id), {
     x: region.x * TILE_SIZE + TILE_SIZE / 2,
@@ -155,6 +222,10 @@ export function buildMapLayerRenderPlan(input: MapLayerRenderInput): MapLayerRen
       const from = anchors.get(String(route.endpointRegionIds[0]))
       const to = anchors.get(String(route.endpointRegionIds[1]))
       if (!from || !to) return []
+      const nominalUsableCapacity = route.capacity * route.quality
+      const availability = route.enabled && nominalUsableCapacity > 0
+        ? Math.max(0, Math.min(1, route.operationalCapacity / nominalUsableCapacity))
+        : 0
       return [{
         id: route.id,
         from,
@@ -164,11 +235,12 @@ export function buildMapLayerRenderPlan(input: MapLayerRenderInput): MapLayerRen
         capacity: route.capacity,
         operationalCapacity: route.operationalCapacity,
         enabled: route.enabled,
+        availability,
       }]
     })
     : []
 
-  return { terrain, elevation, waterBodies, borders, routes: plannedRoutes }
+  return { terrain, elevation, waterBodies, coast, borders, routes: plannedRoutes }
 }
 
 export function useMapLayerRenderer(emit: {
@@ -183,19 +255,36 @@ export function useMapLayerRenderer(emit: {
     getTileTexture,
   } = useTextures()
   const mapStore = useMapStore()
+  const uiStore = useUiStore()
   const { locale } = useI18n()
   const { play } = useAudio()
+  const { scale: viewportScale } = useMapViewport()
 
   let ticker: Ticker | null = null
   let seaLayer: TilingSprite | null = null
   let waterLayer: TilingSprite | null = null
   let renderGeneration = 0
 
+  /** Interactive per-region territory shapes, so the land itself is clickable. */
+  let regionPickLayer: Container | null = null
+  /** Hover/selection feedback, redrawn independently of the expensive base map. */
+  let selectionGraphics: Graphics | null = null
+  /** Region names, drawn imperatively so plates and LOD stay in one place. */
+  let labelLayer: Container | null = null
+
+  const hoveredRegionId = ref<string | null>(null)
+
   const currentVisibility = computed(() => unref(visibility) ?? DEFAULT_MAP_LAYER_VISIBILITY)
+
+  const selectedRegionId = computed(() => (
+    uiStore.selectedTarget?.type === 'region' ? String(uiStore.selectedTarget.id) : null
+  ))
 
   const visibleRegionLabels = computed(() =>
     currentVisibility.value.names
-      ? buildVisibleRegionLabels(Array.from(mapStore.regions.values()), locale.value)
+      ? buildVisibleRegionLabels(Array.from(mapStore.regions.values()), locale.value, {
+        viewportScale: viewportScale.value,
+      })
       : [],
   )
 
@@ -217,6 +306,9 @@ export function useMapLayerRenderer(emit: {
     })
     seaLayer = null
     waterLayer = null
+    regionPickLayer = null
+    selectionGraphics = null
+    labelLayer = null
   }
 
   function getWaterSpeed() {
@@ -253,12 +345,14 @@ export function useMapLayerRenderer(emit: {
     const seaTex = textures.value.SEA_FULL || textures.value.SEA
     seaLayer = visibilityState.water ? new TilingSprite({ texture: seaTex, width: mapWidth, height: mapHeight }) : null
     seaLayer?.tileScale.set(0.5, 0.5)
+    if (seaLayer) seaLayer.tint = WATER_TINT.sea
     const seaMask = new Graphics()
     if (seaLayer) seaLayer.mask = seaMask
 
     const waterTex = textures.value.WATER_FULL || textures.value.WATER
     waterLayer = visibilityState.water ? new TilingSprite({ texture: waterTex, width: mapWidth, height: mapHeight }) : null
     waterLayer?.tileScale.set(0.5, 0.5)
+    if (waterLayer) waterLayer.tint = WATER_TINT.water
     const waterMask = new Graphics()
     if (waterLayer) waterLayer.mask = waterMask
 
@@ -298,6 +392,8 @@ export function useMapLayerRenderer(emit: {
         sprite.roundPixels = true
         sprite.width = TILE_SIZE
         sprite.height = TILE_SIZE
+        // Collapse the saturated tile art into one tonal family.
+        sprite.tint = terrainTint(type)
         sprite.eventMode = 'none'
         groundContainer.addChild(sprite)
       }
@@ -322,7 +418,101 @@ export function useMapLayerRenderer(emit: {
       waterLayer = null
     }
     mapContainer.value?.addChild(groundContainer)
+
+    /*
+     * Colour wash over the tinted tiles. Batched into a single Graphics, so the
+     * whole terrain layer costs one draw call regardless of map size.
+     */
+    if (visibilityState.terrain) {
+      const wash = new Graphics()
+      wash.eventMode = 'none'
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const type = mapStore.mapData[y][x]
+          if (type === 'SEA' || type === 'WATER' || type === 'SECT') continue
+          wash.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            .fill({ color: terrainTint(type), alpha: TERRAIN_WASH_ALPHA })
+        }
+      }
+      mapContainer.value?.addChild(wash)
+    }
+
     startWaterTicker(hasSea, hasWater)
+  }
+
+  /**
+   * Ink veil plus edge vignette. Terrain becomes ground so that structure and
+   * characters can be figure.
+   */
+  function renderAtmosphere(mapWidth: number, mapHeight: number) {
+    const container = mapContainer.value
+    if (!container) return
+
+    const veil = new Graphics()
+    veil.eventMode = 'none'
+    veil.rect(0, 0, mapWidth, mapHeight)
+      .fill({ color: MAP_SURFACE.veilColor, alpha: MAP_SURFACE.veilAlpha })
+    container.addChild(veil)
+
+    const vignette = new Graphics()
+    vignette.eventMode = 'none'
+    const depth = Math.min(mapWidth, mapHeight) * MAP_SURFACE.vignetteDepth
+    const bands = MAP_SURFACE.vignetteBands
+    for (let index = 0; index < bands; index += 1) {
+      const inset = (depth * index) / bands
+      const bandDepth = depth / bands
+      const alpha = MAP_SURFACE.vignetteAlpha * (1 - index / bands) / bands * 2.2
+      // Four edge bands per step; stacking them yields a soft falloff without a shader.
+      vignette.rect(inset, inset, mapWidth - inset * 2, bandDepth)
+        .fill({ color: MAP_SURFACE.vignetteColor, alpha })
+      vignette.rect(inset, mapHeight - inset - bandDepth, mapWidth - inset * 2, bandDepth)
+        .fill({ color: MAP_SURFACE.vignetteColor, alpha })
+      vignette.rect(inset, inset + bandDepth, bandDepth, mapHeight - (inset + bandDepth) * 2)
+        .fill({ color: MAP_SURFACE.vignetteColor, alpha })
+      vignette.rect(mapWidth - inset - bandDepth, inset + bandDepth, bandDepth, mapHeight - (inset + bandDepth) * 2)
+        .fill({ color: MAP_SURFACE.vignetteColor, alpha })
+    }
+    container.addChild(vignette)
+  }
+
+  /** Dark casing under a light core: one line that reads at any zoom. */
+  function strokeEdges(
+    graphics: Graphics,
+    edges: Array<{ x: number; y: number; side: EdgeSide }>,
+    style: { casingColor: number; casingWidth: number; casingAlpha: number; inkColor: number; inkWidth: number; inkAlpha: number },
+  ) {
+    for (const pass of ['casing', 'ink'] as const) {
+      const width = pass === 'casing' ? style.casingWidth : style.inkWidth
+      const color = pass === 'casing' ? style.casingColor : style.inkColor
+      const alpha = pass === 'casing' ? style.casingAlpha : style.inkAlpha
+      for (const edge of edges) {
+        const [x1, y1, x2, y2] = edgeToSegment(edge.x, edge.y, edge.side)
+        graphics.moveTo(x1, y1).lineTo(x2, y2)
+          .stroke({ width, color, alpha, cap: 'round', join: 'round' })
+      }
+    }
+  }
+
+  /** Dashed segment helper, used for water routes and severed links. */
+  function strokeDashed(
+    graphics: Graphics,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    style: { width: number; color: number; alpha: number },
+  ) {
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const length = Math.hypot(dx, dy)
+    if (length <= 0) return
+    const ux = dx / length
+    const uy = dy / length
+    const step = MAP_ROUTE.dashLength + MAP_ROUTE.dashGap
+    for (let travelled = 0; travelled < length; travelled += step) {
+      const end = Math.min(length, travelled + MAP_ROUTE.dashLength)
+      graphics.moveTo(from.x + ux * travelled, from.y + uy * travelled)
+        .lineTo(from.x + ux * end, from.y + uy * end)
+        .stroke({ ...style, cap: 'round' })
+    }
   }
 
   function renderPlanOverlays(plan: MapLayerRenderPlan) {
@@ -339,84 +529,288 @@ export function useMapLayerRenderer(emit: {
       container.addChild(elevationGraphics)
     }
 
-    if (plan.waterBodies.length) {
-      const waterGraphics = new Graphics()
-      waterGraphics.eventMode = 'none'
-      for (const body of plan.waterBodies) {
-        const kind = body.kind.toLowerCase()
-        const color = kind.includes('river') ? 0x67c8e8 : kind.includes('sea') ? 0x3c74c8 : 0x4d9ee8
-        for (const [x, y] of body.cellRefs) {
-          waterGraphics.rect(x * TILE_SIZE + 5, y * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10)
-            .fill({ color, alpha: body.navigable ? 0.3 : 0.2 })
-          if (body.navigable) {
-            waterGraphics.rect(x * TILE_SIZE + TILE_SIZE / 2 - 3, y * TILE_SIZE + TILE_SIZE / 2 - 3, 6, 6)
-              .fill({ color, alpha: 0.82 })
-          }
-        }
-        if (body.flowDirection) {
-          const [dx, dy] = body.flowDirection
-          const magnitude = Math.hypot(dx, dy)
-          const unitX = dx / magnitude
-          const unitY = dy / magnitude
-          for (const [x, y] of body.cellRefs.filter((_, index) => index % 4 === 0)) {
-            const cx = x * TILE_SIZE + TILE_SIZE / 2
-            const cy = y * TILE_SIZE + TILE_SIZE / 2
-            const tipX = cx + unitX * 10
-            const tipY = cy + unitY * 10
-            waterGraphics.moveTo(cx - unitX * 10, cy - unitY * 10)
-              .lineTo(tipX, tipY)
-              .lineTo(tipX - unitX * 5 - unitY * 4, tipY - unitY * 5 + unitX * 4)
-              .moveTo(tipX, tipY)
-              .lineTo(tipX - unitX * 5 + unitY * 4, tipY - unitY * 5 - unitX * 4)
-              .stroke({ width: 2, color, alpha: 0.75 })
-          }
-        }
-      }
-      container.addChild(waterGraphics)
-    }
-
-    if (plan.routes.length) {
-      const routeGraphics = new Graphics()
-      routeGraphics.eventMode = 'none'
-      for (const route of plan.routes) {
-        const nominalUsableCapacity = route.capacity * route.quality
-        const availability = route.enabled && nominalUsableCapacity > 0
-          ? Math.max(0, Math.min(1, route.operationalCapacity / nominalUsableCapacity))
-          : 0
-        const color = availability <= 0
-          ? 0x91564b
-          : isWaterRouteMode(route.mode) ? 0x82a9ff : 0xd8b36a
-        const width = 6 + Math.max(0, Math.min(1, route.quality)) * 4
-        const alpha = 0.24 + availability * 0.56
-        routeGraphics.moveTo(route.from.x, route.from.y)
-          .lineTo(route.to.x, route.to.y)
-          .stroke({ width: width + 4, color: 0x17130d, alpha: 0.2 + availability * 0.42 })
-        routeGraphics.moveTo(route.from.x, route.from.y)
-          .lineTo(route.to.x, route.to.y)
-          .stroke({ width, color, alpha })
-      }
-      container.addChild(routeGraphics)
+    // Coast before borders: the world outline is the strongest line on the map.
+    if (plan.coast.length) {
+      const coastGraphics = new Graphics()
+      coastGraphics.eventMode = 'none'
+      strokeEdges(coastGraphics, plan.coast, MAP_COAST)
+      container.addChild(coastGraphics)
     }
 
     if (plan.borders.length) {
       const borderGraphics = new Graphics()
       borderGraphics.eventMode = 'none'
-      for (const edge of plan.borders) {
-        const px = edge.x * TILE_SIZE
-        const py = edge.y * TILE_SIZE
-        const right = px + TILE_SIZE
-        const bottom = py + TILE_SIZE
-        const [x1, y1, x2, y2] = edge.side === 'left'
-          ? [px, py, px, bottom]
-          : edge.side === 'right'
-            ? [right, py, right, bottom]
-            : edge.side === 'top'
-              ? [px, py, right, py]
-              : [px, bottom, right, bottom]
-        borderGraphics.moveTo(x1, y1).lineTo(x2, y2)
-          .stroke({ width: 2, color: 0xf5e7c8, alpha: 0.64 })
-      }
+      strokeEdges(borderGraphics, plan.borders, MAP_BORDER)
       container.addChild(borderGraphics)
+    }
+
+    /*
+     * Water bodies used to stamp an inset rectangle and a dot into every cell,
+     * which read as debug boxes on the sea. Only the flow trace survives: a
+     * sparse jade tick along the current, which is information the fill was not
+     * carrying anyway.
+     */
+    if (plan.waterBodies.length) {
+      const waterGraphics = new Graphics()
+      waterGraphics.eventMode = 'none'
+      for (const body of plan.waterBodies) {
+        if (!body.flowDirection) continue
+        const [dx, dy] = body.flowDirection
+        const magnitude = Math.hypot(dx, dy)
+        if (!magnitude) continue
+        const unitX = dx / magnitude
+        const unitY = dy / magnitude
+        const half = MAP_WATER_BODY.flowLength / 2
+        for (const [x, y] of body.cellRefs.filter((_, index) => index % MAP_WATER_BODY.flowSampleStride === 0)) {
+          const cx = x * TILE_SIZE + TILE_SIZE / 2
+          const cy = y * TILE_SIZE + TILE_SIZE / 2
+          waterGraphics.moveTo(cx - unitX * half, cy - unitY * half)
+            .lineTo(cx + unitX * half, cy + unitY * half)
+            .stroke({
+              width: MAP_WATER_BODY.flowWidth,
+              color: MAP_WATER_BODY.flowColor,
+              alpha: MAP_WATER_BODY.flowAlpha * (body.navigable ? 1 : 0.6),
+              cap: 'round',
+            })
+        }
+      }
+      container.addChild(waterGraphics)
+    }
+
+    /*
+     * Routes are the trade network, so they must read as a graph: an engraved
+     * path with a node at each endpoint. Width encodes capacity, dashes encode
+     * a water crossing, cinnabar encodes a severed link.
+     */
+    if (plan.routes.length) {
+      const routeGraphics = new Graphics()
+      routeGraphics.eventMode = 'none'
+      for (const route of plan.routes) {
+        const severed = route.availability <= 0
+        const water = isWaterRouteMode(route.mode)
+        const color = severed
+          ? MAP_ROUTE.severedColor
+          : water ? MAP_ROUTE.waterColor : MAP_ROUTE.landColor
+        const width = MAP_ROUTE.minWidth
+          + Math.max(0, Math.min(1, route.quality)) * MAP_ROUTE.maxWidthBonus
+        const alpha = 0.45 + route.availability * 0.5
+
+        routeGraphics.moveTo(route.from.x, route.from.y)
+          .lineTo(route.to.x, route.to.y)
+          .stroke({
+            width: width + 3.5,
+            color: MAP_ROUTE.casingColor,
+            alpha: MAP_ROUTE.casingAlpha,
+            cap: 'round',
+          })
+
+        if (water || severed) {
+          strokeDashed(routeGraphics, route.from, route.to, { width, color, alpha })
+        } else {
+          routeGraphics.moveTo(route.from.x, route.from.y)
+            .lineTo(route.to.x, route.to.y)
+            .stroke({ width, color, alpha, cap: 'round' })
+        }
+
+        for (const node of [route.from, route.to]) {
+          routeGraphics.circle(node.x, node.y, MAP_ROUTE.nodeRadius)
+            .fill({ color: MAP_ROUTE.casingColor, alpha: 0.8 })
+          routeGraphics.circle(node.x, node.y, MAP_ROUTE.nodeRadius - 2)
+            .fill({ color, alpha: Math.min(1, alpha + 0.2) })
+        }
+      }
+      container.addChild(routeGraphics)
+    }
+  }
+
+  /** Cells belonging to each region, from the canonical territory grid. */
+  function collectRegionCells(): Map<string, Array<[number, number]>> {
+    const cells = new Map<string, Array<[number, number]>>()
+    const rows = mapStore.territoryRows
+    for (let y = 0; y < rows.length; y += 1) {
+      const row = rows[y] ?? []
+      for (let x = 0; x < row.length; x += 1) {
+        const id = row[x]
+        if (typeof id !== 'number' || !Number.isFinite(id) || id <= 0) continue
+        const key = String(id)
+        const bucket = cells.get(key)
+        if (bucket) bucket.push([x, y])
+        else cells.set(key, [[x, y]])
+      }
+    }
+    return cells
+  }
+
+  let regionCells = new Map<string, Array<[number, number]>>()
+
+  /**
+   * A transparent, hit-testable shape per region.
+   *
+   * Selection used to be bound to the label's estimated text rectangle, so the
+   * territory itself was not clickable and the hit box was wrong for any
+   * proportional font. Now the land is the target.
+   */
+  function renderRegionPickLayer() {
+    const container = mapContainer.value
+    if (!container) return
+
+    regionCells = collectRegionCells()
+    regionPickLayer = new Container()
+    regionPickLayer.zIndex = MAP_LAYER_Z_INDEX.regionPick
+    regionPickLayer.sortableChildren = false
+
+    for (const [regionId, cells] of regionCells) {
+      const region = mapStore.regions.get(Number(regionId)) ?? mapStore.regions.get(regionId)
+      if (!region) continue
+
+      const shape = new Graphics()
+      for (const [x, y] of cells) {
+        shape.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+      }
+      // Alpha 0 still hit-tests in Pixi; the fill only defines the shape.
+      shape.fill({ color: 0xffffff, alpha: 0 })
+      shape.eventMode = 'static'
+      shape.cursor = 'pointer'
+      shape.on('pointerover', () => { hoveredRegionId.value = regionId })
+      shape.on('pointerout', () => {
+        if (hoveredRegionId.value === regionId) hoveredRegionId.value = null
+      })
+      shape.on('pointertap', () => handleRegionSelect(region))
+      regionPickLayer.addChild(shape)
+    }
+
+    container.addChild(regionPickLayer)
+  }
+
+  /** Gold seal for the selected region, quiet paper wash for the hovered one. */
+  function drawSelection() {
+    if (!selectionGraphics) return
+    const g = selectionGraphics
+    g.clear()
+
+    const paint = (
+      regionId: string,
+      fill: number,
+      fillAlpha: number,
+      stroke: { color: number; alpha: number; width: number },
+      casing?: { color: number; alpha: number; width: number },
+    ) => {
+      const cells = regionCells.get(regionId)
+      if (!cells?.length) return
+      const cellSet = new Set(cells.map(([x, y]) => `${x},${y}`))
+
+      for (const [x, y] of cells) {
+        g.rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+          .fill({ color: fill, alpha: fillAlpha })
+      }
+
+      // Outline only the outer edge of the region, not every internal cell.
+      const edges: Array<[number, number, number, number]> = []
+      for (const [x, y] of cells) {
+        if (!cellSet.has(`${x - 1},${y}`)) edges.push(edgeToSegment(x, y, 'left'))
+        if (!cellSet.has(`${x + 1},${y}`)) edges.push(edgeToSegment(x, y, 'right'))
+        if (!cellSet.has(`${x},${y - 1}`)) edges.push(edgeToSegment(x, y, 'top'))
+        if (!cellSet.has(`${x},${y + 1}`)) edges.push(edgeToSegment(x, y, 'bottom'))
+      }
+
+      if (casing) {
+        for (const [x1, y1, x2, y2] of edges) {
+          g.moveTo(x1, y1).lineTo(x2, y2)
+            .stroke({ width: casing.width, color: casing.color, alpha: casing.alpha, cap: 'round', join: 'round' })
+        }
+      }
+      for (const [x1, y1, x2, y2] of edges) {
+        g.moveTo(x1, y1).lineTo(x2, y2)
+          .stroke({ width: stroke.width, color: stroke.color, alpha: stroke.alpha, cap: 'round', join: 'round' })
+      }
+    }
+
+    const hovered = hoveredRegionId.value
+    if (hovered && hovered !== selectedRegionId.value) {
+      paint(
+        hovered,
+        MAP_SELECTION.hoverFill,
+        MAP_SELECTION.hoverFillAlpha,
+        {
+          color: MAP_SELECTION.hoverStrokeColor,
+          alpha: MAP_SELECTION.hoverStrokeAlpha,
+          width: MAP_SELECTION.hoverStrokeWidth,
+        },
+      )
+    }
+
+    if (selectedRegionId.value) {
+      paint(
+        selectedRegionId.value,
+        MAP_SELECTION.selectedFill,
+        MAP_SELECTION.selectedFillAlpha,
+        {
+          color: MAP_SELECTION.selectedStrokeColor,
+          alpha: MAP_SELECTION.selectedStrokeAlpha,
+          width: MAP_SELECTION.selectedStrokeWidth,
+        },
+        {
+          color: MAP_SELECTION.selectedCasingColor,
+          alpha: MAP_SELECTION.selectedCasingAlpha,
+          width: MAP_SELECTION.selectedCasingWidth,
+        },
+      )
+    }
+  }
+
+  /**
+   * Region names, with a plate behind the ones that need it and a counter-scale
+   * that holds every label at its designed on-screen size.
+   */
+  function drawLabels() {
+    const layer = labelLayer
+    if (!layer) return
+
+    const oldChildren = layer.removeChildren()
+    oldChildren.forEach(child => child.destroy({ children: true }))
+
+    const counterScale = getLabelCounterScale(viewportScale.value)
+
+    for (const label of visibleRegionLabels.value) {
+      const tier = resolveLabelTier(label.type)
+      const group = new Container()
+      group.x = label.labelX
+      group.y = label.labelY
+      group.scale.set(counterScale)
+      group.alpha = tier.alpha
+      group.eventMode = 'none'
+
+      if (tier.plate) {
+        const screen = estimateRegionLabelSize(label.displayName, label.type, locale.value)
+        const plateWidth = (screen.width + MAP_LABEL_PLATE.paddingX * 2) * MAP_LABEL_TEXT_RESOLUTION
+        const plateHeight = (screen.height + MAP_LABEL_PLATE.paddingY * 2) * MAP_LABEL_TEXT_RESOLUTION
+        const plate = new Graphics()
+        plate.eventMode = 'none'
+        plate.roundRect(
+          -plateWidth / 2,
+          -plateHeight / 2,
+          plateWidth,
+          plateHeight,
+          MAP_LABEL_PLATE.radius * MAP_LABEL_TEXT_RESOLUTION,
+        ).fill({ color: MAP_LABEL_PLATE.color, alpha: MAP_LABEL_PLATE.alpha })
+        group.addChild(plate)
+      }
+
+      const text = new Text({
+        text: label.displayName,
+        style: getRegionTextStyle(label.type, locale.value, label.displayName),
+      })
+      text.anchor.set(0.5)
+      text.eventMode = 'none'
+      /*
+       * The glyph texture is rasterized at MAP_LABEL_TEXT_RESOLUTION times the
+       * target size and then scaled down by the counter-scale, so the label is
+       * supersampled. That is what keeps type crisp under the global `nearest`
+       * texture default, which exists for the pixel tiles and not for text.
+       */
+      group.addChild(text)
+
+      layer.addChild(group)
     }
   }
 
@@ -481,7 +875,11 @@ export function useMapLayerRenderer(emit: {
     const mapWidth = cols * TILE_SIZE
     const mapHeight = rows * TILE_SIZE
 
+    mapContainer.value.sortableChildren = true
+
     renderGroundAndWater(rows, cols, mapWidth, mapHeight)
+    if (currentVisibility.value.terrain) renderLargeRegions()
+    renderAtmosphere(mapWidth, mapHeight)
     renderPlanOverlays(buildMapLayerRenderPlan({
       mapData: mapStore.mapData,
       geography: mapStore.geography,
@@ -490,7 +888,21 @@ export function useMapLayerRenderer(emit: {
       routes: mapStore.routes,
       visibility: currentVisibility.value,
     }))
-    if (currentVisibility.value.terrain) renderLargeRegions()
+
+    renderRegionPickLayer()
+
+    selectionGraphics = new Graphics()
+    selectionGraphics.eventMode = 'none'
+    selectionGraphics.zIndex = MAP_LAYER_Z_INDEX.selection
+    mapContainer.value.addChild(selectionGraphics)
+    drawSelection()
+
+    labelLayer = new Container()
+    labelLayer.eventMode = 'none'
+    labelLayer.zIndex = MAP_LAYER_Z_INDEX.labels
+    mapContainer.value.addChild(labelLayer)
+    drawLabels()
+
     emit('mapLoaded', { width: mapWidth, height: mapHeight })
   }
 
@@ -513,6 +925,10 @@ export function useMapLayerRenderer(emit: {
     renderGeneration += 1
     cleanupTicker()
   })
+
+  // Cheap redraws: selection and labels never rebuild the base map.
+  watch([hoveredRegionId, selectedRegionId], () => drawSelection())
+  watch([visibleRegionLabels, () => locale.value], () => drawLabels())
 
   watch([
     () => isLoaded.value,
@@ -539,6 +955,8 @@ export function useMapLayerRenderer(emit: {
     mapContainer,
     locale,
     visibleRegionLabels,
+    hoveredRegionId,
+    selectedRegionId,
     getRegionTextStyle,
     handleRegionSelect,
   }

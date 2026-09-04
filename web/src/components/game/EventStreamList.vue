@@ -133,19 +133,22 @@ function handleSubjectClick(subject: EventSubject) {
   display: flex;
   width: 100%;
   min-width: 0;
-  gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid #2a2a2a;
+  gap: var(--s-4);
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .event-stream-list__row:last-child {
   border-bottom: none;
 }
 
+/* The dateline gutter: tabular so dates form a true column down the stream. */
 .event-stream-list__date {
-  flex: 0 0 76px;
-  font-size: 13px;
-  color: #999;
+  flex: 0 0 72px;
+  color: var(--text-muted);
+  font-family: var(--font-numeric);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -169,51 +172,64 @@ function handleSubjectClick(subject: EventSubject) {
   vertical-align: text-bottom;
 }
 
+/* Subject chips match the Now tab's: hairline border, no filled background. */
 .event-stream-list__subject {
   display: inline-flex;
   align-items: center;
   max-width: 92px;
   height: 18px;
-  padding: 0 5px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #d8d8d8;
-  font-size: 12px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--t-sm);
   line-height: 16px;
   vertical-align: text-bottom;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast);
 }
 
 button.event-stream-list__subject {
   font: inherit;
 }
 
-.event-stream-list__subject--sect {
-  background: rgba(255, 255, 255, 0.04);
+button.event-stream-list__subject:hover {
+  color: var(--text-primary);
+  background: var(--surface-raised);
 }
 
+button.event-stream-list__subject:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.event-stream-list__subject--sect {
+  border-style: dashed;
+}
+
+/* The dead are still named, but recede. */
 .event-stream-list__subject--dead {
-  opacity: 0.72;
+  opacity: 0.6;
 }
 
 .event-stream-list__subject--more,
 .event-stream-list__subject--world {
   cursor: default;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .event-stream-list__content,
 .event-stream-list__empty {
-  font-size: 13px;
+  font-size: var(--t-md);
   line-height: 1.6;
 }
 
 .event-stream-list__content {
-  color: #ddd;
+  color: var(--text-primary);
   width: 100%;
   min-width: 0;
   white-space: pre-line;
@@ -222,9 +238,10 @@ button.event-stream-list__subject {
 }
 
 .event-stream-list__empty {
-  color: #666;
+  color: var(--text-muted);
+  font-style: italic;
   text-align: center;
-  padding: 10px 0;
+  padding: var(--s-5) 0;
 }
 
 .event-stream-list__link {

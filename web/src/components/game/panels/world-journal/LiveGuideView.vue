@@ -218,36 +218,45 @@ function selectSuggestion(value: string) {
 /* Hallmark · pre-emit critique: P5 H5 E4 S5 R4 V5
  * composition: editorial split · tone: xianxia chronicle · anchor hue: antique gold
  */
+/*
+ * The guide keeps its editorial structure, but its local palette is now an
+ * alias layer over the shared tokens rather than a second, parallel set of
+ * greys and golds. Renaming stops here so every rule below still resolves.
+ */
 .live-guide {
-  --guide-paper: #121211;
-  --guide-paper-raised: #191816;
-  --guide-paper-soft: #211f1b;
-  --guide-ink: #eee7d8;
-  --guide-ink-soft: #c9c2b5;
-  --guide-ink-muted: #9e978a;
-  --guide-rule: #38342c;
-  --guide-gold: #c8a96a;
-  --guide-gold-soft: rgba(200, 169, 106, 0.15);
-  --guide-teal: #78cbb1;
-  --guide-teal-soft: rgba(120, 203, 177, 0.08);
-  --guide-teal-rule: rgba(120, 203, 177, 0.35);
-  --guide-crimson: #ba655d;
-  --guide-error: #d89087;
-  --guide-focus: #e1c48d;
-  --guide-gold-text: #f0d8a6;
-  --guide-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --guide-paper: var(--surface-panel);
+  --guide-paper-raised: var(--surface-raised);
+  --guide-paper-soft: var(--surface-sunken);
+  --guide-ink: var(--text-primary);
+  --guide-ink-soft: var(--text-secondary);
+  --guide-ink-muted: var(--text-muted);
+  --guide-rule: var(--rule);
+  --guide-gold: var(--accent);
+  --guide-gold-soft: var(--accent-wash);
+  --guide-teal: var(--jade-300);
+  --guide-teal-soft: var(--jade-wash);
+  --guide-teal-rule: var(--jade-600);
+  --guide-crimson: var(--cinnabar-400);
+  --guide-error: var(--state-alert);
+  --guide-focus: var(--accent);
+  --guide-gold-text: var(--accent-strong);
+  --guide-ease-out: ease;
   min-width: 0;
   min-height: 100%;
-  padding: 16px;
+  padding: var(--s-5);
   background: var(--guide-paper);
   color: var(--guide-ink);
+  font-family: var(--font-ui);
 }
 
 .guide-state {
   margin: 0;
-  padding: 18px;
-  border: 1px dashed var(--guide-rule);
+  padding: var(--s-5) 0;
+  border: 0;
+  border-top: 1px solid var(--rule-soft);
   color: var(--guide-ink-muted);
+  font-size: var(--t-sm);
+  font-style: italic;
 }
 
 .guide-state--error,
@@ -271,39 +280,74 @@ function selectSuggestion(value: string) {
   text-transform: uppercase;
 }
 
-.guide-kicker { display: block; margin-top: 9px; }
+.guide-kicker { display: block; margin-top: var(--s-4); }
+
+/*
+ * `clamp(19px, 3vw, 28px)` sized the headline against the *viewport*, so in a
+ * 380px sidebar on a wide monitor it rendered at 28px. Sized against the
+ * container instead, with the display serif of the setting.
+ */
 .guide-lede h3 {
   min-width: 0;
-  max-width: 760px;
-  margin: 7px 0 0;
+  max-width: 60ch;
+  margin: var(--s-3) 0 0;
   color: var(--guide-ink);
-  font-size: clamp(19px, 3vw, 28px);
-  font-weight: 600;
-  line-height: 1.22;
+  font-family: var(--font-display);
+  font-size: clamp(16px, 4.5cqi, 24px);
+  font-weight: 400;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .source-link {
   position: absolute;
   right: 0;
-  bottom: 18px;
-  min-height: 36px;
-  padding: 0 11px;
+  bottom: var(--s-5);
+  min-height: 28px;
+  padding: 0 var(--s-4);
   border: 1px solid var(--guide-rule);
-  border-radius: 6px;
+  border-radius: var(--r-1);
   background: transparent;
   color: var(--guide-ink-muted);
+  font-size: var(--t-xs);
   white-space: nowrap;
 }
 
+/*
+ * Single column by default. The old two-column split only collapsed at a
+ * viewport of 760px, so in the desktop sidebar — a ~380px container inside a
+ * 1680px window — it rendered a 1.65fr/240px split and overflowed. The split
+ * now keys off the container, which is the measure that actually matters.
+ */
 .guide-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(240px, 1fr);
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
-.guide-main { min-width: 0; padding: 20px 24px 10px 0; }
-.guide-context { min-width: 0; padding: 20px 0 10px 24px; border-left: 1px solid var(--guide-rule); }
+.guide-main { min-width: 0; padding: var(--s-6) 0 var(--s-4); }
+
+.guide-context {
+  min-width: 0;
+  padding: var(--s-6) 0 var(--s-4);
+  border-top: 1px solid var(--guide-rule);
+  border-left: 0;
+}
+
+@container journal (min-width: 620px) {
+  .guide-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(240px, 1fr);
+  }
+
+  .guide-main { padding: var(--s-6) var(--s-7) var(--s-4) 0; }
+
+  .guide-context {
+    padding: var(--s-6) 0 var(--s-4) var(--s-7);
+    border-top: 0;
+    border-left: 1px solid var(--guide-rule);
+  }
+}
 
 .guide-section-heading h4,
 .context-block h4,
@@ -342,14 +386,20 @@ function selectSuggestion(value: string) {
 .thread-copy h5 { margin: 0; color: var(--guide-ink); font-size: 15px; line-height: 1.35; overflow-wrap: anywhere; }
 .thread-copy > p { margin: 7px 0 0; color: var(--guide-ink-soft); font-size: 13px; line-height: 1.62; overflow-wrap: anywhere; }
 
-.thread-subjects { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.thread-subjects { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
+/* Square-ish chips, matching the subject chips in the Now tab. */
 .thread-subjects button {
-  min-height: 30px;
-  padding: 3px 8px;
+  min-height: 26px;
+  padding: 0 var(--s-3);
   border: 1px solid var(--guide-teal-rule);
-  border-radius: 999px;
-  background: var(--guide-teal-soft);
+  border-radius: var(--r-1);
+  background: transparent;
   color: var(--guide-teal);
+  font-size: 10px;
+}
+
+.thread-subjects button:hover:not(:disabled) {
+  background: var(--guide-teal-soft);
 }
 
 .why-link {
@@ -384,69 +434,87 @@ function selectSuggestion(value: string) {
 .concept-block h4 { margin-top: 6px; color: var(--guide-gold); }
 .concept-block p { margin: 8px 0 0; color: var(--guide-ink-soft); font-size: 12px; line-height: 1.62; }
 
+/* The ask-the-chronicler box is the one raised surface in the panel, because it
+   is the only place that takes input. */
 .chronicler-box {
-  margin-top: 16px;
-  padding: 16px;
+  margin-top: var(--s-6);
+  padding: var(--s-5);
   border: 1px solid var(--guide-rule);
-  border-radius: 10px;
+  border-radius: var(--r-2);
   background: var(--guide-paper-raised);
 }
-.chronicler-box > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
-.chronicler-box h4 { margin-top: 4px; }
+.chronicler-box > header { display: flex; align-items: end; justify-content: space-between; gap: var(--s-5); }
+.chronicler-box h4 { margin-top: var(--s-1); }
 .grounded-note { color: var(--guide-ink-muted); font-size: 10px; text-align: right; }
-.chronicler-box form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 13px; }
+.chronicler-box form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s-3); margin-top: var(--s-5); }
 .chronicler-box input {
   min-width: 0;
-  min-height: 46px;
-  padding: 0 13px;
+  min-height: 38px;
+  padding: 0 var(--s-4);
   border: 1px solid var(--guide-rule);
-  border-radius: 7px;
+  border-radius: var(--r-1);
   outline: 0;
-  background: var(--guide-paper);
+  background: var(--surface-sunken);
   color: var(--guide-ink);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
 }
+.chronicler-box input::placeholder { color: var(--paper-700); }
 .chronicler-box form button {
-  min-height: 46px;
-  padding: 0 17px;
-  border: 1px solid var(--guide-gold);
-  border-radius: 7px;
-  background: var(--guide-gold-soft);
+  min-height: 38px;
+  padding: 0 var(--s-6);
+  border: 1px solid var(--gold-600);
+  border-radius: var(--r-1);
+  background: transparent;
   color: var(--guide-gold-text);
+  font-size: var(--t-sm);
   white-space: nowrap;
 }
-.question-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.chronicler-box form button:hover:not(:disabled) { background: var(--guide-gold-soft); }
+.question-suggestions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-4); }
 .question-suggestions button {
-  min-height: 34px;
-  padding: 4px 9px;
+  min-height: 28px;
+  padding: 0 var(--s-3);
   border: 1px solid var(--guide-rule);
-  border-radius: 999px;
-  background: var(--guide-paper-soft);
+  border-radius: var(--r-1);
+  background: transparent;
   color: var(--guide-ink-muted);
+  font-size: 10px;
   white-space: nowrap;
 }
+.question-suggestions button:hover:not(:disabled) { background: var(--surface-raised); }
 
-.guide-answer { margin-top: 13px; padding: 13px; border-left: 3px solid var(--guide-teal); background: var(--guide-paper); }
-.guide-answer > p { margin: 0; color: var(--guide-ink); font-size: 13px; line-height: 1.65; }
-.answer-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; color: var(--guide-ink-muted); font-size: 10px; }
-.answer-sources button { min-height: 32px; border: 0; border-bottom: 1px solid var(--guide-gold); background: transparent; color: var(--guide-gold); }
-.answer-state { margin: 12px 0 0; }
+/* The answer is attributed speech, so it gets the serif and a jade rule. */
+.guide-answer {
+  margin-top: var(--s-5);
+  padding: 0 0 0 var(--s-5);
+  border-left: 2px solid var(--guide-teal-rule);
+  background: transparent;
+}
+.guide-answer > p {
+  margin: 0;
+  color: var(--guide-ink);
+  font-family: var(--font-display);
+  font-size: var(--t-md);
+  line-height: 1.7;
+}
+.answer-sources { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-4); color: var(--guide-ink-muted); font-size: 10px; }
+.answer-sources button { min-height: 26px; padding: 0 var(--s-2); border: 0; border-bottom: 1px solid var(--gold-600); background: transparent; color: var(--guide-gold); font-size: 10px; }
+.answer-state { margin: var(--s-5) 0 0; }
 
 button { font: inherit; cursor: pointer; transition: background-color 120ms var(--guide-ease-out), color 120ms var(--guide-ease-out), border-color 120ms var(--guide-ease-out); }
 button:hover:not(:disabled) { color: var(--guide-focus); }
 button:active:not(:disabled) { opacity: 0.78; }
 button:focus-visible,
-input:focus-visible { outline: 2px solid var(--guide-focus); outline-offset: 2px; }
+input:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 button:disabled,
 input:disabled { cursor: not-allowed; opacity: 0.48; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 760px) {
-  .live-guide { padding: 14px; }
+  .live-guide { padding: var(--s-5); }
   .guide-lede { padding-right: 0; }
-  .source-link { position: static; margin-top: 12px; min-height: 48px; }
-  .guide-layout { display: flex; flex-direction: column; }
-  .guide-main { padding: 20px 0 0; }
-  .guide-context { padding: 22px 0 0; border-top: 1px solid var(--guide-rule); border-left: 0; }
+  .source-link { position: static; margin-top: var(--s-5); min-height: 48px; }
   .thread-copy h5 { font-size: 17px; }
   .thread-copy > p,
   .concept-block p,

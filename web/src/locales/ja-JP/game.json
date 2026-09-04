@@ -51,20 +51,36 @@
     "why_considered_count": "{count}件の選択肢が検討されました",
     "why_rejected": "却下された選択肢",
     "guide": {
-      "loading": "現在の世界を読み解いています...", "error": "生きた手引きを作成できませんでした。", "retry": "再試行",
-      "date": "{year}年 {month}月", "world_in_one_sentence": "世界を一文で",
-      "no_headline": "世界最初の物語はまだ形作られている途中です。", "sources": "{count}件の出典",
-      "happening": "今、何が起きているか", "happening_hint": "現在もっとも重要な物語の流れ",
-      "empty": "物語の流れを作るほど重要な出来事はまだありません。", "understand_why": "理由を知る",
-      "people": "今、重要な人物", "people_empty": "この期間に際立った人物はいません。",
-      "no_current_action": "現在の行動記録なし", "no_ambition": "既知の志なし", "concept": "注目の概念",
-      "ask_eyebrow": "年代記者に聞く", "ask_title": "この世界について尋ねる",
-      "grounded_note": "回答は世界の事実と出典に限定されます", "question_label": "年代記者への質問",
-      "question_placeholder": "なぜこの争いは重要なのか？誰が流れを変えられるのか？", "ask_button": "質問する",
-      "answering": "調査中...", "suggestion_people": "誰が世界を変えている？",
-      "suggestion_conflict": "注目すべき争いは？", "suggestion_change": "最近何が変わった？",
-      "answer_error": "年代記者は今すぐ回答できません。再試行してください。", "answer_unavailable": "回答に十分な出典がありません。",
-      "answer_sources": "回答の出典", "source_number": "出典 {number}"
+      "loading": "現在の世界を読み解いています...",
+      "error": "生きた手引きを作成できませんでした。",
+      "retry": "再試行",
+      "date": "{year}年 {month}月",
+      "world_in_one_sentence": "世界を一文で",
+      "no_headline": "世界最初の物語はまだ形作られている途中です。",
+      "sources": "{count}件の出典",
+      "happening": "今、何が起きているか",
+      "happening_hint": "現在もっとも重要な物語の流れ",
+      "empty": "物語の流れを作るほど重要な出来事はまだありません。",
+      "understand_why": "理由を知る",
+      "people": "今、重要な人物",
+      "people_empty": "この期間に際立った人物はいません。",
+      "no_current_action": "現在の行動記録なし",
+      "no_ambition": "既知の志なし",
+      "concept": "注目の概念",
+      "ask_eyebrow": "年代記者に聞く",
+      "ask_title": "この世界について尋ねる",
+      "grounded_note": "回答は世界の事実と出典に限定されます",
+      "question_label": "年代記者への質問",
+      "question_placeholder": "なぜこの争いは重要なのか？誰が流れを変えられるのか？",
+      "ask_button": "質問する",
+      "answering": "調査中...",
+      "suggestion_people": "誰が世界を変えている？",
+      "suggestion_conflict": "注目すべき争いは？",
+      "suggestion_change": "最近何が変わった？",
+      "answer_error": "年代記者は今すぐ回答できません。再試行してください。",
+      "answer_unavailable": "回答に十分な出典がありません。",
+      "answer_sources": "回答の出典",
+      "source_number": "出典 {number}"
     },
     "why_relation": {
       "triggered_by": "きっかけ",
@@ -74,7 +90,8 @@
       "resolves": "解決",
       "prevented_by": "阻止",
       "contributed_to": "寄与"
-    }
+    },
+    "title_short": "日誌"
   },
   "status_bar": {
     "phenomenon": "天地異象",
@@ -87,7 +104,7 @@
     "click_to_change": "（クリックして異象を変更）",
     "author_github": "GitHub で Star する",
     "hidden_domain": {
-      "label": "[秘境]",
+      "label": "秘境",
       "title": "秘境一覧",
       "empty": "秘境データがありません",
       "required_realm": "入境条件",
@@ -97,13 +114,13 @@
       "open_chance": "出現確率"
     },
     "world_info": {
-      "label": "[世界情報]",
+      "label": "世界情報",
       "title": "世界情報",
       "ai_knowledge_note": "修士 AI がこの仙道世界について把握している知識",
       "empty": "世界情報がありません"
     },
     "avatar_overview": {
-      "label": "[人物概覧]"
+      "label": "人物概覧"
     },
     "time": {
       "title": "時間概要",
@@ -122,7 +139,17 @@
       "war_none": "現在宗門戦争はありません"
     },
     "world_secret": {
-      "label": "[世界秘密]"
+      "label": "世界秘密"
+    },
+    "nav_label": "世界パネル",
+    "menu": "システムメニュー",
+    "time_detail": "時間の詳細",
+    "connected": "接続中",
+    "disconnected": "切断",
+    "groups": {
+      "world": "天地",
+      "powers": "勢力",
+      "records": "記録"
     }
   },
   "world_info": {
@@ -196,7 +223,8 @@
     "resume": "ゲーム再開",
     "pause": "一時停止",
     "paused": "一時停止中",
-    "closed_msg": "ゲームは終了しました。このタブは安全に閉じられます。"
+    "closed_msg": "ゲームは終了しました。このタブは安全に閉じられます。",
+    "running": "進行中"
   },
   "event_panel": {
     "title": "イベント",
@@ -298,7 +326,8 @@
     "fallback": {
       "avatar_name": "キャラクター",
       "counterpart_name": "相手"
-    }
+    },
+    "title_short": "ロール"
   },
   "event_templates": {
     "nickname_awarded": "{avatar_name} は仙道界で名を挙げ、「{nickname}」と呼ばれるようになった。"
@@ -309,8 +338,8 @@
       "middle": "中期",
       "late": "後期"
     },
-    "title_short": "[ランキング]",
-    "tournament_short": "[武道会]",
+    "title_short": "ランキング",
+    "tournament_short": "武道会",
     "title": "天地人ランキング",
     "heaven": "天榜（元嬰）",
     "earth": "地榜（結丹）",
@@ -333,7 +362,7 @@
     "human_first": "人榜第一位"
   },
   "sect_relations": {
-    "title_short": "[宗門関係]",
+    "title_short": "宗門関係",
     "title": "宗門関係",
     "sect_a": "宗門 A",
     "sect_b": "宗門 B",
@@ -363,7 +392,7 @@
     }
   },
   "mortal_system": {
-    "title_short": "[人間]",
+    "title_short": "人間",
     "title": "人間界",
     "empty": "データなし",
     "population_value": "{value}万",
@@ -394,7 +423,7 @@
     }
   },
   "dynasty": {
-    "title_short": "[王朝]",
+    "title_short": "王朝",
     "title": "王朝",
     "name": "王朝名",
     "royal_house": "皇室",
@@ -789,5 +818,63 @@
     "decision_keep": "秘密を保持",
     "decision_none": "未選択",
     "empty": "世界秘密データはありません"
+  },
+  "map": {
+    "tab": "地図",
+    "sheet_close": "パネルを閉じる",
+    "layers": {
+      "title": "レイヤー",
+      "groups": {
+        "physical": "自然",
+        "territorial": "領域",
+        "organizational": "勢力"
+      },
+      "terrain": {
+        "label": "地形"
+      },
+      "water": {
+        "label": "水域"
+      },
+      "elevation": {
+        "label": "標高"
+      },
+      "borders": {
+        "label": "境界"
+      },
+      "names": {
+        "label": "地名"
+      },
+      "routes": {
+        "label": "経路",
+        "hint": "地域間の接続を示し、線は実際の経路ではありません"
+      },
+      "sects": {
+        "label": "宗門"
+      },
+      "infrastructure": {
+        "label": "施設"
+      },
+      "institutionalPresence": {
+        "label": "統治の存在"
+      }
+    },
+    "view": {
+      "group": "表示コントロール",
+      "zoom_in": "拡大",
+      "zoom_out": "縮小",
+      "fit": "全体表示",
+      "zoom_level": "ズーム率"
+    },
+    "legend": {
+      "title": "凡例",
+      "coast": "海岸線",
+      "flow": "水流",
+      "border": "地域境界",
+      "route_land": "陸路",
+      "route_water": "水路",
+      "route_severed": "断絶した経路",
+      "sect": "宗門領域",
+      "site": "インフラ施設"
+    }
   }
 }

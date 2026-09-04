@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import { NPopover } from 'naive-ui'
 
+/**
+ * A single HUD navigation entry.
+ *
+ * Restyled from the old bold, per-item coloured text separated by literal `|`
+ * characters. Colour is no longer used for identity — that read as a rainbow
+ * bookmark bar and left nothing to express state, which the repo's status-bar
+ * rule explicitly warns against. Identity now comes from the icon and the
+ * group it sits in; `accent` is reserved for items that carry live state
+ * (currently the world phenomenon, whose rarity is meaningful).
+ */
 interface Props {
   label: string
   icon?: string
-  color?: string
+  /** Optional meaningful accent. Omit for plain navigation entries. */
+  accent?: string
   disablePopover?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  color: '#ccc',
   disablePopover: false,
 })
 
@@ -18,32 +28,44 @@ const emit = defineEmits(['trigger-click'])
 
 <template>
   <div class="status-widget">
-    <span class="divider">|</span>
-
-    <span
+    <button
       v-if="disablePopover"
+      type="button"
       class="widget-trigger"
-      :style="{ color: props.color }"
+      :class="{ 'widget-trigger--accented': !!props.accent }"
+      :style="props.accent ? { '--widget-accent': props.accent } : undefined"
       :title="props.label"
       @click="emit('trigger-click')"
       v-sound="'open'"
     >
-      <span v-if="props.icon" class="widget-icon" :style="{ '--icon-url': `url(${props.icon})` }" aria-hidden="true"></span>
+      <span
+        v-if="props.icon"
+        class="cw-icon widget-icon"
+        :style="{ '--icon-url': `url(${props.icon})` }"
+        aria-hidden="true"
+      />
       <span class="widget-label">{{ props.label }}</span>
-    </span>
+    </button>
 
     <n-popover v-else trigger="click" placement="bottom" style="max-width: 600px;">
       <template #trigger>
-        <span
+        <button
+          type="button"
           class="widget-trigger"
-          :style="{ color: props.color }"
+          :class="{ 'widget-trigger--accented': !!props.accent }"
+          :style="props.accent ? { '--widget-accent': props.accent } : undefined"
           :title="props.label"
           @click="emit('trigger-click')"
           v-sound="'open'"
         >
-          <span v-if="props.icon" class="widget-icon" :style="{ '--icon-url': `url(${props.icon})` }" aria-hidden="true"></span>
+          <span
+            v-if="props.icon"
+            class="cw-icon widget-icon"
+            :style="{ '--icon-url': `url(${props.icon})` }"
+            aria-hidden="true"
+          />
           <span class="widget-label">{{ props.label }}</span>
-        </span>
+        </button>
       </template>
 
       <div class="widget-content">
@@ -56,62 +78,71 @@ const emit = defineEmits(['trigger-click'])
 <style scoped>
 .status-widget {
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
 }
 
 .widget-trigger {
   position: relative;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-weight: bold;
-  transition:
-    filter 0.16s ease,
-    outline-color 0.16s ease,
-    transform 0.16s ease;
+  gap: var(--s-3);
+  /* 44px touch target: the old 36px bar had none. */
+  min-height: var(--touch-target);
+  padding: 0 var(--s-4);
+  border: 0;
+  border-radius: var(--r-1);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--t-sm);
+  font-weight: 400;
   white-space: nowrap;
-  min-width: 0;
-  max-width: 100%;
-  flex-shrink: 1;
+  cursor: pointer;
+  transition: color var(--motion-fast), background var(--motion-fast);
 }
 
+/* Active/hover is a gold underline, one accent for the whole bar. */
 .widget-trigger::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4px;
+  left: var(--s-4);
+  right: var(--s-4);
+  bottom: 6px;
   height: 1px;
-  background: currentColor;
+  background: var(--accent);
   opacity: 0;
-  transform: scaleX(0.72);
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  transition: opacity var(--motion-fast);
 }
 
 .widget-trigger:hover {
-  filter: brightness(1.22);
-  transform: translateY(-1px);
+  color: var(--text-primary);
+  background: var(--surface-raised);
 }
 
 .widget-trigger:hover::after {
-  opacity: 0.65;
-  transform: scaleX(1);
-}
-
-.widget-trigger:active {
-  transform: translateY(0);
-  filter: brightness(1.06);
+  opacity: 0.8;
 }
 
 .widget-trigger:focus-visible {
-  outline: 2px solid color-mix(in srgb, currentColor 58%, white);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
-.divider {
-  color: #4a443b;
-  margin-right: 10px;
+.widget-trigger:active {
+  background: var(--surface-sunken);
+}
+
+.widget-trigger--accented {
+  color: var(--widget-accent, var(--text-primary));
+}
+
+.widget-trigger--accented .widget-icon {
+  color: var(--widget-accent, var(--accent));
+}
+
+.widget-icon {
+  width: 15px;
+  height: 15px;
 }
 
 .widget-label {
@@ -121,19 +152,32 @@ const emit = defineEmits(['trigger-click'])
   white-space: nowrap;
 }
 
-.widget-icon {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  display: inline-block;
-  background-color: currentColor;
-  -webkit-mask-image: var(--icon-url);
-  mask-image: var(--icon-url);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
+/*
+ * Below the desktop breakpoint the rail becomes icon-only. The accessible name
+ * survives in `title`, and the target stays 44px, so nothing is lost and the
+ * bar stops silently overflowing into a hidden horizontal scroll.
+ */
+@media (max-width: 1180px) {
+  .widget-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .widget-trigger {
+    min-width: var(--touch-target);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .widget-icon {
+    width: 17px;
+    height: 17px;
+  }
 }
 </style>

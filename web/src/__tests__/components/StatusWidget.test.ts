@@ -61,11 +61,11 @@ describe('StatusWidget', () => {
     expect(icon.attributes('style')).toContain('url(/icons/test.svg)')
   })
 
-  it('renders the label with custom color', () => {
+  it('exposes a supplied accent as a custom property', () => {
     const wrapper = mount(StatusWidget, {
       props: {
         ...defaultProps,
-        color: '#ff0000',
+        accent: '#ff0000',
       },
       global: {
         directives: {
@@ -75,10 +75,10 @@ describe('StatusWidget', () => {
     })
 
     const trigger = wrapper.find('.widget-trigger')
-    expect(trigger.attributes('style')).toContain('color: rgb(255, 0, 0)')
+    expect(trigger.attributes('style')).toContain('--widget-accent: #ff0000')
   })
 
-  it('uses the default color when not provided', () => {
+  it('inherits the rail colour when no accent is supplied', () => {
     const wrapper = mount(StatusWidget, {
       props: defaultProps,
       global: {
@@ -88,8 +88,10 @@ describe('StatusWidget', () => {
       },
     })
 
+    // No inline colour at all: plain entries take the bar's text token, which
+    // is what keeps the rail from turning back into a rainbow.
     const trigger = wrapper.find('.widget-trigger')
-    expect(trigger.attributes('style')).toContain('color: rgb(204, 204, 204)')
+    expect(trigger.attributes('style')).toBeUndefined()
   })
 
   it('emits trigger-click when clicked', async () => {
@@ -142,7 +144,7 @@ describe('StatusWidget', () => {
     expect(wrapper.text()).toContain('Custom Content')
   })
 
-  it('renders the divider', () => {
+  it('separates entries with chrome rather than a literal pipe glyph', () => {
     const wrapper = mount(StatusWidget, {
       props: defaultProps,
       global: {
@@ -152,7 +154,41 @@ describe('StatusWidget', () => {
       },
     })
 
-    expect(wrapper.find('.divider').exists()).toBe(true)
-    expect(wrapper.find('.divider').text()).toBe('|')
+    // Grouping is done by the rail's hairline borders, so the widget no longer
+    // prints a `|` of its own.
+    expect(wrapper.find('.divider').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('|')
+  })
+
+  it('is a real button, so it is reachable and activatable by keyboard', () => {
+    const wrapper = mount(StatusWidget, {
+      props: { ...defaultProps, disablePopover: true },
+      global: {
+        directives: {
+          sound: soundDirective,
+        },
+      },
+    })
+
+    const trigger = wrapper.get('.widget-trigger')
+    expect(trigger.element.tagName).toBe('BUTTON')
+    expect(trigger.attributes('type')).toBe('button')
+    expect(trigger.attributes('title')).toBe('Test Label')
+  })
+
+  it('applies an accent only when one is supplied', () => {
+    const plain = mount(StatusWidget, {
+      props: defaultProps,
+      global: { directives: { sound: soundDirective } },
+    })
+    expect(plain.get('.widget-trigger').classes()).not.toContain('widget-trigger--accented')
+
+    const accented = mount(StatusWidget, {
+      props: { ...defaultProps, accent: '#d9b877' },
+      global: { directives: { sound: soundDirective } },
+    })
+    const trigger = accented.get('.widget-trigger')
+    expect(trigger.classes()).toContain('widget-trigger--accented')
+    expect(trigger.attributes('style')).toContain('#d9b877')
   })
 })

@@ -4,6 +4,7 @@ import { Container, Graphics } from 'pixi.js'
 import { useMapStore } from '../../stores/map'
 import { useWorldStore } from '../../stores/world'
 import { useSectStore } from '../../stores/sect'
+import { MAP_SECT } from '@/constants/mapTheme'
 
 const props = defineProps<{
   visible?: boolean
@@ -24,20 +25,24 @@ function hexToNumber(hex: string): number {
   return parseInt(hex.replace(/^#/, ''), 16)
 }
 
-/** 向白色混合，得到提亮版颜色（用于边框更显眼），t 为向白比例 0~1 */
-function brightenColor(colorNum: number, t: number): number {
-  const r = (colorNum >> 16) & 0xff
-  const g = (colorNum >> 8) & 0xff
-  const b = colorNum & 0xff
-  const r2 = Math.round(r + (255 - r) * t)
-  const g2 = Math.round(g + (255 - g) * t)
-  const b2 = Math.round(b + (255 - b) * t)
-  return (r2 << 16) | (g2 << 8) | b2
+function mixToward(colorNum: number, target: number, t: number): number {
+  const mix = (shift: number) => {
+    const a = (colorNum >> shift) & 0xff
+    const b = (target >> shift) & 0xff
+    return Math.round(a + (b - a) * t)
+  }
+  return (mix(16) << 16) | (mix(8) << 8) | mix(0)
 }
 
+/**
+ * Sect territory keeps the organization's canonical color, but expressed as a
+ * diagonal hatch plus a thin double border rather than a flat slab. A 38%-alpha
+ * fill over every owned tile was the loudest thing on the map and buried the
+ * terrain, the routes and the names underneath it.
+ */
 function updateInfluence() {
   if (!influenceGraphics) return
-  
+
   const g = influenceGraphics
   g.clear()
 
@@ -47,29 +52,72 @@ function updateInfluence() {
 
   for (const summary of sectStore.activeTerritories) {
     const colorNum = hexToNumber(summary.color)
-    g.setStrokeStyle(0)
-    for (const tile of summary.owned_tiles ?? []) {
-      g.rect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-        .fill({ color: colorNum, alpha: 0.38 })
+    const tiles = summary.owned_tiles ?? []
+    const owned = new Set(tiles.map(tile => `${tile.x},${tile.y}`))
+
+    for (const tile of tiles) {
+      const px = tile.x * TILE_SIZE
+      const py = tile.y * TILE_SIZE
+      g.rect(px, py, TILE_SIZE, TILE_SIZE)
+        .fill({ color: colorNum, alpha: MAP_SECT.fillAlpha })
+
+      // Diagonal hatch, clipped to the tile, reads as "claimed" without
+      // obscuring what is claimed.
+      for (let offset = 0; offset < TILE_SIZE; offset += MAP_SECT.hatchSpacing) {
+        g.moveTo(px + offset, py)
+          .lineTo(px, py + offset)
+          .stroke({ width: MAP_SECT.hatchWidth, color: colorNum, alpha: MAP_SECT.hatchAlpha })
+        g.moveTo(px + TILE_SIZE, py + offset)
+          .lineTo(px + offset, py + TILE_SIZE)
+          .stroke({ width: MAP_SECT.hatchWidth, color: colorNum, alpha: MAP_SECT.hatchAlpha })
+      }
     }
 
-    const BORDER_WIDTH = 6
-    const borderColor = brightenColor(colorNum, 0.92)
-    const strokeOpt = { width: BORDER_WIDTH, color: borderColor, alpha: 1 }
-    for (const edge of summary.boundary_edges ?? []) {
+    const borderColor = mixToward(colorNum, 0xf2ece0, MAP_SECT.borderLift)
+    const edges = summary.boundary_edges ?? []
+    // Only draw the outer silhouette: interior seams between two owned tiles
+    // are not a boundary.
+    const outer = edges.filter(edge => {
+      const neighbour = edge.side === 'left'
+        ? `${edge.x - 1},${edge.y}`
+        : edge.side === 'right'
+          ? `${edge.x + 1},${edge.y}`
+          : edge.side === 'top'
+            ? `${edge.x},${edge.y - 1}`
+            : `${edge.x},${edge.y + 1}`
+      return !owned.has(neighbour)
+    })
+
+    const segment = (edge: { x: number; y: number; side: string }): [number, number, number, number] => {
       const px = edge.x * TILE_SIZE
       const py = edge.y * TILE_SIZE
       const pr = px + TILE_SIZE
       const pb = py + TILE_SIZE
-      if (edge.side === 'left') {
-        g.moveTo(px, py).lineTo(px, pb).stroke(strokeOpt)
-      } else if (edge.side === 'right') {
-        g.moveTo(pr, py).lineTo(pr, pb).stroke(strokeOpt)
-      } else if (edge.side === 'top') {
-        g.moveTo(px, py).lineTo(pr, py).stroke(strokeOpt)
-      } else if (edge.side === 'bottom') {
-        g.moveTo(px, pb).lineTo(pr, pb).stroke(strokeOpt)
-      }
+      if (edge.side === 'left') return [px, py, px, pb]
+      if (edge.side === 'right') return [pr, py, pr, pb]
+      if (edge.side === 'top') return [px, py, pr, py]
+      return [px, pb, pr, pb]
+    }
+
+    for (const edge of outer) {
+      const [x1, y1, x2, y2] = segment(edge)
+      g.moveTo(x1, y1).lineTo(x2, y2).stroke({
+        width: MAP_SECT.casingWidth,
+        color: MAP_SECT.casingColor,
+        alpha: MAP_SECT.casingAlpha,
+        cap: 'round',
+        join: 'round',
+      })
+    }
+    for (const edge of outer) {
+      const [x1, y1, x2, y2] = segment(edge)
+      g.moveTo(x1, y1).lineTo(x2, y2).stroke({
+        width: MAP_SECT.borderWidth,
+        color: borderColor,
+        alpha: MAP_SECT.borderAlpha,
+        cap: 'round',
+        join: 'round',
+      })
     }
   }
 }
