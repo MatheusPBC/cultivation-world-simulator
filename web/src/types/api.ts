@@ -26,11 +26,21 @@ export interface ApiResponse<T> {
 }
 
 export type InstitutionalOwnerKindDTO = 'region' | 'sect' | 'dynasty';
+export interface InstitutionalRelationDTO {
+  id: string;
+  institution_a_id: string;
+  institution_b_id: string;
+  kind: string;
+  friendliness: number;
+  since_month: number;
+  evidence_event_ids: string[];
+}
 export interface InstitutionalChainResponseDTO {
   owner: { kind: 'city' | 'sect' | 'dynasty'; id: string; institution_id: string; name: string; region_id: string | null };
   current_month: number;
   authority: { institution_id: string; office_ids: string[]; active_claim_ids: string[]; material_control: Record<string, boolean> };
   institutions: Array<{ id: string; kind: string; name: string; scope: 'owner' | 'party' | 'governed_city' }>;
+  relations: InstitutionalRelationDTO[];
   commitments: Array<{ id: string; party_ids: string[]; opened_month: number; closed_month: number | null; aggregate_status: string; owner_institution_id: string; control_scope: 'direct' | 'governed_city'; origin_event_id: string; terms: Array<{ id: string; index: number; kind: string; obligor_institution_id: string; beneficiary_institution_id: string; subject: EntityReferenceDTO; status: string; proposed_month: number; due_month: number | null; breached_month: number | null; resolved_month: number | null; parameters: Record<string, string | number | boolean | null>; evidence_event_ids: string[]; breach_event_ids: string[]; remediation_of_term_id: string | null }> }>;
   events: Array<{ event_id: string; content: string; event_type: string; month_stamp: number; fact_kind: FactKindDTO; causal_origin: CausalOriginDTO; commitment_id: string | null; term_id: string | null; relation: CausalRelationDTO | null; source_event_ids: string[]; decision: { actor_kind: string; actor_id: string; action: string; reason: string } | null }>;
   memories: Array<{ id: string; institution_id: string; event_id: string; salience: number; recorded_month: number; last_reinforced_month: number; effective_salience: number; factors: Record<string, number> }>;

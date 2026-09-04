@@ -147,6 +147,7 @@ def project_flood_site_exposures(
             dict.fromkeys(
                 (
                     f"regional_flood:region:{region_id}:active",
+                    "map:geography:elevation_rows",
                     f"map:infrastructure_site:{site.id}:integrity",
                     *(f"map:geography:{x}:{y}:elevation" for x, y in site.cell_refs),
                     *(

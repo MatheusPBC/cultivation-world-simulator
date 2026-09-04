@@ -12,7 +12,7 @@ from src.systems.institution_authority import can_actor_act_for
 from src.systems.institutional_memory import effective_salience
 
 _OWNER_KINDS = {"region": InstitutionKind.CITY, "sect": InstitutionKind.SECT, "dynasty": InstitutionKind.DYNASTY}
-_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated"}
+_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated", "institutional_relationship_changed", "institutional_relationship_interpreted"}
 _EVENT_SCAN_PAGE_SIZE = 128
 _EVENT_SCAN_PAGES = 3
 
@@ -90,6 +90,13 @@ def _party_ids(
     visited.add(event_id)
     payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
     result: set[str] = set()
+    relationship_impact = payload.get("relationship_impact")
+    if isinstance(relationship_impact, Mapping):
+        result.update(
+            str(relationship_impact[key])
+            for key in ("observer_institution_id", "counterparty_institution_id")
+            if relationship_impact.get(key)
+        )
     request = payload.get("institutional_aid_request")
     if isinstance(request, Mapping):
         result.update(str(request[key]) for key in ("requester_institution_id", "provider_institution_id") if request.get(key))
@@ -186,6 +193,18 @@ def _term(term: Any) -> dict[str, Any]:
     return {"id": term.id, "index": term.index, "kind": term.kind.value, "obligor_institution_id": term.obligor_institution_id, "beneficiary_institution_id": term.beneficiary_institution_id, "subject": term.subject.to_dict(), "status": term.status.value, "proposed_month": term.proposed_month, "due_month": term.due_month, "breached_month": term.breached_month, "resolved_month": term.resolved_month, "parameters": dict(term.parameters), "evidence_event_ids": list(term.evidence_event_ids), "breach_event_ids": list(term.breach_event_ids), "remediation_of_term_id": term.remediation_of_term_id}
 
 
+def _relation(relation: Any) -> dict[str, Any]:
+    return {
+        "id": relation.id,
+        "institution_a_id": relation.institution_a_id,
+        "institution_b_id": relation.institution_b_id,
+        "kind": relation.kind.value,
+        "friendliness": relation.friendliness,
+        "since_month": relation.since_month,
+        "evidence_event_ids": list(relation.evidence_event_ids),
+    }
+
+
 def build_institutional_chain(world: Any, *, owner_kind: str, owner_id: str, commitment_cursor: str | None = None, event_cursor: str | None = None, limit: int = 20) -> dict[str, Any]:
     if owner_kind not in _OWNER_KINDS:
         raise ValueError("owner_kind must be region, sect, or dynasty")
@@ -211,8 +230,24 @@ def build_institutional_chain(world: Any, *, owner_kind: str, owner_id: str, com
         actual_owner = institution.id if direct else next(city.id for city in controlled if city.id in commitment.party_ids)
         commitment_rows.append({"id": commitment.id, "party_ids": list(commitment.party_ids), "opened_month": commitment.opened_month, "closed_month": commitment.closed_month, "aggregate_status": commitment.aggregate_status.value, "owner_institution_id": actual_owner, "control_scope": "direct" if direct else "governed_city", "origin_event_id": commitment.origin_event_id, "terms": [_term(term) for term in commitment.terms]})
     events, event_next, event_more, timeline_participants = _event_page(world, queried_ids, event_cursor, page_limit)
+    relations = sorted(
+        (
+            relation
+            for relation in world.institutional_relations.relations.values()
+            if queried_ids.intersection(
+                (relation.institution_a_id, relation.institution_b_id)
+            )
+        ),
+        key=lambda relation: (relation.since_month, relation.id),
+        reverse=True,
+    )[:page_limit]
     participants = {party for commitment in commitments for party in commitment.party_ids}
     participants.update(timeline_participants)
+    participants.update(
+        party
+        for relation in relations
+        for party in (relation.institution_a_id, relation.institution_b_id)
+    )
     institutions = [{"id": institution.id, "kind": institution.kind.value, "name": _name(world, institution), "scope": "owner"}]
     institutions += [{"id": city.id, "kind": city.kind.value, "name": _name(world, city), "scope": "governed_city"} for city in controlled]
     for participant_id in sorted(participants - queried_ids):
@@ -222,4 +257,4 @@ def build_institutional_chain(world: Any, *, owner_kind: str, owner_id: str, com
     offices = authority.offices_for(institution.id)
     memories = sorted((memory for memory in world.institutional_relations.memories.values() if memory.institution_id in queried_ids), key=lambda memory: (memory.recorded_month, memory.id), reverse=True)[:page_limit]
     scopes = (AuthorityScope.URBAN_ADMINISTRATION, AuthorityScope.RESOURCE_DISPOSITION, AuthorityScope.COMMITMENT_NEGOTIATION)
-    return {"owner": {"kind": institution.kind.value, "id": str(owner_id), "institution_id": institution.id, "name": _name(world, institution), "region_id": str(owner_id) if owner_kind == "region" else None}, "current_month": int(world.month_stamp), "authority": {"institution_id": institution.id, "office_ids": [office.id for office in offices], "active_claim_ids": [claim.id for office in offices for claim in authority.active_claims(office.id)], "material_control": {scope.value: can_actor_act_for(world, owner_ref, owner_ref, scope, current_month=int(world.month_stamp)).allowed for scope in scopes}}, "institutions": institutions, "commitments": commitment_rows, "events": events, "memories": [{"id": memory.id, "institution_id": memory.institution_id, "event_id": memory.event_id, "salience": memory.salience, "recorded_month": memory.recorded_month, "last_reinforced_month": memory.last_reinforced_month, "effective_salience": effective_salience(memory, int(world.month_stamp)), "factors": dict(memory.factors)} for memory in memories], "cursor": {"commitments": {"next": _encode_cursor(commitments[-1].opened_month, commitments[-1].id) if has_more and commitments else None, "has_more": has_more}, "events": {"next": event_next, "has_more": event_more}}}
+    return {"owner": {"kind": institution.kind.value, "id": str(owner_id), "institution_id": institution.id, "name": _name(world, institution), "region_id": str(owner_id) if owner_kind == "region" else None}, "current_month": int(world.month_stamp), "authority": {"institution_id": institution.id, "office_ids": [office.id for office in offices], "active_claim_ids": [claim.id for office in offices for claim in authority.active_claims(office.id)], "material_control": {scope.value: can_actor_act_for(world, owner_ref, owner_ref, scope, current_month=int(world.month_stamp)).allowed for scope in scopes}}, "institutions": institutions, "relations": [_relation(relation) for relation in relations], "commitments": commitment_rows, "events": events, "memories": [{"id": memory.id, "institution_id": memory.institution_id, "event_id": memory.event_id, "salience": memory.salience, "recorded_month": memory.recorded_month, "last_reinforced_month": memory.last_reinforced_month, "effective_salience": effective_salience(memory, int(world.month_stamp)), "factors": dict(memory.factors)} for memory in memories], "cursor": {"commitments": {"next": _encode_cursor(commitments[-1].opened_month, commitments[-1].id) if has_more and commitments else None, "has_more": has_more}, "events": {"next": event_next, "has_more": event_more}}}

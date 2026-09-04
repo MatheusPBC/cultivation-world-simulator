@@ -775,15 +775,18 @@ def _regional_hydrology_value(
     if value is None:
         return None
     is_climate = key.concept_id in {PRECIPITATION_CONCEPT, SOIL_WATER_CONCEPT}
-    state_refs = (
-        [
-            f"climate:region:{region_id}:precipitation"
-            if key.concept_id == PRECIPITATION_CONCEPT
-            else f"climate:region:{region_id}:soil_saturation"
-        ]
-        if is_climate
-        else list(projection.state_refs)
-    )
+    if key.concept_id == PRECIPITATION_CONCEPT:
+        state_refs = [f"climate:region:{region_id}:precipitation"]
+        source_event_ids = projection.climate_source_event_ids
+    elif key.concept_id == SOIL_WATER_CONCEPT:
+        state_refs = [f"climate:region:{region_id}:soil_saturation"]
+        source_event_ids = projection.climate_source_event_ids
+    elif key.concept_id == DRAINAGE_CONCEPT:
+        state_refs = list(projection.drainage_state_refs)
+        source_event_ids = projection.drainage_source_event_ids
+    else:
+        state_refs = list(projection.flooding_state_refs)
+        source_event_ids = projection.flooding_trigger_event_ids
     return MetricReading(
         key=key,
         value=value,
@@ -792,7 +795,7 @@ def _regional_hydrology_value(
         reading_kind=ReadingKind.EXACT if is_climate else ReadingKind.DERIVED,
         calculated_month=month,
         state_refs=state_refs,
-        source_event_ids=list(projection.source_event_ids),
+        source_event_ids=list(source_event_ids),
     )
 
 

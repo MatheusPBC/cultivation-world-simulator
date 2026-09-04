@@ -17,6 +17,7 @@ HYDROLOGY_QUALIFIERS = (("kind", "regional_hydrology"),)
 WATER_MANAGEMENT_CAPABILITIES = frozenset(
     {"water_management", "drainage", "flood_control"}
 )
+_OPEN_WATER_TERRAINS = frozenset({TileType.WATER, TileType.SEA})
 
 
 _TERRAIN_DRAINAGE: dict[TileType, float] = {
@@ -53,8 +54,21 @@ class RegionalHydrologyProjection:
     soil_water: float
     drainage: float
     flooding: float
-    state_refs: tuple[str, ...]
-    source_event_ids: tuple[str, ...]
+    climate_state_refs: tuple[str, ...]
+    drainage_state_refs: tuple[str, ...]
+    flooding_state_refs: tuple[str, ...]
+    climate_source_event_ids: tuple[str, ...]
+    drainage_source_event_ids: tuple[str, ...]
+
+    @property
+    def flooding_trigger_event_ids(self) -> tuple[str, ...]:
+        """Weather observations that can causally trigger a flood."""
+        return self.climate_source_event_ids
+
+    @property
+    def flooding_context_event_ids(self) -> tuple[str, ...]:
+        """Infrastructure history that explains mitigation, not occurrence."""
+        return self.drainage_source_event_ids
 
 
 def _region_sites(world: Any, region_id: int) -> list[Any]:
@@ -70,6 +84,21 @@ def _region_sites(world: Any, region_id: int) -> list[Any]:
         ),
         key=lambda site: site.id,
     )
+
+
+def region_has_floodable_land(world: Any, region_id: int) -> bool | None:
+    """Whether a known regional footprint contains land a flood can occupy.
+
+    Marsh and swamp remain floodable transitional land.  Missing footprint or
+    terrain data is unknown (``None``), never invented as dry land.
+    """
+    coordinates = world.map.get_region_coordinates(region_id)
+    if not coordinates:
+        return None
+    terrains = [world.map.get_terrain(x, y) for x, y in coordinates]
+    if any(terrain is None for terrain in terrains):
+        return None
+    return any(terrain not in _OPEN_WATER_TERRAINS for terrain in terrains)
 
 
 def project_regional_hydrology(
@@ -91,6 +120,9 @@ def project_regional_hydrology(
         return None
 
     coordinates = world.map.get_region_coordinates(normalized_region_id)
+    floodable_land = region_has_floodable_land(world, normalized_region_id)
+    if floodable_land is None:
+        return None
     terrain_drainage: list[float] = []
     elevations: list[float] = []
     geography_refs: list[str] = []
@@ -137,23 +169,22 @@ def project_regional_hydrology(
             ),
         )
     ]
-    source_event_ids = tuple(
-        dict.fromkeys(
-            event_id
-            for event_id in (
-                weather.source_event_id,
-                *(site.last_event_id for site in sites),
-            )
-            if event_id
-        )
+    climate_source_event_ids = (
+        (weather.source_event_id,) if weather.source_event_id else ()
+    )
+    drainage_source_event_ids = tuple(
+        dict.fromkeys(site.last_event_id for site in sites if site.last_event_id)
     )
 
     drainage = _clamp(base_drainage * 0.68 + slope_drainage + site_bonus)
-    surface_load = _clamp(
-        weather.precipitation * 0.56
-        + weather.soil_saturation * 0.34
-        + water_exposure
+    # The normalized weighted rainfall/soil response keeps ordinary
+    # humid/wetland weather below a disaster load while retaining severe,
+    # near-saturated weather as a real trigger; it does not add a new state or
+    # an arbitrary occurrence quota.
+    weather_soil_load = _clamp(
+        (weather.precipitation * 0.56 + weather.soil_saturation * 0.34) / 0.90
     )
+    surface_load = 0.90 * weather_soil_load**1.5
     average_elevation = sum(elevations) / len(elevations) if elevations else 0.0
     all_elevations = [
         float(value)
@@ -166,17 +197,33 @@ def project_regional_hydrology(
         if global_range > 0
         else 0.5
     )
-    flooding = _clamp(surface_load - drainage + _clamp(low_elevation) * 0.22)
+    # Geography is susceptibility, not water arriving anew every month. Nearby
+    # water and low elevation amplify that real weather/soil load, after which
+    # drainage removes a bounded share.
+    # Cap combined water adjacency so densely authored coast/river maps cannot
+    # manufacture arbitrary monthly risk from static topology.
+    water_susceptibility = min(0.25, water_exposure)
+    susceptibility = (
+        1.0 + water_susceptibility * 0.65 + _clamp(low_elevation) * 0.20
+    )
+    flooding = (
+        _clamp(surface_load * susceptibility - drainage)
+        if floodable_land
+        else 0.0
+    )
 
-    state_refs = tuple(
+    climate_state_refs = (
+        f"climate:region:{normalized_region_id}:precipitation",
+        f"climate:region:{normalized_region_id}:soil_saturation",
+    )
+    drainage_state_refs = tuple(dict.fromkeys((*geography_refs, *site_refs)))
+    # Low-elevation normalizes against the canonical map-wide elevation matrix.
+    # A compact aggregate owner ref records that dependency without making every
+    # regional reading enumerate the full map.
+    flooding_state_refs = tuple(
         dict.fromkeys(
-            (
-                f"climate:region:{normalized_region_id}:precipitation",
-                f"climate:region:{normalized_region_id}:soil_saturation",
-                *geography_refs,
-                *water_refs,
-                *site_refs,
-            )
+            (*climate_state_refs, *drainage_state_refs, *water_refs,
+             "map:geography:elevation_rows")
         )
     )
     return RegionalHydrologyProjection(
@@ -186,8 +233,11 @@ def project_regional_hydrology(
         soil_water=weather.soil_saturation,
         drainage=drainage,
         flooding=flooding,
-        state_refs=state_refs,
-        source_event_ids=source_event_ids,
+        climate_state_refs=climate_state_refs,
+        drainage_state_refs=drainage_state_refs,
+        flooding_state_refs=flooding_state_refs,
+        climate_source_event_ids=climate_source_event_ids,
+        drainage_source_event_ids=drainage_source_event_ids,
     )
 
 
@@ -200,4 +250,5 @@ __all__ = [
     "RegionalHydrologyProjection",
     "SOIL_WATER_CONCEPT",
     "project_regional_hydrology",
+    "region_has_floodable_land",
 ]

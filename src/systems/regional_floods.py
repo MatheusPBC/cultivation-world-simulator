@@ -8,8 +8,19 @@ from typing import Any
 
 from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.causal_origin import CausalOrigin
-from src.classes.environment.regional_flood import RegionalFloodOccurrence
+from src.classes.environment.regional_flood import (
+    DrainageObservation,
+    FloodWindowEvidence,
+    RegionalFloodOccurrence,
+)
 from src.classes.event import Event, FactKind
+from src.classes.mechanical_language import (
+    MeasurementAvailability,
+    MetricKey,
+    MetricReading,
+    PrimitiveDimension,
+    ReadingKind,
+)
 from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.sim.simulator_engine.domain_invalidation import (
@@ -18,7 +29,11 @@ from src.sim.simulator_engine.domain_invalidation import (
     DomainInvalidationQueue,
     DomainInvalidationReason,
 )
-from src.systems.regional_hydrology import project_regional_hydrology
+from src.systems.regional_hydrology import (
+    DRAINAGE_CONCEPT,
+    HYDROLOGY_QUALIFIERS,
+    project_regional_hydrology,
+)
 
 
 FLOOD_ACTIVATION_RISK = 0.72
@@ -36,24 +51,46 @@ def _event_id(world: Any, region_id: str, month: int, transition: str) -> str:
     )
 
 
-def _append_sources(
-    sources: dict[str, tuple[str, ...]],
+def _observe_window(
+    evidence_by_region: dict[str, FloodWindowEvidence],
     region_id: str,
-    new_sources: tuple[str, ...],
-) -> tuple[str, ...]:
-    combined = tuple(dict.fromkeys((*sources.get(region_id, ()), *new_sources)))
-    sources[region_id] = combined
-    return combined
+    projection: Any,
+) -> FloodWindowEvidence:
+    """Record this month's evidence into the region's open transition window.
+
+    Infrastructure history is kept for every month of the window because a
+    site's last event changes while the window runs; keeping only the final
+    month would silently drop the earlier evidence.
+    """
+    drainage = DrainageObservation(
+        month=int(projection.month),
+        drainage=projection.drainage,
+        state_refs=projection.drainage_state_refs,
+        source_event_ids=projection.flooding_context_event_ids,
+    )
+    observed = evidence_by_region.get(region_id)
+    if observed is None:
+        observed = FloodWindowEvidence(
+            source_event_ids=projection.flooding_trigger_event_ids,
+            drainage_observations=(drainage,),
+        )
+    else:
+        observed = observed.extended(
+            source_event_ids=projection.flooding_trigger_event_ids,
+            drainage=drainage,
+        )
+    evidence_by_region[region_id] = observed
+    return observed
 
 
 def _clear_activation(state: Any, region_id: str) -> None:
     state.activation_streaks.pop(region_id, None)
-    state.activation_sources.pop(region_id, None)
+    state.activation_evidence.pop(region_id, None)
 
 
 def _clear_resolution(state: Any, region_id: str) -> None:
     state.resolution_streaks.pop(region_id, None)
-    state.resolution_sources.pop(region_id, None)
+    state.resolution_evidence.pop(region_id, None)
 
 
 def _activation_event(
@@ -61,7 +98,7 @@ def _activation_event(
     region: Any,
     *,
     risk: float,
-    source_event_ids: tuple[str, ...],
+    evidence: FloodWindowEvidence,
 ) -> tuple[Event, RegionalFloodOccurrence]:
     region_id = str(region.id)
     event_id = _event_id(world, region_id, int(world.month_stamp), "started")
@@ -69,8 +106,9 @@ def _activation_event(
         region_id=region_id,
         started_month=int(world.month_stamp),
         activation_risk=risk,
-        source_event_ids=source_event_ids,
+        source_event_ids=evidence.source_event_ids,
         last_event_id=event_id,
+        drainage_observations=evidence.drainage_observations,
     )
     event = Event(
         month_stamp=world.month_stamp,
@@ -104,6 +142,7 @@ def _activation_event(
         "outcome": "started",
         "risk": risk,
         "deltas": [delta.to_dict()],
+        "measurements": _drainage_measurements(region_id, evidence),
     }
     event.causal_links = [
         CausalLink(
@@ -111,9 +150,41 @@ def _activation_event(
             cause_event_id=source_id,
             relation=CausalRelation.TRIGGERED_BY,
         )
-        for source_id in source_event_ids
+        for source_id in evidence.source_event_ids
     ]
     return event, occurrence
+
+
+def _drainage_measurements(
+    region_id: str,
+    evidence: FloodWindowEvidence,
+) -> list[dict[str, Any]]:
+    """Publish the drainage read in each month of the window as measurements.
+
+    Drainage works reach the reader through the reading that observed them,
+    never through a causal link: maintenance does not cause a flood, and
+    claiming it prevented a flood that did happen would be equally false.
+    """
+    key = MetricKey(
+        PrimitiveDimension.CAPACITY,
+        "region",
+        region_id,
+        DRAINAGE_CONCEPT,
+        qualifiers=HYDROLOGY_QUALIFIERS,
+    )
+    return [
+        MetricReading(
+            key=key,
+            value=observation.drainage,
+            unit="ratio",
+            availability=MeasurementAvailability.MEASURABLE,
+            reading_kind=ReadingKind.DERIVED,
+            calculated_month=observation.month,
+            state_refs=list(observation.state_refs),
+            source_event_ids=list(observation.source_event_ids),
+        ).to_dict()
+        for observation in evidence.drainage_observations
+    ]
 
 
 def _resolution_event(
@@ -122,7 +193,7 @@ def _resolution_event(
     *,
     occurrence: RegionalFloodOccurrence,
     risk: float,
-    source_event_ids: tuple[str, ...],
+    evidence: FloodWindowEvidence,
 ) -> Event:
     region_id = str(region.id)
     event_id = _event_id(world, region_id, int(world.month_stamp), "resolved")
@@ -158,6 +229,7 @@ def _resolution_event(
         "outcome": "resolved",
         "risk": risk,
         "deltas": [delta.to_dict()],
+        "measurements": _drainage_measurements(region_id, evidence),
     }
     event.causal_links = [
         CausalLink(
@@ -171,7 +243,7 @@ def _resolution_event(
                 cause_event_id=source_id,
                 relation=CausalRelation.TRIGGERED_BY,
             )
-            for source_id in source_event_ids
+            for source_id in evidence.source_event_ids
             if source_id != occurrence.last_event_id
         ),
     ]
@@ -214,14 +286,14 @@ def advance_regional_floods(
     if state.last_evaluated_month is not None and month != state.last_evaluated_month + 1:
         state.activation_streaks.clear()
         state.resolution_streaks.clear()
-        state.activation_sources.clear()
-        state.resolution_sources.clear()
+        state.activation_evidence.clear()
+        state.resolution_evidence.clear()
 
     events: list[Event] = []
     for region_id, region in sorted(world.map.regions.items()):
         key = str(region_id)
         projection = project_regional_hydrology(world, region_id)
-        if projection is None or not projection.source_event_ids:
+        if projection is None or not projection.flooding_trigger_event_ids:
             _clear_activation(state, key)
             _clear_resolution(state, key)
             continue
@@ -233,18 +305,14 @@ def advance_regional_floods(
                 _clear_activation(state, key)
                 continue
             state.activation_streaks[key] = state.activation_streaks.get(key, 0) + 1
-            sources = _append_sources(
-                state.activation_sources,
-                key,
-                projection.source_event_ids,
-            )
+            evidence = _observe_window(state.activation_evidence, key, projection)
             if state.activation_streaks[key] < FLOOD_ACTIVATION_MONTHS:
                 continue
             event, occurrence = _activation_event(
                 world,
                 region,
                 risk=projection.flooding,
-                source_event_ids=sources,
+                evidence=evidence,
             )
             state.active_by_region[key] = occurrence
             _clear_activation(state, key)
@@ -263,11 +331,7 @@ def advance_regional_floods(
             _clear_resolution(state, key)
             continue
         state.resolution_streaks[key] = state.resolution_streaks.get(key, 0) + 1
-        sources = _append_sources(
-            state.resolution_sources,
-            key,
-            projection.source_event_ids,
-        )
+        evidence = _observe_window(state.resolution_evidence, key, projection)
         if state.resolution_streaks[key] < FLOOD_RESOLUTION_MONTHS:
             continue
         event = _resolution_event(
@@ -275,7 +339,7 @@ def advance_regional_floods(
             region,
             occurrence=active,
             risk=projection.flooding,
-            source_event_ids=sources,
+            evidence=evidence,
         )
         state.active_by_region.pop(key)
         _clear_resolution(state, key)

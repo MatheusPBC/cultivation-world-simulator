@@ -291,6 +291,34 @@ async def process_economy_reactivity(
             ),
         )
     )
+    from src.systems.institutional_relationship_impact import (
+        process_institutional_relationship_impacts,
+    )
+
+    produced.extend(
+        await process_institutional_relationship_impacts(
+            world,
+            current_events=[*current_events, *produced],
+            llm_call=llm_call,
+            budget=budget,
+            evaluation_budget=max(
+                0,
+                int(_config_value(
+                    world,
+                    "institutional_relationship_impact_evaluation_budget_per_month",
+                    8,
+                )),
+            ),
+            llm_budget=max(
+                0,
+                int(_config_value(
+                    world,
+                    "institutional_relationship_impact_llm_budget_per_month",
+                    2,
+                )),
+            ),
+        )
+    )
     return produced
 
 

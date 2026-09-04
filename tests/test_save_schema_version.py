@@ -5,7 +5,9 @@ import pytest
 from src.sim.load.load_game import check_save_compatibility, load_game
 
 
-@pytest.mark.parametrize("schema_version", [None, 0, 1, 2, "2"])
+# Version 3 serialized regional flood windows without their per-month drainage
+# evidence, so its body no longer loads: it is rejected at the version gate.
+@pytest.mark.parametrize("schema_version", [None, 0, 1, 2, "2", 3, "3"])
 def test_old_or_invalid_save_schema_is_rejected_without_mutating_file(
     tmp_path, schema_version
 ):
@@ -27,7 +29,7 @@ def test_current_schema_without_required_events_sidecar_is_rejected(tmp_path):
     original = json.dumps(
         {
             "meta": {
-                "schema_version": 3,
+                "schema_version": 4,
                 "events_db": "missing-sidecar_events.deadbeef.db",
                 "event_count": 0,
             }

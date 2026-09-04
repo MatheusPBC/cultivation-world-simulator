@@ -38,6 +38,7 @@ function resourceLabel(term: { subject: { id: string } }) {
   return t(`game.info_panel.region.economy.resources.${term.subject.id}`, term.subject.id)
 }
 function subject(term: { subject: { id: string } }) { return resourceLabel(term) }
+function relationEvidence(ids: string[]) { return ids.slice(-3).reverse() }
 function formatMonthStamp(monthStamp: number) {
   const year = Math.floor(monthStamp / 12)
   const month = (monthStamp % 12) + 1
@@ -76,7 +77,20 @@ function formatMonthStamp(monthStamp: number) {
           </span>
         </div>
       </article>
-      <p v-if="!chain.commitments.length && !chain.events.length">{{ t('game.institutional_chain.empty') }}</p>
+      <section v-if="chain.relations.length" class="relations" data-testid="institutional-relations">
+        <h3>{{ t('game.institutional_chain.relations_title') }}</h3>
+        <article v-for="relation in chain.relations" :key="relation.id" class="relation">
+          <div class="relation-parties">
+            <strong>{{ institutionName(relation.institution_a_id) }}</strong>
+            <span aria-hidden="true">↔</span>
+            <strong>{{ institutionName(relation.institution_b_id) }}</strong>
+          </div>
+          <div>{{ label(relation.kind) }}</div>
+          <div class="relation-climate">{{ t('game.institutional_chain.relation_climate') }}: {{ relation.friendliness }}</div>
+          <button v-for="eventId in relationEvidence(relation.evidence_event_ids)" :key="eventId" type="button" @click="why(eventId)">{{ t('game.institutional_chain.evidence') }}</button>
+        </article>
+      </section>
+      <p v-if="!chain.commitments.length && !chain.events.length && !chain.relations.length">{{ t('game.institutional_chain.empty') }}</p>
       <button v-if="chain.commitmentCursor.hasMore" type="button" :disabled="loading" @click="loadMoreCommitments">{{ t('game.institutional_chain.more_commitments') }}</button>
       <div class="timeline">
         <article v-for="event in chain.events" :key="event.event_id">

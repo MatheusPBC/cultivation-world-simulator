@@ -269,7 +269,20 @@ def decision_context(
                         "salience": salience,
                     }
                 )
-    return {"known_facts": facts, "authorized_holder": _holder_projection(world, institution_id)}
+    relations = []
+    for relation in world.institutional_relations.relations.values():
+        if institution_id not in (relation.institution_a_id, relation.institution_b_id):
+            continue
+        counterpart = relation.institution_b_id if relation.institution_a_id == institution_id else relation.institution_a_id
+        relations.append({
+            "relation_id": relation.id,
+            "counterpart_institution_id": counterpart,
+            "counterpart_name": _institution_name(world, counterpart),
+            "kind": relation.kind.value,
+            "friendliness": relation.friendliness,
+            "evidence_event_ids": list(relation.evidence_event_ids[-4:]),
+        })
+    return {"known_facts": facts, "authorized_holder": _holder_projection(world, institution_id), "current_relations": sorted(relations, key=lambda item: item["counterpart_institution_id"])[:4]}
 
 
 def _holder_projection(world: Any, institution_id: str) -> dict[str, Any] | None:
@@ -380,8 +393,9 @@ def _institution_name(world: Any, institution_id: str) -> str:
         region = getattr(getattr(world, "map", None), "regions", {}).get(int(owner.id))
         return str(getattr(region, "name", institution_id))
     if owner.kind == "dynasty":
-        return str(getattr(getattr(world, "dynasty", None), "name", institution_id))
-    sect = getattr(getattr(world, "sect_manager", None), "sects", {}).get(int(owner.id))
+        return str(getattr(getattr(world, "dynasty", None), "title", institution_id))
+    context = getattr(world, "sect_context", None)
+    sect = next((item for item in (context.get_active_sects() if context else ()) if str(item.id) == owner.id), None)
     return str(getattr(sect, "name", institution_id))
 
 

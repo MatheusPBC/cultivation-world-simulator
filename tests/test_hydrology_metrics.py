@@ -20,7 +20,11 @@ from src.classes.mechanical_language import (
 )
 from src.systems.semantic_world.resolvers import available_metric_keys, resolve_metric
 from src.systems.semantic_world.service import evaluate_semantic_world
-from src.systems.regional_hydrology import CLIMATE_QUALIFIERS, HYDROLOGY_QUALIFIERS
+from src.systems.regional_hydrology import (
+    CLIMATE_QUALIFIERS,
+    HYDROLOGY_QUALIFIERS,
+    project_regional_hydrology,
+)
 from src.systems.time import Month, Year, create_month_stamp
 
 
@@ -179,6 +183,37 @@ def test_hydrology_projection_is_ratio_valued_and_carries_provenance() -> None:
         assert reading.source_event_ids
 
 
+def test_each_hydrology_reading_cites_only_its_own_evidence() -> None:
+    world = _world(precipitation_ratio=0.92, water_management_integrity=0.25)
+    region = world.map.regions[101]
+
+    readings = _hydrology_readings(world, region)
+
+    # Weather is measured by the climate observation alone: an intact gate is
+    # no part of how much rain fell.
+    climate_refs = {
+        "precipitation": ["climate:region:101:precipitation"],
+        "soil_water": ["climate:region:101:soil_saturation"],
+    }
+    for concept, state_refs in climate_refs.items():
+        assert readings[concept].source_event_ids == ["event:heavy-rain"]
+        assert readings[concept].state_refs == state_refs
+
+    # Drainage is a property of terrain and works, never of this month's rain.
+    drainage = readings["drainage"]
+    assert drainage.source_event_ids == ["event:gate-maintained"]
+    assert "event:heavy-rain" not in drainage.source_event_ids
+    assert "map:infrastructure_site:site:water-gate:integrity" in drainage.state_refs
+    assert not any(ref.startswith("climate:") for ref in drainage.state_refs)
+
+    # Flooding is where rain and terrain meet, so it cites the weather that
+    # can trigger it and the geography it lands on.
+    flooding = readings["flooding"]
+    assert flooding.source_event_ids == ["event:heavy-rain"]
+    assert "climate:region:101:precipitation" in flooding.state_refs
+    assert "map:geography:elevation_rows" in flooding.state_refs
+
+
 def test_water_and_high_precipitation_increase_flood_exposure() -> None:
     dry_world = _world(precipitation_ratio=0.15)
     wet_world = _world(precipitation_ratio=0.95)
@@ -191,6 +226,102 @@ def test_water_and_high_precipitation_increase_flood_exposure() -> None:
     assert wet["precipitation"].value > dry["precipitation"].value
     assert wet["soil_water"].value > dry["soil_water"].value
     assert wet["flooding"].value > dry["flooding"].value
+
+
+def test_dry_water_adjacent_land_has_no_recurring_flood_risk() -> None:
+    world = _world(precipitation_ratio=0.0)
+    world.map.set_geography(
+        GeographyLayer(
+            width=4,
+            height=2,
+            terrain_rows=[
+                [TileType.SWAMP, TileType.WATER, TileType.SWAMP, TileType.PLAIN],
+                [TileType.SWAMP, TileType.SWAMP, TileType.SWAMP, TileType.PLAIN],
+            ],
+            elevation_rows=[[0.0] * 4 for _ in range(2)],
+            water_bodies=[
+                WaterBody(
+                    id="river:swamp-margin",
+                    kind="river",
+                    cell_refs=((1, 0),),
+                    navigable=False,
+                    region_id=101,
+                    flow_direction=(0, 1),
+                )
+            ],
+        )
+    )
+    projection = project_regional_hydrology(world, 101)
+
+    assert projection is not None
+    assert projection.flooding == 0.0
+
+
+def test_nearby_water_amplifies_equal_weather_load() -> None:
+    game_map = Map(width=7, height=1)
+    game_map.set_geography(
+        GeographyLayer(
+            width=7,
+            height=1,
+            terrain_rows=[
+                [
+                    TileType.PLAIN,
+                    TileType.PLAIN,
+                    TileType.WATER,
+                    TileType.PLAIN,
+                    TileType.PLAIN,
+                    TileType.PLAIN,
+                    TileType.PLAIN,
+                ]
+            ],
+            elevation_rows=[[0.0] * 7],
+            water_bodies=[
+                WaterBody(
+                    id="river:between",
+                    kind="river",
+                    cell_refs=((2, 0),),
+                    navigable=False,
+                    flow_direction=(0, 1),
+                )
+            ],
+        )
+    )
+    near = NormalRegion(
+        id=101, name="Margem", desc="", cors=[(0, 0), (1, 0)]
+    )
+    far = NormalRegion(
+        id=102, name="Planice", desc="", cors=[(5, 0), (6, 0)]
+    )
+    game_map.regions = {101: near, 102: far}
+    game_map.region_cors = {101: list(near.cors), 102: list(far.cors)}
+    world = World(
+        map=game_map,
+        month_stamp=create_month_stamp(Year(1), Month.JANUARY),
+    )
+    month = int(world.month_stamp)
+    world.climate_state = ClimateState(
+        regions={
+            str(region.id): RegionalWeather(
+                region_id=str(region.id),
+                month=month,
+                precipitation=0.96,
+                soil_saturation=0.96,
+                previous_soil_saturation=0.86,
+                source_event_id="event:heavy-rain",
+            )
+            for region in (near, far)
+        },
+        last_updated_month=month,
+    )
+
+    near_projection = project_regional_hydrology(world, near.id)
+    far_projection = project_regional_hydrology(world, far.id)
+
+    assert near_projection is not None
+    assert far_projection is not None
+    assert near_projection.flooding > far_projection.flooding
+    assert "map:water_body:river:between" in near_projection.flooding_state_refs
+    assert "map:water_body:river:between" not in far_projection.flooding_state_refs
 
 
 def test_intact_water_management_increases_drainage_and_reduces_flooding() -> None:

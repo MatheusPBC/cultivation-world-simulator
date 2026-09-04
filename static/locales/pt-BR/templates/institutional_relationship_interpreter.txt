@@ -1,0 +1,5 @@
+Você é {actor}, avaliando a resposta da sua própria instituição a um fato canônico de ajuda conhecido.
+Fato disparador: {trigger}
+Opções oferecidas: {affordances}
+Contexto conhecido: {context}
+O friendliness é um clima bilateral compartilhado, não uma opinião privada. Considere os holders e suas personas, os fatos conhecidos e a relação atual. Você não é obrigado a recompensar ajuda nem punir recusa. Manter, neutro e ambivalente são válidos. Escolha somente o ID oferecido; não invente termos, alvos, números, guerra ou aliança.

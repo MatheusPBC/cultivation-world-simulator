@@ -39,6 +39,16 @@ async def _select_first(_task, _template, context, **_kwargs):
     }
 
 
+async def _request_then_refuse(_task, _template, context, **_kwargs):
+    if "institutional_aid_request" in context["trigger"]["event_type"]:
+        return {"decision": "maintain", "reason": "Provider declines the request."}
+    return {
+        "decision": "act",
+        "reason": "The grounded institutional option is acceptable.",
+        "selected_affordance_id": context["affordances"][0]["id"],
+    }
+
+
 def _setup(world):
     emperor = SimpleNamespace(id="emperor", is_dead=False)
     world.avatar_manager.avatars[emperor.id] = emperor
@@ -88,13 +98,16 @@ async def test_request_and_independent_acceptance_create_terms_without_moving_st
         llm_call=_select_first,
     )
 
-    assert [event.event_type for event in events] == [
+    assert [event.event_type for event in events[:4]] == [
         "institutional_aid_request_interpretation_decision",
         "institutional_aid_requested",
         "institutional_aid_response_interpretation_decision",
         "institutional_aid_accepted",
     ]
-    decisions = [event for event in events if event.fact_kind is FactKind.DECISION]
+    assert [event.event_type for event in events[4:]].count(
+        "institutional_relationship_impact_interpretation_decision"
+    ) == 2
+    decisions = [event for event in events[:4] if event.fact_kind is FactKind.DECISION]
     assert [event.causal_payload["decision"]["subject_id"] for event in decisions] == [
         "305",
         "302",
@@ -111,6 +124,34 @@ async def test_request_and_independent_acceptance_create_terms_without_moving_st
         SimpleNamespace(world=base_world),
         [shortage, *events],
     )
+
+
+@pytest.mark.asyncio
+async def test_same_month_refusal_reaches_both_relationship_observers(base_world):
+    _source, _destination, shortage = _setup(base_world)
+
+    events = await process_economy_reactivity(
+        base_world,
+        current_events=[shortage],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_request_then_refuse,
+    )
+
+    refused = next(event for event in events if event.event_type == "institutional_aid_refused")
+    relationship_decisions = [
+        event
+        for event in events
+        if event.event_type == "institutional_relationship_impact_interpretation_decision"
+    ]
+    assert len(relationship_decisions) == 2
+    assert {
+        receipt.condition_instance_id
+        for receipt in base_world.mechanical_language.reaction_receipts.values()
+        if receipt.domain == "institutional_relationship_impact"
+    } == {
+        f"institutional-relationship:inst:city:302:{refused.id}",
+        f"institutional-relationship:inst:city:305:{refused.id}",
+    }
 
 
 @pytest.mark.asyncio
@@ -241,12 +282,15 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         invalidations=DomainInvalidationQueue(),
         llm_call=_select_first,
     )
-    assert [event.event_type for event in events] == [
+    assert [event.event_type for event in events[:4]] == [
         "institutional_aid_fulfillment_interpretation_decision",
         "regional_resource_transfer_completed",
         "institutional_commitment_term_fulfilled",
         "institutional_aid_request_interpretation_decision",
     ]
+    assert [event.event_type for event in events[4:]].count(
+        "institutional_relationship_impact_interpretation_decision"
+    ) == 2
     assert source.economy.stocks["grain"] == source_before - 1
     assert destination.economy.stocks["grain"] == destination_before + 1
     updated = base_world.institutional_relations.commitments[commitment.id]
@@ -266,9 +310,10 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         invalidations=DomainInvalidationQueue(),
         llm_call=_select_first,
     )
-    assert [event.event_type for event in breach_events] == [
-        "institutional_commitment_term_breached"
-    ]
+    assert breach_events[0].event_type == "institutional_commitment_term_breached"
+    assert [event.event_type for event in breach_events[1:]].count(
+        "institutional_relationship_impact_interpretation_decision"
+    ) == 2
     breached = base_world.institutional_relations.commitments[commitment.id]
     breached_term = breached.terms[1]
     assert breached_term.status.value == "breached"
@@ -339,9 +384,10 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         invalidations=DomainInvalidationQueue(),
         llm_call=_select_first,
     )
-    assert [event.event_type for event in repeated_breach_events] == [
-        "institutional_commitment_term_breached"
-    ]
+    assert repeated_breach_events[0].event_type == "institutional_commitment_term_breached"
+    assert [event.event_type for event in repeated_breach_events[1:]].count(
+        "institutional_relationship_impact_interpretation_decision"
+    ) == 2
     rebreached = base_world.institutional_relations.commitments[commitment.id]
     assert rebreached.terms[1].status.value == "breached"
     assert rebreached.terms[1].breach_event_ids == (
@@ -372,11 +418,14 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         invalidations=DomainInvalidationQueue(),
         llm_call=_select_first,
     )
-    assert [event.event_type for event in resolved_events] == [
+    assert [event.event_type for event in resolved_events[:3]] == [
         "institutional_aid_fulfillment_interpretation_decision",
         "regional_resource_transfer_completed",
         "institutional_commitment_term_remediated",
     ]
+    assert [event.event_type for event in resolved_events[3:]].count(
+        "institutional_relationship_impact_interpretation_decision"
+    ) == 2
     resolved = base_world.institutional_relations.commitments[commitment.id]
     assert [term.status.value for term in resolved.terms] == [
         "fulfilled",

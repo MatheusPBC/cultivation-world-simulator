@@ -13,30 +13,88 @@ retained intentionally, with a known disk-growth limitation and no automated
 sweep or live-data cleanup. Causal storage has lazy bulk links and a detailed
 causal getter. Three institutional-aid locale templates match actual payload
 interpolation. Wave 6 is not wholly complete: qualitative institutional
-relationship changes are not yet implemented, and aid `identity_anchor_impact`
-is currently zero.
+relationship impacts are implemented with enabled defaults (evaluation 8,
+LLM budget 2), while aid `identity_anchor_impact` is currently zero. Each
+observer independently makes a typed choice through the audited decision and
+owner transition, with bounded friendliness changes of +/-2, +/-4, or +/-6;
+`maintain`, `neutral`, and `ambivalent` produce no delta. The scalar is a
+shared bilateral climate, not a private attitude, and no automatic formal
+alliance/war kind changes occur.
 
 Wave 7 local API/UI institutional-chain integration is implemented and verified
 by focused tests; it is not browser/live-deployment acceptance. Region, Sect and
 Dynasty surfaces have an actual path, with API/Why restoration complete.
-Root-consolidated evidence is 182 backend tests passed,
-including the 18 query-regression tests; frontend build succeeded and the final
-consolidated UI rerun passed 32/32 tests, including the 21 Why tests.
-Final audited 120-month artifacts succeeded: natural has 3,192 events and causal
-depth 17; pressured has 3,599 events, causal depth 10, and 20 economic transfers.
+Root-consolidated evidence is 218 backend tests passed in 52.56 seconds;
+frontend build/typecheck succeeded and the final consolidated UI rerun passed
+32/32 tests, including the 21 Why tests. Final audited 120-month artifacts
+succeeded: natural has 3,200 events and causal depth 17; pressured has 3,661
+events, causal depth 10, and 20 economic transfers.
 Both report zero broken causes, out-of-window links, Story mutations, provider
 calls/awaits, and Story material ancestors. Pressured proves the exact seven-event
 witness chain and linked memory; absence of a required fulfillment witness is
-valid in the natural scenario. Both
+valid in the natural scenario. Runtime tests also cover same-month refusal,
+injected real-owner +6 and -2 choices yielding 4, roundtrip/replay/rollback,
+and factual context/known-fact handling; current-authority and stale-counterpart
+guards are implemented and reviewed.
+Both
 still contain 147 untyped events and 27 conditions activated/0 resolved, so this is
 not full production-world quality proof. No whole-roadmap claim is valid.
 
-Factual prehistory, hydrology/flood response, and commerce/war/religion/
-civil-disorder composition remain deferred and are not completed waves 8+.
-Orchestration is user-directed by
-the root agent: light work may use Luna, complex implementation Terra, and Claude
-is suspended. This ledger records current state, not a redesign of the frozen
-architecture.
+Factual prehistory and commerce/war/religion/civil-disorder composition remain
+deferred and are not completed waves 8+. The working-tree hydrology correction
+now applies a nonlinear severe-weather and soil response, then a bounded
+geography susceptibility multiplier, and finally drainage as subtractive
+resistance; a known Region footprint composed only of open water (SEA/WATER)
+has zero flood risk, while an unknown footprint remains unknown. Hydrology
+provenance is now split between climate and drainage sources, with the
+map-wide elevation dependency represented by an aggregate geography reference.
+Each activation/resolution window persists one `DrainageObservation` per month,
+validates the strict consecutive window, and saves that observation history;
+the resulting mechanical measurements are available through the existing Why
+path. This is a verified focused checkpoint, not a full hydrology acceptance
+claim. The earlier focused hydrology checkpoint had 76 tests passed (previous
+checkpoint). A preliminary three-seed,
+12-month classic check changed the prior all-eight-regions-active result to zero
+floods in two seeds and one wetland flood starting in month 5 and still active
+at month 12 in the third. Final provider-free 120-month, one-world Simulator
+smokes passed all audit assertions: natural produced 3,200 events at causal
+depth 17 with zero transfers; pressured produced 3,661 events at causal depth
+10 with 20 transfers.
+Both report zero broken causes, out-of-window links, Story mutations, Story
+material ancestors, and provider calls/awaits; pressured also proves the exact
+seven-event fact chain and linked memory witness. Artifacts are
+`/tmp/cws-provenance-verified-natural.json` and
+`/tmp/cws-provenance-verified-pressured.json`. This remains focused evidence, not
+full-suite or world-quality acceptance. It preserves floodable transitional
+land, mixed/land regions, the existing
+two-high-month activation and two-low-month resolution windows, and the
+separate occurrence-to-site-damage owner chain; see
+`.superpowers/sdd/actor-driven-emergent-world/hydrology-audit.md`.
+Opus's earlier read-only review found no blocker, but its provenance precision
+findings are now implemented and verified in the focused checkpoint: climate and
+drainage source IDs are distinct, elevation normalization has an aggregate
+map reference, and drainage observations are retained across the strict
+two-month windows. Flood activation still labels site maintenance as context,
+not `TRIGGERED_BY`; no full-hydrology claim is made. Calibration also shows
+that some strongly drained regions cannot reach the 0.72 activation threshold
+under the bounded maximum load, making a well-protected plain effectively
+immune in this model, but not establishing universal immunity. The previously
+flagged isolated-adjacency test was addressed and verified in the 76-test
+rerun (previous checkpoint). Save schema is now version 4; loaders explicitly
+reject version 3, with no destructive production data or DDL operation. This
+schema/version evidence is current. The final hydrology subset rerun after
+the tiny numeric fixture refinement passed 37 tests in 4.40 seconds. An
+additional exact eight-file batch passed 65 tests in 77.15 seconds after an
+earlier 64-pass/1-failure batch; that failure did not reproduce and its cause
+is unconfirmed, so it is not labeled pre-existing-fixed and does not establish
+full-suite green.
+Relationship transitions learn both parties through `KnowledgeState` without
+an added memory factor, and the API/UI
+relation section is read-only with Why evidence. Future aid prompts may use
+the current relation.
+Orchestration is user-directed by the root agent: Claude Opus implemented this
+provenance block, Terra reviewed it, and the root agent integrated it. This
+ledger records current state, not a redesign of the frozen architecture.
 
 ## Celestial Dao
 
@@ -427,14 +485,21 @@ water bodies, infrastructure, or consequences.
 
 A Regional Hydrology Projection is a read-only interpretation of Regional
 Weather, map-owned geography, and real water-management Infrastructure Sites.
-It exposes grounded mechanical readings and never becomes a parallel state
-owner.
+Flooding responds nonlinearly to severe weather and soil saturation, applies a
+bounded geography susceptibility multiplier, and then subtracts drainage as
+resistance. A known pure SEA/WATER footprint yields zero flood risk; an unknown
+footprint yields unknown rather than silently suppressing or inventing a
+hazard. It exposes grounded mechanical readings and never becomes a parallel
+state owner.
 
 ### Flood Risk
 
 Flood Risk is a derived observation of hydrological exposure. It is not a flood
 occurrence and cannot damage assets, close routes, move population, or change
-another domain without a separately validated domain action.
+another domain without a separately validated domain action. Pure open-water
+Regions have zero Flood Risk when their footprint is known; land and mixed
+footprints remain eligible. The two-high-month activation and two-low-month
+resolution windows are unchanged.
 
 ### Regional Flood Occurrence
 

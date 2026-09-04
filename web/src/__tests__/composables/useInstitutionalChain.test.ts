@@ -5,7 +5,7 @@ import { institutionalChainApi } from '@/api'
 import { useInstitutionalChain } from '@/composables/useInstitutionalChain'
 
 vi.mock('@/api', () => ({ institutionalChainApi: { fetch: vi.fn() } }))
-const page = (tag: string, commitmentNext: string | null = null, eventNext: string | null = null) => ({ owner: { kind: 'city', id: '1', institutionId: 'i', name: tag, regionId: '1' }, currentMonth: 1, institutions: [], commitments: [{ id: `c-${tag}` }], events: [{ event_id: `e-${tag}` }], memories: [], commitmentCursor: { next: commitmentNext, hasMore: Boolean(commitmentNext) }, eventCursor: { next: eventNext, hasMore: Boolean(eventNext) } }) as any
+const page = (tag: string, commitmentNext: string | null = null, eventNext: string | null = null) => ({ owner: { kind: 'city', id: '1', institutionId: 'i', name: tag, regionId: '1' }, currentMonth: 1, institutions: [], relations: [], commitments: [{ id: `c-${tag}` }], events: [{ event_id: `e-${tag}` }], memories: [], commitmentCursor: { next: commitmentNext, hasMore: Boolean(commitmentNext) }, eventCursor: { next: eventNext, hasMore: Boolean(eventNext) } }) as any
 
 describe('useInstitutionalChain', () => {
   it('drops stale owner responses and preserves the other independent cursor while paging', async () => {
