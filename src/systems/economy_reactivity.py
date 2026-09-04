@@ -8,19 +8,21 @@ from src.classes.event import Event
 from src.classes.mechanical_language import DomainReactionReceipt
 from src.sim.simulator_engine.causal_budget import CausalBudget
 from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
-from src.systems.economy_interpreter import (
-    economy_affordance_context,
-    interpret_resource_shortage,
-)
 from src.systems.domain_affordance_registry import (
     DOMAIN_AFFORDANCES,
     StaleAffordanceError,
     stale_affordance_blocked_event,
 )
+from src.systems.economy_interpreter import (
+    economy_affordance_context,
+    interpret_resource_shortage,
+)
 from src.systems.institutional_aid import (
     has_institutional_aid_request_option,
     has_institutional_aid_requester,
+    process_institutional_aid_deadlines,
     process_institutional_aid_fulfillment,
+    process_institutional_aid_remediation,
     process_institutional_aid_shortage,
 )
 
@@ -75,16 +77,26 @@ async def process_economy_reactivity(
 ) -> list[Event]:
     """Interpret grounded shortages and execute only validated shipments."""
     budget = budget or CausalBudget.from_world(world)
-    llm_budget = max(0, int(_config_value(
-        world,
-        "economy_interpreter_llm_budget_per_month",
-        2,
-    )))
-    evaluation_budget = max(0, int(_config_value(
-        world,
-        "economy_reaction_evaluation_budget_per_month",
-        8,
-    )))
+    llm_budget = max(
+        0,
+        int(
+            _config_value(
+                world,
+                "economy_interpreter_llm_budget_per_month",
+                2,
+            )
+        ),
+    )
+    evaluation_budget = max(
+        0,
+        int(
+            _config_value(
+                world,
+                "economy_reaction_evaluation_budget_per_month",
+                8,
+            )
+        ),
+    )
     produced: list[Event] = []
     llm_calls = 0
     evaluations = 0
@@ -118,9 +130,39 @@ async def process_economy_reactivity(
             ),
         )
     )
+    produced.extend(
+        await process_institutional_aid_remediation(
+            world,
+            llm_call=llm_call,
+            budget=budget,
+            evaluation_budget=max(
+                0,
+                int(
+                    _config_value(
+                        world,
+                        "institutional_aid_fulfillment_evaluation_budget_per_month",
+                        8,
+                    )
+                ),
+            ),
+            llm_budget=max(
+                0,
+                int(
+                    _config_value(
+                        world,
+                        "institutional_aid_fulfillment_llm_budget_per_month",
+                        2,
+                    )
+                ),
+            ),
+        )
+    )
 
     for shortage in current_events:
-        if shortage.event_type != "regional_resource_shortage" or shortage.id in processed:
+        if (
+            shortage.event_type != "regional_resource_shortage"
+            or shortage.id in processed
+        ):
             continue
         if evaluations >= evaluation_budget or not budget.consume_propagation_step():
             break
@@ -131,9 +173,7 @@ async def process_economy_reactivity(
         params = shortage.render_params or {}
         destination_id = str(params.get("region_id", ""))
         if has_institutional_aid_requester(world, destination_id):
-            has_request_option = has_institutional_aid_request_option(
-                world, shortage
-            )
+            has_request_option = has_institutional_aid_request_option(world, shortage)
             request_uses_llm = has_request_option and (
                 llm_calls < llm_budget and budget.consume_interpreter_call()
             )
@@ -176,8 +216,7 @@ async def process_economy_reactivity(
                 )
             continue
         can_use_interpreter = (
-            llm_calls < llm_budget
-            and budget.consume_interpreter_call()
+            llm_calls < llm_budget and budget.consume_interpreter_call()
         )
         decision, decision_event = await interpret_resource_shortage(
             world,
@@ -233,6 +272,25 @@ async def process_economy_reactivity(
                 transfer_event.event_type == "regional_resource_transfer_completed"
             ),
         )
+    produced.extend(
+        process_institutional_aid_deadlines(
+            world,
+            budget=budget,
+            evaluation_budget=min(
+                4,
+                max(
+                    0,
+                    int(
+                        _config_value(
+                            world,
+                            "institutional_aid_fulfillment_evaluation_budget_per_month",
+                            8,
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
     return produced
 
 

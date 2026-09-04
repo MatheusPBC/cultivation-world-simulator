@@ -630,6 +630,7 @@ class CommitmentTerm:
             else _id(self.remediation_of_term_id, "remediation_of_term_id")
         )
         if remediation is not None and status not in {
+            CommitmentTermStatus.BREACHED,
             CommitmentTermStatus.REMEDIATION_PROPOSED,
             CommitmentTermStatus.REMEDIATED,
         }:

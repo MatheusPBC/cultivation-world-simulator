@@ -17,7 +17,10 @@ from src.classes.institution import (
     CommitmentTermStatus,
     Institution,
     InstitutionalCommitment,
+    InstitutionalFactKnowledge,
+    InstitutionalMemory,
     InstitutionKind,
+    KnowledgeChannel,
 )
 from src.classes.mechanical_language import EntityRef
 from src.classes.state_delta import StateDelta
@@ -25,8 +28,8 @@ from src.sim.simulator_engine.causal_budget import CausalBudget
 from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
 from src.systems.collective_affordances import economy_affordances
 from src.systems.domain_affordance_registry import (
-    AffordanceContext,
     DOMAIN_AFFORDANCES,
+    AffordanceContext,
     StaleAffordanceError,
     stale_affordance_blocked_event,
 )
@@ -34,15 +37,22 @@ from src.systems.domain_decision_interpreter import interpret_domain_affordances
 from src.systems.institution_authority import can_actor_act_for
 from src.systems.resource_transfer import resolve_specified_resource_transfer
 
-
 REQUEST_DOMAIN = "institutional_aid_request"
 RESPONSE_DOMAIN = "institutional_aid_response"
 FULFILLMENT_DOMAIN = "institutional_aid_fulfillment"
+REMEDIATION_DOMAIN = "institutional_aid_remediation"
 REQUEST_ACTION = "request_institutional_aid"
 ACCEPT_ACTION = "accept_institutional_aid"
 FULFILL_ACTION = "fulfill_institutional_aid_term"
+REMEDIATE_ACTION = "propose_institutional_aid_remediation"
 INTERPRETER_TEMPLATE = "institutional_aid_interpreter.txt"
 INSTALLMENT_DUE_OFFSETS = (1, 2)
+MEMORY_FACTOR_NAMES = (
+    "relative_scale",
+    "institutional_change",
+    "commitment_breach",
+    "identity_anchor_impact",
+)
 
 
 def city_institution_id(region_id: int | str) -> str:
@@ -128,12 +138,16 @@ def _has_open_aid_commitment(
     resource_id: str,
 ) -> bool:
     for commitment in world.institutional_relations.commitments.values():
-        if commitment.closed_month is not None:
-            continue
         for term in commitment.terms:
             params = dict(term.parameters)
             if (
                 term.kind is CommitmentTermKind.RESOURCE_TRANSFER
+                and term.status
+                in {
+                    CommitmentTermStatus.PROPOSED,
+                    CommitmentTermStatus.ACTIVE,
+                    CommitmentTermStatus.REMEDIATION_PROPOSED,
+                }
                 and term.subject.id == resource_id
                 and str(params.get("source_region_id", "")) == source_region_id
                 and str(params.get("destination_region_id", ""))
@@ -167,13 +181,12 @@ def request_affordances(context: AffordanceContext):
     for transfer in economy_affordances(economy_context):
         params = dict(transfer.parameters)
         source_id = str(params["source_region_id"])
-        if (
-            not _active_city_institution(context.world, source_id)
-            or not _city_authorized(
-                context.world,
-                source_id,
-                AuthorityScope.COMMITMENT_NEGOTIATION,
-            )
+        if not _active_city_institution(
+            context.world, source_id
+        ) or not _city_authorized(
+            context.world,
+            source_id,
+            AuthorityScope.COMMITMENT_NEGOTIATION,
         ):
             continue
         if _has_open_aid_commitment(
@@ -265,6 +278,30 @@ def _specified_shipment_is_possible(world: Any, params: Mapping[str, Any]) -> bo
     )
 
 
+def _transfer_memory_factors(
+    world: Any,
+    params: Mapping[str, Any],
+    *,
+    institutional_change: float,
+    commitment_breach: float,
+) -> tuple[tuple[str, float], ...]:
+    source = _city(world, str(params.get("source_region_id", "")))
+    resource_id = str(params.get("resource_id", ""))
+    amount = float(params.get("amount", 0.0))
+    capacity = (
+        float(source.economy.capacities.get(resource_id, 0.0))
+        if source is not None
+        else 0.0
+    )
+    relative_scale = min(1.0, amount / max(capacity, amount, 1.0))
+    return (
+        ("relative_scale", relative_scale),
+        ("institutional_change", institutional_change),
+        ("commitment_breach", commitment_breach),
+        ("identity_anchor_impact", 0.0),
+    )
+
+
 def response_affordances(context: AffordanceContext):
     request = _aid_request_payload(context.trigger_event)
     if request is None:
@@ -274,8 +311,7 @@ def response_affordances(context: AffordanceContext):
     resource_id = str(request["resource_id"])
     if (
         context.actor_ref != EntityRef("region", source_id)
-        or str(request["provider_institution_id"])
-        != city_institution_id(source_id)
+        or str(request["provider_institution_id"]) != city_institution_id(source_id)
         or str(request["requester_institution_id"])
         != city_institution_id(destination_id)
         or not _active_city_institution(context.world, source_id)
@@ -301,9 +337,7 @@ def response_affordances(context: AffordanceContext):
             domain=context.domain,
             actor_ref=context.actor_ref,
             action_kind=ACCEPT_ACTION,
-            target_refs=(
-                EntityRef("region", str(request["destination_region_id"])),
-            ),
+            target_refs=(EntityRef("region", str(request["destination_region_id"])),),
             parameters={**request, "request_event_id": context.trigger_event.id},
             urgency=float(request["urgency"]),
             motivation_event_ids=(context.trigger_event.id,),
@@ -327,8 +361,18 @@ def fulfillment_affordances(context: AffordanceContext):
     if commitment is None or int(context.world.month_stamp) <= commitment.opened_month:
         return ()
     options: list[DomainAffordance] = []
+    current_month = int(context.world.month_stamp)
     for term in commitment.terms:
-        if term.status is not CommitmentTermStatus.ACTIVE:
+        if term.status not in {
+            CommitmentTermStatus.ACTIVE,
+            CommitmentTermStatus.REMEDIATION_PROPOSED,
+        }:
+            continue
+        if (
+            term.status is CommitmentTermStatus.ACTIVE
+            and term.due_month is not None
+            and current_month > term.due_month
+        ):
             continue
         params = dict(term.parameters)
         params["resource_id"] = term.subject.id
@@ -344,7 +388,11 @@ def fulfillment_affordances(context: AffordanceContext):
             or not _specified_shipment_is_possible(context.world, params)
         ):
             continue
-        due = term.due_month if term.due_month is not None else int(context.world.month_stamp)
+        due = (
+            term.due_month
+            if term.due_month is not None
+            else int(context.world.month_stamp)
+        )
         month_distance = int(context.world.month_stamp) - due
         urgency = (
             min(1.0, 0.9 + month_distance * 0.1)
@@ -366,10 +414,54 @@ def fulfillment_affordances(context: AffordanceContext):
                 },
                 urgency=urgency,
                 motivation_event_ids=tuple(
-                    dict.fromkeys((commitment.origin_event_id, *term.evidence_event_ids))
+                    dict.fromkeys(
+                        (commitment.origin_event_id, *term.evidence_event_ids)
+                    )
                 ),
             )
         )
+    return tuple(options)
+
+
+def remediation_affordances(context: AffordanceContext):
+    options: list[DomainAffordance] = []
+    for commitment in context.world.institutional_relations.commitments.values():
+        for term in commitment.terms:
+            if (
+                term.status is not CommitmentTermStatus.BREACHED
+                or context.trigger_event.id not in term.breach_event_ids
+            ):
+                continue
+            params = dict(term.parameters)
+            params["resource_id"] = term.subject.id
+            source_id = str(params.get("source_region_id", ""))
+            if (
+                context.actor_ref != EntityRef("region", source_id)
+                or not _city_authorized(
+                    context.world,
+                    source_id,
+                    AuthorityScope.COMMITMENT_NEGOTIATION,
+                )
+                or not _specified_shipment_is_possible(context.world, params)
+            ):
+                continue
+            options.append(
+                DomainAffordance(
+                    domain=context.domain,
+                    actor_ref=context.actor_ref,
+                    action_kind=REMEDIATE_ACTION,
+                    target_refs=(
+                        EntityRef("region", str(params["destination_region_id"])),
+                    ),
+                    parameters={
+                        **params,
+                        "commitment_id": commitment.id,
+                        "term_id": term.id,
+                    },
+                    urgency=0.9,
+                    motivation_event_ids=(context.trigger_event.id,),
+                )
+            )
     return tuple(options)
 
 
@@ -421,6 +513,14 @@ def _execute_request(
                 relation=CausalRelation.TRIGGERED_BY,
             ),
         )
+    )
+    _record_institutional_fact(
+        context.world,
+        event,
+        (
+            str(option.parameters["requester_institution_id"]),
+            str(option.parameters["provider_institution_id"]),
+        ),
     )
     return event
 
@@ -517,6 +617,17 @@ def _execute_acceptance(
             ),
         )
     )
+    _record_institutional_fact(
+        context.world,
+        event,
+        commitment.party_ids,
+        memory_factors=_transfer_memory_factors(
+            context.world,
+            params,
+            institutional_change=1.0,
+            commitment_breach=0.0,
+        ),
+    )
     return event
 
 
@@ -556,6 +667,82 @@ def _execute_fulfillment(
     return event
 
 
+def _execute_remediation_proposal(
+    context: AffordanceContext,
+    option: DomainAffordance,
+    *,
+    decision_event_id: str,
+    **_: Any,
+) -> Event:
+    params = option.parameters
+    source_id = str(params["source_region_id"])
+    if not _city_authorized(
+        context.world,
+        source_id,
+        AuthorityScope.COMMITMENT_NEGOTIATION,
+    ):
+        raise StaleAffordanceError("remediation authority changed")
+    event = Event(
+        context.world.month_stamp,
+        "The obligor proposed material remediation for a breached aid term.",
+        event_type="institutional_commitment_remediation_proposed",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "deltas": [],
+            "commitment_id": str(params["commitment_id"]),
+            "term_id": str(params["term_id"]),
+            "affordance_id": option.id,
+        },
+    )
+    context.world.institutional_relations.propose_remediation(
+        str(params["commitment_id"]),
+        str(params["term_id"]),
+        proposed_month=int(context.world.month_stamp),
+        event_id=event.id,
+        authority_state=context.world.institutional_authority,
+    )
+    event.causal_payload["deltas"] = [
+        StateDelta(
+            event_id=event.id,
+            owner_kind="institutional_commitment",
+            owner_id=str(params["commitment_id"]),
+            aspect=f"term:{params['term_id']}:status",
+            before=CommitmentTermStatus.BREACHED.value,
+            after=CommitmentTermStatus.REMEDIATION_PROPOSED.value,
+        ).to_dict()
+    ]
+    event.causal_links.extend(
+        (
+            CausalLink(
+                event_id=event.id,
+                cause_event_id=decision_event_id,
+                relation=CausalRelation.MOTIVATED_BY,
+            ),
+            CausalLink(
+                event_id=event.id,
+                cause_event_id=context.trigger_event.id,
+                relation=CausalRelation.RESPONSE_TO,
+            ),
+        )
+    )
+    commitment = context.world.institutional_relations.commitments[
+        str(params["commitment_id"])
+    ]
+    _record_institutional_fact(
+        context.world,
+        event,
+        commitment.party_ids,
+        memory_factors=_transfer_memory_factors(
+            context.world,
+            params,
+            institutional_change=1.0,
+            commitment_breach=1.0,
+        ),
+    )
+    return event
+
+
 def _refusal_event(
     world: Any,
     request_event: Event,
@@ -583,7 +770,93 @@ def _refusal_event(
             ),
         )
     )
+    request = _aid_request_payload(request_event)
+    if request is not None:
+        _record_institutional_fact(
+            world,
+            event,
+            (
+                str(request["requester_institution_id"]),
+                str(request["provider_institution_id"]),
+            ),
+            memory_factors=_transfer_memory_factors(
+                world,
+                request,
+                institutional_change=0.0,
+                commitment_breach=0.0,
+            ),
+        )
     return event
+
+
+def _record_institutional_fact(
+    world: Any,
+    event: Event,
+    institution_ids: tuple[str, ...],
+    *,
+    memory_factors: tuple[tuple[str, float], ...] = (),
+) -> None:
+    payload = event.causal_payload
+    if not isinstance(payload, dict):
+        raise TypeError("institutional fact event requires a causal payload")
+    deltas = list(payload.get("deltas") or [])
+    for institution_id in tuple(dict.fromkeys(institution_ids)):
+        was_known = world.institutional_knowledge.contains(institution_id, event.id)
+        world.institutional_knowledge.record(
+            InstitutionalFactKnowledge(
+                institution_id=institution_id,
+                event_id=event.id,
+                learned_month=int(world.month_stamp),
+                channel=KnowledgeChannel.FORMAL_NOTICE,
+                learned_from_event_id=event.id,
+            ),
+            world.institutional_authority,
+        )
+        if not was_known:
+            deltas.append(
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="institutional_knowledge",
+                    owner_id=institution_id,
+                    aspect=f"known_fact:{event.id}",
+                    before="unknown",
+                    after="known",
+                ).to_dict()
+            )
+        if not memory_factors:
+            continue
+        provided_factors = dict(memory_factors)
+        normalized_factors = tuple(
+            (name, max(0.0, min(1.0, float(provided_factors.get(name, 0.0)))))
+            for name in MEMORY_FACTOR_NAMES
+        )
+        memory = InstitutionalMemory(
+            institution_id=institution_id,
+            event_id=event.id,
+            salience=sum(value for _, value in normalized_factors)
+            / len(MEMORY_FACTOR_NAMES),
+            recorded_month=int(world.month_stamp),
+            last_reinforced_month=int(world.month_stamp),
+            factors=normalized_factors,
+        )
+        if memory.id not in world.institutional_relations.memories:
+            world.institutional_relations.add_memory(
+                memory,
+                world.institutional_knowledge,
+                world.institutional_authority,
+            )
+            deltas.append(
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="institutional_memory",
+                    owner_id=memory.id,
+                    aspect="salience",
+                    before="none",
+                    after=str(memory.salience),
+                    magnitude=memory.salience,
+                ).to_dict()
+            )
+    payload["deltas"] = deltas
 
 
 def _mark_term_fulfilled(
@@ -592,17 +865,35 @@ def _mark_term_fulfilled(
     term_id: str,
     transfer_event: Event,
 ) -> Event:
-    world.institutional_relations.fulfill_term(
-        commitment_id,
-        term_id,
-        settled_month=int(world.month_stamp),
-        event_id=transfer_event.id,
-        authority_state=world.institutional_authority,
-    )
+    commitment = world.institutional_relations.commitments[commitment_id]
+    current_term = next(term for term in commitment.terms if term.id == term_id)
+    before_status = current_term.status
+    if before_status is CommitmentTermStatus.REMEDIATION_PROPOSED:
+        after_status = CommitmentTermStatus.REMEDIATED
+        world.institutional_relations.remediate_term(
+            commitment_id,
+            term_id,
+            settled_month=int(world.month_stamp),
+            event_id=transfer_event.id,
+            authority_state=world.institutional_authority,
+        )
+        event_type = "institutional_commitment_term_remediated"
+        content = "A breached institutional aid term was materially remediated."
+    else:
+        after_status = CommitmentTermStatus.FULFILLED
+        world.institutional_relations.fulfill_term(
+            commitment_id,
+            term_id,
+            settled_month=int(world.month_stamp),
+            event_id=transfer_event.id,
+            authority_state=world.institutional_authority,
+        )
+        event_type = "institutional_commitment_term_fulfilled"
+        content = "An institutional aid term was fulfilled."
     event = Event(
         world.month_stamp,
-        "An institutional aid term was fulfilled.",
-        event_type="institutional_commitment_term_fulfilled",
+        content,
+        event_type=event_type,
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.DETERMINISTIC,
         causal_payload={
@@ -612,8 +903,8 @@ def _mark_term_fulfilled(
                     owner_kind="institutional_commitment",
                     owner_id=commitment_id,
                     aspect=f"term:{term_id}:status",
-                    before=CommitmentTermStatus.ACTIVE.value,
-                    after=CommitmentTermStatus.FULFILLED.value,
+                    before=before_status.value,
+                    after=after_status.value,
                 ).to_dict()
             ],
             "commitment_id": commitment_id,
@@ -628,7 +919,117 @@ def _mark_term_fulfilled(
             relation=CausalRelation.TRIGGERED_BY,
         )
     )
+    if before_status is CommitmentTermStatus.REMEDIATION_PROPOSED:
+        for breach_event_id in current_term.breach_event_ids:
+            event.causal_links.append(
+                CausalLink(
+                    event_id=event.id,
+                    cause_event_id=breach_event_id,
+                    relation=CausalRelation.RESOLVES,
+                )
+            )
+    params = {**dict(current_term.parameters), "resource_id": current_term.subject.id}
+    _record_institutional_fact(
+        world,
+        event,
+        commitment.party_ids,
+        memory_factors=_transfer_memory_factors(
+            world,
+            params,
+            institutional_change=1.0,
+            commitment_breach=(
+                1.0
+                if before_status is CommitmentTermStatus.REMEDIATION_PROPOSED
+                else 0.0
+            ),
+        ),
+    )
     return event
+
+
+def process_institutional_aid_deadlines(
+    world: Any,
+    *,
+    budget: CausalBudget | None = None,
+    evaluation_budget: int = 4,
+) -> list[Event]:
+    produced: list[Event] = []
+    month = int(world.month_stamp)
+    evaluated = 0
+    for commitment in sorted(
+        world.institutional_relations.commitments.values(),
+        key=lambda item: item.id,
+    ):
+        for term in commitment.terms:
+            if evaluated >= max(0, int(evaluation_budget)):
+                return produced
+            cause_event_id = commitment.origin_event_id
+            if term.status is CommitmentTermStatus.ACTIVE:
+                if term.due_month is None or month <= term.due_month:
+                    continue
+            elif term.status is CommitmentTermStatus.REMEDIATION_PROPOSED:
+                proposal_event = world.event_manager.get_event_by_id(
+                    term.evidence_event_ids[-1]
+                )
+                if proposal_event is None or month <= int(proposal_event.month_stamp):
+                    continue
+                cause_event_id = proposal_event.id
+            else:
+                continue
+            evaluated += 1
+            if budget is not None and not budget.consume_domain_mutation():
+                return produced
+            before_status = term.status
+            event = Event(
+                world.month_stamp,
+                "An institutional aid term passed its deadline unfulfilled.",
+                event_type="institutional_commitment_term_breached",
+                fact_kind=FactKind.STATE_TRANSITION,
+                causal_origin=CausalOrigin.DETERMINISTIC,
+                causal_payload={
+                    "deltas": [],
+                    "commitment_id": commitment.id,
+                    "term_id": term.id,
+                },
+            )
+            world.institutional_relations.breach_term(
+                commitment.id,
+                term.id,
+                breached_month=month,
+                event_id=event.id,
+                authority_state=world.institutional_authority,
+            )
+            event.causal_payload["deltas"] = [
+                StateDelta(
+                    event_id=event.id,
+                    owner_kind="institutional_commitment",
+                    owner_id=commitment.id,
+                    aspect=f"term:{term.id}:status",
+                    before=before_status.value,
+                    after=CommitmentTermStatus.BREACHED.value,
+                ).to_dict()
+            ]
+            event.causal_links.append(
+                CausalLink(
+                    event_id=event.id,
+                    cause_event_id=cause_event_id,
+                    relation=CausalRelation.TRIGGERED_BY,
+                )
+            )
+            params = {**dict(term.parameters), "resource_id": term.subject.id}
+            _record_institutional_fact(
+                world,
+                event,
+                commitment.party_ids,
+                memory_factors=_transfer_memory_factors(
+                    world,
+                    params,
+                    institutional_change=1.0,
+                    commitment_breach=1.0,
+                ),
+            )
+            produced.append(event)
+    return produced
 
 
 async def process_institutional_aid_shortage(
@@ -756,7 +1157,11 @@ async def process_institutional_aid_fulfillment(
         source_ids = {
             str(dict(term.parameters).get("source_region_id", ""))
             for term in commitment.terms
-            if term.status is CommitmentTermStatus.ACTIVE
+            if term.status
+            in {
+                CommitmentTermStatus.ACTIVE,
+                CommitmentTermStatus.REMEDIATION_PROPOSED,
+            }
         }
         for source_id in sorted(item for item in source_ids if item):
             if evaluations >= max(0, int(evaluation_budget)):
@@ -833,10 +1238,100 @@ async def process_institutional_aid_fulfillment(
     return produced
 
 
+async def process_institutional_aid_remediation(
+    world: Any,
+    *,
+    llm_call: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+    budget: CausalBudget | None = None,
+    evaluation_budget: int = 8,
+    llm_budget: int = 2,
+) -> list[Event]:
+    """Let obligors decide whether to reopen a materially viable breached term."""
+
+    produced: list[Event] = []
+    evaluations = 0
+    llm_calls = 0
+    candidates: list[tuple[InstitutionalCommitment, CommitmentTerm, Event]] = []
+    for commitment in world.institutional_relations.commitments.values():
+        for term in commitment.terms:
+            if (
+                term.status is not CommitmentTermStatus.BREACHED
+                or not term.breach_event_ids
+            ):
+                continue
+            breach = world.event_manager.get_event_by_id(term.breach_event_ids[-1])
+            if breach is not None:
+                candidates.append((commitment, term, breach))
+
+    for commitment, term, breach in sorted(
+        candidates,
+        key=lambda item: (item[0].id, item[1].id),
+    ):
+        if evaluations >= max(0, int(evaluation_budget)):
+            break
+        if budget is not None and not budget.consume_propagation_step():
+            break
+        source_id = str(dict(term.parameters).get("source_region_id", ""))
+        source = _city(world, source_id)
+        if source is None:
+            continue
+        context = AffordanceContext(
+            world,
+            REMEDIATION_DOMAIN,
+            EntityRef("region", source_id),
+            breach,
+        )
+        options = DOMAIN_AFFORDANCES.compose(context)
+        if not options:
+            continue
+        evaluations += 1
+        use_llm = llm_calls < max(0, int(llm_budget)) and (
+            budget is None or budget.consume_interpreter_call()
+        )
+        if use_llm:
+            llm_calls += 1
+        decision, decision_event = await interpret_domain_affordances(
+            world,
+            domain=REMEDIATION_DOMAIN,
+            actor_ref=context.actor_ref,
+            actor_label=source.name,
+            trigger_event=breach,
+            affordances=options,
+            task_name="institutional_aid_remediation_interpreter",
+            template_name=INTERPRETER_TEMPLATE,
+            extra_context={"role": "obligor", "commitment_id": commitment.id},
+            llm_call=llm_call,
+            force_rule=not use_llm,
+        )
+        produced.append(decision_event)
+        if decision.decision is not DomainDecisionKind.ACT:
+            continue
+        if budget is not None and not budget.consume_domain_mutation():
+            continue
+        try:
+            produced.append(
+                DOMAIN_AFFORDANCES.execute(
+                    context,
+                    decision.selected_affordance_id or "",
+                    decision_event_id=decision_event.id,
+                )
+            )
+        except StaleAffordanceError:
+            produced.append(
+                stale_affordance_blocked_event(
+                    context,
+                    decision_event_id=decision_event.id,
+                    selected_affordance_id=decision.selected_affordance_id or "",
+                )
+            )
+    return produced
+
+
 for _domain, _provider in (
     (REQUEST_DOMAIN, request_affordances),
     (RESPONSE_DOMAIN, response_affordances),
     (FULFILLMENT_DOMAIN, fulfillment_affordances),
+    (REMEDIATION_DOMAIN, remediation_affordances),
 ):
     DOMAIN_AFFORDANCES.register_provider(_domain, _provider)
 
@@ -844,19 +1339,23 @@ for _action, _executor in (
     (REQUEST_ACTION, _execute_request),
     (ACCEPT_ACTION, _execute_acceptance),
     (FULFILL_ACTION, _execute_fulfillment),
+    (REMEDIATE_ACTION, _execute_remediation_proposal),
 ):
     DOMAIN_AFFORDANCES.register_executor(_action, _executor)
 
 
 __all__ = [
     "FULFILLMENT_DOMAIN",
+    "REMEDIATION_DOMAIN",
     "REQUEST_DOMAIN",
     "RESPONSE_DOMAIN",
     "city_institution_id",
     "fulfillment_affordances",
     "has_institutional_aid_request_option",
     "has_institutional_aid_requester",
+    "process_institutional_aid_deadlines",
     "process_institutional_aid_fulfillment",
+    "process_institutional_aid_remediation",
     "process_institutional_aid_shortage",
     "request_affordances",
     "response_affordances",

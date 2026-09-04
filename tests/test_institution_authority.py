@@ -17,8 +17,10 @@ from src.systems.institution_authority import (
     AuthorityDenial,
     can_actor_act_for,
 )
-from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institution_bootstrap import synchronize_institutional_authority
+from src.systems.institution_bootstrap import (
+    bootstrap_institutional_authority,
+    synchronize_institutional_authority,
+)
 
 
 def _avatar(avatar_id: str, *, dead: bool = False, patriarch: bool = False):
@@ -94,7 +96,13 @@ def test_bootstrap_is_idempotent_and_cities_have_no_office():
     world.dynasty.current_emperor_id = "emperor-3"
     emperor_3 = _avatar("emperor-3")
     world.avatar_manager.avatars[emperor_3.id] = emperor_3
-    source = Event(world.month_stamp, "succession", related_avatars=["emperor-3"])
+    new_emperor.is_dead = True
+    source = Event(
+        world.month_stamp,
+        "The former emperor died.",
+        event_type="death",
+        related_avatars=["emperor-2"],
+    )
     transitions = synchronize_institutional_authority(world, current_events=(source,))
     assert any(
         source.id in {link.cause_event_id for link in event.causal_links}

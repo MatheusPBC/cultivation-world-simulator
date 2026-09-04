@@ -8,15 +8,14 @@ from typing import Any
 from .authority_state import InstitutionalAuthorityState
 from .knowledge_state import InstitutionalKnowledgeState
 from .models import (
+    INSTITUTION_MODEL_VERSION,
     CommitmentTerm,
     CommitmentTermStatus,
-    INSTITUTION_MODEL_VERSION,
     InstitutionalCommitment,
     InstitutionalMemory,
     InstitutionalRelation,
     RecognitionRecord,
 )
-
 
 _TERM_TRANSITIONS = {
     CommitmentTermStatus.PROPOSED: {
@@ -255,7 +254,11 @@ class InstitutionalRelationsState:
 
     @staticmethod
     def _transition_event_id(event_id: Any, label: str) -> str:
-        if not isinstance(event_id, str) or not event_id.strip() or event_id != event_id.strip():
+        if (
+            not isinstance(event_id, str)
+            or not event_id.strip()
+            or event_id != event_id.strip()
+        ):
             raise ValueError(f"{label} must be a non-empty event ID")
         return event_id
 
@@ -287,7 +290,9 @@ class InstitutionalRelationsState:
             CommitmentTermStatus.EXPIRED,
         }
         closed_month = commitment.closed_month
-        if closed_month is None and all(term.status in terminal for term in updated_terms):
+        if closed_month is None and all(
+            term.status in terminal for term in updated_terms
+        ):
             resolved_months = [term.resolved_month for term in updated_terms]
             if any(month is None for month in resolved_months):
                 raise ValueError("terminal commitment terms require resolved months")
@@ -314,9 +319,16 @@ class InstitutionalRelationsState:
         commitment = self.commitments.get(commitment_id)
         if commitment is None:
             raise KeyError(f"unknown commitment: {commitment_id}")
-        if not isinstance(accepted_month, int) or isinstance(accepted_month, bool) or accepted_month < commitment.opened_month:
+        if (
+            not isinstance(accepted_month, int)
+            or isinstance(accepted_month, bool)
+            or accepted_month < commitment.opened_month
+        ):
             raise ValueError("accepted_month must be at or after opened_month")
-        if any(term.status is not CommitmentTermStatus.PROPOSED for term in commitment.terms):
+        if any(
+            term.status is not CommitmentTermStatus.PROPOSED
+            for term in commitment.terms
+        ):
             raise ValueError("only a proposed commitment can be accepted")
         terms = tuple(
             replace(
@@ -346,9 +358,16 @@ class InstitutionalRelationsState:
         commitment = self.commitments.get(commitment_id)
         if commitment is None:
             raise KeyError(f"unknown commitment: {commitment_id}")
-        if not isinstance(rejected_month, int) or isinstance(rejected_month, bool) or rejected_month < commitment.opened_month:
+        if (
+            not isinstance(rejected_month, int)
+            or isinstance(rejected_month, bool)
+            or rejected_month < commitment.opened_month
+        ):
             raise ValueError("rejected_month must be at or after opened_month")
-        if any(term.status is not CommitmentTermStatus.PROPOSED for term in commitment.terms):
+        if any(
+            term.status is not CommitmentTermStatus.PROPOSED
+            for term in commitment.terms
+        ):
             raise ValueError("only a proposed commitment can be rejected")
         terms = tuple(
             replace(
@@ -399,16 +418,21 @@ class InstitutionalRelationsState:
         event_id: str,
         authority_state: InstitutionalAuthorityState,
     ) -> InstitutionalCommitment:
-        """Record one active term's breach without erasing its obligation."""
+        """Record a missed obligation or remediation without erasing history."""
 
         event_id = self._transition_event_id(event_id, "event_id")
         commitment, index, term = self._commitment_term(commitment_id, term_id)
-        if term.status is not CommitmentTermStatus.ACTIVE:
-            raise ValueError("only an active term can be breached")
+        if term.status not in {
+            CommitmentTermStatus.ACTIVE,
+            CommitmentTermStatus.REMEDIATION_PROPOSED,
+        }:
+            raise ValueError("only an active obligation can be breached")
         replacement = replace(
             term,
             status=CommitmentTermStatus.BREACHED,
-            breached_month=breached_month,
+            breached_month=(
+                breached_month if term.breached_month is None else term.breached_month
+            ),
             breach_event_ids=term.breach_event_ids + (event_id,),
             evidence_event_ids=term.evidence_event_ids
             if event_id in term.evidence_event_ids
@@ -627,7 +651,7 @@ class InstitutionalRelationsState:
         data: dict[str, Any],
         authority_state: InstitutionalAuthorityState,
         knowledge_state: InstitutionalKnowledgeState,
-    ) -> "InstitutionalRelationsState":
+    ) -> InstitutionalRelationsState:
         raw = _strict_payload(data)
         relations = _registry(
             raw["relations"], InstitutionalRelation.from_dict, "relations"

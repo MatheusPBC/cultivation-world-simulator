@@ -7,18 +7,18 @@ from src.classes.environment.city_state import CityGovernance
 from src.classes.environment.region import CityRegion
 from src.classes.environment.route import Route
 from src.classes.event import Event, FactKind
+from src.classes.mechanical_language import EntityRef
 from src.classes.regional_economy import RegionalEconomyState
 from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
 from src.sim.simulator_engine.finalizer import validate_causal_integrity
 from src.systems.domain_affordance_registry import (
-    AffordanceContext,
     DOMAIN_AFFORDANCES,
+    AffordanceContext,
     StaleAffordanceError,
 )
 from src.systems.economy_reactivity import process_economy_reactivity
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institutional_aid import FULFILLMENT_DOMAIN
-from src.classes.mechanical_language import EntityRef
+from src.systems.institutional_aid import FULFILLMENT_DOMAIN, REQUEST_DOMAIN
 
 
 async def _select_first(_task, _template, context, **_kwargs):
@@ -165,3 +165,144 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         SimpleNamespace(world=base_world),
         [repeated_shortage, *events],
     )
+
+    assert base_world.event_manager.commit_step([repeated_shortage, *events])
+    base_world.map.routes["aid-road"].update_runtime(enabled=False)
+    base_world.month_stamp = base_world.month_stamp + 2
+    breach_events = await process_economy_reactivity(
+        base_world,
+        current_events=[],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert [event.event_type for event in breach_events] == [
+        "institutional_commitment_term_breached"
+    ]
+    breached = base_world.institutional_relations.commitments[commitment.id]
+    breached_term = breached.terms[1]
+    assert breached_term.status.value == "breached"
+    assert breached_term.breach_event_ids == (breach_events[0].id,)
+    assert (
+        len(
+            [
+                fact
+                for fact in base_world.institutional_knowledge.known_facts.values()
+                if fact.event_id == breach_events[0].id
+            ]
+        )
+        == 2
+    )
+    breach_memories = [
+        memory
+        for memory in base_world.institutional_relations.memories.values()
+        if memory.event_id == breach_events[0].id
+    ]
+    assert len(breach_memories) == 2
+    assert all(
+        memory.salience == sum(value for _, value in memory.factors) / 4
+        for memory in breach_memories
+    )
+    assert source.economy.stocks["grain"] == source_before - 1
+    assert destination.economy.stocks["grain"] == destination_before + 1
+    validate_causal_integrity(SimpleNamespace(world=base_world), breach_events)
+
+    assert base_world.event_manager.commit_step(breach_events)
+    base_world.map.routes["aid-road"].update_runtime(enabled=True)
+    recovery_shortage = Event(
+        base_world.month_stamp,
+        "The city can seek a fresh agreement after the previous breach.",
+        event_type="regional_resource_shortage",
+        render_params={"region_id": "305", "resource_id": "grain"},
+    )
+    assert DOMAIN_AFFORDANCES.compose(
+        AffordanceContext(
+            base_world,
+            REQUEST_DOMAIN,
+            EntityRef("region", "305"),
+            recovery_shortage,
+        )
+    )
+    base_world.month_stamp = base_world.month_stamp + 1
+    remediation_events = await process_economy_reactivity(
+        base_world,
+        current_events=[],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert [event.event_type for event in remediation_events] == [
+        "institutional_aid_remediation_interpretation_decision",
+        "institutional_commitment_remediation_proposed",
+    ]
+    remediating = base_world.institutional_relations.commitments[commitment.id]
+    assert remediating.terms[1].status.value == "remediation_proposed"
+    assert source.economy.stocks["grain"] == source_before - 1
+    assert destination.economy.stocks["grain"] == destination_before + 1
+    validate_causal_integrity(SimpleNamespace(world=base_world), remediation_events)
+
+    assert base_world.event_manager.commit_step(remediation_events)
+    base_world.map.routes["aid-road"].update_runtime(enabled=False)
+    base_world.month_stamp = base_world.month_stamp + 1
+    repeated_breach_events = await process_economy_reactivity(
+        base_world,
+        current_events=[],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert [event.event_type for event in repeated_breach_events] == [
+        "institutional_commitment_term_breached"
+    ]
+    rebreached = base_world.institutional_relations.commitments[commitment.id]
+    assert rebreached.terms[1].status.value == "breached"
+    assert rebreached.terms[1].breach_event_ids == (
+        breach_events[0].id,
+        repeated_breach_events[0].id,
+    )
+    validate_causal_integrity(SimpleNamespace(world=base_world), repeated_breach_events)
+
+    assert base_world.event_manager.commit_step(repeated_breach_events)
+    base_world.map.routes["aid-road"].update_runtime(enabled=True)
+    base_world.month_stamp = base_world.month_stamp + 1
+    renewed_remediation_events = await process_economy_reactivity(
+        base_world,
+        current_events=[],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert [event.event_type for event in renewed_remediation_events] == [
+        "institutional_aid_remediation_interpretation_decision",
+        "institutional_commitment_remediation_proposed",
+    ]
+    assert base_world.event_manager.commit_step(renewed_remediation_events)
+
+    base_world.month_stamp = base_world.month_stamp + 1
+    resolved_events = await process_economy_reactivity(
+        base_world,
+        current_events=[],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert [event.event_type for event in resolved_events] == [
+        "institutional_aid_fulfillment_interpretation_decision",
+        "regional_resource_transfer_completed",
+        "institutional_commitment_term_remediated",
+    ]
+    resolved = base_world.institutional_relations.commitments[commitment.id]
+    assert [term.status.value for term in resolved.terms] == [
+        "fulfilled",
+        "remediated",
+    ]
+    assert resolved.closed_month == base_world.month_stamp
+    assert resolved.terms[1].breach_event_ids == (
+        breach_events[0].id,
+        repeated_breach_events[0].id,
+    )
+    resolved_causes = {
+        link.cause_event_id
+        for event in resolved_events
+        if event.event_type == "institutional_commitment_term_remediated"
+        for link in event.causal_links
+    }
+    assert set(resolved.terms[1].breach_event_ids).issubset(resolved_causes)
+    assert source.economy.stocks["grain"] == source_before - 2
+    assert destination.economy.stocks["grain"] == destination_before + 2
+    validate_causal_integrity(SimpleNamespace(world=base_world), resolved_events)
