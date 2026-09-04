@@ -12,7 +12,7 @@ from src.run.map_snapshot import serialize_map_snapshot
 from src.systems.opportunity import serialize_opportunities
 from src.systems.world_secret import serialize_world_secret
 
-from .base import SaveContext
+from .base import SAVE_SCHEMA_VERSION, SaveContext
 
 
 def _model_to_dict(model):
@@ -40,6 +40,7 @@ class MetaSection:
         dead_count = len(world.avatar_manager.dead_avatars)
         total_count = alive_count + dead_count
         return {
+            "schema_version": SAVE_SCHEMA_VERSION,
             "version": app_config.CONFIG.meta.version,
             "save_time": datetime.now().isoformat(),
             "game_time": f"{world.month_stamp.get_year()}年{world.month_stamp.get_month().value}月",
@@ -139,6 +140,9 @@ class WorldSection:
             "mechanical_language": world.mechanical_language.to_dict(),
             "climate_state": world.climate_state.to_dict(),
             "regional_flood_state": world.regional_flood_state.to_dict(),
+            "institutional_authority": world.institutional_authority.to_dict(),
+            "institutional_knowledge": world.institutional_knowledge.to_dict(),
+            "institutional_relations": world.institutional_relations.to_dict(),
             "deceased_records": world.deceased_manager.to_save_list(),
             "pois": world.poi_manager.to_save_list(),
         }

@@ -22,6 +22,11 @@ class WorldCoreLoadSection:
         from src.classes.mechanical_language import MechanicalLanguageState
         from src.classes.environment.climate import ClimateState
         from src.classes.environment.regional_flood import RegionalFloodState
+        from src.classes.institution import (
+            InstitutionalAuthorityState,
+            InstitutionalKnowledgeState,
+            InstitutionalRelationsState,
+        )
 
         world_data = context.world_data or {}
         run_config_snapshot = context.run_config_snapshot or {}
@@ -60,6 +65,18 @@ class WorldCoreLoadSection:
         world.climate_state = ClimateState.from_dict(world_data.get("climate_state", {}))
         world.regional_flood_state = RegionalFloodState.from_dict(
             world_data["regional_flood_state"]
+        )
+        world.institutional_authority = InstitutionalAuthorityState.from_dict(
+            world_data["institutional_authority"]
+        )
+        world.institutional_knowledge = InstitutionalKnowledgeState.from_dict(
+            world_data["institutional_knowledge"],
+            authority_state=world.institutional_authority,
+        )
+        world.institutional_relations = InstitutionalRelationsState.from_dict(
+            world_data["institutional_relations"],
+            authority_state=world.institutional_authority,
+            knowledge_state=world.institutional_knowledge,
         )
         load_world_secret_from_save(world, world_data.get("world_secret"))
 

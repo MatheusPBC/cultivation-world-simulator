@@ -317,8 +317,22 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
     before_rng = random.getstate()
     before_relations = dict(dummy_avatar.relations)
     before_receipts = dict(base_world.mechanical_language.reaction_receipts)
+    before_institutional = (
+        base_world.institutional_authority.to_dict(),
+        base_world.institutional_knowledge.to_dict(),
+        base_world.institutional_relations.to_dict(),
+    )
 
     def mutate(simulator, ctx):
+        from src.classes.institution import (
+            Institution,
+            InstitutionalFactKnowledge,
+            InstitutionalMemory,
+            InstitutionKind,
+            KnowledgeChannel,
+        )
+        from src.classes.mechanical_language import EntityRef
+
         dummy_avatar.relations[dummy_avatar] = RelationState(friendliness=42)
         receipt = DomainReactionReceipt.create(
             "rollback-condition",
@@ -329,6 +343,33 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
             decision_event_ids=("rollback-decision",),
         )
         simulator.world.mechanical_language.reaction_receipts[receipt.id] = receipt
+        authority = simulator.world.institutional_authority
+        institution = Institution(
+            kind=InstitutionKind.DYNASTY,
+            owner_ref=EntityRef("dynasty", "rollback-house"),
+            founded_month=0,
+        )
+        authority.add_institution(institution)
+        knowledge = InstitutionalFactKnowledge(
+            institution_id=institution.id,
+            event_id="rollback-fact",
+            learned_month=int(simulator.world.month_stamp),
+            channel=KnowledgeChannel.OWN_ACTION,
+            learned_from_event_id="rollback-fact",
+        )
+        simulator.world.institutional_knowledge.record(knowledge, authority)
+        simulator.world.institutional_relations.add_memory(
+            InstitutionalMemory(
+                institution_id=institution.id,
+                event_id=knowledge.event_id,
+                salience=0.8,
+                recorded_month=int(simulator.world.month_stamp),
+                last_reinforced_month=int(simulator.world.month_stamp),
+                factors=(("institutional_change", 0.5),),
+            ),
+            simulator.world.institutional_knowledge,
+            authority,
+        )
         random.random()
         ctx.add_events([Event(simulator.world.month_stamp, "will not persist")])
 
@@ -353,6 +394,11 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
 
     assert dummy_avatar.relations == before_relations
     assert base_world.mechanical_language.reaction_receipts == before_receipts
+    assert (
+        base_world.institutional_authority.to_dict(),
+        base_world.institutional_knowledge.to_dict(),
+        base_world.institutional_relations.to_dict(),
+    ) == before_institutional
     assert base_world.month_stamp == before_month
     assert base_world.event_manager.count() == before_event_count
     assert random.getstate() == before_rng

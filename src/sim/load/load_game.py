@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 import src.utils.config as app_config
-from src.sim.save.sections.base import LoadContext
+from src.sim.save.sections.base import SAVE_SCHEMA_VERSION, LoadContext
 from src.sim.save.sections.registry import restore_loaded_game
 
 if TYPE_CHECKING:
@@ -40,6 +40,21 @@ def _resolve_load_path(save_path: Optional[Path]) -> Path:
     return Path(save_path)
 
 
+def _validate_save_schema(save_data: object) -> dict:
+    if not isinstance(save_data, dict):
+        raise ValueError("Save root must be an object")
+    meta = save_data.get("meta")
+    if not isinstance(meta, dict):
+        raise ValueError("Save metadata must be an object")
+    version = meta.get("schema_version")
+    if type(version) is not int or version != SAVE_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported save schema version: {version!r}; "
+            f"expected {SAVE_SCHEMA_VERSION}"
+        )
+    return save_data
+
+
 def load_game(save_path: Optional[Path] = None) -> Tuple["World", "Simulator", List["Sect"]]:
     """从文件加载游戏状态。"""
     resolved_save_path = _resolve_load_path(save_path)
@@ -48,7 +63,7 @@ def load_game(save_path: Optional[Path] = None) -> Tuple["World", "Simulator", L
 
     try:
         with open(resolved_save_path, "r", encoding="utf-8") as f:
-            save_data = json.load(f)
+            save_data = _validate_save_schema(json.load(f))
 
         meta = save_data.get("meta", {})
         print(
@@ -70,10 +85,10 @@ def load_game(save_path: Optional[Path] = None) -> Tuple["World", "Simulator", L
 
 
 def check_save_compatibility(save_path: Path) -> Tuple[bool, str]:
-    """检查存档兼容性。当前开发阶段不做严格版本阻断。"""
+    """Return whether a save uses the current explicit schema."""
     try:
         with open(save_path, "r", encoding="utf-8") as f:
-            json.load(f)
+            _validate_save_schema(json.load(f))
         return True, ""
     except Exception as exc:
         return False, f"无法读取存档文件: {exc}"

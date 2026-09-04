@@ -25,6 +25,11 @@ from src.classes.celestial_dao import DaoPetition
 from src.classes.mechanical_language import MechanicalLanguageState
 from src.classes.environment.climate import ClimateState
 from src.classes.environment.regional_flood import RegionalFloodState
+from src.classes.institution import (
+    InstitutionalAuthorityState,
+    InstitutionalKnowledgeState,
+    InstitutionalRelationsState,
+)
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -81,6 +86,18 @@ class World():
     # Active physical flood occurrences belong to the world. Their hydrological
     # inputs remain projections over climate and map-owned geography.
     regional_flood_state: RegionalFloodState = field(default_factory=RegionalFloodState)
+    # Durable institutional identity/authority, knowledge, and relations are
+    # independent World-owned registries. Domain resources remain with their
+    # existing canonical owners.
+    institutional_authority: InstitutionalAuthorityState = field(
+        default_factory=InstitutionalAuthorityState
+    )
+    institutional_knowledge: InstitutionalKnowledgeState = field(
+        default_factory=InstitutionalKnowledgeState
+    )
+    institutional_relations: InstitutionalRelationsState = field(
+        default_factory=InstitutionalRelationsState
+    )
     # 宗门上下文（惰性初始化），用于统一本局启用宗门作用域
     _sect_context: Any = field(default=None, init=False, repr=False)
 
@@ -270,14 +287,14 @@ class World():
             event_manager=event_manager,
             start_year=start_year,
         )
-        
+
         # 初始化天下武道会的时间
         world.ranking_manager.init_tournament_info(
             start_year,
             month_stamp.get_year(),
             month_stamp.get_month().value
         )
-        
+
         return world
 
 

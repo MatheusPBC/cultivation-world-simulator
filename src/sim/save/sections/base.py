@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+
+SAVE_SCHEMA_VERSION = 1
+
 if TYPE_CHECKING:
     from src.classes.core.sect import Sect
     from src.classes.core.world import World
