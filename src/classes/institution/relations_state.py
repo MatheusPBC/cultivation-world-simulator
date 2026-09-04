@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .authority_state import InstitutionalAuthorityState
@@ -254,6 +254,221 @@ class InstitutionalRelationsState:
         self.commitments[commitment.id] = commitment
 
     @staticmethod
+    def _transition_event_id(event_id: Any, label: str) -> str:
+        if not isinstance(event_id, str) or not event_id.strip() or event_id != event_id.strip():
+            raise ValueError(f"{label} must be a non-empty event ID")
+        return event_id
+
+    def _commitment_term(
+        self, commitment_id: str, term_id: str
+    ) -> tuple[InstitutionalCommitment, int, CommitmentTerm]:
+        commitment = self.commitments.get(commitment_id)
+        if commitment is None:
+            raise KeyError(f"unknown commitment: {commitment_id}")
+        for index, term in enumerate(commitment.terms):
+            if term.id == term_id:
+                return commitment, index, term
+        raise KeyError(f"unknown commitment term: {term_id}")
+
+    def _replace_term(
+        self,
+        commitment: InstitutionalCommitment,
+        term_index: int,
+        replacement: CommitmentTerm,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        terms = list(commitment.terms)
+        terms[term_index] = replacement
+        updated_terms = tuple(terms)
+        terminal = {
+            CommitmentTermStatus.FULFILLED,
+            CommitmentTermStatus.REMEDIATED,
+            CommitmentTermStatus.CANCELLED,
+            CommitmentTermStatus.EXPIRED,
+        }
+        closed_month = commitment.closed_month
+        if closed_month is None and all(term.status in terminal for term in updated_terms):
+            resolved_months = [term.resolved_month for term in updated_terms]
+            if any(month is None for month in resolved_months):
+                raise ValueError("terminal commitment terms require resolved months")
+            closed_month = max(resolved_months)
+        updated = replace(
+            commitment,
+            terms=updated_terms,
+            closed_month=closed_month,
+        )
+        self.replace_commitment(updated, authority_state)
+        return updated
+
+    def accept_commitment(
+        self,
+        commitment_id: str,
+        *,
+        accepted_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Accept an all-proposed commitment by activating every term."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment = self.commitments.get(commitment_id)
+        if commitment is None:
+            raise KeyError(f"unknown commitment: {commitment_id}")
+        if not isinstance(accepted_month, int) or isinstance(accepted_month, bool) or accepted_month < commitment.opened_month:
+            raise ValueError("accepted_month must be at or after opened_month")
+        if any(term.status is not CommitmentTermStatus.PROPOSED for term in commitment.terms):
+            raise ValueError("only a proposed commitment can be accepted")
+        terms = tuple(
+            replace(
+                term,
+                status=CommitmentTermStatus.ACTIVE,
+                evidence_event_ids=term.evidence_event_ids
+                if event_id in term.evidence_event_ids
+                else term.evidence_event_ids + (event_id,),
+            )
+            for term in commitment.terms
+        )
+        updated = replace(commitment, terms=terms)
+        self.replace_commitment(updated, authority_state)
+        return updated
+
+    def reject_commitment(
+        self,
+        commitment_id: str,
+        *,
+        rejected_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Reject an all-proposed commitment by cancelling its terms."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment = self.commitments.get(commitment_id)
+        if commitment is None:
+            raise KeyError(f"unknown commitment: {commitment_id}")
+        if not isinstance(rejected_month, int) or isinstance(rejected_month, bool) or rejected_month < commitment.opened_month:
+            raise ValueError("rejected_month must be at or after opened_month")
+        if any(term.status is not CommitmentTermStatus.PROPOSED for term in commitment.terms):
+            raise ValueError("only a proposed commitment can be rejected")
+        terms = tuple(
+            replace(
+                term,
+                status=CommitmentTermStatus.CANCELLED,
+                resolved_month=rejected_month,
+                evidence_event_ids=term.evidence_event_ids
+                if event_id in term.evidence_event_ids
+                else term.evidence_event_ids + (event_id,),
+            )
+            for term in commitment.terms
+        )
+        updated = replace(commitment, terms=terms, closed_month=rejected_month)
+        self.replace_commitment(updated, authority_state)
+        return updated
+
+    def fulfill_term(
+        self,
+        commitment_id: str,
+        term_id: str,
+        *,
+        settled_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Fulfill one active term; no stock or resource mutation occurs here."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment, index, term = self._commitment_term(commitment_id, term_id)
+        if term.status is not CommitmentTermStatus.ACTIVE:
+            raise ValueError("only an active term can be fulfilled")
+        replacement = replace(
+            term,
+            status=CommitmentTermStatus.FULFILLED,
+            resolved_month=settled_month,
+            evidence_event_ids=term.evidence_event_ids
+            if event_id in term.evidence_event_ids
+            else term.evidence_event_ids + (event_id,),
+        )
+        return self._replace_term(commitment, index, replacement, authority_state)
+
+    def breach_term(
+        self,
+        commitment_id: str,
+        term_id: str,
+        *,
+        breached_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Record one active term's breach without erasing its obligation."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment, index, term = self._commitment_term(commitment_id, term_id)
+        if term.status is not CommitmentTermStatus.ACTIVE:
+            raise ValueError("only an active term can be breached")
+        replacement = replace(
+            term,
+            status=CommitmentTermStatus.BREACHED,
+            breached_month=breached_month,
+            breach_event_ids=term.breach_event_ids + (event_id,),
+            evidence_event_ids=term.evidence_event_ids
+            if event_id in term.evidence_event_ids
+            else term.evidence_event_ids + (event_id,),
+        )
+        return self._replace_term(commitment, index, replacement, authority_state)
+
+    def propose_remediation(
+        self,
+        commitment_id: str,
+        term_id: str,
+        *,
+        proposed_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Open remediation for a breach while retaining breach evidence."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment, index, term = self._commitment_term(commitment_id, term_id)
+        if term.status is not CommitmentTermStatus.BREACHED:
+            raise ValueError("only a breached term can propose remediation")
+        replacement = replace(
+            term,
+            status=CommitmentTermStatus.REMEDIATION_PROPOSED,
+            remediation_of_term_id=term.id,
+            evidence_event_ids=term.evidence_event_ids
+            if event_id in term.evidence_event_ids
+            else term.evidence_event_ids + (event_id,),
+        )
+        if proposed_month < commitment.opened_month:
+            raise ValueError("proposed_month must be at or after opened_month")
+        return self._replace_term(commitment, index, replacement, authority_state)
+
+    def remediate_term(
+        self,
+        commitment_id: str,
+        term_id: str,
+        *,
+        settled_month: int,
+        event_id: str,
+        authority_state: InstitutionalAuthorityState,
+    ) -> InstitutionalCommitment:
+        """Resolve remediation while preserving the original breach history."""
+
+        event_id = self._transition_event_id(event_id, "event_id")
+        commitment, index, term = self._commitment_term(commitment_id, term_id)
+        if term.status is not CommitmentTermStatus.REMEDIATION_PROPOSED:
+            raise ValueError("only proposed remediation can be remediated")
+        replacement = replace(
+            term,
+            status=CommitmentTermStatus.REMEDIATED,
+            resolved_month=settled_month,
+            evidence_event_ids=term.evidence_event_ids
+            if event_id in term.evidence_event_ids
+            else term.evidence_event_ids + (event_id,),
+        )
+        return self._replace_term(commitment, index, replacement, authority_state)
+
+    @staticmethod
     def _validate_commitment_transition(
         current: InstitutionalCommitment,
         replacement: InstitutionalCommitment,
@@ -306,6 +521,10 @@ class InstitutionalRelationsState:
             replacement.breached_month != current.breached_month
         ):
             raise ValueError("commitment breach month is immutable once recorded")
+        if current.resolved_month is not None and (
+            replacement.resolved_month != current.resolved_month
+        ):
+            raise ValueError("commitment resolution month is immutable once recorded")
         if current.remediation_of_term_id is not None and (
             replacement.remediation_of_term_id != current.remediation_of_term_id
         ):

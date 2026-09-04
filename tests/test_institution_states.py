@@ -288,3 +288,129 @@ def test_three_state_round_trip_validates_cross_state_references():
     assert restored_authority == authority
     assert restored_knowledge == knowledge
     assert restored_relations == relations
+
+
+def test_commitment_lifecycle_accepts_rejects_and_blocks_invalid_transitions():
+    authority, city, _office, _claim = authority_fixture()
+    sect = institution("sect", "7")
+    authority.add_institution(sect)
+
+    def make_commitment(origin: str) -> InstitutionalCommitment:
+        term = CommitmentTerm(
+            id=f"term:{origin}",
+            index=0,
+            kind=CommitmentTermKind.RESOURCE_TRANSFER,
+            obligor_institution_id=sect.id,
+            beneficiary_institution_id=city.id,
+            subject=ref("resource", "grain"),
+            status=CommitmentTermStatus.PROPOSED,
+            proposed_month=2,
+            parameters=(("amount", 5),),
+            evidence_event_ids=(f"event:{origin}:proposal",),
+        )
+        return InstitutionalCommitment(
+            party_ids=(city.id, sect.id),
+            opened_month=2,
+            terms=(term,),
+            origin_event_id=f"event:{origin}",
+        )
+
+    relations = InstitutionalRelationsState()
+    accepted = make_commitment("accepted")
+    relations.add_commitment(accepted, authority)
+    active = relations.accept_commitment(
+        accepted.id,
+        accepted_month=3,
+        event_id="event:accepted",
+        authority_state=authority,
+    )
+    assert active.terms[0].status is CommitmentTermStatus.ACTIVE
+    with pytest.raises(ValueError, match="only a proposed commitment"):
+        relations.accept_commitment(
+            accepted.id,
+            accepted_month=3,
+            event_id="event:accepted-again",
+            authority_state=authority,
+        )
+
+    rejected = make_commitment("rejected")
+    relations.add_commitment(rejected, authority)
+    closed = relations.reject_commitment(
+        rejected.id,
+        rejected_month=3,
+        event_id="event:rejected",
+        authority_state=authority,
+    )
+    assert closed.terms[0].status is CommitmentTermStatus.CANCELLED
+    assert closed.closed_month == 3
+
+
+def test_commitment_breach_remediation_preserves_history_and_terminality():
+    authority, city, _office, _claim = authority_fixture()
+    sect = institution("sect", "7")
+    authority.add_institution(sect)
+    term = CommitmentTerm(
+        id="term:breach",
+        index=0,
+        kind=CommitmentTermKind.RESOURCE_TRANSFER,
+        obligor_institution_id=sect.id,
+        beneficiary_institution_id=city.id,
+        subject=ref("resource", "grain"),
+        status=CommitmentTermStatus.ACTIVE,
+        proposed_month=2,
+        parameters=(("amount", 5),),
+        evidence_event_ids=("event:proposal",),
+    )
+    commitment = InstitutionalCommitment(
+        party_ids=(city.id, sect.id),
+        opened_month=2,
+        terms=(term,),
+        origin_event_id="event:breach-commitment",
+    )
+    relations = InstitutionalRelationsState()
+    relations.add_commitment(commitment, authority)
+    breached = relations.breach_term(
+        commitment.id,
+        term.id,
+        breached_month=4,
+        event_id="event:breach",
+        authority_state=authority,
+    )
+    proposed = relations.propose_remediation(
+        commitment.id,
+        term.id,
+        proposed_month=5,
+        event_id="event:remediation-proposed",
+        authority_state=authority,
+    )
+    remediated = relations.remediate_term(
+        commitment.id,
+        term.id,
+        settled_month=6,
+        event_id="event:remediated",
+        authority_state=authority,
+    )
+    final_term = remediated.terms[0]
+    assert breached.terms[0].breach_event_ids == ("event:breach",)
+    assert proposed.terms[0].status is CommitmentTermStatus.REMEDIATION_PROPOSED
+    assert final_term.status is CommitmentTermStatus.REMEDIATED
+    assert final_term.breached_month == 4
+    assert final_term.breach_event_ids == ("event:breach",)
+    assert final_term.resolved_month == 6
+    with pytest.raises(ValueError, match="closed_month exists exactly"):
+        relations.replace_commitment(
+            replace(
+                remediated,
+                terms=(
+                    replace(
+                        final_term,
+                        status=CommitmentTermStatus.ACTIVE,
+                        breached_month=None,
+                        breach_event_ids=(),
+                        resolved_month=None,
+                        remediation_of_term_id=None,
+                    ),
+                ),
+            ),
+            authority,
+        )

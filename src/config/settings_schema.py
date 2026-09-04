@@ -126,6 +126,12 @@ class RunConfig(NewGameDefaults):
     )
     economy_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
     economy_reaction_evaluation_budget_per_month: int = Field(default=8, ge=1, le=256)
+    institutional_aid_fulfillment_llm_budget_per_month: int = Field(
+        default=2, ge=0, le=20
+    )
+    institutional_aid_fulfillment_evaluation_budget_per_month: int = Field(
+        default=8, ge=1, le=256
+    )
     city_interpreter_llm_budget_per_month: int = Field(default=2, ge=0, le=20)
     city_reaction_evaluation_budget_per_month: int = Field(default=8, ge=1, le=256)
     city_blocked_retry_months: int = Field(default=12, ge=1, le=1200)

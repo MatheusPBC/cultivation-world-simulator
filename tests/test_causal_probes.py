@@ -734,7 +734,7 @@ async def test_blocked_supply_profile_interrupts_the_selected_route_and_records_
     ]
     interpretation = reaction_events[0].causal_payload["interpretation"]
     assert interpretation["decision"] == "maintain"
-    assert interpretation["action_intent"] is None
+    assert "selected_affordance_id" not in interpretation
 
 
 @pytest.mark.asyncio

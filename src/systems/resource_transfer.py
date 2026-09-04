@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import math
 from typing import Any
 
 from src.classes.causal_link import CausalLink, CausalRelation
@@ -203,6 +204,170 @@ def resolve_resource_transfer(
         )
         for source_event_id in route["source_event_ids"]
     )
+    return event
+
+
+def resolve_specified_resource_transfer(
+    world: Any,
+    *,
+    source: CityRegion,
+    destination: CityRegion,
+    resource_id: str,
+    route_id: str,
+    amount: float,
+    decision_event_id: str,
+    invalidations: DomainInvalidationQueue | None = None,
+) -> Event:
+    """Execute exactly the shipment accepted in an institutional term.
+
+    Unlike the shortage resolver, this owner never chooses a different source,
+    route, or amount at execution time.  Any changed material fact blocks the
+    promised shipment without leaking a partial mutation.
+    """
+
+    def blocked(reason: str) -> Event:
+        return _blocked(
+            world,
+            destination,
+            resource_id,
+            decision_event_id,
+            reason,
+        )
+
+    if source.id == destination.id or not math.isfinite(amount) or amount <= 0:
+        return blocked("invalid_transfer_parameters")
+    route = getattr(getattr(world, "map", None), "routes", {}).get(route_id)
+    if (
+        route is None
+        or not route.enabled
+        or not route.connects(int(source.id), int(destination.id))
+        or not route.allows_resource(resource_id)
+    ):
+        return blocked("accepted_route_unavailable")
+    if (
+        resource_id not in source.economy.stocks
+        or resource_id not in destination.economy.stocks
+        or resource_id not in destination.economy.capacities
+        or resource_id not in source.economy.access
+        or resource_id not in destination.economy.access
+    ):
+        return blocked("accepted_resource_unknown")
+    source_available = source.economy.available_stock(resource_id)
+    if source_available is None or source_available < amount:
+        return blocked("accepted_source_stock_unavailable")
+    if (
+        source.economy.access[resource_id] <= 0
+        or destination.economy.access[resource_id] <= 0
+    ):
+        return blocked("accepted_resource_access_unavailable")
+    headroom = (
+        destination.economy.capacities[resource_id]
+        - destination.economy.stocks[resource_id]
+    )
+    if headroom < amount:
+        return blocked("accepted_destination_capacity_unavailable")
+    transport_capacity = world.map.get_route_operational_capacity(route_id)
+    if transport_capacity < amount:
+        return blocked("accepted_route_capacity_unavailable")
+
+    source_before = float(source.economy.stocks[resource_id])
+    destination_before = float(destination.economy.stocks[resource_id])
+    source.economy.change_stock(resource_id, -amount)
+    destination.economy.change_stock(resource_id, amount)
+    source_after = float(source.economy.stocks[resource_id])
+    destination_after = float(destination.economy.stocks[resource_id])
+    event = Event(
+        world.month_stamp,
+        t(
+            "{resource} moved from {source} to {destination}.",
+            resource=resource_id,
+            source=source.name,
+            destination=destination.name,
+        ),
+        event_type="regional_resource_transfer_completed",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        render_params={
+            "source_region_id": str(source.id),
+            "destination_region_id": str(destination.id),
+            "resource_id": resource_id,
+            "route_id": route_id,
+            "amount": amount,
+        },
+    )
+    route_sources = list(
+        dict.fromkeys(
+            site.last_event_id
+            for site in world.map.get_route_dependency_sites(route_id)
+            if site.last_event_id is not None
+        )
+    )
+    event.causal_payload = {
+        "outcome": "completed",
+        "execution": {
+            "kind": "resource_transfer",
+            "resource_id": resource_id,
+            "source_region_id": str(source.id),
+            "destination_region_id": str(destination.id),
+            "route_id": route_id,
+            "amount": amount,
+            "transport_capacity": transport_capacity,
+            "route_capacity": float(route.capacity),
+            "route_quality": float(route.quality),
+            "route_mode": str(route.mode),
+            "route_source_event_ids": route_sources,
+        },
+        "deltas": [],
+    }
+    deltas = [
+        StateDelta(
+            event_id=event.id,
+            owner_kind="region",
+            owner_id=str(source.id),
+            aspect=f"resource_stock:{resource_id}",
+            before=str(source_before),
+            after=str(source_after),
+            magnitude=-amount,
+        ),
+        StateDelta(
+            event_id=event.id,
+            owner_kind="region",
+            owner_id=str(destination.id),
+            aspect=f"resource_stock:{resource_id}",
+            before=str(destination_before),
+            after=str(destination_after),
+            magnitude=amount,
+        ),
+    ]
+    event.causal_payload["deltas"] = [delta.to_dict() for delta in deltas]
+    event.causal_links.append(
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=decision_event_id,
+            relation=CausalRelation.MOTIVATED_BY,
+        )
+    )
+    event.causal_links.extend(
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=source_event_id,
+            relation=CausalRelation.CONTRIBUTED_TO,
+        )
+        for source_event_id in route_sources
+    )
+    if invalidations is not None:
+        for changed_region in (source, destination):
+            invalidations.mark(
+                DomainInvalidation(
+                    layer=DomainInvalidationLayer.MECHANICAL,
+                    domain="economy",
+                    target_kind="region",
+                    target_id=str(changed_region.id),
+                    reason=DomainInvalidationReason.RESOURCE_STOCK_CHANGED,
+                    source_event_ids=(event.id,),
+                    revision=event.id,
+                )
+            )
     return event
 
 
