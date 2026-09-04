@@ -826,6 +826,13 @@ class CausalTortureRunner:
 
                     if self.config.probe_profile == "institutional_urban_strain":
                         prepare_institutional_urban_strain_world(world)
+                        from src.systems.institution_bootstrap import (
+                            bootstrap_institutional_authority,
+                            synchronize_institutional_authority,
+                        )
+
+                        bootstrap_institutional_authority(world)
+                        synchronize_institutional_authority(world)
                     elif self.config.probe_profile == "health_recovery_strain":
                         prepare_health_recovery_strain_world(world)
                     probe_schedule = build_causal_probe_schedule(

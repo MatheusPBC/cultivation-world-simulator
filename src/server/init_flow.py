@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 from src.systems.city_governance import ground_unclaimed_city_governance
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
@@ -282,6 +283,7 @@ async def perform_game_initialization(
             _resolve_initially_dead_avatars(world=world, avatars=final_avatars)
             world.existed_sects = existed_sects
             world.sect_context.from_existed_sects(existed_sects)
+            bootstrap_institutional_authority(world)
             from src.systems.world_secret import initialize_world_secret
             initialize_world_secret(world, getattr(run_config, "world_secret_id", "none"))
             runtime.set_world_and_sim(world, sim)

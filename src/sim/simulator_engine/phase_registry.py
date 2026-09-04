@@ -331,11 +331,18 @@ async def evaluate_semantic_world(simulator, ctx):
 
 
 async def react_government(simulator, ctx):
+    from src.systems.institution_bootstrap import synchronize_institutional_authority
     from src.systems.government_reactivity import (
         enqueue_unreacted_government_conditions,
         process_government_reactivity,
     )
 
+    ctx.add_events(
+        synchronize_institutional_authority(
+            simulator.world,
+            current_events=ctx.events,
+        )
+    )
     enqueue_unreacted_government_conditions(simulator.world, ctx.invalidations)
     ctx.add_events(await process_government_reactivity(
         simulator.world,

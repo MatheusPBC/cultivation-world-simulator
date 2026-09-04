@@ -178,6 +178,24 @@ class InstitutionalAuthorityState:
             raise ValueError(f"duplicate identity anchor id: {anchor.id}")
         self.identity_anchors[anchor.id] = anchor
 
+    def replace_institution(self, institution: Institution) -> None:
+        if not isinstance(institution, Institution):
+            raise TypeError("institution must be an Institution")
+        if institution.id not in self.institutions:
+            raise KeyError(f"unknown institution: {institution.id}")
+        current = self.institutions[institution.id]
+        if (
+            institution.kind is not current.kind
+            or institution.owner_ref != current.owner_ref
+            or institution.founded_month != current.founded_month
+        ):
+            raise ValueError("institution identity and founding month are immutable")
+        if current.dissolved_month is not None and (
+            institution.dissolved_month != current.dissolved_month
+        ):
+            raise ValueError("dissolved institutions cannot reactivate or move dissolution")
+        self.institutions[institution.id] = institution
+
     def get_claim(self, claim_id: str) -> AuthorityClaim | None:
         return self.claims.get(str(claim_id))
 
