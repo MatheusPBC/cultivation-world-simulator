@@ -26,6 +26,13 @@ from src.systems.single_choice import (
     SectRecruitmentRequest,
     resolve_sect_recruitment,
 )
+from src.systems.institutional_diplomacy import (
+    get_sect_diplomacy_state,
+    has_active_sect_institution,
+    sect_institution_id,
+    set_formal_peace,
+    set_formal_war,
+)
 from src.systems.sect_member_support import transfer_sect_member_support
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
@@ -51,12 +58,6 @@ _VALID_DIPLOMACY_ACTIONS = frozenset(
 # 语义外交状态，用于 StateDelta 的 before/after。
 _DIPLOMACY_STATUS_WAR = "war"
 _DIPLOMACY_STATUS_PEACE = "peace"
-
-
-def normalize_sect_pair_id(sect_a_id: int, sect_b_id: int) -> str:
-    """规范化的宗门对 ID：`min:max`，与谁发起该动作无关。"""
-    first, second = sorted((int(sect_a_id), int(sect_b_id)))
-    return f"{first}:{second}"
 
 
 @dataclass(slots=True)
@@ -440,11 +441,28 @@ class SectDecider:
             target = target_by_id.get(int(action.other_sect_id))
             if target is None:
                 continue
+            if not all(
+                has_active_sect_institution(
+                    world,
+                    sect_id,
+                    current_month=int(world.month_stamp),
+                )
+                for sect_id in (sect.id, action.other_sect_id)
+            ):
+                decision.rejected.append(
+                    {
+                        "action_name": action.action,
+                        "params": {"other_sect_id": int(action.other_sect_id)},
+                        "reason": "institutional identity is missing or inactive",
+                    }
+                )
+                continue
 
             # 以“执行时的真实外交状态”为准，而不是上下文快照：同一轮里
             # 另一个宗门可能已经改变了这对关系，用快照会写出错误的
             # before 值，或重复执行一次已经成立的状态转移。
-            live_state = world.get_sect_diplomacy_state(
+            live_state = get_sect_diplomacy_state(
+                world,
                 int(sect.id),
                 int(action.other_sect_id),
                 current_month=int(world.month_stamp),
@@ -453,16 +471,16 @@ class SectDecider:
                 live_state.get("status", _DIPLOMACY_STATUS_PEACE)
                 or _DIPLOMACY_STATUS_PEACE
             )
+            live_relation = world.institutional_relations.get_relation(
+                sect_institution_id(sect.id),
+                sect_institution_id(action.other_sect_id),
+            )
+            before_kind = live_relation.kind.value if live_relation else "none"
 
             if action.action == DIPLOMACY_ACTION_DECLARE_WAR:
                 if before_status == _DIPLOMACY_STATUS_WAR:
                     continue
                 after_status = _DIPLOMACY_STATUS_WAR
-                world.declare_sect_war(
-                    sect_a_id=int(sect.id),
-                    sect_b_id=int(action.other_sect_id),
-                    reason=str(target.get("other_sect_name", "") or ""),
-                )
                 result.war_declared_count += 1
                 content = t(
                     "{sect_name} declared war on {target_name}; from this point on, the two sects are at war.",
@@ -473,11 +491,6 @@ class SectDecider:
                 if before_status != _DIPLOMACY_STATUS_WAR:
                     continue
                 after_status = _DIPLOMACY_STATUS_PEACE
-                world.make_sect_peace(
-                    sect_a_id=int(sect.id),
-                    sect_b_id=int(action.other_sect_id),
-                    reason=str(target.get("other_sect_name", "") or ""),
-                )
                 result.peace_made_count += 1
                 content = t(
                     "{sect_name} made peace with {target_name}, and the state of war between them came to an end.",
@@ -494,16 +507,42 @@ class SectDecider:
                 related_sects=[int(sect.id), int(action.other_sect_id)],
                 is_major=True,
                 fact_kind=FactKind.STATE_TRANSITION,
+                causal_origin=CausalOrigin.ACTOR_DECISION,
+                render_params={
+                    "sect_id": str(sect.id),
+                    "target_sect_id": str(action.other_sect_id),
+                    "reason": str(target.get("other_sect_name", "") or ""),
+                },
+            )
+            relation = (
+                set_formal_war(
+                    world,
+                    int(sect.id),
+                    int(action.other_sect_id),
+                    current_month=int(world.month_stamp),
+                    evidence_event_ids=(transition_event.id,),
+                )
+                if after_status == _DIPLOMACY_STATUS_WAR
+                else set_formal_peace(
+                    world,
+                    int(sect.id),
+                    int(action.other_sect_id),
+                    current_month=int(world.month_stamp),
+                    evidence_event_ids=(transition_event.id,),
+                )
             )
             delta = StateDelta(
                 event_id=transition_event.id,
-                owner_kind="sect_diplomacy",
-                owner_id=normalize_sect_pair_id(sect.id, action.other_sect_id),
-                aspect="status",
-                before=before_status,
-                after=after_status,
+                owner_kind="institutional_relation",
+                owner_id=relation.id,
+                aspect="kind",
+                before=before_kind,
+                after=relation.kind.value,
             )
-            transition_event.causal_payload = {"deltas": [delta.to_dict()]}
+            transition_event.causal_payload = {
+                "reason": str(target.get("other_sect_name", "") or ""),
+                "deltas": [delta.to_dict()],
+            }
             # 结果事件由本次决策引发。
             transition_event.causal_links.append(
                 CausalLink(

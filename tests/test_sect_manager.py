@@ -13,6 +13,8 @@ from src.classes.event import Event
 from src.classes.gender import Gender
 from src.systems.battle import get_base_strength
 from src.systems.cultivation import CultivationProgress
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.systems.institutional_diplomacy import set_formal_war
 from src.classes.sect_ranks import SectRank
 
 @pytest.fixture
@@ -374,7 +376,11 @@ def test_sect_manager_updates_war_weariness_annually(base_world):
 
     world.existed_sects = [sect_a, sect_b]
     world.sect_context.from_existed_sects(world.existed_sects)
-    world.declare_sect_war(sect_a_id=1, sect_b_id=2)
+    bootstrap_institutional_authority(world)
+    set_formal_war(
+        world, 1, 2, current_month=int(world.month_stamp),
+        evidence_event_ids=("event:existing-war",),
+    )
 
     manager = SectManager(world)
     manager.update_sects()

@@ -418,8 +418,7 @@
       "TERRITORY_CONFLICT": "領土衝突",
       "WAR_STATE": "戦争状態",
       "PEACE_STATE": "平和状態",
-      "LONG_PEACE": "長期和平",
-      "RANDOM_EVENT": "ランダムイベント"
+      "LONG_PEACE": "長期和平"
     }
   },
   "mortal_system": {

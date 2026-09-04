@@ -18,8 +18,6 @@ from src.utils.df import game_configs
 from src.classes.language import language_manager
 from src.i18n import t
 from src.classes.ranking import RankingManager
-from src.classes.sect_diplomacy_state import SectDiplomacyState
-from src.classes.war import STATUS_PEACE, STATUS_WAR
 from src.systems.opportunity import OpportunityManager
 from src.classes.celestial_dao import DaoPetition
 from src.classes.mechanical_language import MechanicalLanguageState
@@ -74,7 +72,6 @@ class World():
     ranking_manager: RankingManager = field(default_factory=RankingManager)
     # 游玩单局 ID，用于区分存档
     playthrough_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    sect_diplomacy: SectDiplomacyState = field(default_factory=SectDiplomacyState)
     # 机缘管理器：维护单人限时机缘状态与冷却。
     opportunity_manager: OpportunityManager = field(default_factory=OpportunityManager)
     # Per-world semantic vocabulary and reusable definitions. Canonical facts
@@ -149,101 +146,6 @@ class World():
             if existed:
                 self._sect_context.from_existed_sects(existed)
         return self._sect_context
-
-    @property
-    def sect_relation_modifiers(self) -> list[dict[str, Any]]:
-        return self.sect_diplomacy.relation_modifiers
-
-    @sect_relation_modifiers.setter
-    def sect_relation_modifiers(self, value: Iterable[dict[str, Any]]) -> None:
-        self.sect_diplomacy.set_relation_modifiers(value)
-
-    @property
-    def sect_wars(self) -> list[dict[str, Any]]:
-        return self.sect_diplomacy.wars
-
-    @sect_wars.setter
-    def sect_wars(self, value: Iterable[dict[str, Any]]) -> None:
-        self.sect_diplomacy.set_wars(value)
-
-    def add_sect_relation_modifier(
-        self,
-        *,
-        sect_a_id: int,
-        sect_b_id: int,
-        delta: int,
-        duration: int,
-        reason: str,
-        meta: Optional[dict] = None,
-    ) -> None:
-        self.sect_diplomacy.add_relation_modifier(sect_a_id=sect_a_id, sect_b_id=sect_b_id, delta=delta, duration=duration, reason=reason, current_month=int(self.month_stamp), meta=meta)
-
-    def get_sect_war(self, sect_a_id: int, sect_b_id: int) -> Optional[dict[str, Any]]:
-        return self.sect_diplomacy.get_war(sect_a_id, sect_b_id)
-
-    def are_sects_at_war(self, sect_a_id: int, sect_b_id: int) -> bool:
-        war = self.get_sect_war(sect_a_id, sect_b_id)
-        return bool(war and str(war.get("status", "")) == STATUS_WAR)
-
-    def declare_sect_war(
-        self,
-        *,
-        sect_a_id: int,
-        sect_b_id: int,
-        reason: str = "",
-        start_month: Optional[int] = None,
-    ) -> dict[str, Any]:
-        return self.sect_diplomacy.declare_war(sect_a_id=sect_a_id, sect_b_id=sect_b_id, current_month=int(self.month_stamp if start_month is None else start_month), reason=reason)
-
-    def make_sect_peace(
-        self,
-        *,
-        sect_a_id: int,
-        sect_b_id: int,
-        reason: str = "",
-        peace_start_month: Optional[int] = None,
-    ) -> dict[str, Any]:
-        return self.sect_diplomacy.make_peace(sect_a_id=sect_a_id, sect_b_id=sect_b_id, current_month=int(self.month_stamp if peace_start_month is None else peace_start_month), reason=reason)
-
-    def record_sect_battle(self, sect_a_id: int, sect_b_id: int, *, battle_month: Optional[int] = None) -> None:
-        self.sect_diplomacy.record_battle(sect_a_id, sect_b_id, current_month=int(self.month_stamp if battle_month is None else battle_month))
-
-    def get_sect_diplomacy_state(
-        self,
-        sect_a_id: int,
-        sect_b_id: int,
-        *,
-        current_month: Optional[int] = None,
-    ) -> dict[str, Any]:
-        return self.sect_diplomacy.get_state(
-            sect_a_id,
-            sect_b_id,
-            current_month=int(self.month_stamp if current_month is None else current_month),
-            start_year=self.start_year,
-        )
-
-    def prune_expired_sect_relation_modifiers(self, current_month: Optional[int] = None) -> None:
-        self.sect_diplomacy.prune_relation_modifiers(
-            current_month=int(self.month_stamp if current_month is None else current_month)
-        )
-
-    def get_active_sect_relation_breakdown(
-        self, current_month: Optional[int] = None
-    ) -> dict[tuple[int, int], list[dict[str, Any]]]:
-        return self.sect_diplomacy.relation_breakdown(
-            current_month=int(self.month_stamp if current_month is None else current_month)
-        )
-
-    def get_active_sect_diplomacy_breakdown(
-        self,
-        current_month: Optional[int] = None,
-        sect_ids: Optional[Iterable[int]] = None,
-    ) -> dict[tuple[int, int], list[dict[str, Any]]]:
-        return self.sect_diplomacy.diplomacy_breakdown(
-            current_month=int(self.month_stamp if current_month is None else current_month),
-            start_year=self.start_year,
-            sect_ids=sect_ids,
-        )
 
     def set_world_lore(self, lore_text: str) -> None:
         """设置本局的世界观与历史输入文本。"""

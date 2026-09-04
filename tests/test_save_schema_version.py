@@ -5,7 +5,7 @@ import pytest
 from src.sim.load.load_game import check_save_compatibility, load_game
 
 
-@pytest.mark.parametrize("schema_version", [None, 0, "1"])
+@pytest.mark.parametrize("schema_version", [None, 0, 1, "2"])
 def test_old_or_invalid_save_schema_is_rejected_without_mutating_file(
     tmp_path, schema_version
 ):

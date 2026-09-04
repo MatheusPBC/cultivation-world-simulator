@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Optional
 
+from src.systems.institutional_diplomacy import get_sect_diplomacy_state
+
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
 
@@ -121,7 +123,8 @@ def build_avatar_prompt_context(
         for other in active_sects:
             if other is None or int(getattr(other, "id", 0)) == int(getattr(avatar.sect, "id", 0)):
                 continue
-            state = world.get_sect_diplomacy_state(
+            state = get_sect_diplomacy_state(
+                world,
                 int(avatar.sect.id),
                 int(other.id),
                 current_month=current_month,
@@ -135,7 +138,6 @@ def build_avatar_prompt_context(
                     "other_sect_name": str(getattr(other, "name", "") or ""),
                     "war_months": int(state.get("war_months", 0) or 0),
                     "war_reason": str(state.get("reason", "") or ""),
-                    "last_battle_month": state.get("last_battle_month"),
                 }
             )
         sect_context = {

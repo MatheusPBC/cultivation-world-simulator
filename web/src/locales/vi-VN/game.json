@@ -418,8 +418,7 @@
       "TERRITORY_CONFLICT": "Xung đột lãnh thổ",
       "WAR_STATE": "Trạng thái chiến tranh",
       "PEACE_STATE": "Trạng thái hòa bình",
-      "LONG_PEACE": "Hòa bình lâu dài",
-      "RANDOM_EVENT": "Sự kiện ngẫu nhiên"
+      "LONG_PEACE": "Hòa bình lâu dài"
     }
   },
   "mortal_system": {

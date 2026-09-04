@@ -6,6 +6,7 @@ from src.classes.causal_link import CausalRelation
 from src.i18n import t
 from src.server.services.public_api_contract import raise_public_error
 from src.systems.cultivation_display import build_avatar_cultivation_display
+from src.systems.institutional_diplomacy import get_sect_diplomacy_breakdown
 
 # Server-side clamps for the `why` causal traversal (docs/specs/causal-world-kernel.md §7.1).
 CAUSAL_QUERY_MAX_DEPTH = 5
@@ -190,15 +191,15 @@ def get_sect_relations(runtime, *, compute_sect_relations) -> dict[str, Any]:
     if not active_sects:
         return {"relations": []}
 
-    extra_breakdown_by_pair = world.get_active_sect_relation_breakdown()
-    diplomacy_by_pair = world.get_active_sect_diplomacy_breakdown(
-        sect_ids=[int(s.id) for s in active_sects]
+    diplomacy_by_pair = get_sect_diplomacy_breakdown(
+        world,
+        current_month=int(world.month_stamp),
+        sect_ids=[int(s.id) for s in active_sects],
     )
     relations = compute_sect_relations(
         active_sects,
         snapshot.tile_owners,
         border_contact_counts=snapshot.border_contact_counts,
-        extra_breakdown_by_pair=extra_breakdown_by_pair,
         diplomacy_by_pair=diplomacy_by_pair,
     )
     return {"relations": relations}

@@ -15,6 +15,7 @@ from src.classes.relation.relation import Relation, get_numeric_relation_label, 
 from src.classes.emotions import EMOTION_EMOJIS, EmotionType
 from src.classes.official_rank import OFFICIAL_NONE
 from src.utils.config import CONFIG
+from src.systems.institutional_diplomacy import get_sect_diplomacy_state
 
 
 def _get_goldfinger_structured_payload(avatar: "Avatar") -> dict | None:
@@ -309,7 +310,8 @@ def get_avatar_structured_info(avatar: "Avatar") -> dict:
         for other in active_sects:
             if other is None or int(getattr(other, "id", 0)) == int(getattr(avatar.sect, "id", 0)):
                 continue
-            state = avatar.world.get_sect_diplomacy_state(
+            state = get_sect_diplomacy_state(
+                avatar.world,
                 int(avatar.sect.id),
                 int(other.id),
                 current_month=current_month,
@@ -322,7 +324,6 @@ def get_avatar_structured_info(avatar: "Avatar") -> dict:
                     "other_sect_name": str(getattr(other, "name", "") or ""),
                     "war_months": int(state.get("war_months", 0) or 0),
                     "war_reason": str(state.get("reason", "") or ""),
-                    "last_battle_month": state.get("last_battle_month"),
                 }
             )
         sect_status_summary = {

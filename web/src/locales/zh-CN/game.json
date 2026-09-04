@@ -504,8 +504,7 @@
       "TERRITORY_CONFLICT": "边界压力",
       "WAR_STATE": "战争状态",
       "PEACE_STATE": "和平状态",
-      "LONG_PEACE": "长期和平",
-      "RANDOM_EVENT": "随机事件"
+      "LONG_PEACE": "长期和平"
     }
   },
   "mortal_system": {

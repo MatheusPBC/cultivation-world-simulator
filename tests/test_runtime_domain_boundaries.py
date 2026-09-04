@@ -4,10 +4,24 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.classes.sect_diplomacy_state import SectDiplomacyState
-from src.classes.war import STATUS_WAR
+from src.classes.institution import (
+    InstitutionalAuthorityState,
+    InstitutionalRelationsState,
+    Institution,
+    InstitutionKind,
+)
+from src.classes.mechanical_language import EntityRef
 from src.server.runtime.session import GameSessionRuntime, create_default_game_state
-from src.sim.runtime_capabilities import DecisionBoundaryResult, get_decision_boundary_gateway
+from src.sim.runtime_capabilities import (
+    DecisionBoundaryResult,
+    get_decision_boundary_gateway,
+)
+from src.systems.institutional_diplomacy import (
+    STATUS_WAR,
+    get_sect_diplomacy_breakdown,
+    get_sect_diplomacy_state,
+    set_formal_war,
+)
 
 
 def test_domain_and_simulation_modules_do_not_depend_on_server_implementation():
@@ -47,23 +61,41 @@ def test_runtime_gateway_marks_a_controlled_avatar_at_a_decision_boundary():
     world = SimpleNamespace(avatar_manager=Manager(), runtime=runtime)
     gateway = get_decision_boundary_gateway(world)
     assert gateway is not None
-    assert gateway.before_ai_decision(world) == DecisionBoundaryResult.WAITING_FOR_PLAYER
+    assert (
+        gateway.before_ai_decision(world) == DecisionBoundaryResult.WAITING_FOR_PLAYER
+    )
     assert runtime.get_roleplay_session()["status"] == "awaiting_decision"
     assert runtime.is_effectively_paused() is True
 
 
-def test_sect_diplomacy_state_owns_war_and_relation_records():
-    state = SectDiplomacyState()
-    state.add_relation_modifier(
-        sect_a_id=2,
-        sect_b_id=1,
-        delta=8,
-        duration=12,
-        reason="test",
-        current_month=100,
+def test_institutional_relations_own_formal_war_without_material_effects():
+    authority = InstitutionalAuthorityState()
+    for sect_id in (1, 2):
+        authority.add_institution(
+            Institution(
+                kind=InstitutionKind.SECT,
+                owner_ref=EntityRef("sect", str(sect_id)),
+                founded_month=100,
+            )
+        )
+    world = SimpleNamespace(
+        start_year=0,
+        institutional_authority=authority,
+        institutional_relations=InstitutionalRelationsState(),
+        event_manager=None,
     )
-    state.declare_war(sect_a_id=1, sect_b_id=2, current_month=101, reason="test")
 
-    assert state.relation_modifiers[0]["sect_a_id"] == 1
-    assert state.get_war(1, 2)["status"] == STATUS_WAR
-    assert state.diplomacy_breakdown(current_month=101, start_year=0)[(1, 2)][0]["reason"] == "WAR_STATE"
+    relation = set_formal_war(
+        world, 2, 1, current_month=101, evidence_event_ids=("event:war",)
+    )
+
+    assert relation.id in world.institutional_relations.relations
+    assert (
+        get_sect_diplomacy_state(world, 1, 2, current_month=101)["status"] == STATUS_WAR
+    )
+    assert (
+        get_sect_diplomacy_breakdown(world, current_month=101, sect_ids=(1, 2))[(1, 2)][
+            0
+        ]["reason"]
+        == "WAR_STATE"
+    )

@@ -56,11 +56,6 @@ export function useSectRelationsModal(show: () => boolean, close: () => void) {
     const baseLabel = t(`game.sect_relations.reasons_map.${item.reason}`)
     if (item.reason === 'PEACE_STATE') return ''
     if (item.reason === 'LONG_PEACE') return baseLabel
-    if (item.reason === 'RANDOM_EVENT') {
-      const cause = item.meta?.cause
-      return typeof cause === 'string' && cause.trim() ? `${baseLabel} (${cause.trim()})` : baseLabel
-    }
-
     if (item.reason !== 'TERRITORY_CONFLICT') {
       if (item.reason === 'WAR_STATE' || item.reason === 'PEACE_STATE' || item.reason === 'LONG_PEACE') {
         const months = item.meta?.war_months ?? item.meta?.peace_months

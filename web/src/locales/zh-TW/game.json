@@ -418,8 +418,7 @@
       "TERRITORY_CONFLICT": "勢力範圍衝突",
       "WAR_STATE": "戰爭狀態",
       "PEACE_STATE": "和平狀態",
-      "LONG_PEACE": "長期和平",
-      "RANDOM_EVENT": "隨機事件"
+      "LONG_PEACE": "長期和平"
     }
   },
   "mortal_system": {

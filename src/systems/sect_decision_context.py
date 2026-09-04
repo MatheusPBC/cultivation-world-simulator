@@ -5,6 +5,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from src.sim.managers.sect_manager import SectManager
 from src.i18n import t
+from src.systems.institutional_diplomacy import (
+    get_sect_diplomacy_breakdown,
+    get_sect_diplomacy_state,
+)
 from src.systems.sect_relations import compute_sect_relations
 from src.systems.semantic_world.context import build_sect_semantic_context
 from src.systems.time import get_date_str
@@ -381,16 +385,15 @@ def build_sect_decision_context(
 
     # 4. 当前宗门关系快照
     # 统一使用 SectManager + compute_sect_relations 计算关系数值与理由
-    extra_breakdown_by_pair = world.get_active_sect_relation_breakdown(current_month)
-    diplomacy_by_pair = world.get_active_sect_diplomacy_breakdown(
-        current_month,
+    diplomacy_by_pair = get_sect_diplomacy_breakdown(
+        world,
+        current_month=current_month,
         sect_ids=[int(s.id) for s in active_sects],
     )
     relations_raw = compute_sect_relations(
         active_sects,
         tile_owners,
         border_contact_counts=snapshot.border_contact_counts,
-        extra_breakdown_by_pair=extra_breakdown_by_pair,
         diplomacy_by_pair=diplomacy_by_pair,
     )
 
@@ -427,7 +430,9 @@ def build_sect_decision_context(
                 "reason_breakdown": list(item.get("reason_breakdown", [])),
             }
         )
-        diplomacy_state = world.get_sect_diplomacy_state(sect.id, other_id, current_month=current_month)
+        diplomacy_state = get_sect_diplomacy_state(
+            world, sect.id, other_id, current_month=current_month
+        )
         other_patriarch = find_living_patriarch(other_sect_by_id.get(other_id))
         diplomacy_target = {
             "other_sect_id": other_id,
@@ -447,7 +452,6 @@ def build_sect_decision_context(
             "status": str(diplomacy_state.get("status", "peace") or "peace"),
             "war_months": int(diplomacy_state.get("war_months", 0) or 0),
             "peace_months": int(diplomacy_state.get("peace_months", 0) or 0),
-            "last_battle_month": diplomacy_state.get("last_battle_month"),
             "war_reason": str(diplomacy_state.get("reason", "") or ""),
             "relation_value": value,
             "border_contact_edges": int(border_contact_by_other_id.get(other_id, 0)),

@@ -16,7 +16,6 @@ class SectRelationReason(str, Enum):
     WAR_STATE = "WAR_STATE"
     PEACE_STATE = "PEACE_STATE"
     LONG_PEACE = "LONG_PEACE"
-    RANDOM_EVENT = "RANDOM_EVENT"
 
 
 def _clamp(value: int, min_value: int, max_value: int) -> int:
@@ -108,7 +107,6 @@ def compute_sect_relations(
     sects: Iterable[Sect],
     tile_owners: Dict[Tuple[int, int], List[int]],
     border_contact_counts: Dict[Tuple[int, int], int] | None = None,
-    extra_breakdown_by_pair: Dict[Tuple[int, int], List[dict]] | None = None,
     diplomacy_by_pair: Dict[Tuple[int, int], List[dict]] | None = None,
 ) -> List[dict]:
     """
@@ -167,16 +165,6 @@ def compute_sect_relations(
 
             border_contact_edges = border_contact_counts.get((sid_a, sid_b), 0)
             value, reason_breakdown = _compute_pair_score(sect_a, sect_b, border_contact_edges)
-            for extra_item in (extra_breakdown_by_pair or {}).get((sid_a, sid_b), []):
-                delta = int(extra_item.get("delta", 0))
-                value += delta
-                reason_breakdown.append(
-                    {
-                        "reason": str(extra_item.get("reason", SectRelationReason.RANDOM_EVENT.value)),
-                        "delta": delta,
-                        "meta": dict(extra_item.get("meta", {}) or {}),
-                    }
-                )
             diplomacy_items = (diplomacy_by_pair or {}).get((sid_a, sid_b), [])
             diplomacy_status = "peace"
             diplomacy_duration_months = 0
@@ -212,4 +200,3 @@ def compute_sect_relations(
             )
 
     return results
-

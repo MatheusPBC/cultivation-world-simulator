@@ -418,8 +418,7 @@
       "TERRITORY_CONFLICT": "Conflit territorial",
       "WAR_STATE": "État de guerre",
       "PEACE_STATE": "État de paix",
-      "LONG_PEACE": "Longue paix",
-      "RANDOM_EVENT": "Événement aléatoire"
+      "LONG_PEACE": "Longue paix"
     }
   },
   "mortal_system": {

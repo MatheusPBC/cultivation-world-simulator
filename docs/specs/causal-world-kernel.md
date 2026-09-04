@@ -20,15 +20,15 @@ simulation.
 Restating the plan invariants in terms of this repository:
 
 1. `Simulator.step()` (`src/sim/simulator_engine/simulator.py`) stays the only
-   execution path. The 29 entries of `SIMULATION_PHASES`
+   execution path. The entries of `SIMULATION_PHASES`
    (`src/sim/simulator_engine/phase_registry.py`) stay the only orchestrator.
 2. `Event` (`src/classes/event.py`) stays the only fact identity, and
    `EventStorage` (`src/classes/event_storage.py`) behind
    `EventManager` (`src/sim/managers/event_manager.py`) stays the only fact store.
 3. Domain state stays authoritative: `Avatar` (`src/classes/core/avatar/core.py`),
    `CityRegion`/`CultivateRegion` (`src/classes/environment/region.py`),
-   `Sect` (`src/classes/core/sect.py`), `SectDiplomacyState`
-   (`src/classes/sect_diplomacy_state.py`), `POIManager`
+   `Sect` (`src/classes/core/sect.py`), `InstitutionalRelationsState`
+   (`src/classes/institution/relations_state.py`), `POIManager`
    (`src/classes/poi/manager.py`), `CirculationManager`
    (`src/classes/circulation.py`), `Dynasty` (`src/classes/core/dynasty.py`).
    Causal records are **evidence about** those mutations, never the mutation.
@@ -215,7 +215,7 @@ single fact drives section 6.
 | Fact persistence and pagination | `src/classes/event_storage.py : EventStorage`, `src/sim/managers/event_manager.py : EventManager` | new columns on `events` and one new side table created in `EventStorage._init_db`, written in `add_event` | a second DB, a JSON causal log, an event-sourcing replay log |
 | `fact_kind` (occurrence / state transition / derived condition / decision) | n/a (new) — nearest existing owner `src/classes/event.py : Event`, whose `event_type` it must **not** overload | `Event.fact_kind`, `events.fact_kind` column | reusing/overloading `event_type`, which is already load-bearing for propagation (`finalizer.special_major_kinds`) and rendering (`render_key`) |
 | `CausalLink` (typed edge between facts) | n/a (new) — nearest existing owner `src/classes/event_observation.py : EventObservation`, whose table shape it copies exactly | `src/classes/causal_link.py : CausalLink` + `event_causal_links` table with `ON DELETE CASCADE` | a graph store, a generic `relations` table, edges stored inside `render_params` |
-| `StateDelta` (evidence of a domain state change) | n/a (new record); the **state** stays owned by `Avatar`, `CityRegion`, `CultivateRegion`, `Sect`, `SectDiplomacyState`, `POIManager`, `CirculationManager`, `Dynasty` | evidence-only dataclass persisted with the event; **never applied** | a patch/apply engine, a `set_state(path, value)` API, ECS-style component writes |
+| `StateDelta` (evidence of a domain state change) | n/a (new record); the **state** stays owned by `Avatar`, `CityRegion`, `CultivateRegion`, `Sect`, `InstitutionalRelationsState`, `POIManager`, `CirculationManager`, `Dynasty` | evidence-only dataclass persisted with the event; **never applied** | a patch/apply engine, a `set_state(path, value)` API, ECS-style component writes |
 | Neutral change envelope | `src/classes/action_runtime.py : ActionResult` (already has `payload`) and `src/sim/simulator_engine/context.py : SimulationStepContext.add_events` | a recorder handle on `SimulationStepContext`; optional keys in `ActionResult.payload` | a new `SimulationChangeSet` type threaded through all 29 phases — see §11.2 |
 | Decision audit (`AgentDecision`, carried on a `fact_kind=DECISION` `Event` — §5.4) | `src/classes/ai.py : LLMAI._decide`, `src/classes/core/avatar/action_mixin.py : ActionMixin.load_decide_result_chain` (`Avatar.thinking`, `Avatar.short_term_objective`), `src/classes/sect_decider.py : SectDecider` | emit a `fact_kind=DECISION` `Event` at the `phase_decide_actions` boundary carrying the `AgentDecision` in `causal_payload`, so `motivated_by` edges have a target (§5.4) | a second planner, a duplicate goal store, a duplicate memory store |
 | Bounded decisions | `src/systems/single_choice/` : `SingleChoiceRequest`, `SingleChoiceDecision`, `resolve_single_choice` | reuse verbatim | a new choice resolver |

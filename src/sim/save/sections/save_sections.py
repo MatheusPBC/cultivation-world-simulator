@@ -134,8 +134,6 @@ class WorldSection:
             "world_lore_snapshot": getattr(world, "world_lore_snapshot", None) or build_world_lore_snapshot(world),
             "world_secret": serialize_world_secret(world),
             "sect_runtime_states": sect_runtime_states,
-            "sect_relation_modifiers": list(getattr(world, "sect_relation_modifiers", []) or []),
-            "sect_wars": list(getattr(world, "sect_wars", []) or []),
             "opportunities": serialize_opportunities(world),
             "mechanical_language": world.mechanical_language.to_dict(),
             "climate_state": world.climate_state.to_dict(),

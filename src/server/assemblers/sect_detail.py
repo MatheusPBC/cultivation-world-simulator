@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING, Any, Dict, List
 from src.classes.effect import format_effects_to_text
 from src.i18n import t
 from src.sim.managers.sect_manager import SectManager
+from src.systems.institutional_diplomacy import (
+    get_sect_diplomacy_breakdown,
+    get_sect_diplomacy_state,
+)
 from src.systems.sect_relations import compute_sect_relations
 from src.utils.config import CONFIG
 
@@ -119,16 +123,15 @@ def build_sect_detail(sect: "Sect", world: "World", language_manager: object) ->
         "estimated_yearly_upkeep": estimated_yearly_upkeep,
     }
 
-    extra_breakdown_by_pair = world.get_active_sect_relation_breakdown(current_month)
-    diplomacy_by_pair = world.get_active_sect_diplomacy_breakdown(
-        current_month,
+    diplomacy_by_pair = get_sect_diplomacy_breakdown(
+        world,
+        current_month=current_month,
         sect_ids=[int(s.id) for s in snapshot.active_sects],
     )
     relations_raw = compute_sect_relations(
         snapshot.active_sects,
         snapshot.tile_owners,
         border_contact_counts=snapshot.border_contact_counts,
-        extra_breakdown_by_pair=extra_breakdown_by_pair,
         diplomacy_by_pair=diplomacy_by_pair,
     )
     relation_by_other_id: Dict[int, Dict[str, Any]] = {}
@@ -152,7 +155,9 @@ def build_sect_detail(sect: "Sect", world: "World", language_manager: object) ->
     for other in active_sects:
         if other is None or int(getattr(other, "id", 0)) == int(getattr(sect, "id", 0)):
             continue
-        state = world.get_sect_diplomacy_state(int(sect.id), int(other.id), current_month=current_month)
+        state = get_sect_diplomacy_state(
+            world, int(sect.id), int(other.id), current_month=current_month
+        )
         relation_item = relation_by_other_id.get(int(other.id), {})
         relation_value = int(relation_item.get("value", 0) or 0)
         if str(state.get("status", "peace") or "peace") == "war":
@@ -178,7 +183,6 @@ def build_sect_detail(sect: "Sect", world: "World", language_manager: object) ->
                 "peace_months": int(state.get("peace_months", 0) or 0),
                 "relation_value": relation_value,
                 "war_reason": str(state.get("reason", "") or ""),
-                "last_battle_month": state.get("last_battle_month"),
                 "reason_summary": reason_summary,
             }
         )

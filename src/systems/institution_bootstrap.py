@@ -20,8 +20,6 @@ from src.classes.state_delta import StateDelta
 
 _DYNASTY_SCOPES = tuple(AuthorityScope)
 _SECT_SCOPES = (
-    AuthorityScope.URBAN_ADMINISTRATION,
-    AuthorityScope.RESOURCE_DISPOSITION,
     AuthorityScope.TREASURY_DISPOSITION,
     AuthorityScope.COMMITMENT_NEGOTIATION,
     AuthorityScope.RECOGNITION,
@@ -210,26 +208,19 @@ def _relevant_sources(
     old_holder: EntityRef | None = None,
     new_holder: EntityRef | None = None,
 ) -> tuple[Any, ...]:
-    owner_id = institution.owner_ref.id
-    avatar_ids = {ref.id for ref in (old_holder, new_holder) if ref is not None}
+    del institution, new_holder
+    old_holder_id = old_holder.id if old_holder is not None else None
+    if old_holder_id is None:
+        return ()
     matched: list[Any] = []
     for event in current_events:
+        # Only a canonical death of the previous holder is precise enough to
+        # motivate an office transition.  Mere co-occurrence with a sect or a
+        # financial delta is context, not causality.
         related_avatars = {
             str(item) for item in (getattr(event, "related_avatars", None) or [])
         }
-        related_sects = {
-            str(item) for item in (getattr(event, "related_sects", None) or [])
-        }
-        payload = getattr(event, "causal_payload", None) or {}
-        deltas = payload.get("deltas", []) if isinstance(payload, dict) else []
-        delta_matches = any(
-            isinstance(delta, dict) and str(delta.get("owner_id", "")) == owner_id
-            for delta in deltas
-        )
-        owner_matches = (
-            institution.owner_ref.kind == "sect" and owner_id in related_sects
-        )
-        if related_avatars.intersection(avatar_ids) or owner_matches or delta_matches:
+        if getattr(event, "event_type", "") == "death" and old_holder_id in related_avatars:
             matched.append(event)
     return tuple(
         sorted(

@@ -214,7 +214,6 @@ export interface AvatarDetail extends EntityBase {
       other_sect_name: string;
       war_months: number;
       war_reason?: string;
-      last_battle_month?: number | null;
     }>;
     rule_desc?: string;
     sect_alignment?: string;
@@ -310,7 +309,6 @@ export interface SectDiplomacyItem {
   peace_months: number;
   relation_value?: number;
   war_reason?: string;
-  last_battle_month?: number | null;
   reason_summary?: string;
 }
 

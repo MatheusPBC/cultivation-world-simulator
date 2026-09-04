@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
 from src.classes.event import Event
 from src.systems.battle import get_base_strength
+from src.systems.institutional_diplomacy import are_sects_at_war
 from src.utils.config import CONFIG
 
 if TYPE_CHECKING:
@@ -390,7 +391,7 @@ class SectManager:
                 1
                 for other in active_sects
                 if int(getattr(other, "id", 0)) != int(sect.id)
-                and self.world.are_sects_at_war(int(sect.id), int(other.id))
+                and are_sects_at_war(self.world, int(sect.id), int(other.id))
             )
 
             for avatar in getattr(sect, "members", {}).values():

@@ -4,6 +4,7 @@ from src.classes.event import Event
 from src.classes.observe import is_within_observation
 from src.systems.battle import decide_battle, get_effective_strength_pair, handle_battle_finish
 from src.i18n import t
+from src.systems.institutional_diplomacy import are_sects_at_war
 
 
 def _pair_key(a_id: str, b_id: str) -> tuple[str, str]:
@@ -52,7 +53,9 @@ async def phase_handle_sect_wars(simulator, living_avatars) -> list[Event]:
                 continue
             if getattr(defender, "is_dead", False) or str(defender.id) in engaged_avatar_ids:
                 continue
-            if not world.are_sects_at_war(int(attacker_sect.id), int(defender_sect.id)):
+            if not are_sects_at_war(
+                world, int(attacker_sect.id), int(defender_sect.id)
+            ):
                 continue
             if not (is_within_observation(attacker, defender) or is_within_observation(defender, attacker)):
                 continue
@@ -94,7 +97,6 @@ async def phase_handle_sect_wars(simulator, living_avatars) -> list[Event]:
             for event in war_events:
                 event.related_sects = [int(attacker_sect.id), int(defender_sect.id)]
             events.extend(war_events)
-            world.record_sect_battle(int(attacker_sect.id), int(defender_sect.id))
             if getattr(loser, "sect", None) is not None:
                 loser.sect.change_war_weariness(3)
 

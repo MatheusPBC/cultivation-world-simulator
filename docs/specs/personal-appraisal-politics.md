@@ -21,7 +21,10 @@ The causal kernel observes and links existing systems. It is never a second exec
 - `EventAppraisal` records what a direct participant personally took from it.
 - Existing relationship state remains the current social summary.
 - `AgentDecision` remains the auditable choice made by an agent or institution.
-- The sect remains the owner of diplomacy. Its current patriarch's memories are context, not a numeric modifier or compulsory outcome.
+- The sect remains the decision actor and owner of its material capacity;
+  `InstitutionalRelationsState` owns only the formal relation. Its current
+  patriarch's memories are context, not a numeric modifier or compulsory
+  outcome.
 
 ## EventAppraisal
 
@@ -99,7 +102,7 @@ Every sect decision round records an `AgentDecision(subject_kind="sect")`. Its c
 
 - The decision event links `MOTIVATED_BY` to source events of cited appraisals.
 - A resulting war or peace event links `MOTIVATED_BY` to the decision event.
-- Diplomacy changes are `FactKind.STATE_TRANSITION` facts with a `StateDelta` owned by `sect_diplomacy`, a normalized sect-pair owner ID, aspect `status`, and semantic before/after values.
+- Diplomacy changes are `FactKind.STATE_TRANSITION` facts with a `StateDelta` owned by `institutional_relation`, the canonical `InstitutionalRelation` ID, aspect `kind`, and semantic before/after values.
 - The existing summary event remains linked to the decision.
 - Rule fallback is auditable and does not pause simulation.
 

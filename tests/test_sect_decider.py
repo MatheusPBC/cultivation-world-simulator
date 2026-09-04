@@ -6,6 +6,8 @@ from src.classes.age import Age
 from src.classes.alignment import Alignment
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
+from src.classes.institution import Institution, InstitutionKind
+from src.classes.mechanical_language import EntityRef
 from src.classes.sect_decider import SectDecider
 from src.classes.sect_ranks import get_rank_from_realm
 from src.classes.technique import (
@@ -16,6 +18,7 @@ from src.classes.technique import (
 )
 from src.classes.root import Root
 from src.systems.cultivation import Realm
+from src.systems.institutional_diplomacy import are_sects_at_war
 from src.systems.sect_decision_context import SectDecisionContext
 from src.systems.time import Month, Year, create_month_stamp
 from src.utils.llm.runtime_mode import llm_test_mode_scope
@@ -251,7 +254,6 @@ def _dummy_ctx(rogue: Avatar, member: Avatar, breaker: Avatar) -> SectDecisionCo
                 "status": "peace",
                 "war_months": 0,
                 "peace_months": 24,
-                "last_battle_month": None,
                 "relation_value": -10,
             }
         ],
@@ -568,6 +570,14 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
         technique_names=[],
         magic_stone=1000,
     )
+    for sect_id in (1, 2):
+        base_world.institutional_authority.add_institution(
+            Institution(
+                kind=InstitutionKind.SECT,
+                owner_ref=EntityRef("sect", str(sect_id)),
+                founded_month=int(base_world.month_stamp),
+            )
+        )
     ctx = SectDecisionContext(
         basic_structured={"name": "War Sect"},
         basic_text="",
@@ -585,7 +595,6 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
                 "status": "peace",
                 "war_months": 0,
                 "peace_months": 12,
-                "last_battle_month": None,
                 "relation_value": -40,
             }
         ],
@@ -613,7 +622,7 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
     ):
         result = await SectDecider.decide(sect, ctx, base_world)
 
-    assert base_world.are_sects_at_war(1, 2)
+    assert are_sects_at_war(base_world, 1, 2)
     assert result.war_declared_count == 1
     assert any("宣战" in event.content for event in result.events)
 

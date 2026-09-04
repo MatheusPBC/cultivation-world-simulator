@@ -26,6 +26,8 @@ from src.classes.emotions import EmotionType
 from src.classes.event import Event, FactKind
 from src.classes.event_appraisal import AppraisalSource, EventAppraisal
 from src.classes.event_storage import EventStorage
+from src.classes.institution import Institution, InstitutionKind
+from src.classes.mechanical_language import EntityRef
 from src.classes.root import Root
 from src.classes.sect_decider import SectDecider
 from src.systems.sect_decision_context import (
@@ -34,6 +36,8 @@ from src.systems.sect_decision_context import (
 )
 from src.classes.sect_ranks import SectRank
 from src.systems.cultivation import Realm
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.systems.institutional_diplomacy import are_sects_at_war, set_formal_war
 from src.systems.sect_decision_context import SectDecisionContext, build_sect_decision_context
 from src.systems.time import Month, MonthStamp, Year, create_month_stamp
 
@@ -82,6 +86,7 @@ def _make_world_with_two_sects(base_world: World) -> tuple[World, Sect, Sect]:
                   alignment=Alignment.NEUTRAL, headquarter=hq, technique_names=[], magic_stone=1000)
     world.existed_sects = [sect_a, sect_b]
     world.sect_context.from_existed_sects(world.existed_sects)
+    bootstrap_institutional_authority(world)
     return world, sect_a, sect_b
 
 
@@ -157,7 +162,6 @@ def _target(other_sect_id: int = 2, *, status: str = "peace", appraisals: list[d
         "status": status,
         "war_months": 0,
         "peace_months": 12,
-        "last_battle_month": None,
         "relation_value": -40,
         "local_patriarch_id": "patriarch-a",
         "other_patriarch_id": "patriarch-b",
@@ -309,7 +313,7 @@ class TestDiplomacyActionValidation:
 
         result = await _decide(sect_a, ctx, base_world, payload)
 
-        assert base_world.are_sects_at_war(1, 2)
+        assert are_sects_at_war(base_world, 1, 2)
         assert result.war_declared_count == 1
 
     @pytest.mark.asyncio
@@ -321,7 +325,7 @@ class TestDiplomacyActionValidation:
 
         result = await _decide(sect_a, ctx, base_world, payload)
 
-        assert not base_world.are_sects_at_war(1, 2)
+        assert not are_sects_at_war(base_world, 1, 2)
         assert result.war_declared_count == 0
         assert result.decision_event is not None  # the round is still audited
 
@@ -343,7 +347,17 @@ class TestDiplomacyActionValidation:
             _target(2, appraisals=[_appraisal_entry("ap-1", "ev-1")]),
             _target(3, status="war", appraisals=[_appraisal_entry("ap-cross", "ev-cross")]),
         ])
-        base_world.declare_sect_war(sect_a_id=1, sect_b_id=3)
+        base_world.institutional_authority.add_institution(
+            Institution(
+                kind=InstitutionKind.SECT,
+                owner_ref=EntityRef("sect", "3"),
+                founded_month=int(base_world.month_stamp),
+            )
+        )
+        set_formal_war(
+            base_world, 1, 3, current_month=int(base_world.month_stamp),
+            evidence_event_ids=("event:existing-war",),
+        )
         payload = {
             "thinking": "Mixed evidence.",
             "diplomacy_actions": [
@@ -354,11 +368,11 @@ class TestDiplomacyActionValidation:
 
         result = await _decide(sect_a, ctx, base_world, payload)
 
-        assert not base_world.are_sects_at_war(1, 2), f"{reason} citation must invalidate its action"
+        assert not are_sects_at_war(base_world, 1, 2), f"{reason} citation must invalidate its action"
         assert result.war_declared_count == 0
         # The unrelated, well-formed action still executes.
         assert result.peace_made_count == 1
-        assert not base_world.are_sects_at_war(1, 3)
+        assert not are_sects_at_war(base_world, 1, 3)
 
     @pytest.mark.asyncio
     async def test_valid_citation_is_recorded_on_the_executed_action(self, base_world):
@@ -392,7 +406,7 @@ class TestDiplomacyActionValidation:
         result = await _decide(sect_a, ctx, base_world, payload)
 
         assert result.war_declared_count == 0
-        assert not base_world.are_sects_at_war(1, 2)
+        assert not are_sects_at_war(base_world, 1, 2)
 
     def test_legacy_target_id_arrays_are_gone(self):
         from src.classes.sect_decider import SectDecisionPlan
@@ -524,20 +538,29 @@ class TestDiplomacyStateTransitions:
         result = await _decide(sect_a, ctx, base_world, payload)
 
         war_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
+        assert war_event.causal_origin is CausalOrigin.ACTOR_DECISION
         deltas = war_event.causal_payload["deltas"]
         assert len(deltas) == 1
         delta = deltas[0]
         assert delta["event_id"] == war_event.id
-        assert delta["owner_kind"] == "sect_diplomacy"
-        assert delta["owner_id"] == "1:2"
-        assert delta["aspect"] == "status"
-        assert delta["before"] == "peace"
-        assert delta["after"] == "war"
+        assert delta["owner_kind"] == "institutional_relation"
+        assert delta["owner_id"] == "relation:inst:sect:1:inst:sect:2"
+        assert delta["aspect"] == "kind"
+        assert delta["before"] == "none"
+        assert delta["after"] == "at_war"
+        relation = base_world.institutional_relations.get_relation(
+            "inst:sect:1", "inst:sect:2"
+        )
+        assert relation is not None
+        assert war_event.id in relation.evidence_event_ids
 
     @pytest.mark.asyncio
     async def test_peace_event_carries_semantic_state_delta_with_correct_event_id(self, base_world):
         _, sect_a, _ = _make_world_with_two_sects(base_world)
-        base_world.declare_sect_war(sect_a_id=1, sect_b_id=2)
+        set_formal_war(
+            base_world, 1, 2, current_month=int(base_world.month_stamp),
+            evidence_event_ids=("event:existing-war",),
+        )
         ctx = _minimal_ctx([_target(2, status="war")])
         payload = {
             "thinking": "Peace.",
@@ -551,11 +574,11 @@ class TestDiplomacyStateTransitions:
         assert len(deltas) == 1
         delta = deltas[0]
         assert delta["event_id"] == peace_event.id
-        assert delta["owner_kind"] == "sect_diplomacy"
-        assert delta["owner_id"] == "1:2"
-        assert delta["aspect"] == "status"
-        assert delta["before"] == "war"
-        assert delta["after"] == "peace"
+        assert delta["owner_kind"] == "institutional_relation"
+        assert delta["owner_id"] == "relation:inst:sect:1:inst:sect:2"
+        assert delta["aspect"] == "kind"
+        assert delta["before"] == "at_war"
+        assert delta["after"] == "neutral"
 
     @pytest.mark.asyncio
     async def test_normalized_pair_is_stable_regardless_of_which_sect_acts(self, base_world):
@@ -569,14 +592,20 @@ class TestDiplomacyStateTransitions:
         result = await _decide(sect_b, ctx, base_world, payload)
 
         war_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
-        assert war_event.causal_payload["deltas"][0]["owner_id"] == "1:2"
+        assert (
+            war_event.causal_payload["deltas"][0]["owner_id"]
+            == "relation:inst:sect:1:inst:sect:2"
+        )
 
     @pytest.mark.asyncio
     async def test_no_op_transition_is_skipped_using_live_state_not_stale_context(self, base_world):
         """The context snapshot says 'peace', but the pair is already at war --
         the live state must win, so no duplicate contradictory transition."""
         _, sect_a, _ = _make_world_with_two_sects(base_world)
-        base_world.declare_sect_war(sect_a_id=1, sect_b_id=2)
+        set_formal_war(
+            base_world, 1, 2, current_month=int(base_world.month_stamp),
+            evidence_event_ids=("event:existing-war",),
+        )
         ctx = _minimal_ctx([_target(2, status="peace")])  # deliberately stale
         payload = {
             "thinking": "War again.",
@@ -629,7 +658,7 @@ class TestCausalChainIntegration:
         # the citation survives into the audit chain for the Why view
         chain = decision_event.causal_payload["decision"]["chosen_chain"]
         assert any(step.get("appraisal_ids") == [appraisal.id] for step in chain)
-        assert world.are_sects_at_war(1, 2)
+        assert are_sects_at_war(world, 1, 2)
 
     @pytest.mark.asyncio
     async def test_same_conflict_with_military_inferiority_may_end_in_peace_or_inaction(self, base_world):
@@ -652,7 +681,7 @@ class TestCausalChainIntegration:
         finally:
             _close(storage)
 
-        assert not world.are_sects_at_war(1, 2)
+        assert not are_sects_at_war(world, 1, 2)
         assert result.war_declared_count == 0
         assert result.decision_event is not None
         assert result.decision_event.causal_links == []

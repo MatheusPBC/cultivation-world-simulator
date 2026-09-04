@@ -16,9 +16,6 @@ class SectRuntimeLoadSection:
         existed_sects = [sects_by_id[sid] for sid in existed_sect_ids if sid in sects_by_id]
         context.existed_sects = existed_sects
 
-        world.sect_relation_modifiers = list(world_data.get("sect_relation_modifiers", []) or [])
-        world.prune_expired_sect_relation_modifiers(int(world.month_stamp))
-        world.sect_wars = list(world_data.get("sect_wars", []) or [])
         load_opportunities(world, world_data.get("opportunities"))
         world.deceased_manager.load_from_list(world_data.get("deceased_records", []))
         world.poi_manager.load_from_list(world_data.get("pois", []))
@@ -32,10 +29,7 @@ class SectRuntimeLoadSection:
             sect.temporary_sect_effects = []
             sect.set_war_weariness(0)
 
-        sect_runtime_states = (
-            world_data.get("sect_runtime_states", {})
-            or world_data.get("sect_runtime_effects", {})
-        )
+        sect_runtime_states = world_data.get("sect_runtime_states", {})
         for sid_key, state in (sect_runtime_states or {}).items():
             try:
                 sid = int(sid_key)

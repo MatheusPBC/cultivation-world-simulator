@@ -18,6 +18,8 @@ from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.sim.simulator_engine.phases import annual, sect_war, world as world_phases
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.systems.cultivation import Realm
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.systems.institutional_diplomacy import set_formal_war
 from src.systems.time import Month, Year, create_month_stamp
 from src.utils.llm.client import call_llm_with_task_name
 
@@ -364,7 +366,11 @@ async def test_phase_handle_sect_wars_auto_battles_and_teleports_loser(base_worl
     )
     base_world.existed_sects = [sect_a, sect_b]
     base_world.sect_context.from_existed_sects(base_world.existed_sects)
-    base_world.declare_sect_war(sect_a_id=1, sect_b_id=2)
+    bootstrap_institutional_authority(base_world)
+    set_formal_war(
+        base_world, 1, 2, current_month=int(base_world.month_stamp),
+        evidence_event_ids=("event:existing-war",),
+    )
 
     attacker = Avatar(
         world=base_world,
