@@ -23,7 +23,7 @@
 1. 本文件作用域：仓库根目录及其全部子目录。
 2. 当前仓库暂无更深层级的 `AGENTS.md` 或 `AGENTS.override.md`，因此本文件是项目级主说明。
 3. 指令来源：`.cursor/rules/*.mdc`、`.cursor/skills/*/SKILL.md`、`.cursor/commands/*.md`。
-4. 补充设计文档：`docs/specs/*.md` 中记录已经落地的重要系统设计；配置系统请优先参考 `docs/specs/config-architecture.md`，地图系统请优先参考 `docs/specs/region-first-map-system.md`，小故事系统请优先参考 `docs/specs/story-event-system.md`，角色扮演模式请优先参考 `docs/specs/avatar-roleplay-mode.md` 与 `docs/specs/single-choice-unified-framework.md`，修为阶层别名请优先参考 `docs/specs/cultivation-alias-system.md`；因果世界层（`fact_kind`/`CausalLink`/`StateDelta`/`AgentDecision`、被动 `CausalRecorder`、`why` 查询与 Chronicle 视图、必选决策失败暂停语义 `required_decision_failed`）请优先参考 `docs/specs/causal-world-kernel.md`。
+4. 补充设计文档：`docs/specs/*.md` 中记录已经落地的重要系统设计；配置系统请优先参考 `docs/specs/config-architecture.md`，地图系统请优先参考 `docs/specs/region-first-map-system.md`，小故事系统请优先参考 `docs/specs/story-event-system.md`，角色扮演模式请优先参考 `docs/specs/avatar-roleplay-mode.md` 与 `docs/specs/single-choice-unified-framework.md`，修为阶层别名请优先参考 `docs/specs/cultivation-alias-system.md`；因果世界层（`fact_kind`/`CausalLink`/`StateDelta`/`AgentDecision`、被动 `CausalRecorder`、`why` 查询与 Chronicle 视图、必选决策失败暂停语义 `required_decision_failed`）请优先参考 `docs/specs/causal-world-kernel.md`；机构、职位、并发权威主张、机构关系/多条款承诺/补救、机构知识与记忆、`CasusBelliReading` 等 actor-driven 涌现世界设计请优先参考 `docs/specs/actor-driven-emergent-world.md` 及 `docs/adr/0005`-`docs/adr/0008`。
 5. 外接控制 API 的服务端当前已经完成一轮模块化收口；优先参考 `docs/specs/external-control-api.md` 中的“当前落地后的服务端模块地图”，不要再把 query builder、command handler、初始化 phase 或宿主装配重新堆回 `src/server/main.py`。
 
 ## 3. `.cursor/rules` 沉淀
@@ -93,6 +93,12 @@
 36. 三期自由对话必须依附 `Conversation` 动作触发，采用“玩家一侧输入、目标角色由 LLM 回复”的单边接管模式；原始聊天记录不进长期事件流，只以 summary 落地。
 37. 前端大型面板/弹窗/详情页的业务状态、数据加载、派生字段、跳转、提交、timer 与 Pixi 生命周期应优先放入既有 composable；不要把这些逻辑重新堆回 `.vue` 展示组件。
 38. 使用 `defineAsyncComponent` + `v-if` 懒加载的弹窗，如果依赖 `props.show` 触发请求，watcher 必须 `{ immediate: true }`，并补“初始挂载 `show=true` 也会请求”的测试，避免王朝、天下武道会等状态栏入口首次打开为空。
+39. `InstitutionalAuthorityState`（`Institution`/`InstitutionalOffice`/`AuthorityClaim`/`InstitutionalIdentityAnchor`）、`InstitutionalRelationsState`（关系、多条款 `InstitutionalCommitment`/`Term`、机构记忆、正式承认）与最小的 `InstitutionalKnowledgeState` 必须是三个独立的 state 对象；`InstitutionalRelationsState` 不得持有资源、人口、领土、项目、战略或决策。
+40. `AuthorityClaim` 的生命周期只能是 `active`/`withdrawn`/`defeated`/`expired`；`can_actor_act_for(actor, institution, scope)` 必须从当前 canonical state 确定性计算，禁止缓存或从叙事文本推断。`ImperialCrisis` 只产出 `AuthorityClaim`，不直接授予领土、承认或物理控制。
+41. V1 中城市机构以其 `CityRegion` 标识，这是当前版本的身份简化，不得在代码或文档中当作永恒领域真相描述；跨领域引用一律使用 `EntityRef`，为未来拆分机构与地点身份留出空间。禁止在 V1 新增独立的 `CityInstitution`。
+42. `InstitutionalCommitment` 的 `Term` 状态只能是 `proposed`/`active`/`fulfilled`/`breached`/`remediation_proposed`/`remediated`/`cancelled`/`expired`；聚合状态必须由 Term 派生，不得单独存储。Term 保存引擎枚举并被双方接受的不可变机械参数（包括引擎计算的数量），但不得拥有或预留库存。履约与补救都必须经过新的决策、当前 affordance、材料可行性与权限校验，再由 canonical owner 执行；到期未履约可以派生违约/过期事实，但不得自动执行任何物质转移；补救只解决当前义务，不得抹除历史违约事实。
+43. 知识系统是"谁知道某个事实"的唯一所有者；`InstitutionalMemory` 只记录已知 canonical 事实对某机构的重要程度，且每条记忆必须引用 canonical event ID。历史权重只使用相对规模、机构变动、承诺违约与对 `InstitutionalIdentityAnchor` 的影响这四类因素，未经模拟证据不得新增其他因子。
+44. 所有机构类选择（认领、正式承认、主动履约、故意采取不兼容行动、补救、建立关系）必须落为不携带 `StateDelta` 的 `FactKind.DECISION` + `AgentDecision`；其 `actor_ref` 可以是机构，office/holder 只通过 `can_actor_act_for` 授权。canonical owner 随后以独立、指向该决定的 state-transition 事件携带 `StateDelta`；到期未履约等违约也可以从事实确定性派生。LLM/Story 只能在引擎枚举的 `DomainAffordance` 中选择或做事后解读，不得凭空发明证据、数量、目标、条款或权限。`CasusBelliReading` 中缺失的证据保持未知，不得由文本臆造填充，且其本身不构成开战或认领的授权。
 
 ## 4. `.cursor/skills` 沉淀
 

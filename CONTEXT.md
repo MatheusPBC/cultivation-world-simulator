@@ -529,3 +529,106 @@ Monthly Resource Balance is the net change to a region's canonical resource
 stock after its declared production and demand for one month are reconciled.
 Production and demand remain measurable flows, but when they cancel each other
 there is no stock transition fact to report.
+
+## Institution
+
+An Institution is the durable identity that owns institutional relations and
+commitments across a change of leader. In V1 a city institution is identified
+by its `CityRegion`; this is the current V1 identity, not a timeless domain
+truth, and all cross-domain references use `EntityRef` so institution and
+location may separate in a later schema.
+
+### InstitutionalOffice
+
+An InstitutionalOffice is a named role inside an Institution that declares one
+or more authority scopes. An office exists independently of who currently
+holds it.
+
+### AuthorityClaim
+
+An AuthorityClaim is a concurrent claim over an InstitutionalOffice. Its
+lifecycle is exactly `active`, `withdrawn`, `defeated`, or `expired`. A claim
+never grants territory, troops, resources, treasury access, or authority by
+merely existing; the engine deterministically answers
+`can_actor_act_for(actor, institution, scope)` from current canonical state.
+
+### Authority Scope
+
+An Authority Scope is the declared boundary of what an InstitutionalOffice may
+authorize. It is distinct from Formal Recognition and from material control:
+an actor may hold a scope without the territory, forces, or resources needed
+to exercise it.
+
+### Formal Recognition
+
+Formal Recognition is a relational fact about who or what acknowledges an
+AuthorityClaim. It always stores the claim ID, never a loose office holder. It
+is independent from perceived legitimacy,
+which belongs to an observer's knowledge and readings, and from material
+control, which is derived from canonical territory, administration, resources,
+and forces. Concurrent claimants may diverge in recognition, perceived
+legitimacy, and material control at the same time.
+
+## Institutional Relation
+
+An Institutional Relation is a World-owned fact between two Institutions,
+held in `InstitutionalRelationsState`. `InstitutionalRelationsState` never
+owns resources, population, territory, projects, strategy, capacity, or
+decisions; it is separate from `InstitutionalAuthorityState`, which owns
+institutions, offices, claims, and identity anchors. Recognition records live
+in the relations state and reference a claim ID loaded from the authority
+state; a missing claim is invalid.
+
+### Institutional Commitment and Term
+
+An Institutional Commitment is an obligation between Institutions composed of
+independent Terms. Each Term preserves the immutable mechanical parameters
+enumerated by the engine and accepted by the parties, including an
+engine-computed quantity where relevant. It neither owns nor reserves the
+canonical stock needed later. A Term's state is exactly `proposed`, `active`,
+`fulfilled`, `breached`, `remediation_proposed`, `remediated`, `cancelled`, or
+`expired`; the Commitment's aggregate status is derived from its Terms, never
+stored independently. A Commitment is an obligation, not a scheduled command:
+fulfillment and remediation each require a new decision, a current
+affordance, material feasibility, authority, and execution by the canonical
+owner. A missed due date may deterministically produce a breach or expiry fact,
+but never a material transfer. Remediation resolves the current obligation but
+never erases the historical breach.
+
+## Institutional Knowledge
+
+An Institutional Knowledge record belongs to `InstitutionalKnowledgeState` and
+answers only whether an Institution knows a canonical event. It identifies the
+institution, event, acquisition channel, and acquisition event/month. It does
+not store salience and does not forget facts in V1.
+
+## Institutional Memory
+
+An Institutional Memory records only how much a known canonical fact matters
+to an Institution; it never decides who knows that fact. Every memory
+references canonical event IDs. Active memory has salience, decay, and
+reinforcement; engine-owned historical weight uses only relative scale,
+institutional change, commitment breach, and impact on an
+InstitutionalIdentityAnchor.
+
+### Institutional Identity Anchor
+
+An InstitutionalIdentityAnchor is owned by `InstitutionalAuthorityState` and
+references a canonical founder, headquarters or capital, core relic, sacred
+site, or founding commitment. It exists to give Institutional Memory a stable
+reference for historical weight, not to add a new mutable domain state.
+
+## Strategic Capacity
+
+Strategic Capacity is a derived, non-persisted reading of what an Institution
+can currently sustain: administrative, diplomatic, military, logistics, and
+project capacity. Each dimension is read from canonical state and is never a
+single aggregate score.
+
+## Casus Belli Reading
+
+A CasusBelliReading is one actor's interpretation of a potential conflict. It
+contains perceived cause, credibility, objective, reach, urgency, expected
+cost, expected gain, and available alternatives. Missing evidence remains
+unknown; it is never replaced by a fabricated value. An ImperialCrisis
+produces AuthorityClaims, not CasusBelliReadings by itself.
