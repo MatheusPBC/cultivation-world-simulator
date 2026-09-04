@@ -8,9 +8,10 @@ import ChronicleDossierDrawer from '@/components/game/panels/world-journal/Chron
 import ChronicleView from '@/components/game/panels/world-journal/ChronicleView.vue'
 import LiveGuideView from '@/components/game/panels/world-journal/LiveGuideView.vue'
 import DaoPetitionsView from '@/components/game/panels/world-journal/DaoPetitionsView.vue'
+import SituationsView from '@/components/game/panels/world-journal/SituationsView.vue'
 import { useUiStore } from '@/stores/ui'
 import { useWorldJournalStore, type WorldJournalTab } from '@/stores/worldJournal'
-import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, LiveGuideSubjectDTO, MetricReadingDTO, WorldJournalPeriodMonths } from '@/types/api'
+import type { CausalEdgeDTO, EventDTO, EventSubjectDTO, LiveGuideSubjectDTO, MetricReadingDTO, WorldJournalPeriodMonths, WorldSituationSubjectDTO } from '@/types/api'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
@@ -122,6 +123,15 @@ function selectGuideSubject(subject: LiveGuideSubjectDTO) {
     return
   }
   void uiStore.select('sect', subject.id)
+}
+
+function selectSituationSubject(subject: WorldSituationSubjectDTO) {
+  void uiStore.select(subject.kind, subject.id)
+}
+
+function openDaoFromSituation() {
+  journalStore.selectTab('dao')
+  void journalStore.refreshDaoPetitions()
 }
 
 function openWhy(eventId: string) {
@@ -321,32 +331,14 @@ onMounted(() => {
     </div>
 
     <div v-else-if="activeTab === 'focus'" class="journal-body" data-testid="journal-focus">
-      <p v-if="loading && !journal" class="journal-state">{{ t('game.world_journal.loading') }}</p>
-      <p v-else-if="hasError" class="journal-state journal-state--error">
-        {{ t('game.world_journal.error') }}
-      </p>
-      <template v-else-if="journal">
-        <p v-if="journal.ongoing.length === 0" class="journal-empty">
-          {{ t('game.world_journal.focus_empty') }}
-        </p>
-        <article v-for="item in journal.ongoing" v-else :key="item.avatar_id" class="focus-card">
-          <button type="button" class="focus-card-header" @click="uiStore.select('avatar', item.avatar_id)">
-            <span class="ongoing-avatar">{{ item.avatar_name }}</span>
-            <span class="ongoing-action">{{ item.action }}</span>
-          </button>
-          <dl class="focus-objectives">
-            <div class="focus-objective">
-              <dt>{{ t('game.world_journal.focus_short_term') }}</dt>
-              <dd>{{ item.short_term_objective || t('game.world_journal.focus_no_objective') }}</dd>
-            </div>
-            <div class="focus-objective">
-              <dt>{{ t('game.world_journal.focus_long_term') }}</dt>
-              <dd>{{ item.long_term_objective || t('game.world_journal.focus_no_objective') }}</dd>
-            </div>
-          </dl>
-          <small>{{ t('game.world_journal.event_count', { count: item.event_count }) }}</small>
-        </article>
-      </template>
+      <SituationsView
+        :situations="journal?.situations ?? []"
+        :loading="loading"
+        :error="hasError"
+        @why="openWhy"
+        @subject="selectSituationSubject"
+        @dao="openDaoFromSituation"
+      />
     </div>
 
     <div v-else-if="activeTab === 'stories'" class="journal-body" data-testid="journal-stories">
@@ -407,7 +399,7 @@ onMounted(() => {
     </div>
 
     <div v-else class="journal-timeline" data-testid="journal-timeline">
-      <EventPanel />
+      <EventPanel @open-why="openWhy" />
     </div>
 
     <ChronicleDossierDrawer
@@ -444,9 +436,12 @@ onMounted(() => {
               <ul v-else class="why-edge-list">
                 <li v-for="(edge, index) in causalDetail.causes" :key="`cause-${index}`" class="why-edge">
                   <span class="why-relation">{{ relationLabel(edge) }}</span>
-                  <span class="why-edge-text" :class="{ 'why-edge-text--pruned': edge.pruned }">
+                  <span v-if="edge.pruned || !edge.event" class="why-edge-text why-edge-text--pruned">
                     {{ edgeEventText(edge) }}
                   </span>
+                  <button v-else type="button" class="why-edge-button" @click="openWhy(edge.event.id)">
+                    {{ edgeEventText(edge) }}
+                  </button>
                 </li>
               </ul>
             </section>
@@ -459,9 +454,12 @@ onMounted(() => {
               <ul v-else class="why-edge-list">
                 <li v-for="(edge, index) in causalDetail.effects" :key="`effect-${index}`" class="why-edge">
                   <span class="why-relation">{{ relationLabel(edge) }}</span>
-                  <span class="why-edge-text" :class="{ 'why-edge-text--pruned': edge.pruned }">
+                  <span v-if="edge.pruned || !edge.event" class="why-edge-text why-edge-text--pruned">
                     {{ edgeEventText(edge) }}
                   </span>
+                  <button v-else type="button" class="why-edge-button" @click="openWhy(edge.event.id)">
+                    {{ edgeEventText(edge) }}
+                  </button>
                 </li>
               </ul>
             </section>
@@ -536,10 +534,15 @@ onMounted(() => {
               <p class="why-decision-meta">
                 {{ t('game.world_journal.why_considered_count', { count: causalDetail.decision.considered_count }) }}
               </p>
-              <p v-if="causalDetail.decision.rejected.length" class="why-decision-meta">
-                {{ t('game.world_journal.why_rejected') }}:
-                {{ causalDetail.decision.rejected.map((r) => r.action_name).join(', ') }}
-              </p>
+              <div v-if="causalDetail.decision.rejected.length" class="why-rejections">
+                <h5>{{ t('game.world_journal.why_rejected') }}</h5>
+                <ul>
+                  <li v-for="rejected in causalDetail.decision.rejected" :key="`${rejected.action_name}-${rejected.reason}`">
+                    <strong>{{ rejected.action_name }}</strong>
+                    <span>{{ rejected.reason }}</span>
+                  </li>
+                </ul>
+              </div>
 
               <div v-if="causalDetail.decision_appraisals.length" class="why-appraisals">
                 <h5>{{ t('game.world_journal.why_decision_appraisals') }}</h5>
@@ -1027,67 +1030,6 @@ onMounted(() => {
   display: flex;
 }
 
-/* --- Focus tab: people and objectives --- */
-
-.focus-card {
-  padding: var(--s-5) 0;
-  border: 0;
-  background: transparent;
-}
-
-.focus-card + .focus-card {
-  border-top: 1px solid var(--rule-soft);
-}
-
-.focus-card-header {
-  display: block;
-  width: 100%;
-  min-height: 40px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.focus-card-header:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.focus-objectives {
-  margin: var(--s-4) 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-4);
-}
-
-/* Objectives read as a definition list: tracked term, indented answer. */
-.focus-objective dt {
-  color: var(--text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-}
-
-.focus-objective dd {
-  margin: var(--s-1) 0 0;
-  color: var(--text-primary);
-  font-size: var(--t-md);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-.focus-card > small {
-  display: block;
-  margin-top: var(--s-4);
-  color: var(--text-muted);
-  font-family: var(--font-numeric);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-}
-
 /* --- "Why" causal drill-down overlay --- */
 
 .why-overlay {
@@ -1230,6 +1172,33 @@ onMounted(() => {
   word-break: break-word;
 }
 
+.why-edge-button {
+  width: 100%;
+  margin-top: var(--s-2);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--t-md);
+  line-height: 1.55;
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.why-edge-button:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--gold-600);
+}
+
+.why-edge-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* A pruned edge is absence of evidence, and must read as such. */
 .why-edge-text--pruned {
   color: var(--text-muted);
@@ -1342,6 +1311,43 @@ onMounted(() => {
   margin: var(--s-3) 0 0;
   color: var(--text-muted);
   font-size: var(--t-xs);
+  line-height: 1.5;
+}
+
+.why-rejections {
+  margin-top: var(--s-5);
+}
+
+.why-rejections h5 {
+  margin: 0 0 var(--s-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.why-rejections ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.why-rejections li {
+  display: grid;
+  gap: 2px;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--rule-soft);
+  font-size: var(--t-sm);
+}
+
+.why-rejections li strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.why-rejections li span {
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -1516,15 +1522,15 @@ onMounted(() => {
   .subject-chip,
   .why-retry,
   .why-appraisal-button,
-  .focus-card-header {
+  .why-edge-button {
     min-height: 48px;
   }
 
   .highlight-card p,
   .why-edge-text,
+  .why-edge-button,
   .why-subject,
-  .why-decision-thinking,
-  .focus-objective dd {
+  .why-decision-thinking {
     font-size: 16px;
     line-height: 1.6;
   }

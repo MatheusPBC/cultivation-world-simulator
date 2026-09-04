@@ -4,6 +4,8 @@ import EventStreamList from '@/components/game/EventStreamList.vue'
 import { useI18n } from 'vue-i18n'
 import { useEventPanel } from '@/composables/useEventPanel'
 
+const emit = defineEmits<{ 'open-why': [eventId: string] }>()
+
 const { t } = useI18n()
 const {
   eventStore,
@@ -76,6 +78,8 @@ const {
         :render-segments="renderEventContent"
         :on-avatar-click="handleAvatarClick"
         :on-sect-click="handleSectClick"
+        :on-open-why="(eventId) => emit('open-why', eventId)"
+        :why-label="t('game.world_journal.why_button')"
       />
     </div>
   </section>

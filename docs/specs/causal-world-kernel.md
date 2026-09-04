@@ -832,14 +832,27 @@ Contract rules:
 with the middle two disabled. The slice fills them:
 
 - `now` — unchanged.
-- `focus` — people and objectives, from the existing `ongoing` aggregation plus
-  `Avatar.short_term_objective` / long-term objective.
+- `focus` — open situations assembled from canonical owners: active hazards and
+  conditions, unfinished city projects, impaired infrastructure, an active
+  imperial crisis, and pending Dao petitions. `build_world_situations` is a
+  read-only projection; situations are never persisted and never become a
+  second quest or simulation system. Each item carries its evidence ids,
+  current subjects, age, latest factual event, and the latest domain reaction
+  receipt when one exists.
 - `stories` — `is_story` events for the period, which the current response only
   counts.
 - `timeline` — unchanged; it stays the full paginated `EventPanel` history.
   **Views filter and summarize; they never replace the timeline.**
 - Every event row in every view gets a "why" affordance that opens the §7.1
-  drill-down.
+  drill-down. Cause and effect rows inside that view are themselves navigable,
+  and rejected options show their engine-owned reason rather than only the
+  action name.
+- `get_world_journal` reads its indexed month window through
+  `EventManager.get_events_between_months`; it must not paginate through the
+  complete event store on every simulation tick.
+- The Live Guide may reuse open situations when no recent major event exists.
+  A Chronicle headline is current only when its publication window overlaps the
+  Guide window; an old chapter must never produce a source-less headline.
 
 Frontend obligations (from `.cursor/rules/frontend*.mdc`):
 

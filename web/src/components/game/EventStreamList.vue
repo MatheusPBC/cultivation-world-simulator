@@ -13,6 +13,8 @@ const props = defineProps<{
   renderSegments?: (event: GameEvent) => EventSegment[]
   onAvatarClick?: (avatarId?: string) => void
   onSectClick?: (sectId?: number) => void
+  onOpenWhy?: (eventId: string) => void
+  whyLabel?: string
 }>()
 
 const MAX_VISIBLE_SUBJECTS = 3
@@ -53,7 +55,18 @@ function handleSubjectClick(subject: EventSubject) {
   <div class="event-stream-list">
     <div v-if="events.length === 0" class="event-stream-list__empty">{{ emptyText }}</div>
     <div v-for="event in events" :key="event.id" class="event-stream-list__row">
-      <span class="event-stream-list__date">{{ formatDate(event) }}</span>
+      <div class="event-stream-list__gutter">
+        <span class="event-stream-list__date">{{ formatDate(event) }}</span>
+        <button
+          v-if="onOpenWhy && whyLabel"
+          type="button"
+          class="event-stream-list__why"
+          :aria-label="`${whyLabel}: ${event.content || event.text}`"
+          @click="onOpenWhy?.(event.id)"
+        >
+          {{ whyLabel }}
+        </button>
+      </div>
       <div class="event-stream-list__body">
         <div class="event-stream-list__main">
           <div class="event-stream-list__content">
@@ -144,12 +157,39 @@ function handleSubjectClick(subject: EventSubject) {
 
 /* The dateline gutter: tabular so dates form a true column down the stream. */
 .event-stream-list__date {
-  flex: 0 0 72px;
+  display: block;
   color: var(--text-muted);
   font-family: var(--font-numeric);
   font-size: var(--t-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.event-stream-list__gutter {
+  flex: 0 0 72px;
+}
+
+.event-stream-list__why {
+  min-height: 24px;
+  margin-top: var(--s-1);
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--gold-600);
+  background: transparent;
+  color: var(--accent);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.event-stream-list__why:hover {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent);
+}
+
+.event-stream-list__why:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .event-stream-list__body {
@@ -262,8 +302,20 @@ button.event-stream-list__subject:focus-visible {
   }
 
   .event-stream-list__date {
-    flex-basis: auto;
     font-size: 11px;
+  }
+
+  .event-stream-list__gutter {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+  }
+
+  .event-stream-list__why {
+    min-height: 44px;
+    margin-top: 0;
   }
 }
 </style>

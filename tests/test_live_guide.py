@@ -119,6 +119,42 @@ def test_live_guide_does_not_let_a_stale_chapter_hide_current_highlights():
     assert guide["source_event_ids"] == ["current"]
 
 
+def test_live_guide_uses_an_open_canonical_situation_when_recent_news_is_empty():
+    source = Event(MonthStamp(18), "A enchente continua ativa.", id="flood", created_at=1.0)
+    chapter = ChronicleChapter(
+        id="old-chapter", start_month_stamp=18, end_month_stamp=18, trigger="max_interval",
+        title="Um passado distante",
+        paragraphs=(ChronicleParagraph(
+            segments=(ChronicleSegment(text=source.content),), source_event_ids=(source.id,),
+        ),),
+        source_event_ids=(source.id,), created_at=1.0,
+    )
+    game_world = _world(source, chapter)
+    guide = build_live_guide(
+        game_world,
+        journal={
+            "period": {"start_month_stamp": 22},
+            "highlights": [],
+            "ongoing": [],
+            "situations": [{
+                "id": "hazard:regional_flood",
+                "title": "Enchentes persistentes",
+                "severity": "major",
+                "primary_event_id": source.id,
+                "source_event_ids": [source.id],
+                "subjects": [],
+                "latest_event": {"content": source.content},
+            }],
+        },
+        serialize_events_for_client=_serialize,
+    )
+
+    assert guide["headline"] == "Enchentes persistentes"
+    assert guide["headline"] != chapter.title
+    assert guide["threads"][0]["primary_event_id"] == source.id
+    assert guide["source_event_ids"] == [source.id]
+
+
 @pytest.mark.asyncio
 async def test_live_guide_question_uses_test_mode_fallback_without_provider():
     source = _event("fact-1", "Lin avançou para a fronteira.")

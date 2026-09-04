@@ -331,6 +331,28 @@ class TestWorldJournalAPI:
 
         assert response.status_code == 422
 
+    def test_get_world_journal_queries_only_the_selected_month_window(
+        self,
+        client_with_world,
+        mock_world_with_events,
+        monkeypatch,
+    ):
+        mock_world_with_events.month_stamp = create_month_stamp(Year(100), Month.MAY)
+
+        def fail_if_full_history_is_scanned(*_args, **_kwargs):
+            raise AssertionError("journal must not paginate through the complete event store")
+
+        monkeypatch.setattr(
+            mock_world_with_events.event_manager,
+            "get_events_paginated",
+            fail_if_full_history_is_scanned,
+        )
+
+        response = client_with_world.get("/api/v1/query/world/journal?period_months=3")
+
+        assert response.status_code == 200
+        assert response.json()["data"]["activity"]["total_events"] == 3
+
 
 class TestCleanupEventsAPI:
     """Tests for DELETE /api/v1/command/events/cleanup endpoint."""

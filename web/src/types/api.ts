@@ -562,6 +562,51 @@ export interface WorldJournalOngoingDTO {
   long_term_objective: string;
 }
 
+export type WorldSituationKindDTO =
+  | 'hazard'
+  | 'condition'
+  | 'project'
+  | 'infrastructure'
+  | 'crisis'
+  | 'petition';
+
+export type WorldSituationSeverityDTO = 'critical' | 'major' | 'notable';
+
+export interface WorldSituationSubjectDTO {
+  kind: 'avatar' | 'sect' | 'region' | 'site';
+  id: string;
+  name: string;
+}
+
+export interface WorldSituationResponseDTO {
+  event_id: string;
+  decision: 'maintain' | 'act';
+  reason: string;
+  actor: WorldSituationSubjectDTO | null;
+  rejected: Array<{ action_name: string; reason: string }>;
+}
+
+export interface WorldSituationDTO {
+  id: string;
+  kind: WorldSituationKindDTO;
+  severity: WorldSituationSeverityDTO;
+  status: string;
+  started_month: number;
+  age_months: number;
+  title?: string;
+  title_key: string;
+  title_params: Record<string, string | number>;
+  summary?: string;
+  summary_key: string;
+  summary_params: Record<string, string | number>;
+  primary_event_id: string;
+  source_event_ids: string[];
+  subjects: WorldSituationSubjectDTO[];
+  direct_action: 'dao_petition' | null;
+  latest_response: WorldSituationResponseDTO | null;
+  latest_event: EventDTO | null;
+}
+
 export interface WorldJournalResponseDTO {
   period: {
     months: WorldJournalPeriodMonths;
@@ -573,6 +618,7 @@ export interface WorldJournalResponseDTO {
   stories: EventDTO[];
   stories_truncated: boolean;
   ongoing: WorldJournalOngoingDTO[];
+  situations: WorldSituationDTO[];
 }
 
 // --- Live Guide ---

@@ -115,6 +115,12 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
  * rounded card.
  */
 .chronicle-view {
+  --chronicle-copy: #eee7da;
+  --chronicle-meta: #b5ad9f;
+  --chronicle-event: #f3dfb9;
+  --chronicle-avatar: #a8e3d0;
+  --chronicle-sect: #d8c2f2;
+  --chronicle-region: #b9d7f3;
   min-width: 0;
   padding: var(--s-5);
   overflow-y: auto;
@@ -160,27 +166,29 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
    heading — this is the register's byline. */
 .chronicle-chapter h3 {
   margin: 0;
-  color: var(--text-primary);
+  color: var(--gold-200);
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.3;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .chronicle-trigger {
   flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 10px;
+  color: var(--chronicle-meta);
+  font-size: 11px;
+  line-height: 1.35;
   letter-spacing: var(--tracking-wide);
+  text-align: right;
   text-transform: uppercase;
 }
 
 .chronicle-paragraph {
   margin: var(--s-5) 0 0;
-  color: var(--text-primary);
+  color: var(--chronicle-copy);
   font-family: var(--font-display);
-  font-size: var(--t-lg);
-  line-height: 1.75;
+  font-size: 17px;
+  line-height: 1.78;
   overflow-wrap: anywhere;
 }
 
@@ -193,10 +201,11 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
   display: inline;
   padding: 1px 2px;
   border: 0;
-  border-bottom: 1px solid var(--gold-600);
+  border-bottom: 1px solid color-mix(in srgb, var(--chronicle-event) 65%, transparent);
   background: transparent;
-  color: var(--gold-300);
+  color: var(--chronicle-event);
   font: inherit;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   transition: background var(--motion-fast);
@@ -212,8 +221,8 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
 }
 
 .chronicle-reference--avatar {
-  border-bottom-color: var(--jade-600);
-  color: var(--jade-300);
+  border-bottom-color: color-mix(in srgb, var(--chronicle-avatar) 65%, transparent);
+  color: var(--chronicle-avatar);
 }
 
 .chronicle-reference--avatar:hover {
@@ -221,21 +230,21 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
 }
 
 .chronicle-reference--sect {
-  border-bottom-color: var(--cinnabar-400);
-  color: var(--cinnabar-300);
+  border-bottom-color: color-mix(in srgb, var(--chronicle-sect) 65%, transparent);
+  color: var(--chronicle-sect);
 }
 
 .chronicle-reference--sect:hover {
-  background: var(--cinnabar-wash);
+  background: rgba(216, 194, 242, 0.1);
 }
 
 .chronicle-reference--region {
-  border-bottom-color: var(--paper-700);
-  color: var(--paper-200);
+  border-bottom-color: color-mix(in srgb, var(--chronicle-region) 65%, transparent);
+  color: var(--chronicle-region);
 }
 
 .chronicle-reference--region:hover {
-  background: var(--surface-raised);
+  background: rgba(185, 215, 243, 0.1);
 }
 
 /* Fact vs inference is an epistemic distinction: it stays legible as a tracked
@@ -251,28 +260,30 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
 }
 
 .chronicle-badge--fact {
-  border: 1px solid var(--jade-600);
-  color: var(--jade-300);
+  border: 1px solid color-mix(in srgb, var(--chronicle-avatar) 55%, transparent);
+  background: rgba(168, 227, 208, 0.11);
+  color: var(--chronicle-avatar);
 }
 
 .chronicle-badge--inference {
-  border: 1px dashed var(--gold-600);
-  color: var(--gold-300);
+  border: 1px dashed color-mix(in srgb, var(--chronicle-event) 55%, transparent);
+  background: rgba(243, 223, 185, 0.1);
+  color: var(--chronicle-event);
 }
 
 .chronicle-reference__label {
   margin-left: var(--s-1);
-  color: var(--text-muted);
+  color: var(--chronicle-meta);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .chronicle-source-count {
   display: block;
   margin-top: var(--s-4);
-  color: var(--text-muted);
+  color: var(--chronicle-meta);
   font-family: var(--font-numeric);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -311,12 +322,24 @@ function referenceLabel(reference: ChronicleReferenceDTO) {
   }
 
   .chronicle-paragraph {
-    font-size: 16px;
-    line-height: 1.7;
+    font-size: 17px;
+    line-height: 1.78;
   }
 
   .chronicle-load-more {
     min-height: 48px;
+  }
+}
+
+@container journal (max-width: 460px) {
+  .chronicle-chapter__header {
+    display: block;
+  }
+
+  .chronicle-trigger {
+    display: block;
+    margin-top: var(--s-2);
+    text-align: left;
   }
 }
 </style>

@@ -159,6 +159,47 @@ def build_live_guide(
         used_source_ids.add(event_id)
         event_by_id[event_id] = event
 
+    # Canonical situations remain relevant even when their originating event
+    # falls outside the three-month news window.  They keep the Guide current
+    # without asking narrative text to invent continuity.
+    for situation in journal.get("situations") or []:
+        event_id = str(situation.get("primary_event_id") or "")
+        if not event_id or event_id in used_source_ids:
+            continue
+        event = manager.get_event_by_id(event_id)
+        if event is None:
+            continue
+        event_dto = situation.get("latest_event") or {}
+        event_text = _trim(
+            str(event_dto.get("content") or event_dto.get("text") or event.content),
+            360,
+        )
+        title = _trim(str(situation.get("title") or event_text), 88)
+        situation_source_ids = _unique_existing_event_ids(
+            manager, situation.get("source_event_ids") or [event_id]
+        )
+        threads.append(
+            {
+                "id": f"situation-thread-{situation['id']}",
+                "title": title,
+                "summary": event_text,
+                "severity": str(situation.get("severity") or "notable"),
+                "primary_event_id": event_id,
+                "source_event_ids": situation_source_ids,
+                "subjects": [
+                    dict(subject)
+                    for subject in situation.get("subjects") or []
+                    if subject.get("kind") in {"avatar", "sect"}
+                ],
+                "_sort_month_stamp": int(world.month_stamp),
+            }
+        )
+        used_source_ids.update(situation_source_ids)
+        for source_id in situation_source_ids:
+            source_event = manager.get_event_by_id(source_id)
+            if source_event is not None:
+                event_by_id[source_id] = source_event
+
     threads.sort(key=lambda item: (-int(item["_sort_month_stamp"]), item["id"]))
     threads = threads[:3]
     for item in threads:
@@ -169,7 +210,12 @@ def build_live_guide(
 
     month_stamp = world.month_stamp
     latest_thread_month = max((int(event.month_stamp) for event in source_events), default=-1)
-    chapter_is_current = latest_chapter is not None and int(latest_chapter.end_month_stamp) >= latest_thread_month
+    chapter_is_current = (
+        latest_chapter is not None
+        and bool(source_events)
+        and int(latest_chapter.end_month_stamp) >= period_start
+        and int(latest_chapter.end_month_stamp) >= latest_thread_month
+    )
     headline = str(getattr(latest_chapter, "title", "") or "") if chapter_is_current else ""
     if not headline and threads:
         headline = str(threads[0]["title"])
@@ -197,6 +243,14 @@ def build_live_guide(
             "source_event_ids": list(dict.fromkeys(str(event.id) for event in source_events)),
         },
     }
+
+
+def _unique_existing_event_ids(manager: Any, event_ids: Any) -> list[str]:
+    return [
+        event_id
+        for event_id in dict.fromkeys(str(item) for item in event_ids if item)
+        if manager.get_event_by_id(event_id) is not None
+    ]
 
 
 def _event_prompt_row(event: Any) -> dict[str, Any]:

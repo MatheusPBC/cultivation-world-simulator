@@ -650,22 +650,18 @@ def get_world_journal(
 
     end_month_stamp = int(world.month_stamp)
     start_month_stamp = end_month_stamp - period_months + 1
-    period_events: list[Any] = []
-    cursor: str | None = None
+    from src.classes.event import FactKind
+    from src.systems.world_situation_service import build_world_situations
 
-    while True:
-        events, next_cursor, has_more = event_manager.get_events_paginated(
-            cursor=cursor,
-            limit=500,
+    # The Journal is refreshed every simulation tick.  Query the indexed month
+    # window directly instead of walking the complete persisted event history.
+    period_events = [
+        event
+        for event in reversed(
+            event_manager.get_events_between_months(start_month_stamp, end_month_stamp)
         )
-        for event in events:
-            event_month_stamp = int(event.month_stamp)
-            if start_month_stamp <= event_month_stamp <= end_month_stamp:
-                period_events.append(event)
-
-        if not has_more or next_cursor is None:
-            break
-        cursor = next_cursor
+        if getattr(event, "fact_kind", FactKind.OCCURRENCE) is not FactKind.DECISION
+    ]
 
     major_count = sum(bool(event.is_major) and not bool(event.is_story) for event in period_events)
     story_count = sum(bool(event.is_story) for event in period_events)
@@ -699,6 +695,20 @@ def get_world_journal(
         )
     ongoing.sort(key=lambda item: (-item["event_count"], item["avatar_name"], item["avatar_id"]))
 
+    situations = build_world_situations(world)
+    for situation in situations:
+        primary_event_id = str(situation.get("primary_event_id") or "")
+        primary_event = (
+            event_manager.get_event_by_id(primary_event_id)
+            if primary_event_id
+            else None
+        )
+        situation["latest_event"] = (
+            serialize_events_for_client([primary_event], world=world)[0]
+            if primary_event is not None
+            else None
+        )
+
     return {
         "period": {
             "months": period_months,
@@ -716,6 +726,7 @@ def get_world_journal(
         "stories": serialize_events_for_client(stories[:WORLD_JOURNAL_STORY_LIST_CAP], world=world),
         "stories_truncated": len(stories) > WORLD_JOURNAL_STORY_LIST_CAP,
         "ongoing": ongoing[:5],
+        "situations": situations,
     }
 
 

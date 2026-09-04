@@ -76,6 +76,17 @@ function createJournalI18n() {
             focus_short_term: 'Meta de curto prazo',
             focus_long_term: 'Meta de longo prazo',
             focus_no_objective: 'Nenhuma meta definida.',
+            situations: {
+              eyebrow: 'Agora requer atencao', title: 'Situacoes em aberto', description: 'Assuntos persistentes.', empty: 'Nenhuma situacao aberta.',
+              kind: { hazard: 'Perigo regional', condition: 'Condicao', project: 'Projeto', infrastructure: 'Infraestrutura', crisis: 'Crise', petition: 'Suplica' },
+              open_for: '{count} meses em aberto', flood_title: 'Enchentes em {count} regioes', flood_summary: 'Risco de {risk}% ha {age} meses.',
+              condition_title: '{label}', condition_group_title: '{label} em {count} alvos', condition_summary: 'Intensidade {intensity}%.',
+              project_title: 'Expansao em {region}', project_summary: 'Progresso {progress}%.', infrastructure_title: '{site} precisa de atencao',
+              infrastructure_summary: 'Integridade {integrity}%.', imperial_crisis_title: 'Trono em disputa', imperial_crisis_summary: '{claims} pretensoes.',
+              petition_title: '{initiator} pede resposta', petition_summary: 'Sem resposta.', event_date: 'Ano {year}, mes {month}', involved: 'Envolvidos',
+              latest_fact: 'Ultimo fato', latest_response: 'Ultima reacao', response_maintain: 'Manteve', response_act: 'Agiu', paths: 'O que posso fazer',
+              understand: 'Entender causas', open_subject: 'Abrir {name}', answer_dao: 'Responder no Dao',
+            },
             stories_empty: 'Nenhuma historia neste periodo.',
             stories_truncated: 'Mostrando as {count} historias mais recentes.',
             why_button: 'Por que?',
@@ -223,6 +234,17 @@ const baseJournal = {
       long_term_objective: 'Ascender a imortalidade',
     },
   ],
+  situations: [{
+    id: 'hazard:regional_flood', kind: 'hazard', severity: 'major', status: 'active',
+    started_month: 1198, age_months: 7, title_key: 'flood_title', title_params: { count: 1 },
+    summary_key: 'flood_summary', summary_params: { count: 1, age: 7, risk: 82, damaged: 1 },
+    primary_event_id: 'major-1', source_event_ids: ['major-1'],
+    subjects: [{ kind: 'region', id: '7', name: 'Pantano das Sombras' }], direct_action: null,
+    latest_response: null, latest_event: {
+      id: 'major-1', text: 'Uma enchente comecou.', content: 'Uma enchente comecou.', year: 100, month: 5,
+      month_stamp: 1204, related_avatar_ids: [], subjects: [], is_major: true, is_story: false, created_at: 1,
+    },
+  }],
 }
 
 const baseGuide = {
@@ -517,26 +539,27 @@ describe('WorldJournalPanel', () => {
     expect(whyOverlay.classes()).toContain('why-overlay--above-dossier')
   })
 
-  it('shows people and objectives in the Focus tab', async () => {
+  it('shows persistent canonical situations in the Focus tab', async () => {
     const wrapper = mountPanel()
     await settlePromises()
 
     await wrapper.get('[data-testid="journal-tab-focus"]').trigger('click')
     const focus = wrapper.get('[data-testid="journal-focus"]')
 
-    expect(focus.text()).toContain('Alice')
-    expect(focus.text()).toContain('Cultivando')
-    expect(focus.text()).toContain('Alcancar o proximo reino')
-    expect(focus.text()).toContain('Ascender a imortalidade')
+    expect(focus.text()).toContain('Situacoes em aberto')
+    expect(focus.text()).toContain('Enchentes em 1 regioes')
+    expect(focus.text()).toContain('Pantano das Sombras')
+    expect(focus.text()).toContain('Uma enchente comecou.')
+    expect(focus.text()).toContain('O que posso fazer')
   })
 
-  it('shows the focus empty state when nothing is ongoing', async () => {
-    fetchWorldJournalMock.mockResolvedValue({ ...baseJournal, ongoing: [] })
+  it('shows the situation empty state when the canonical owners are quiet', async () => {
+    fetchWorldJournalMock.mockResolvedValue({ ...baseJournal, situations: [] })
     const wrapper = mountPanel()
     await settlePromises()
 
     await wrapper.get('[data-testid="journal-tab-focus"]').trigger('click')
-    expect(wrapper.get('[data-testid="journal-focus"]').text()).toContain('Nenhum dado em foco para este periodo.')
+    expect(wrapper.get('[data-testid="journal-focus"]').text()).toContain('Nenhuma situacao aberta.')
   })
 
   it('shows story events in the Stories tab', async () => {
@@ -649,6 +672,9 @@ describe('WorldJournalPanel', () => {
     expect(measurements.text()).toContain('stock(grain)')
     await measurements.get('[data-testid="why-measurement-source-event-measurement-source"]').trigger('click')
     expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('measurement-source')
+
+    await overlay.get('.why-edge-button').trigger('click')
+    expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('cause-1')
 
     await overlay.get('.why-close').trigger('click')
     expect(wrapper.find('[data-testid="why-overlay"]').exists()).toBe(false)
