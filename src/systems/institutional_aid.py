@@ -17,10 +17,7 @@ from src.classes.institution import (
     CommitmentTermStatus,
     Institution,
     InstitutionalCommitment,
-    InstitutionalFactKnowledge,
-    InstitutionalMemory,
     InstitutionKind,
-    KnowledgeChannel,
 )
 from src.classes.mechanical_language import EntityRef
 from src.classes.state_delta import StateDelta
@@ -35,6 +32,11 @@ from src.systems.domain_affordance_registry import (
 )
 from src.systems.domain_decision_interpreter import interpret_domain_affordances
 from src.systems.institution_authority import can_actor_act_for
+from src.systems.institutional_memory import (
+    decision_context as institutional_decision_context,
+    record_known_fact,
+    reinforce_from_evidence,
+)
 from src.systems.resource_transfer import resolve_specified_resource_transfer
 
 REQUEST_DOMAIN = "institutional_aid_request"
@@ -47,12 +49,6 @@ FULFILL_ACTION = "fulfill_institutional_aid_term"
 REMEDIATE_ACTION = "propose_institutional_aid_remediation"
 INTERPRETER_TEMPLATE = "institutional_aid_interpreter.txt"
 INSTALLMENT_DUE_OFFSETS = (1, 2)
-MEMORY_FACTOR_NAMES = (
-    "relative_scale",
-    "institutional_change",
-    "commitment_breach",
-    "identity_anchor_impact",
-)
 
 
 def city_institution_id(region_id: int | str) -> str:
@@ -796,67 +792,12 @@ def _record_institutional_fact(
     *,
     memory_factors: tuple[tuple[str, float], ...] = (),
 ) -> None:
-    payload = event.causal_payload
-    if not isinstance(payload, dict):
-        raise TypeError("institutional fact event requires a causal payload")
-    deltas = list(payload.get("deltas") or [])
-    for institution_id in tuple(dict.fromkeys(institution_ids)):
-        was_known = world.institutional_knowledge.contains(institution_id, event.id)
-        world.institutional_knowledge.record(
-            InstitutionalFactKnowledge(
-                institution_id=institution_id,
-                event_id=event.id,
-                learned_month=int(world.month_stamp),
-                channel=KnowledgeChannel.FORMAL_NOTICE,
-                learned_from_event_id=event.id,
-            ),
-            world.institutional_authority,
-        )
-        if not was_known:
-            deltas.append(
-                StateDelta(
-                    event_id=event.id,
-                    owner_kind="institutional_knowledge",
-                    owner_id=institution_id,
-                    aspect=f"known_fact:{event.id}",
-                    before="unknown",
-                    after="known",
-                ).to_dict()
-            )
-        if not memory_factors:
-            continue
-        provided_factors = dict(memory_factors)
-        normalized_factors = tuple(
-            (name, max(0.0, min(1.0, float(provided_factors.get(name, 0.0)))))
-            for name in MEMORY_FACTOR_NAMES
-        )
-        memory = InstitutionalMemory(
-            institution_id=institution_id,
-            event_id=event.id,
-            salience=sum(value for _, value in normalized_factors)
-            / len(MEMORY_FACTOR_NAMES),
-            recorded_month=int(world.month_stamp),
-            last_reinforced_month=int(world.month_stamp),
-            factors=normalized_factors,
-        )
-        if memory.id not in world.institutional_relations.memories:
-            world.institutional_relations.add_memory(
-                memory,
-                world.institutional_knowledge,
-                world.institutional_authority,
-            )
-            deltas.append(
-                StateDelta(
-                    event_id=event.id,
-                    owner_kind="institutional_memory",
-                    owner_id=memory.id,
-                    aspect="salience",
-                    before="none",
-                    after=str(memory.salience),
-                    magnitude=memory.salience,
-                ).to_dict()
-            )
-    payload["deltas"] = deltas
+    record_known_fact(
+        world,
+        event,
+        institution_ids,
+        factors=dict(memory_factors) if memory_factors else None,
+    )
 
 
 def _mark_term_fulfilled(
@@ -920,14 +861,16 @@ def _mark_term_fulfilled(
         )
     )
     if before_status is CommitmentTermStatus.REMEDIATION_PROPOSED:
-        for breach_event_id in current_term.breach_event_ids:
-            event.causal_links.append(
-                CausalLink(
-                    event_id=event.id,
-                    cause_event_id=breach_event_id,
-                    relation=CausalRelation.RESOLVES,
-                )
+        # The newest breach points to its predecessor, so one RESOLVES edge to
+        # the newest breach keeps the complete history navigable without
+        # crowding out the material transfer edge under the global cap of 8.
+        event.causal_links.append(
+            CausalLink(
+                event_id=event.id,
+                cause_event_id=current_term.breach_event_ids[-1],
+                relation=CausalRelation.RESOLVES,
             )
+        )
     params = {**dict(current_term.parameters), "resource_id": current_term.subject.id}
     _record_institutional_fact(
         world,
@@ -1016,6 +959,14 @@ def process_institutional_aid_deadlines(
                     relation=CausalRelation.TRIGGERED_BY,
                 )
             )
+            if term.breach_event_ids:
+                event.causal_links.append(
+                    CausalLink(
+                        event_id=event.id,
+                        cause_event_id=term.breach_event_ids[-1],
+                        relation=CausalRelation.RESPONSE_TO,
+                    )
+                )
             params = {**dict(term.parameters), "resource_id": term.subject.id}
             _record_institutional_fact(
                 world,
@@ -1028,6 +979,16 @@ def process_institutional_aid_deadlines(
                     commitment_breach=1.0,
                 ),
             )
+            # The latest predecessor is sufficient: breach events themselves
+            # form a navigable chain, while memory work remains bounded.
+            if term.breach_event_ids:
+                for institution_id in commitment.party_ids:
+                    reinforce_from_evidence(
+                        world,
+                        institution_id=institution_id,
+                        remembered_event_id=term.breach_event_ids[-1],
+                        evidence_event=event,
+                    )
             produced.append(event)
     return produced
 
@@ -1061,7 +1022,14 @@ async def process_institutional_aid_shortage(
         affordances=request_options,
         task_name="institutional_aid_request_interpreter",
         template_name=INTERPRETER_TEMPLATE,
-        extra_context={"role": "requester"},
+        extra_context={
+            "role": "requester",
+            "institution": institutional_decision_context(
+                world,
+                city_institution_id(destination.id),
+                event_overlays=(shortage_event,),
+            ),
+        },
         llm_call=llm_call,
         force_rule=request_force_rule,
     )
@@ -1106,7 +1074,14 @@ async def process_institutional_aid_shortage(
         affordances=response_options,
         task_name="institutional_aid_response_interpreter",
         template_name=INTERPRETER_TEMPLATE,
-        extra_context={"role": "provider"},
+        extra_context={
+            "role": "provider",
+            "institution": institutional_decision_context(
+                world,
+                city_institution_id(provider.id),
+                event_overlays=(request_event,),
+            ),
+        },
         llm_call=llm_call,
         force_rule=response_force_rule,
     )
@@ -1195,7 +1170,15 @@ async def process_institutional_aid_fulfillment(
                 affordances=options,
                 task_name="institutional_aid_fulfillment_interpreter",
                 template_name=INTERPRETER_TEMPLATE,
-                extra_context={"role": "obligor", "commitment_id": commitment.id},
+                extra_context={
+                    "role": "obligor",
+                    "commitment_id": commitment.id,
+                    "institution": institutional_decision_context(
+                        world,
+                        city_institution_id(source.id),
+                        event_overlays=(trigger,),
+                    ),
+                },
                 llm_call=llm_call,
                 force_rule=not use_llm,
             )
@@ -1299,7 +1282,15 @@ async def process_institutional_aid_remediation(
             affordances=options,
             task_name="institutional_aid_remediation_interpreter",
             template_name=INTERPRETER_TEMPLATE,
-            extra_context={"role": "obligor", "commitment_id": commitment.id},
+            extra_context={
+                "role": "obligor",
+                "commitment_id": commitment.id,
+                "institution": institutional_decision_context(
+                    world,
+                    city_institution_id(source.id),
+                    event_overlays=(breach,),
+                ),
+            },
             llm_call=llm_call,
             force_rule=not use_llm,
         )

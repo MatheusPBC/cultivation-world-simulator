@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { DOMWrapper, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -172,11 +172,21 @@ function createJournalI18n() {
 }
 
 function mountPanel() {
-  return mount(WorldJournalPanel, {
+  const wrapper = mount(WorldJournalPanel, {
     global: {
       plugins: [createPinia(), createJournalI18n()],
     },
   })
+  mountedPanels.push(wrapper)
+  return wrapper
+}
+
+const mountedPanels: ReturnType<typeof mount>[] = []
+
+function teleportedWhyOverlay() {
+  const element = document.body.querySelector<HTMLElement>('[data-testid="why-overlay"]')
+  if (!element) throw new Error('Expected Why overlay in document.body')
+  return new DOMWrapper(element)
 }
 
 async function settlePromises() {
@@ -278,6 +288,7 @@ describe('WorldJournalPanel', () => {
   })
 
   afterEach(() => {
+    mountedPanels.splice(0).forEach((wrapper) => wrapper.unmount())
     vi.useFakeTimers()
   })
 
@@ -477,7 +488,9 @@ describe('WorldJournalPanel', () => {
     await wrapper.get('[data-testid="guide-why-major-1"]').trigger('click')
     await settlePromises()
     expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('major-1')
-    expect(wrapper.get('[data-testid="why-overlay"]').exists()).toBe(true)
+    const overlay = teleportedWhyOverlay()
+    expect(overlay.exists()).toBe(true)
+    expect(overlay.element.parentElement).toBe(document.body)
   })
 
   it('asks the Chronicler and keeps the answer citation clickable', async () => {
@@ -534,9 +547,10 @@ describe('WorldJournalPanel', () => {
     await wrapper.get('[data-testid="dossier-why-event-1"]').trigger('click')
     await settlePromises()
 
-    const whyOverlay = wrapper.get('[data-testid="why-overlay"]')
+    const whyOverlay = teleportedWhyOverlay()
+    expect(whyOverlay.element.parentElement).toBe(document.body)
     expect(whyOverlay.isVisible()).toBe(true)
-    expect(whyOverlay.classes()).toContain('why-overlay--above-dossier')
+    expect(whyOverlay.element.closest('[data-testid="chronicle-dossier"]')).toBeNull()
   })
 
   it('shows persistent canonical situations in the Focus tab', async () => {
@@ -655,7 +669,7 @@ describe('WorldJournalPanel', () => {
     await settlePromises()
 
     expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('major-1')
-    const overlay = wrapper.get('[data-testid="why-overlay"]')
+    const overlay = teleportedWhyOverlay()
     expect(overlay.text()).toContain('Alice decidiu avancar.')
     expect(overlay.text()).toContain('(removido do historico)')
     expect(overlay.text()).toContain('realm')
@@ -677,7 +691,7 @@ describe('WorldJournalPanel', () => {
     expect(fetchEventCausalDetailMock).toHaveBeenCalledWith('cause-1')
 
     await overlay.get('.why-close').trigger('click')
-    expect(wrapper.find('[data-testid="why-overlay"]').exists()).toBe(false)
+    expect(document.body.querySelector('[data-testid="why-overlay"]')).toBeNull()
   })
 
   it('shows a loading state then an error with retry when the why query fails', async () => {
@@ -689,7 +703,7 @@ describe('WorldJournalPanel', () => {
     await wrapper.get('.why-button').trigger('click')
     await settlePromises()
 
-    const overlay = wrapper.get('[data-testid="why-overlay"]')
+    const overlay = teleportedWhyOverlay()
     expect(overlay.text()).toContain('Nao foi possivel carregar a cadeia causal.')
     expect(overlay.find('.why-retry').exists()).toBe(true)
   })

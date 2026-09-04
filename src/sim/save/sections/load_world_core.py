@@ -40,7 +40,9 @@ class WorldCoreLoadSection:
         world = World.create_with_db(
             map=game_map,
             month_stamp=MonthStamp(world_data["month_stamp"]),
-            events_db_path=get_events_db_path(Path(context.save_path)),
+            events_db_path=get_events_db_path(
+                Path(context.save_path), context.save_data["meta"]["events_db"]
+            ),
             start_year=world_data.get("start_year", 100),
         )
         context.world = world

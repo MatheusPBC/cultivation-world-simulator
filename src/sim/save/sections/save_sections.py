@@ -153,20 +153,6 @@ class AvatarsSection:
         return [avatar.to_save_dict() for avatar in context.world.avatar_manager._iter_all_avatars()]
 
 
-class EventsSection:
-    key = "events"
-
-    def dump(self, context: SaveContext) -> list[dict[str, Any]]:
-        max_events = app_config.CONFIG.save.max_events_to_save
-        return [
-            event.to_dict()
-            for event in context.world.event_manager.get_recent_events(
-                limit=max_events,
-                include_decisions=True,
-            )
-        ]
-
-
 class SimulatorSection:
     key = "simulator"
 

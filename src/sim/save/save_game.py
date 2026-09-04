@@ -8,13 +8,16 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
 import src.utils.config as app_config
-from src.sim.load.load_game import get_events_db_path
+from src.classes.event_storage import EventStorage
 from src.sim.save.sections.base import SaveContext
 from src.sim.save.sections.registry import dump_save_data
 
@@ -60,23 +63,65 @@ def _resolve_save_path(
     return saves_dir / filename
 
 
-def _copy_events_database_if_needed(world: "World", events_db_path: Path) -> None:
+def _snapshot_events_database(world: "World", events_db_path: Path) -> None:
+    """Materialize the authoritative event history into a SQLite sidecar."""
     storage = getattr(getattr(world, "event_manager", None), "_storage", None)
-    if storage is None:
+    if storage is not None:
+        storage.backup_to(events_db_path)
         return
 
-    current_db_path = storage._db_path
-    if current_db_path == events_db_path:
+    snapshot = EventStorage(events_db_path)
+    try:
+        events = world.event_manager.get_events_between_months(-2**63, 2**63 - 1)
+        if not snapshot.commit_step(events):
+            raise RuntimeError("Failed to materialize in-memory event history")
+        chapters = []
+        cursor = None
+        while True:
+            page, cursor, has_more = world.event_manager.get_chronicle_chapters_page(
+                cursor, limit=100
+            )
+            chapters.extend(page)
+            if not has_more:
+                break
+        for chapter in reversed(chapters):
+            if not snapshot.append_chronicle_chapter(chapter):
+                raise RuntimeError("Failed to materialize in-memory chronicle history")
+    finally:
+        snapshot.close()
+
+
+def _temporary_path(destination: Path, suffix: str) -> Path:
+    handle, raw_path = tempfile.mkstemp(
+        prefix=f".{destination.stem}.",
+        suffix=suffix,
+        dir=destination.parent,
+    )
+    os.close(handle)
+    return Path(raw_path)
+
+
+def _validate_institutional_evidence(world: "World", events_db_path: Path) -> None:
+    references = world.event_manager.collect_event_reference_ids(
+        [
+            world.institutional_authority.to_dict(),
+            world.institutional_knowledge.to_dict(),
+            world.institutional_relations.to_dict(),
+        ]
+    )
+    if not references:
         return
-
-    import shutil
-
-    if current_db_path.exists():
-        events_db_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(current_db_path, events_db_path)
-        print(f"Copied events database: {current_db_path} -> {events_db_path}")
-    else:
-        print(f"Warning: Current events database not found: {current_db_path}")
+    storage = EventStorage(events_db_path)
+    try:
+        missing = sorted(
+            event_id for event_id in references if storage.get_event_by_id(event_id) is None
+        )
+    finally:
+        storage.close()
+    if missing:
+        raise ValueError(
+            "Save would lose canonical causal evidence: " + ", ".join(missing)
+        )
 
 
 def save_game(
@@ -94,22 +139,38 @@ def save_game(
             save_path=save_path,
             custom_name=custom_name,
         )
-        events_db_path = get_events_db_path(resolved_save_path)
-        _copy_events_database_if_needed(world, events_db_path)
-
-        context = SaveContext(
-            world=world,
-            simulator=simulator,
-            existed_sects=list(existed_sects),
-            save_path=resolved_save_path,
-            events_db_path=events_db_path,
-            custom_name=custom_name,
-            is_auto_save=is_auto_save,
+        events_db_path = resolved_save_path.with_name(
+            f"{resolved_save_path.stem}_events.{uuid.uuid4().hex}.db"
         )
-        save_data = dump_save_data(context)
+        temporary_events_db_path = _temporary_path(events_db_path, ".db")
+        temporary_save_path = _temporary_path(resolved_save_path, ".json")
+        try:
+            _snapshot_events_database(world, temporary_events_db_path)
+            _validate_institutional_evidence(world, temporary_events_db_path)
 
-        with open(resolved_save_path, "w", encoding="utf-8") as f:
-            json.dump(save_data, f, ensure_ascii=False, indent=2)
+            context = SaveContext(
+                world=world,
+                simulator=simulator,
+                existed_sects=list(existed_sects),
+                save_path=resolved_save_path,
+                events_db_path=events_db_path,
+                custom_name=custom_name,
+                is_auto_save=is_auto_save,
+            )
+            save_data = dump_save_data(context)
+
+            with open(temporary_save_path, "w", encoding="utf-8") as f:
+                json.dump(save_data, f, ensure_ascii=False, indent=2)
+
+            os.replace(temporary_events_db_path, events_db_path)
+            try:
+                os.replace(temporary_save_path, resolved_save_path)
+            except Exception:
+                events_db_path.unlink(missing_ok=True)
+                raise
+        finally:
+            temporary_events_db_path.unlink(missing_ok=True)
+            temporary_save_path.unlink(missing_ok=True)
 
         print(f"Game saved to: {resolved_save_path}")
         return True, resolved_save_path.name

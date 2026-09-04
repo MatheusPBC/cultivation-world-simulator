@@ -22,8 +22,8 @@ def trigger_auto_save(*, world, sim, sects_by_id) -> None:
         if not oldest_path.exists():
             continue
         try:
-            os.remove(oldest_path)
             db_path = get_events_db_path(oldest_path)
+            os.remove(oldest_path)
             if db_path.exists():
                 os.remove(db_path)
             print(f"[Auto-Save] Removed old auto save: {oldest_path.name}")

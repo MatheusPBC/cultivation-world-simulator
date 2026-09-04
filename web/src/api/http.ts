@@ -110,8 +110,8 @@ async function request<T>(
 }
 
 export const httpClient = {
-  get<T>(path: string) {
-    return request<T>(path, { method: 'GET' });
+  get<T>(path: string, options?: HttpRequestOptions) {
+    return request<T>(path, { method: 'GET' }, options);
   },
 
   post<T>(path: string, body: unknown, options?: HttpRequestOptions) {
@@ -148,4 +148,3 @@ export const httpClient = {
     return request<T>(path, { method: 'DELETE' });
   }
 };
-

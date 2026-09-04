@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
@@ -7,6 +8,7 @@ from src.classes.environment.city_state import CityGovernance
 from src.classes.environment.region import CityRegion
 from src.classes.environment.route import Route
 from src.classes.event import Event, FactKind
+from src.classes.causal_link import MAX_CAUSAL_LINKS_PER_EVENT
 from src.classes.mechanical_language import EntityRef
 from src.classes.regional_economy import RegionalEconomyState
 from src.sim.simulator_engine.domain_invalidation import DomainInvalidationQueue
@@ -19,6 +21,14 @@ from src.systems.domain_affordance_registry import (
 from src.systems.economy_reactivity import process_economy_reactivity
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
 from src.systems.institutional_aid import FULFILLMENT_DOMAIN, REQUEST_DOMAIN
+from src.systems.institutional_memory import (
+    decision_context,
+    effective_salience,
+    record_known_fact,
+    reinforce_from_evidence,
+)
+from src.utils.llm.prompt import build_prompt
+from src.server.assemblers.institutional_chain import build_institutional_chain
 
 
 async def _select_first(_task, _template, context, **_kwargs):
@@ -100,6 +110,87 @@ async def test_request_and_independent_acceptance_create_terms_without_moving_st
     validate_causal_integrity(
         SimpleNamespace(world=base_world),
         [shortage, *events],
+    )
+
+
+@pytest.mark.asyncio
+async def test_aid_template_receives_bounded_known_context_in_real_prompt_builder(
+    base_world,
+):
+    _source, _destination, shortage = _setup(base_world)
+    events = await process_economy_reactivity(
+        base_world,
+        current_events=[shortage],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    accepted = next(event for event in events if event.event_type == "institutional_aid_accepted")
+    context = decision_context(
+        base_world,
+        "inst:city:302",
+        event_overlays=(accepted,),
+    )
+    template = Path("static/locales/en-US/templates/institutional_aid_interpreter.txt").read_text(
+        encoding="utf-8"
+    )
+    prompt = build_prompt(
+        template,
+        {
+            "actor": "City 302",
+            "trigger": {"event_id": accepted.id, "event_type": accepted.event_type},
+            "affordances": [{"id": "aid-option"}],
+            "context": {"role": "provider", "institution": context},
+        },
+    )
+    assert "City 302" in prompt
+    assert accepted.id in prompt
+    assert accepted.event_type in prompt
+    assert "aid-option" in prompt
+    assert "known_facts" in prompt
+
+
+def test_memory_decay_and_reinforcement_require_distinct_known_canonical_evidence(
+    base_world,
+):
+    _source, _destination, _shortage = _setup(base_world)
+    institution_id = "inst:city:302"
+    remembered = Event(
+        base_world.month_stamp,
+        "A canonical institutional event occurred.",
+        event_type="institutional_aid_accepted",
+        causal_payload={"deltas": []},
+        id="memory:remembered",
+    )
+    factors = {"relative_scale": 0.4, "institutional_change": 1.0}
+    record_known_fact(base_world, remembered, (institution_id,), factors=factors)
+    memory = base_world.institutional_relations.memories[
+        f"memory:{institution_id}:{remembered.id}"
+    ]
+    base_world.month_stamp += 12
+    assert effective_salience(memory, base_world.month_stamp) == pytest.approx(memory.salience / 2)
+
+    evidence = Event(
+        base_world.month_stamp,
+        "A distinct canonical breach confirmed the earlier obligation mattered.",
+        event_type="institutional_commitment_term_breached",
+        causal_payload={"deltas": []},
+        id="memory:evidence",
+    )
+    record_known_fact(base_world, evidence, (institution_id,))
+    assert reinforce_from_evidence(
+        base_world,
+        institution_id=institution_id,
+        remembered_event_id=remembered.id,
+        evidence_event=evidence,
+    )
+    refreshed = base_world.institutional_relations.memories[memory.id]
+    assert refreshed.factors == memory.factors
+    assert refreshed.last_reinforced_month == base_world.month_stamp
+    assert not reinforce_from_evidence(
+        base_world,
+        institution_id=institution_id,
+        remembered_event_id=remembered.id,
+        evidence_event=evidence,
     )
 
 
@@ -302,7 +393,61 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         if event.event_type == "institutional_commitment_term_remediated"
         for link in event.causal_links
     }
-    assert set(resolved.terms[1].breach_event_ids).issubset(resolved_causes)
+    # A remediated event retains a direct edge to the newest breach only.  Each
+    # repeated breach points to its predecessor, so the entire breach history
+    # stays navigable without ever exceeding the global eight-edge cap.
+    assert resolved.terms[1].breach_event_ids[-1] in resolved_causes
+    assert len(
+        [
+            link
+            for link in repeated_breach_events[0].causal_links
+            if link.cause_event_id == breach_events[0].id
+        ]
+    ) == 1
+    assert all(
+        len(event.causal_links) <= MAX_CAUSAL_LINKS_PER_EVENT
+        for event in [*breach_events, *repeated_breach_events, *resolved_events]
+    )
     assert source.economy.stocks["grain"] == source_before - 2
     assert destination.economy.stocks["grain"] == destination_before + 2
     validate_causal_integrity(SimpleNamespace(world=base_world), resolved_events)
+
+
+@pytest.mark.asyncio
+async def test_chain_projects_real_aid_decisions_and_material_transfer(base_world):
+    source, destination, shortage = _setup(base_world)
+    accepted = await process_economy_reactivity(
+        base_world,
+        current_events=[shortage],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert base_world.event_manager.commit_step([shortage, *accepted])
+
+    base_world.month_stamp += 1
+    continued_shortage = Event(
+        base_world.month_stamp,
+        "The shortage remains while aid is due.",
+        event_type="regional_resource_shortage",
+        render_params={"region_id": str(destination.id), "resource_id": "grain"},
+        id="shortage:chain:next",
+    )
+    fulfilled = await process_economy_reactivity(
+        base_world,
+        current_events=[continued_shortage],
+        invalidations=DomainInvalidationQueue(),
+        llm_call=_select_first,
+    )
+    assert base_world.event_manager.commit_step([continued_shortage, *fulfilled])
+
+    chain = build_institutional_chain(
+        base_world,
+        owner_kind="region",
+        owner_id=str(source.id),
+        limit=50,
+    )
+
+    event_types = {event["event_type"] for event in chain["events"]}
+    assert "institutional_aid_fulfillment_interpretation_decision" in event_types
+    assert "regional_resource_transfer_completed" in event_types
+    assert "institutional_commitment_term_fulfilled" in event_types

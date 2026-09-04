@@ -40,6 +40,7 @@ class EventManager:
         """
         self._storage = storage
         self._subject_resolver: Callable[[str], object | None] | None = None
+        self._protected_event_ids_resolver: Callable[[], set[str]] | None = None
         # 内存后备，仅当 storage 为 None 时使用，主要用于测试。
         self._memory_events: List["Event"] = []
         self._memory_chronicle_chapters: list[object] = []
@@ -71,6 +72,34 @@ class EventManager:
 
     def set_subject_resolver(self, resolver: Callable[[str], object | None]) -> None:
         self._subject_resolver = resolver
+
+    def set_protected_event_ids_resolver(self, resolver: Callable[[], set[str]]) -> None:
+        """Keep canonical-state evidence out of maintenance cleanup."""
+        self._protected_event_ids_resolver = resolver
+
+    @staticmethod
+    def collect_event_reference_ids(payload: object) -> set[str]:
+        """Collect conventionally named event references from JSON-safe state."""
+        event_ids: set[str] = set()
+
+        def visit(value: object, key: str | None = None) -> None:
+            if isinstance(value, dict):
+                for child_key, child_value in value.items():
+                    visit(child_value, str(child_key))
+                return
+            if isinstance(value, (list, tuple)):
+                for item in value:
+                    visit(item, key)
+                return
+            if (
+                isinstance(value, str)
+                and key is not None
+                and (key == "event_id" or key.endswith("_event_id") or key.endswith("_event_ids"))
+            ):
+                event_ids.add(value)
+
+        visit(payload)
+        return event_ids
 
     def _capture_subject_snapshots(self, event: "Event") -> None:
         if self._subject_resolver is None:
@@ -270,10 +299,27 @@ class EventManager:
         if query.audience is EventAudience.OBSERVED and len(query.avatar_ids) != 1:
             raise ValueError("Observed event queries require exactly one avatar")
         from src.classes.event import FactKind
+        if query.stable_cursor is not None:
+            month, event_id = query.stable_cursor
+            if (
+                isinstance(month, bool)
+                or not isinstance(month, int)
+                or month < 0
+                or not isinstance(event_id, str)
+                or not event_id
+            ):
+                raise ValueError("invalid stable event cursor")
         result: list["Event"] = []
         start_index = int(query.cursor or "0")
         matched_index = 0
-        for event in reversed(self._memory_events):
+        memory_events = reversed(self._memory_events)
+        if query.stable_order:
+            memory_events = iter(sorted(
+                self._memory_events,
+                key=lambda event: (int(event.month_stamp), str(event.id)),
+                reverse=True,
+            ))
+        for event in memory_events:
             related = {str(item) for item in (event.related_avatars or [])}
             if query.audience is EventAudience.OBSERVED:
                 matched = self._is_observed_by(event, query.avatar_ids[0])
@@ -284,6 +330,10 @@ class EventManager:
             if not query.include_decisions and getattr(event, "fact_kind", FactKind.OCCURRENCE) == FactKind.DECISION:
                 continue
             if query.sect_id is not None and query.sect_id not in (getattr(event, "related_sects", None) or []):
+                continue
+            if query.stable_cursor is not None and (
+                int(event.month_stamp), str(event.id)
+            ) >= query.stable_cursor:
                 continue
             if matched_index < start_index:
                 matched_index += 1
@@ -442,13 +492,47 @@ class EventManager:
         Returns:
             删除的事件数量。
         """
+        protected_event_ids = (
+            self._protected_event_ids_resolver()
+            if self._protected_event_ids_resolver is not None
+            else set()
+        )
+        preserve_factual = self._protected_event_ids_resolver is not None
         if self._storage:
-            return self._storage.cleanup(keep_major=keep_major, before_month_stamp=before_month_stamp)
-        else:
-            # 内存模式：简单清空。
-            count = len(self._memory_events)
-            self._memory_events.clear()
-            return count
+            return self._storage.cleanup(
+                keep_major=keep_major,
+                before_month_stamp=before_month_stamp,
+                protected_event_ids=protected_event_ids,
+                preserve_factual=preserve_factual,
+            )
+        protected = set(protected_event_ids)
+        by_id = {event.id: event for event in self._memory_events}
+        frontier = list(protected)
+        while frontier:
+            event = by_id.get(frontier.pop())
+            if event is None:
+                continue
+            for link in getattr(event, "causal_links", ()) or ():
+                cause_id = str(link.cause_event_id)
+                if cause_id not in protected:
+                    protected.add(cause_id)
+                    frontier.append(cause_id)
+
+        def should_delete(event: "Event") -> bool:
+            if (
+                (preserve_factual and not getattr(event, "is_story", False))
+                or event.id in protected
+            ):
+                return False
+            if keep_major and getattr(event, "is_major", False):
+                return False
+            return before_month_stamp is None or int(event.month_stamp) < before_month_stamp
+
+        before_count = len(self._memory_events)
+        self._memory_events[:] = [
+            event for event in self._memory_events if not should_delete(event)
+        ]
+        return before_count - len(self._memory_events)
 
     def count(self) -> int:
         """获取事件总数。"""

@@ -27,6 +27,10 @@ class EventQuery:
     sect_id: int | None = None
     memory_scope: EventMemoryScope = EventMemoryScope.ALL
     cursor: str | None = None
+    # Stable event identity cursor for projections that must survive new event
+    # inserts.  Unlike ``cursor``, it is ordered by (month_stamp, event_id).
+    stable_cursor: tuple[int, str] | None = None
+    stable_order: bool = False
     limit: int = 100
     chronological: bool = False
     # Decision-audit events (fact_kind=DECISION) are hidden from the default

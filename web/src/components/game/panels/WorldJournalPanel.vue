@@ -411,7 +411,8 @@ onMounted(() => {
       :on-open-why="journalStore.openCausalDetail"
     />
 
-    <div v-if="causalEventId" class="why-overlay why-overlay--above-dossier" data-testid="why-overlay" role="dialog" aria-modal="true">
+    <Teleport to="body">
+    <div v-if="causalEventId" class="why-overlay" data-testid="why-overlay" role="dialog" aria-modal="true">
       <div class="why-panel">
         <header class="why-header">
           <h3>{{ t('game.world_journal.why_title') }}</h3>
@@ -585,6 +586,7 @@ onMounted(() => {
         </div>
       </div>
     </div>
+    </Teleport>
   </section>
 </template>
 
@@ -1035,15 +1037,12 @@ onMounted(() => {
 .why-overlay {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* Also serves detail panels opened inside Naive UI dynasty modals. */
+  z-index: 3000;
   display: flex;
   align-items: flex-end;
   background: var(--surface-scrim);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-.why-overlay--above-dossier {
-  z-index: 70;
 }
 
 .why-panel {

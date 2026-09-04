@@ -84,10 +84,10 @@ def delete_save_file(
         filename,
         candidate_dirs=[saves_dir, *(fallback_saves_dirs or [])],
     ) or (saves_dir / filename)
+    events_db_path = get_events_db_path(target_path)
     if target_path.exists():
         os.remove(target_path)
 
-    events_db_path = get_events_db_path(target_path)
     if os.path.exists(events_db_path):
         try:
             os.remove(events_db_path)

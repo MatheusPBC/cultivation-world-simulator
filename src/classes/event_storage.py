@@ -293,6 +293,19 @@ class EventStorage:
             self._logger.error("Failed to commit simulation step: %s", exc)
             return False
 
+    def backup_to(self, destination: Path) -> None:
+        """Write a consistent SQLite snapshot without copying a live database file."""
+        if self._conn is None:
+            raise EventStorageError("Event storage is not initialized")
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        target = sqlite3.connect(str(destination))
+        try:
+            with self._db_lock:
+                self._conn.backup(target)
+        finally:
+            target.close()
+
     def _insert_event(self, event: "Event") -> None:
         """Insert one event and its dependent rows without managing a transaction."""
         # 插入事件主表。
@@ -502,7 +515,7 @@ class EventStorage:
         fact_kind_value = row["fact_kind"] if "fact_kind" in row_keys else None
         causal_payload_json = row["causal_payload"] if "causal_payload" in row_keys else None
         causal_origin_value = row["causal_origin"] if "causal_origin" in row_keys else None
-        return Event(
+        event = Event(
             month_stamp=MonthStamp(row["month_stamp"]),
             content=row["content"],
             related_avatars=related_avatars if related_avatars else None,
@@ -519,6 +532,7 @@ class EventStorage:
             causal_payload=json.loads(causal_payload_json) if causal_payload_json else None,
             causal_origin=CausalOrigin(causal_origin_value) if causal_origin_value else CausalOrigin.DETERMINISTIC,
         )
+        return event
 
     def _build_events_from_rows(self, rows) -> list["Event"]:
         event_ids = [row["id"] for row in rows]
@@ -573,6 +587,8 @@ class EventStorage:
         sect_id: Optional[int] = None,
         major_scope: Optional[str] = None,
         cursor: Optional[str] = None,
+        stable_cursor: tuple[int, str] | None = None,
+        stable_order: bool = False,
         limit: int = 100,
         include_decisions: bool = False,
     ) -> EventPage["Event"]:
@@ -649,7 +665,21 @@ class EventStorage:
                 if not include_decisions:
                     where_clauses.append("(e.fact_kind IS NULL OR e.fact_kind != 'decision')")
 
-                if cursor:
+                if stable_cursor is not None:
+                    cursor_month, cursor_event_id = stable_cursor
+                    if (
+                        isinstance(cursor_month, bool)
+                        or not isinstance(cursor_month, int)
+                        or cursor_month < 0
+                        or not isinstance(cursor_event_id, str)
+                        or not cursor_event_id
+                    ):
+                        raise ValueError("invalid stable event cursor")
+                    where_clauses.append(
+                        "(e.month_stamp < ? OR (e.month_stamp = ? AND e.id < ?))"
+                    )
+                    params.extend([cursor_month, cursor_month, cursor_event_id])
+                elif cursor:
                     cursor_month, cursor_rowid = self._parse_cursor(cursor)
                     where_clauses.append(
                         "(e.month_stamp < ? OR (e.month_stamp = ? AND e.rowid < ?))"
@@ -662,7 +692,10 @@ class EventStorage:
 
                 # 排序和分页（最新的在前，向上加载更旧的）。
                 # 使用 rowid 保证同一 month_stamp 内的插入顺序。
-                base_query += " ORDER BY e.month_stamp DESC, e.rowid DESC LIMIT ?"
+                if stable_order:
+                    base_query += " ORDER BY e.month_stamp DESC, e.id DESC LIMIT ?"
+                else:
+                    base_query += " ORDER BY e.month_stamp DESC, e.rowid DESC LIMIT ?"
                 params.append(limit + 1)  # 多取一条判断是否有更多。
 
                 rows = self._conn.execute(base_query, params).fetchall()
@@ -714,6 +747,8 @@ class EventStorage:
                 sect_id=query.sect_id,
                 major_scope=None if query.memory_scope is EventMemoryScope.ALL else query.memory_scope.value,
                 cursor=query.cursor,
+                stable_cursor=query.stable_cursor,
+                stable_order=query.stable_order,
                 limit=query.limit,
                 include_decisions=query.include_decisions,
             )
@@ -948,7 +983,13 @@ class EventStorage:
             ).fetchall()
         return self._build_events_from_rows(rows)
 
-    def cleanup(self, keep_major: bool = True, before_month_stamp: Optional[int] = None) -> int:
+    def cleanup(
+        self,
+        keep_major: bool = True,
+        before_month_stamp: Optional[int] = None,
+        protected_event_ids: set[str] | None = None,
+        preserve_factual: bool = False,
+    ) -> int:
         """
         清理事件。
 
@@ -973,6 +1014,12 @@ class EventStorage:
                 conditions.append("month_stamp < ?")
                 params.append(before_month_stamp)
 
+            # A world-level cleanup may discard presentation-only story text,
+            # but never canonical facts.  State references add an extra guard
+            # for their full causal ancestry below.
+            if preserve_factual:
+                conditions.append("is_story = TRUE")
+
             # 如果没有条件且要保留大事，则无需删除任何内容
             if not conditions and keep_major:
                 return 0
@@ -980,11 +1027,42 @@ class EventStorage:
             where_clause = " AND ".join(conditions) if conditions else "1=1"
 
             with self._transaction():
-                cursor = self._conn.execute(
-                    f"DELETE FROM events WHERE {where_clause}",
+                before_count = self._conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE {where_clause}", params
+                ).fetchone()[0]
+                self._conn.execute(
+                    "CREATE TEMP TABLE IF NOT EXISTS event_cleanup_protected ("
+                    "id TEXT PRIMARY KEY)"
+                )
+                self._conn.execute("DELETE FROM event_cleanup_protected")
+                self._conn.executemany(
+                    "INSERT OR IGNORE INTO event_cleanup_protected (id) VALUES (?)",
+                    [(str(event_id),) for event_id in protected_event_ids or ()],
+                )
+                if preserve_factual:
+                    self._conn.execute(
+                        "INSERT OR IGNORE INTO event_cleanup_protected (id) "
+                        "SELECT id FROM events WHERE is_story = FALSE"
+                    )
+                self._conn.execute(
+                    f"""
+                    WITH RECURSIVE protected(id) AS (
+                        SELECT id FROM event_cleanup_protected
+                        UNION
+                        SELECT links.cause_event_id
+                        FROM event_causal_links AS links
+                        JOIN protected ON links.event_id = protected.id
+                    )
+                    DELETE FROM events
+                    WHERE {where_clause}
+                      AND id NOT IN (SELECT id FROM protected)
+                    """,
                     params
                 )
-                deleted = cursor.rowcount
+                after_count = self._conn.execute(
+                    f"SELECT COUNT(*) FROM events WHERE {where_clause}", params
+                ).fetchone()[0]
+                deleted = before_count - after_count
 
             self._logger.info(f"Cleaned up {deleted} events")
             return deleted
@@ -1209,7 +1287,9 @@ class EventStorage:
             ).fetchone()
         if row is None:
             return None
-        return self._row_to_event(row)
+        event = self._row_to_event(row)
+        event.causal_links = self.get_causal_links_for_event(event.id)
+        return event
 
     def get_causal_links_for_event(self, event_id: str) -> list["CausalLink"]:
         """

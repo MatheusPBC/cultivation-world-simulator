@@ -445,7 +445,19 @@ def test_v1_delete_save_command_uses_ok_envelope(temp_save_dir):
     original = _reset_state()
     try:
         save_path = temp_save_dir / "delete_me.json"
-        save_path.write_text(json.dumps({"meta": {}}), encoding="utf-8")
+        db_name = "delete_me_events.current.db"
+        save_path.write_text(
+            json.dumps(
+                {
+                    "meta": {
+                        "schema_version": 3,
+                        "events_db": db_name,
+                        "event_count": 0,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         db_path = main.get_events_db_path(save_path)
         db_path.write_text("", encoding="utf-8")
 

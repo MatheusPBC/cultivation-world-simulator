@@ -8,6 +8,7 @@ import crownIcon from '@/assets/icons/ui/lucide/crown.svg'
 import landmarkIcon from '@/assets/icons/ui/lucide/landmark.svg'
 import scaleIcon from '@/assets/icons/ui/lucide/scale.svg'
 import usersIcon from '@/assets/icons/ui/lucide/users.svg'
+import InstitutionalChainPanel from './institution/InstitutionalChainPanel.vue'
 
 const props = defineProps<{
   show: boolean;
@@ -197,6 +198,7 @@ function handleShowChange(value: boolean) {
               {{ t('game.dynasty.officials.empty') }}
             </div>
           </section>
+          <InstitutionalChainPanel owner-kind="dynasty" owner-id="1" />
         </template>
 
         <div v-else class="empty-state">

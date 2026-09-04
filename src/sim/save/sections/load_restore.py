@@ -4,7 +4,6 @@ from typing import Any
 
 from .base import LoadContext
 from .load_avatars import AvatarsLoadSection
-from .load_events import EventsLoadSection
 from .load_membership import MembershipLoadSection
 from .load_region_runtime import RegionRuntimeLoadSection
 from .load_run_config import RunConfigLoadSection
@@ -20,7 +19,6 @@ LOAD_SECTIONS = (
     AvatarsLoadSection(),
     RegionRuntimeLoadSection(),
     MembershipLoadSection(),
-    EventsLoadSection(),
     SimulatorLoadSection(),
 )
 

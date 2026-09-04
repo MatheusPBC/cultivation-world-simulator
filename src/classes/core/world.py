@@ -104,6 +104,34 @@ class World():
             self.event_manager.set_subject_resolver(
                 lambda avatar_id: self.avatar_manager.get_avatar(str(avatar_id))
             )
+        if hasattr(self.event_manager, "set_protected_event_ids_resolver"):
+            self.event_manager.set_protected_event_ids_resolver(
+                self._canonical_event_reference_ids
+            )
+
+    def _canonical_event_reference_ids(self) -> set[str]:
+        """Return durable event evidence referenced by currently saved state."""
+        payloads = []
+        for value in (
+            self.dynasty,
+            self.dao_petitions,
+            self.mechanical_language,
+            self.climate_state,
+            self.regional_flood_state,
+            self.institutional_authority,
+            self.institutional_knowledge,
+            self.institutional_relations,
+        ):
+            serializer = getattr(value, "to_dict", None)
+            if callable(serializer):
+                payloads.append(serializer())
+            elif isinstance(value, list):
+                payloads.extend(
+                    serializer()
+                    for item in value
+                    if callable(serializer := getattr(item, "to_dict", None))
+                )
+        return self.event_manager.collect_event_reference_ids(payloads)
 
     def get_info(self, detailed: bool = False, avatar: Optional["Avatar"] = None) -> dict:
         """

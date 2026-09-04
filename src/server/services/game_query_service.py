@@ -56,6 +56,7 @@ class GameQueryDependencies:
     get_roleplay_session_query: Any
     get_world_secret_meta_query: Any
     get_world_secret_overview_query: Any
+    build_institutional_chain: Any
 
 
 class GameQueryService:
@@ -360,3 +361,9 @@ class GameQueryService:
 
     def get_world_secret_overview(self) -> dict:
         return self._deps.get_world_secret_overview_query(self._deps.runtime)
+
+    def get_institutional_chain(self, *, owner_kind: str, owner_id: str, commitment_cursor: str | None, event_cursor: str | None, limit: int) -> dict:
+        return self._deps.build_institutional_chain(
+            self._deps.runtime.get("world"), owner_kind=owner_kind, owner_id=owner_id,
+            commitment_cursor=commitment_cursor, event_cursor=event_cursor, limit=limit,
+        )

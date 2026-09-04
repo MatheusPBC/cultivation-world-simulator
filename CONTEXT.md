@@ -1,5 +1,43 @@
 # Ubiquitous Language
 
+## Current implementation ledger (2026-09-04)
+
+The current working tree contains the institutional backbone pieces through the
+urban aid vertical: authority, relations, knowledge and memory remain separate
+World-owned state; aid uses independent request/response decisions, multi-term
+commitments, canonical delivery, bounded breach chaining, remediation, and
+factual causal links. Memory decay/reinforcement is bounded and leader context
+uses factual evidence only. SQLite schema 3 uses a required, versioned sidecar
+with atomic publication; when overwriting an active save the old sidecar is
+retained intentionally, with a known disk-growth limitation and no automated
+sweep or live-data cleanup. Causal storage has lazy bulk links and a detailed
+causal getter. Three institutional-aid locale templates match actual payload
+interpolation. Wave 6 is not wholly complete: qualitative institutional
+relationship changes are not yet implemented, and aid `identity_anchor_impact`
+is currently zero.
+
+Wave 7 local API/UI institutional-chain integration is implemented and verified
+by focused tests; it is not browser/live-deployment acceptance. Region, Sect and
+Dynasty surfaces have an actual path, with API/Why restoration complete.
+Root-consolidated evidence is 182 backend tests passed,
+including the 18 query-regression tests; frontend build succeeded and the final
+consolidated UI rerun passed 32/32 tests, including the 21 Why tests.
+Final audited 120-month artifacts succeeded: natural has 3,192 events and causal
+depth 17; pressured has 3,599 events, causal depth 10, and 20 economic transfers.
+Both report zero broken causes, out-of-window links, Story mutations, provider
+calls/awaits, and Story material ancestors. Pressured proves the exact seven-event
+witness chain and linked memory; absence of a required fulfillment witness is
+valid in the natural scenario. Both
+still contain 147 untyped events and 27 conditions activated/0 resolved, so this is
+not full production-world quality proof. No whole-roadmap claim is valid.
+
+Factual prehistory, hydrology/flood response, and commerce/war/religion/
+civil-disorder composition remain deferred and are not completed waves 8+.
+Orchestration is user-directed by
+the root agent: light work may use Luna, complex implementation Terra, and Claude
+is suspended. This ledger records current state, not a redesign of the frozen
+architecture.
+
 ## Celestial Dao
 
 The player-visible authority that can remain silent, issue an observable sign,

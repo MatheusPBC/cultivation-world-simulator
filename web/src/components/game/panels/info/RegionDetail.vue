@@ -14,6 +14,7 @@ import leafIcon from '@/assets/icons/ui/lucide/leaf.svg';
 import messageCircleIcon from '@/assets/icons/ui/lucide/message-circle.svg';
 import packageIcon from '@/assets/icons/ui/lucide/package.svg';
 import sparkleIcon from '@/assets/icons/ui/lucide/sparkles.svg';
+import InstitutionalChainPanel from '../institution/InstitutionalChainPanel.vue';
 
 const { locale, t } = useI18n();
 const props = defineProps<{
@@ -731,6 +732,7 @@ function collectiveHealthStateRefs(): string[] {
         />
       </div>
     </div>
+    <InstitutionalChainPanel v-if="data.type === 'city'" owner-kind="region" :owner-id="data.id" />
   </div>
 </template>
 

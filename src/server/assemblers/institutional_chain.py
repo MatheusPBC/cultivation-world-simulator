@@ -1,0 +1,225 @@
+"""Read-only projection of canonical institutional state and factual history."""
+from __future__ import annotations
+
+import base64
+import json
+from typing import Any, Mapping
+
+from src.classes.event_query import EventQuery
+from src.classes.institution import AuthorityScope, InstitutionKind
+from src.classes.mechanical_language import EntityRef
+from src.systems.institution_authority import can_actor_act_for
+from src.systems.institutional_memory import effective_salience
+
+_OWNER_KINDS = {"region": InstitutionKind.CITY, "sect": InstitutionKind.SECT, "dynasty": InstitutionKind.DYNASTY}
+_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated"}
+_EVENT_SCAN_PAGE_SIZE = 128
+_EVENT_SCAN_PAGES = 3
+
+
+def _encode_cursor(month: int, item_id: str) -> str:
+    raw = json.dumps({"month": month, "id": item_id}, separators=(",", ":"), sort_keys=True)
+    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+
+
+def _decode_cursor(value: str | None) -> tuple[int, str] | None:
+    if value is None:
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode((value + "=" * (-len(value) % 4)).encode()).decode())
+        month, item_id = data["month"], data["id"]
+        if isinstance(month, bool) or not isinstance(month, int) or month < 0 or not isinstance(item_id, str) or not item_id:
+            raise ValueError
+        return month, item_id
+    except (KeyError, TypeError, ValueError, UnicodeDecodeError) as exc:
+        raise ValueError("invalid cursor") from exc
+
+
+def _key(event: Any) -> tuple[int, str]:
+    return int(event.month_stamp), str(event.id)
+
+
+def _name(world: Any, institution: Any) -> str:
+    ref = institution.owner_ref
+    if ref.kind == "region":
+        try:
+            region = world.map.regions.get(int(ref.id))
+        except (AttributeError, ValueError):
+            region = None
+        return str(getattr(region, "name", "") or ref.id)
+    if ref.kind == "sect":
+        context = getattr(world, "sect_context", None)
+        sects = context.get_active_sects() if context else ()
+        sect = next((item for item in sects if str(item.id) == ref.id), None)
+        return str(getattr(sect, "name", "") or ref.id)
+    dynasty = getattr(world, "dynasty", None)
+    return str(getattr(dynasty, "title", "") or getattr(dynasty, "name", "") or ref.id)
+
+
+def _controlled_cities(world: Any, kind: str, owner_id: str) -> list[Any]:
+    if kind not in {"sect", "dynasty"}:
+        return []
+    result = []
+    for institution in world.institutional_authority.institutions.values():
+        if institution.kind is not InstitutionKind.CITY:
+            continue
+        try:
+            governance = world.map.regions[int(institution.owner_ref.id)].city_state.governance
+        except (AttributeError, KeyError, TypeError, ValueError):
+            continue
+        if governance.controller_kind == kind and str(governance.controller_id) == owner_id:
+            result.append(institution)
+    return sorted(result, key=lambda item: item.id)
+
+
+def _party_ids(
+    world: Any,
+    event: Any,
+    *,
+    visited: set[str] | None = None,
+    depth: int = 0,
+    memo: dict[str, set[str]] | None = None,
+) -> set[str]:
+    """Correlate events by canonical payload, EntityRef, and causal links only."""
+    event_id = str(event.id)
+    if memo is not None and event_id in memo:
+        return set(memo[event_id])
+    visited = set() if visited is None else visited
+    if event_id in visited or depth >= 3 or len(visited) >= 16:
+        return set()
+    visited.add(event_id)
+    payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
+    result: set[str] = set()
+    request = payload.get("institutional_aid_request")
+    if isinstance(request, Mapping):
+        result.update(str(request[key]) for key in ("requester_institution_id", "provider_institution_id") if request.get(key))
+    commitment_id = payload.get("commitment_id")
+    if commitment_id:
+        commitment = world.institutional_relations.commitments.get(str(commitment_id))
+        if commitment:
+            result.update(commitment.party_ids)
+    execution = payload.get("execution")
+    if isinstance(execution, Mapping):
+        for field in ("source_region_id", "destination_region_id"):
+            if execution.get(field) is not None:
+                institution = world.institutional_authority.get_institution_for_owner(EntityRef("region", str(execution[field])))
+                if institution:
+                    result.add(institution.id)
+    decision = payload.get("decision")
+    if isinstance(decision, Mapping):
+        try:
+            institution = world.institutional_authority.get_institution_for_owner(EntityRef(str(decision["subject_kind"]), str(decision["subject_id"])))
+        except (KeyError, TypeError, ValueError):
+            institution = None
+        if institution:
+            result.add(institution.id)
+    for link in world.event_manager.get_causal_links_for_event(event.id)[:3]:
+        cause = world.event_manager.get_event_by_id(link.cause_event_id)
+        if cause is not None:
+            cause_payload = cause.causal_payload if isinstance(cause.causal_payload, Mapping) else {}
+            if isinstance(cause_payload.get("institutional_aid_request"), Mapping) or isinstance(cause_payload.get("decision"), Mapping):
+                result.update(_party_ids(world, cause, visited=visited, depth=depth + 1, memo=memo))
+    if memo is not None:
+        memo[event_id] = set(result)
+    return result
+
+
+def _decision(payload: Mapping[str, Any]) -> dict[str, str] | None:
+    audit = payload.get("decision")
+    if not isinstance(audit, Mapping):
+        return None
+    interpretation = payload.get("interpretation")
+    action = ""
+    if isinstance(interpretation, Mapping):
+        action = str(interpretation.get("decision") or interpretation.get("selected_affordance_id") or "")
+    if not action and isinstance(audit.get("chosen_chain"), list) and audit["chosen_chain"]:
+        chosen = audit["chosen_chain"][0]
+        if isinstance(chosen, Mapping):
+            action = str(chosen.get("selected_affordance_id") or chosen.get("action_name") or "")
+    return {"actor_kind": str(audit.get("subject_kind") or ""), "actor_id": str(audit.get("subject_id") or ""), "action": action, "reason": str(audit.get("thinking") or "")}
+
+
+def _event_row(world: Any, event: Any) -> dict[str, Any]:
+    payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
+    links = list(world.event_manager.get_causal_links_for_event(event.id))
+    return {"event_id": str(event.id), "content": str(event.content or ""), "event_type": str(event.event_type or ""), "month_stamp": int(event.month_stamp), "fact_kind": getattr(event.fact_kind, "value", str(event.fact_kind)), "causal_origin": getattr(event.causal_origin, "value", str(event.causal_origin)), "commitment_id": str(payload["commitment_id"]) if payload.get("commitment_id") else None, "term_id": str(payload["term_id"]) if payload.get("term_id") else None, "relation": getattr(getattr(links[0], "relation", None), "value", None) if links else None, "source_event_ids": [str(link.cause_event_id) for link in links], "decision": _decision(payload)}
+
+
+def _event_page(world: Any, institution_ids: set[str], cursor: str | None, limit: int) -> tuple[list[dict[str, Any]], str | None, bool, set[str]]:
+    stable_cursor = _decode_cursor(cursor)
+    rows: list[dict[str, Any]] = []
+    participant_ids: set[str] = set()
+    party_memo: dict[str, set[str]] = {}
+    last_scan_cursor = stable_cursor
+    last_page_has_more = False
+    for _ in range(_EVENT_SCAN_PAGES):
+        page = world.event_manager.query_page(EventQuery(
+            stable_cursor=stable_cursor,
+            stable_order=True,
+            limit=_EVENT_SCAN_PAGE_SIZE,
+            include_decisions=True,
+        ))
+        if not page.events:
+            break
+        last_page_has_more = page.next_cursor is not None
+        for event in page.events:
+            payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
+            is_decision = isinstance(payload.get("decision"), Mapping)
+            if event.event_type in _EVENT_TYPES or is_decision:
+                parties = _party_ids(world, event, memo=party_memo)
+                if parties.intersection(institution_ids):
+                    participant_ids.update(parties)
+                    rows.append(_event_row(world, event))
+                    if len(rows) > limit:
+                        consumed = rows[:limit]
+                        return consumed, _encode_cursor(consumed[-1]["month_stamp"], consumed[-1]["event_id"]), True, participant_ids
+        last_scan_cursor = _key(page.events[-1])
+        stable_cursor = last_scan_cursor
+        if not last_page_has_more:
+            break
+    if last_page_has_more and last_scan_cursor is not None:
+        return rows, _encode_cursor(*last_scan_cursor), True, participant_ids
+    return rows, None, False, participant_ids
+
+
+def _term(term: Any) -> dict[str, Any]:
+    return {"id": term.id, "index": term.index, "kind": term.kind.value, "obligor_institution_id": term.obligor_institution_id, "beneficiary_institution_id": term.beneficiary_institution_id, "subject": term.subject.to_dict(), "status": term.status.value, "proposed_month": term.proposed_month, "due_month": term.due_month, "breached_month": term.breached_month, "resolved_month": term.resolved_month, "parameters": dict(term.parameters), "evidence_event_ids": list(term.evidence_event_ids), "breach_event_ids": list(term.breach_event_ids), "remediation_of_term_id": term.remediation_of_term_id}
+
+
+def build_institutional_chain(world: Any, *, owner_kind: str, owner_id: str, commitment_cursor: str | None = None, event_cursor: str | None = None, limit: int = 20) -> dict[str, Any]:
+    if owner_kind not in _OWNER_KINDS:
+        raise ValueError("owner_kind must be region, sect, or dynasty")
+    if world is None:
+        raise RuntimeError("world is unavailable")
+    page_limit = max(1, min(int(limit), 50))
+    authority = world.institutional_authority
+    owner_ref = EntityRef(owner_kind, str(owner_id))
+    institution = authority.get_institution_for_owner(owner_ref)
+    if institution is None:
+        raise KeyError("institution not found")
+    controlled = _controlled_cities(world, owner_kind, str(owner_id))
+    queried_ids = {institution.id, *(item.id for item in controlled)}
+    after = _decode_cursor(commitment_cursor)
+    commitments = sorted((item for item in world.institutional_relations.commitments.values() if queried_ids.intersection(item.party_ids)), key=lambda item: (item.opened_month, item.id), reverse=True)
+    if after:
+        commitments = [item for item in commitments if (item.opened_month, item.id) < after]
+    has_more = len(commitments) > page_limit
+    commitments = commitments[:page_limit]
+    commitment_rows = []
+    for commitment in commitments:
+        direct = institution.id in commitment.party_ids
+        actual_owner = institution.id if direct else next(city.id for city in controlled if city.id in commitment.party_ids)
+        commitment_rows.append({"id": commitment.id, "party_ids": list(commitment.party_ids), "opened_month": commitment.opened_month, "closed_month": commitment.closed_month, "aggregate_status": commitment.aggregate_status.value, "owner_institution_id": actual_owner, "control_scope": "direct" if direct else "governed_city", "origin_event_id": commitment.origin_event_id, "terms": [_term(term) for term in commitment.terms]})
+    events, event_next, event_more, timeline_participants = _event_page(world, queried_ids, event_cursor, page_limit)
+    participants = {party for commitment in commitments for party in commitment.party_ids}
+    participants.update(timeline_participants)
+    institutions = [{"id": institution.id, "kind": institution.kind.value, "name": _name(world, institution), "scope": "owner"}]
+    institutions += [{"id": city.id, "kind": city.kind.value, "name": _name(world, city), "scope": "governed_city"} for city in controlled]
+    for participant_id in sorted(participants - queried_ids):
+        participant = authority.get_institution(participant_id)
+        if participant:
+            institutions.append({"id": participant.id, "kind": participant.kind.value, "name": _name(world, participant), "scope": "party"})
+    offices = authority.offices_for(institution.id)
+    memories = sorted((memory for memory in world.institutional_relations.memories.values() if memory.institution_id in queried_ids), key=lambda memory: (memory.recorded_month, memory.id), reverse=True)[:page_limit]
+    scopes = (AuthorityScope.URBAN_ADMINISTRATION, AuthorityScope.RESOURCE_DISPOSITION, AuthorityScope.COMMITMENT_NEGOTIATION)
+    return {"owner": {"kind": institution.kind.value, "id": str(owner_id), "institution_id": institution.id, "name": _name(world, institution), "region_id": str(owner_id) if owner_kind == "region" else None}, "current_month": int(world.month_stamp), "authority": {"institution_id": institution.id, "office_ids": [office.id for office in offices], "active_claim_ids": [claim.id for office in offices for claim in authority.active_claims(office.id)], "material_control": {scope.value: can_actor_act_for(world, owner_ref, owner_ref, scope, current_month=int(world.month_stamp)).allowed for scope in scopes}}, "institutions": institutions, "commitments": commitment_rows, "events": events, "memories": [{"id": memory.id, "institution_id": memory.institution_id, "event_id": memory.event_id, "salience": memory.salience, "recorded_month": memory.recorded_month, "last_reinforced_month": memory.last_reinforced_month, "effective_salience": effective_salience(memory, int(world.month_stamp)), "factors": dict(memory.factors)} for memory in memories], "cursor": {"commitments": {"next": _encode_cursor(commitments[-1].opened_month, commitments[-1].id) if has_more and commitments else None, "has_more": has_more}, "events": {"next": event_next, "has_more": event_more}}}

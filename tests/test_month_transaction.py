@@ -325,7 +325,11 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
 
     def mutate(simulator, ctx):
         from src.classes.institution import (
+            CommitmentTerm,
+            CommitmentTermKind,
+            CommitmentTermStatus,
             Institution,
+            InstitutionalCommitment,
             InstitutionalFactKnowledge,
             InstitutionalMemory,
             InstitutionKind,
@@ -350,6 +354,40 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
             founded_month=0,
         )
         authority.add_institution(institution)
+        counterparty = Institution(
+            kind=InstitutionKind.SECT,
+            owner_ref=EntityRef("sect", "rollback-sect"),
+            founded_month=0,
+        )
+        authority.add_institution(counterparty)
+        breach_event = Event(
+            simulator.world.month_stamp,
+            "rollback aid breach",
+            event_type="institutional_commitment_term_breached",
+            fact_kind=FactKind.STATE_TRANSITION,
+        )
+        commitment = InstitutionalCommitment(
+            party_ids=(institution.id, counterparty.id),
+            opened_month=int(simulator.world.month_stamp),
+            origin_event_id=breach_event.id,
+            terms=(
+                CommitmentTerm(
+                    id="term:rollback-aid",
+                    index=0,
+                    kind=CommitmentTermKind.RESOURCE_TRANSFER,
+                    obligor_institution_id=counterparty.id,
+                    beneficiary_institution_id=institution.id,
+                    subject=EntityRef("resource", "grain"),
+                    status=CommitmentTermStatus.REMEDIATION_PROPOSED,
+                    proposed_month=int(simulator.world.month_stamp),
+                    breached_month=int(simulator.world.month_stamp),
+                    parameters=(("amount", 1),),
+                    evidence_event_ids=(breach_event.id,),
+                    breach_event_ids=(breach_event.id,),
+                ),
+            ),
+        )
+        simulator.world.institutional_relations.add_commitment(commitment, authority)
         knowledge = InstitutionalFactKnowledge(
             institution_id=institution.id,
             event_id="rollback-fact",
@@ -371,7 +409,7 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
             authority,
         )
         random.random()
-        ctx.add_events([Event(simulator.world.month_stamp, "will not persist")])
+        ctx.add_events([breach_event, Event(simulator.world.month_stamp, "will not persist")])
 
     phases = (
         SimulationPhase("mutate", 1, "mutate", mutate),

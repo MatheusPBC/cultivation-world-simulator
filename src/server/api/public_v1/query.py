@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Any, Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.server.services.public_api_contract import ok_response
@@ -41,6 +41,7 @@ def create_public_query_router(
     build_roleplay_session: Callable[[], dict] | None = None,
     build_world_secret_meta: Callable[[], dict] | None = None,
     build_world_secret_overview: Callable[[], dict] | None = None,
+    build_institutional_chain: Callable[..., dict] | None = None,
 ) -> APIRouter:
     router = APIRouter()
 
@@ -218,6 +219,32 @@ def create_public_query_router(
         if query_service is not None:
             return ok_response(query_service.get_institutional_presence())
         return ok_response({"regions": []})
+
+    @router.get("/api/v1/query/world/institutional-chain")
+    def get_institutional_chain_v1(
+        owner_kind: Literal["region", "sect", "dynasty"],
+        owner_id: str,
+        commitment_cursor: str | None = None,
+        event_cursor: str | None = None,
+        limit: int = 20,
+    ):
+        try:
+            if query_service is not None:
+                return ok_response(query_service.get_institutional_chain(
+                    owner_kind=owner_kind, owner_id=owner_id,
+                    commitment_cursor=commitment_cursor, event_cursor=event_cursor,
+                    limit=limit,
+                ))
+            return ok_response(build_institutional_chain(
+                owner_kind=owner_kind, owner_id=owner_id,
+                commitment_cursor=commitment_cursor, event_cursor=event_cursor, limit=limit,
+            ))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="institution not found") from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @router.get("/api/v1/query/mortals/overview")
     def get_mortal_overview_v1():

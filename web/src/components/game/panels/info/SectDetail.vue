@@ -14,6 +14,7 @@ import scaleIcon from '@/assets/icons/ui/lucide/scale.svg';
 import scrollIcon from '@/assets/icons/ui/lucide/scroll.svg';
 import sparklesIcon from '@/assets/icons/ui/lucide/sparkles.svg';
 import usersIcon from '@/assets/icons/ui/lucide/users.svg';
+import InstitutionalChainPanel from '../institution/InstitutionalChainPanel.vue';
 
 const { t } = useI18n();
 const props = defineProps<{
@@ -181,6 +182,7 @@ const {
              />
           </div>
        </div>
+      <InstitutionalChainPanel owner-kind="sect" :owner-id="data.id" />
     </div>
   </div>
 </template>

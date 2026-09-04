@@ -20,6 +20,7 @@ from src.server.assemblers.sect_detail import build_sect_detail
 from src.server.assemblers.mortal_overview import build_mortal_overview
 from src.server.assemblers.dynasty_detail import build_dynasty_detail
 from src.server.assemblers.dynasty_overview import build_dynasty_overview
+from src.server.assemblers.institutional_chain import build_institutional_chain
 from src.server.services.avatar_adjustment import apply_avatar_adjustment, build_avatar_adjust_options
 from src.server.services.avatar_control import (
     clear_long_term_objective_for_avatar,
@@ -322,6 +323,7 @@ query_dependencies = GameQueryDependencies(
     get_roleplay_session_query=get_roleplay_session_query,
     get_world_secret_meta_query=get_world_secret_meta_query,
     get_world_secret_overview_query=get_world_secret_overview_query,
+    build_institutional_chain=build_institutional_chain,
 )
 settings_service = SettingsServiceProxy(get_settings_service)
 

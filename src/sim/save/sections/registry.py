@@ -7,7 +7,6 @@ from .load_restore import restore_loaded_game
 from .save_sections import (
     AvatarsSection,
     CustomContentSection,
-    EventsSection,
     MetaSection,
     RunConfigSection,
     SimulatorSection,
@@ -21,7 +20,6 @@ SAVE_SECTIONS = (
     CustomContentSection(),
     WorldSection(),
     AvatarsSection(),
-    EventsSection(),
     SimulatorSection(),
 )
 

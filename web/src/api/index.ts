@@ -5,6 +5,7 @@ export { systemApi } from './modules/system';
 export { llmApi } from './modules/llm';
 export { eventApi } from './modules/event';
 export { institutionalPresenceApi } from './modules/institutionalPresence';
+export { institutionalChainApi } from './modules/institutionalChain';
 
 export type { 
   AppSettingsDTO,
