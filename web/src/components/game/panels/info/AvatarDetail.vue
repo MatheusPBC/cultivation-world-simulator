@@ -14,6 +14,7 @@ import AvatarEquipmentSection from './avatar-detail/AvatarEquipmentSection.vue';
 import AvatarRelationsSection from './avatar-detail/AvatarRelationsSection.vue';
 import AvatarEffectsSection from './avatar-detail/AvatarEffectsSection.vue';
 import AvatarMemoriesSection from './avatar-detail/AvatarMemoriesSection.vue';
+import AvatarActivitySection from './avatar-detail/AvatarActivitySection.vue';
 import { useUiStore } from '@/stores/ui';
 import { useWorldJournalStore } from '@/stores/worldJournal';
 import { useI18n } from 'vue-i18n';
@@ -138,6 +139,24 @@ const {
       <div v-if="!data.is_dead && data.action_state" class="action-banner">
         {{ data.action_state }}
       </div>
+
+      <AvatarActivitySection
+        v-if="data.activity"
+        :activity="data.activity"
+        :title="t('game.info_panel.avatar.activity.title')"
+        :now-label="t('game.info_panel.avatar.activity.now')"
+        :idle-label="t('game.info_panel.avatar.activity.idle')"
+        :queue-label="t('game.info_panel.avatar.activity.queue')"
+        :facts-label="t('game.info_panel.avatar.activity.facts')"
+        :decision-label="t('game.info_panel.avatar.activity.decision')"
+        :fact-label="t('game.info_panel.avatar.activity.fact')"
+        :why-label="t('game.info_panel.avatar.activity.why')"
+        :empty-label="t('game.info_panel.avatar.activity.empty')"
+        :objective-label="t('game.info_panel.avatar.activity.objective')"
+        :considered-label="count => t('game.info_panel.avatar.activity.considered', { count })"
+        :rejected-label="t('game.info_panel.avatar.activity.rejected')"
+        @open-source="openMemorySource"
+      />
 
       <div v-if="data.individual_consequences?.active_injury" class="section consequence-section">
         <div class="section-title">{{ t('game.info_panel.avatar.consequences.injury_title') }}</div>

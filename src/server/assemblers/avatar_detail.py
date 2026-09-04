@@ -13,7 +13,108 @@ def build_avatar_detail(
     info["pic_id"] = resolve_avatar_pic_id(avatar)
     info["realm_id"] = avatar.cultivation_progress.realm.value
     info["personal_appraisals"] = _build_personal_appraisals(avatar)
+    info["activity"] = _build_avatar_activity(avatar)
     return info
+
+
+def _action_label(avatar: Any, action_name: Any) -> str:
+    """Resolve a persisted action class name to the active UI locale.
+
+    Decision audits keep machine-readable action names.  The activity view is
+    a read-only player projection, so it resolves only the label and never
+    sends action parameters back to the client as a second execution path.
+    """
+    from src.classes.action.registry import ActionRegistry
+
+    normalized = str(action_name or "")
+    if not normalized:
+        return ""
+    try:
+        return str(ActionRegistry.get(normalized).get_action_name())
+    except (KeyError, TypeError, ValueError):
+        return normalized
+
+
+def _event_date(event: Any) -> tuple[int, int]:
+    stamp = getattr(event, "month_stamp", None)
+    try:
+        return int(stamp.get_year()), int(stamp.get_month().value)
+    except (AttributeError, TypeError, ValueError):
+        return 0, 0
+
+
+def _build_avatar_activity(avatar: Any) -> dict[str, Any]:
+    """Project the avatar's canonical action and auditable recent trail.
+
+    This deliberately surfaces decision events only inside their owner
+    Avatar's dossier.  They remain hidden from the public world timeline;
+    narrative events remain facts to inspect, never inputs to this view.
+    """
+    from src.classes.event import FactKind
+    from src.classes.event_query import EventQuery
+
+    current = getattr(avatar, "current_action", None)
+    queued = list(getattr(avatar, "planned_actions", ()) or ())[:3]
+    current_action = {
+        "status": str(getattr(current, "status", "idle") if current is not None else "idle"),
+        "label": str(avatar.current_action_name) if current is not None else "",
+        "queued_actions": [
+            _action_label(avatar, getattr(plan, "action_name", ""))
+            for plan in queued
+            if getattr(plan, "action_name", "")
+        ],
+    }
+
+    world = getattr(avatar, "world", None)
+    manager = getattr(world, "event_manager", None)
+    if manager is None:
+        return {"current_action": current_action, "events": []}
+
+    events = manager.query_page(
+        EventQuery(
+            avatar_ids=(str(avatar.id),),
+            include_decisions=True,
+            limit=8,
+        )
+    ).events
+    trail: list[dict[str, Any]] = []
+    for event in events:
+        year, month = _event_date(event)
+        is_decision = getattr(event, "fact_kind", FactKind.OCCURRENCE) is FactKind.DECISION
+        decision_payload = (getattr(event, "causal_payload", None) or {}).get("decision") or {}
+        decision = None
+        if is_decision and str(decision_payload.get("subject_id") or "") == str(avatar.id):
+            decision = {
+                "thinking": str(decision_payload.get("thinking") or ""),
+                "short_term_objective": str(decision_payload.get("short_term_objective") or ""),
+                "considered_count": int(decision_payload.get("considered_count") or 0),
+                "chosen_actions": [
+                    _action_label(avatar, item.get("action_name"))
+                    for item in decision_payload.get("chosen_chain") or []
+                    if isinstance(item, dict) and item.get("action_name")
+                ][:3],
+                "rejected": [
+                    {
+                        "action_name": _action_label(avatar, item.get("action_name")),
+                        "reason": str(item.get("reason") or ""),
+                    }
+                    for item in decision_payload.get("rejected") or []
+                    if isinstance(item, dict) and item.get("action_name")
+                ][:3],
+            }
+        trail.append(
+            {
+                "event_id": str(event.id),
+                "content": str(getattr(event, "content", "") or ""),
+                "year": year,
+                "month": month,
+                "fact_kind": "decision" if is_decision else str(getattr(event, "fact_kind", "occurrence")),
+                "is_major": bool(getattr(event, "is_major", False)),
+                "is_story": bool(getattr(event, "is_story", False)),
+                "decision": decision,
+            }
+        )
+    return {"current_action": current_action, "events": trail}
 
 
 def build_emotion_display(emotion: Any) -> dict[str, str]:

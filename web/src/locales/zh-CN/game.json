@@ -695,6 +695,12 @@
         "current_effects": "当前效果",
         "memories": "记忆犹新"
       },
+      "activity": {
+        "title": "行动轨迹", "now": "此刻", "idle": "等待下一次决策", "queue": "后续行动",
+        "facts": "近期事实与决策", "decision": "决策", "fact": "事实", "why": "查看缘由",
+        "empty": "此角色尚无已持久化的事实。", "objective": "目标",
+        "considered": "已考虑 {count} 个行动", "rejected": "不可行的备选方案"
+      },
       "memories": {
         "empty": "尚无深刻的记忆。",
         "strength": {

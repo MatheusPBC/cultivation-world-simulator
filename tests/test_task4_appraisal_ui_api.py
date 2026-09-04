@@ -115,6 +115,52 @@ def _resolve_avatar_pic_id(_avatar) -> int:
 
 
 class TestAvatarDetailPersonalAppraisals:
+    def test_activity_keeps_decision_audit_with_real_events_local_to_its_avatar(self, world):
+        alpha = _make_avatar(world, "Alpha")
+        beta = _make_avatar(world, "Beta")
+        occurrence = Event(
+            world.month_stamp,
+            "Alpha inspected the damaged bridge.",
+            related_avatars=[alpha.id],
+            is_major=True,
+        )
+        decision = Event(
+            world.month_stamp,
+            "Alpha committed to an action chain.",
+            related_avatars=[alpha.id],
+            fact_kind=FactKind.DECISION,
+            causal_payload={
+                "deltas": [],
+                "decision": {
+                    "subject_kind": "avatar",
+                    "subject_id": str(alpha.id),
+                    "thinking": "The route needs attention before travel.",
+                    "short_term_objective": "Inspect the route.",
+                    "considered_count": 3,
+                    "chosen_chain": [{"action_name": "Rest", "params": {"hidden": "never sent"}}],
+                    "rejected": [{"action_name": "Attack", "params": {"target": str(beta.id)}, "reason": "No enemy present."}],
+                },
+            },
+        )
+        unrelated = Event(
+            world.month_stamp,
+            "Beta found a cave.",
+            related_avatars=[beta.id],
+        )
+        world.event_manager.add_event(occurrence)
+        world.event_manager.add_event(decision)
+        world.event_manager.add_event(unrelated)
+
+        activity = build_avatar_detail(alpha, resolve_avatar_pic_id=_resolve_avatar_pic_id)["activity"]
+
+        assert activity["current_action"]["status"] == "idle"
+        assert [entry["event_id"] for entry in activity["events"]] == [decision.id, occurrence.id]
+        decision_entry = activity["events"][0]["decision"]
+        assert decision_entry["thinking"] == "The route needs attention before travel."
+        assert decision_entry["chosen_actions"]
+        assert decision_entry["rejected"] == [{"action_name": decision_entry["rejected"][0]["action_name"], "reason": "No enemy present."}]
+        assert "params" not in decision_entry
+
     def test_top_ten_sorted_by_effective_weight_with_display_fields(self, world):
         alpha = _make_avatar(world, "Alpha")
         beta = _make_avatar(world, "Beta")

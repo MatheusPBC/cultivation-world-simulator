@@ -650,6 +650,20 @@
         "current_effects": "Efeitos Ativos",
         "memories": "Memórias marcantes"
       },
+      "activity": {
+        "title": "Rastro de ação",
+        "now": "Agora",
+        "idle": "Aguardando a próxima decisão",
+        "queue": "Na sequência",
+        "facts": "Fatos e decisões recentes",
+        "decision": "Decisão",
+        "fact": "Fato",
+        "why": "Ver causas",
+        "empty": "Ainda não há fatos persistidos para este personagem.",
+        "objective": "Objetivo",
+        "considered": "{count} ações consideradas",
+        "rejected": "Alternativas inviáveis"
+      },
       "memories": {
         "empty": "Ainda não há memórias marcantes.",
         "strength": {

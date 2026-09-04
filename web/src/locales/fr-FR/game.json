@@ -579,6 +579,12 @@
         "relations": "Relations",
         "current_effects": "Effets actuels"
       },
+      "activity": {
+        "title": "Fil d'action", "now": "Maintenant", "idle": "En attente de la prochaine décision", "queue": "À suivre",
+        "facts": "Faits et décisions récents", "decision": "Décision", "fact": "Fait", "why": "Voir les causes",
+        "empty": "Aucun fait persistant pour ce personnage.", "objective": "Objectif",
+        "considered": "{count} actions examinées", "rejected": "Alternatives indisponibles"
+      },
       "weapon_meta": "Maîtrise {value}",
       "adjust": {
         "entry": "Ajuster",

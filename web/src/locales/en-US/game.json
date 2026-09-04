@@ -581,6 +581,12 @@
         "current_effects": "Current Effects",
         "memories": "Memorable Moments"
       },
+      "activity": {
+        "title": "Action trail", "now": "Now", "idle": "Awaiting the next decision", "queue": "Up next",
+        "facts": "Recent facts and decisions", "decision": "Decision", "fact": "Fact", "why": "Examine causes",
+        "empty": "There are no persisted facts for this character yet.", "objective": "Objective",
+        "considered": "{count} actions considered", "rejected": "Unavailable alternatives"
+      },
       "memories": {
         "empty": "No memorable moments yet.",
         "strength": {

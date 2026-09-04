@@ -579,6 +579,12 @@
         "relations": "関係",
         "current_effects": "現在の効果"
       },
+      "activity": {
+        "title": "行動の軌跡", "now": "現在", "idle": "次の判断を待っています", "queue": "次の行動",
+        "facts": "最近の事実と判断", "decision": "判断", "fact": "事実", "why": "原因を見る",
+        "empty": "この人物にはまだ記録済みの事実がありません。", "objective": "目標",
+        "considered": "{count} 件の行動を検討", "rejected": "実行できない選択肢"
+      },
       "weapon_meta": "熟練度 {value}",
       "adjust": {
         "entry": "調整",

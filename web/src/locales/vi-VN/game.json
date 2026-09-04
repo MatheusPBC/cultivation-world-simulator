@@ -579,6 +579,12 @@
         "relations": "Quan Hệ",
         "current_effects": "Hiệu Ứng Hiện Tại"
       },
+      "activity": {
+        "title": "Dấu vết hành động", "now": "Hiện tại", "idle": "Đang chờ quyết định tiếp theo", "queue": "Tiếp theo",
+        "facts": "Sự kiện và quyết định gần đây", "decision": "Quyết định", "fact": "Sự kiện", "why": "Xem nguyên nhân",
+        "empty": "Chưa có sự kiện được lưu cho nhân vật này.", "objective": "Mục tiêu",
+        "considered": "Đã cân nhắc {count} hành động", "rejected": "Lựa chọn không khả thi"
+      },
       "weapon_meta": "Độ thuần thục {value}",
       "adjust": {
         "entry": "Điều Chỉnh",

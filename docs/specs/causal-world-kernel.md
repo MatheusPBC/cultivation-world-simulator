@@ -853,6 +853,12 @@ with the middle two disabled. The slice fills them:
 - The Live Guide may reuse open situations when no recent major event exists.
   A Chronicle headline is current only when its publication window overlaps the
   Guide window; an old chapter must never produce a source-less headline.
+- An Avatar detail may project its own current action, short action queue, and
+  bounded direct event trail. That owner-local trail may include the Avatar's
+  `FactKind.DECISION` audit — choice, thinking, objective, and engine-recorded
+  rejections — while the public timeline remains decision-free. It exposes
+  localized action labels and causal event ids only; raw action parameters are
+  not player-facing data and cannot become a second command surface.
 
 Frontend obligations (from `.cursor/rules/frontend*.mdc`):
 

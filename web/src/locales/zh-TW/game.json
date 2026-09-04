@@ -579,6 +579,12 @@
         "relations": "關係",
         "current_effects": "當前效果"
       },
+      "activity": {
+        "title": "行動軌跡", "now": "此刻", "idle": "等待下一次決策", "queue": "後續行動",
+        "facts": "近期事實與決策", "decision": "決策", "fact": "事實", "why": "查看緣由",
+        "empty": "此角色尚無已持久化的事實。", "objective": "目標",
+        "considered": "已考慮 {count} 個行動", "rejected": "不可行的備選方案"
+      },
       "weapon_meta": "熟練度 {value}",
       "adjust": {
         "entry": "調整",

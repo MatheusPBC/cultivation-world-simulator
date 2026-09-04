@@ -82,6 +82,34 @@ export interface PersonalAppraisalEntry {
   effective_weight: number;
 }
 
+export interface AvatarActivityDecision {
+  thinking: string;
+  short_term_objective: string;
+  considered_count: number;
+  chosen_actions: string[];
+  rejected: Array<{ action_name: string; reason: string }>;
+}
+
+export interface AvatarActivityEvent {
+  event_id: string;
+  content: string;
+  year: number;
+  month: number;
+  fact_kind: string;
+  is_major: boolean;
+  is_story: boolean;
+  decision: AvatarActivityDecision | null;
+}
+
+export interface AvatarActivity {
+  current_action: {
+    status: string;
+    label: string;
+    queued_actions: string[];
+  };
+  events: AvatarActivityEvent[];
+}
+
 // --- 角色 (Avatar) ---
 
 export interface AvatarSummary extends EntityBase, Coordinates {
@@ -110,6 +138,7 @@ export interface AvatarDetail extends EntityBase {
   appearance: string; // 外貌描述
   is_dead?: boolean;
   action_state?: string; // 当前正在进行的动作描述
+  activity?: AvatarActivity;
   death_info?: {
     time: number;
     reason: string;
