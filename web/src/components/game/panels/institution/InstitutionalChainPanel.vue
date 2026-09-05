@@ -37,6 +37,10 @@ function decisionAction(value: string) {
 function resourceLabel(term: { subject: { id: string } }) {
   return t(`game.info_panel.region.economy.resources.${term.subject.id}`, term.subject.id)
 }
+function tradeResourceLabel(resourceId: unknown) {
+  const id = String(resourceId ?? '')
+  return t(`game.info_panel.region.economy.resources.${id}`, id)
+}
 function subject(term: { subject: { id: string } }) { return resourceLabel(term) }
 function relationEvidence(ids: string[]) { return ids.slice(-3).reverse() }
 function formatMonthStamp(monthStamp: number) {
@@ -100,6 +104,15 @@ function formatMonthStamp(monthStamp: number) {
             {{ t('game.institutional_chain.decision') }}:
             {{ decisionActor(event.decision) }} · {{ decisionAction(event.decision.action) }} · {{ event.decision.reason }}
           </p>
+          <div v-if="event.trade_offer?.legs.length" class="trade-offer" data-testid="institutional-trade-offer">
+            <span>{{ t('game.institutional_chain.trade_legs') }}</span>
+            <div v-for="(leg, index) in event.trade_offer.legs" :key="`${event.event_id}-leg-${index}`" class="trade-leg">
+              <strong>{{ institutionName(String(leg.source_institution_id ?? '')) }}</strong>
+              <span aria-hidden="true">→</span>
+              <strong>{{ institutionName(String(leg.destination_institution_id ?? '')) }}</strong>
+              <span>{{ leg.amount }} {{ tradeResourceLabel(leg.resource_id) }}</span>
+            </div>
+          </div>
           <button type="button" @click="why(event.event_id)">{{ t('game.world_journal.why_button') }}</button>
           <button v-for="source in event.source_event_ids" :key="source" type="button" @click="why(source)">{{ t('game.institutional_chain.evidence') }}</button>
         </article>
@@ -121,4 +134,7 @@ function formatMonthStamp(monthStamp: number) {
 .term span { color: var(--panel-text-secondary, #aaa); }
 button { border: 0; background: transparent; color: var(--panel-accent, #d6b270); text-decoration: underline; cursor: pointer; padding: 2px 0; }
 .timeline p { margin: 0; line-height: 1.4; }
+.trade-offer, .trade-leg { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.trade-offer { flex-direction: column; align-items: flex-start; }
+.trade-leg span { color: var(--panel-text-secondary, #aaa); }
 </style>

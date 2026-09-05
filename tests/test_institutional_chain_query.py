@@ -50,7 +50,7 @@ def _world_with_events():
         6,
         "decision",
         id="decision-1",
-        event_type="institutional_aid_request_interpretation_decision",
+        event_type="institutional_resource_request_interpretation_decision",
         fact_kind=FactKind.DECISION,
         causal_payload={"deltas": [], "decision": {
             "subject_kind": "region", "subject_id": "1", "thinking": "grounded",

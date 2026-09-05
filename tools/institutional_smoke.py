@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-free long smoke for the institutional aid lifecycle.
+"""Provider-free long smoke for institutional material commitments.
 
 This is a harness, not a simulation path: each month goes through the normal
 ``Simulator.step`` and only the initial canonical city state differs between
@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -18,7 +19,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
-def _world_factory(*, pressured: bool, seed: int):
+def _world_factory(*, pressured: bool, commerce: bool, seed: int):
     from src.classes.age import Age
     from src.classes.core.avatar import Avatar, Gender
     from src.classes.core.dynasty import Dynasty
@@ -50,9 +51,9 @@ def _world_factory(*, pressured: bool, seed: int):
             "map_id": "classic", "test_mode": True, "provider": "test",
             "npc_awakening_rate_per_month": 0.0,
             "economy_interpreter_llm_budget_per_month": 0,
-            "institutional_aid_fulfillment_llm_budget_per_month": 0,
+            "institutional_commitment_fulfillment_llm_budget_per_month": 0,
             "institutional_smoke_seed": seed,
-            "institutional_smoke_scenario": "pressured" if pressured else "natural",
+            "institutional_smoke_scenario": "commerce" if commerce else ("pressured" if pressured else "natural"),
         }
         source = world.map.regions[302]
         destination = world.map.regions[305]
@@ -62,7 +63,20 @@ def _world_factory(*, pressured: bool, seed: int):
             raise RuntimeError("classic institutional smoke cities are not connected")
         source.city_state.governance = CityGovernance("dynasty", "1", 1.0)
         destination.city_state.governance = CityGovernance("dynasty", "1", 1.0)
-        if pressured:
+        if commerce:
+            source.economy = RegionalEconomyState(
+                stocks={"grain": 20.0, "medicine": 0.0},
+                capacities={"grain": 30.0, "medicine": 30.0},
+                demand_rates={"grain": 0.0, "medicine": 2.0},
+                access={"grain": 1.0, "medicine": 1.0},
+            )
+            destination.economy = RegionalEconomyState(
+                stocks={"grain": 0.0, "medicine": 20.0},
+                capacities={"grain": 30.0, "medicine": 30.0},
+                demand_rates={"grain": 2.0, "medicine": 0.0},
+                access={"grain": 1.0, "medicine": 1.0},
+            )
+        elif pressured:
             source.economy = RegionalEconomyState(
                 stocks={"grain": 20.0}, capacities={"grain": 30.0},
                 demand_rates={"grain": 0.0}, access={"grain": 1.0},
@@ -77,13 +91,13 @@ def _world_factory(*, pressured: bool, seed: int):
     return factory
 
 
-async def run_scenario(*, pressured: bool, seed: int, months: int) -> dict:
+async def run_scenario(*, pressured: bool, seed: int, months: int, commerce: bool = False) -> dict:
     from src.systems.causal_observatory import CausalTortureConfig, CausalTortureRunner
 
     captured: list = []
     memory_event_ids: set[str] = set()
     simulators: dict[int, object] = {}
-    factory = _world_factory(pressured=pressured, seed=seed)
+    factory = _world_factory(pressured=pressured, commerce=commerce, seed=seed)
 
     def capture_factory(index: int, world_seed: int):
         return factory(index, world_seed)
@@ -104,13 +118,44 @@ async def run_scenario(*, pressured: bool, seed: int, months: int) -> dict:
 
     provider = AsyncMock(side_effect=AssertionError("institutional smoke attempted a provider call"))
 
-    with patch("src.utils.llm.client.call_llm_with_template", provider):
-        report = await CausalTortureRunner(CausalTortureConfig(
-            worlds=1, months=months, seed=seed, test_mode=True, provider="test",
-            probe_profile="baseline",
-        )).run(world_factory=capture_factory, step=normal_step)
+    async def choose_trade_only(original, *args, **kwargs):
+        """Controlled decision fixture; production fallback remains untouched."""
+        from src.classes.domain_affordance import DomainDecision, DomainDecisionKind
+
+        domain = kwargs["domain"]
+        options = tuple(kwargs["affordances"])
+        action = {
+            "institutional_resource_request": "request_reciprocal_trade",
+            "institutional_resource_response": "accept_reciprocal_trade",
+            "institutional_commitment_fulfillment": "fulfill_resource_transfer_term",
+        }.get(domain)
+        selected = next((item for item in options if item.action_kind == action), None)
+        decision = (
+            DomainDecision(DomainDecisionKind.ACT, "Controlled barter smoke witness.", selected.id)
+            if selected is not None
+            else DomainDecision(DomainDecisionKind.MAINTAIN, "No controlled barter action.")
+        )
+        return await original(*args, **{**kwargs, "injected_decision": decision})
+
+    patches = [patch("src.utils.llm.client.call_llm_with_template", provider)]
+    if commerce:
+        import src.systems.institutional_resource_commitment as commitments
+
+        original_interpreter = commitments.interpret_domain_affordances
+
+        async def controlled_interpreter(*args, **kwargs):
+            return await choose_trade_only(original_interpreter, *args, **kwargs)
+
+        patches.append(patch.object(commitments, "interpret_domain_affordances", controlled_interpreter))
+
+    with patches[0]:
+        with patches[1] if len(patches) > 1 else nullcontext():
+            report = await CausalTortureRunner(CausalTortureConfig(
+                worlds=1, months=months, seed=seed, test_mode=True, provider="test",
+                probe_profile="baseline",
+            )).run(world_factory=capture_factory, step=normal_step)
     data = report.to_dict()
-    data["scenario"] = "pressured" if pressured else "natural"
+    data["scenario"] = "commerce" if commerce else ("pressured" if pressured else "natural")
     by_id = {str(event.id): event for event in captured}
     def ancestors(event_id: str, *, max_nodes: int = 64) -> tuple[dict[str, object], list[dict[str, str]]]:
         found: dict[str, object] = {}
@@ -147,16 +192,76 @@ async def run_scenario(*, pressured: bool, seed: int, months: int) -> dict:
             for event_id, event in material_ancestors.items()
             if event_id != str(material.id) and bool(getattr(event, "is_story", False))
         )
-    fulfilled = next((event for event in captured if event.event_type == "institutional_commitment_term_fulfilled"), None)
+    fulfilled_events = [event for event in captured if event.event_type == "institutional_commitment_term_fulfilled"]
+    fulfilled = fulfilled_events[0] if fulfilled_events else None
     witness = {"fulfilled": str(fulfilled.id) if fulfilled else None}
-    if fulfilled:
+    if commerce:
+        proposal = next((event for event in captured if event.event_type == "institutional_trade_proposed"), None)
+        accepted = next((event for event in captured if event.event_type == "institutional_trade_accepted"), None)
+        legs = ((proposal.causal_payload or {}).get("institutional_trade_offer") or {}).get("legs", []) if proposal else []
+        commitment_id = str((accepted.causal_payload or {}).get("commitment_id", "")) if accepted else ""
+        term_ids = {
+            str(item) for item in ((accepted.causal_payload or {}).get("term_ids") or [])
+        } if accepted else set()
+        transfers = [
+            event for event in captured
+            if event.event_type == "regional_resource_transfer_completed"
+            and str((event.causal_payload or {}).get("commitment_id", "")) == commitment_id
+            and str((event.causal_payload or {}).get("term_id", "")) in term_ids
+        ]
+        term_fulfillments = [
+            event for event in fulfilled_events
+            if str((event.causal_payload or {}).get("commitment_id", "")) == commitment_id
+            and str((event.causal_payload or {}).get("term_id", "")) in term_ids
+        ]
+        leg_shapes = {
+            (str(leg.get("source_region_id")), str(leg.get("destination_region_id")), str(leg.get("resource_id")), str(leg.get("route_id")), float(leg.get("amount", 0.0)))
+            for leg in legs if isinstance(leg, dict)
+        }
+        transfer_shapes = {
+            (str((event.causal_payload or {}).get("execution", {}).get("source_region_id")), str((event.causal_payload or {}).get("execution", {}).get("destination_region_id")), str((event.causal_payload or {}).get("execution", {}).get("resource_id")), str((event.causal_payload or {}).get("execution", {}).get("route_id")), float((event.causal_payload or {}).get("execution", {}).get("amount", 0.0)))
+            for event in transfers
+        }
+        term_witnesses = {}
+        combined_edges = []
+        required_types = {
+            "institutional_resource_request_interpretation_decision",
+            "institutional_trade_proposed",
+            "institutional_resource_response_interpretation_decision",
+            "institutional_trade_accepted",
+            "institutional_commitment_fulfillment_interpretation_decision",
+            "regional_resource_transfer_completed",
+            "institutional_commitment_term_fulfilled",
+        }
+        for fulfilled_event in term_fulfillments:
+            chain, chain_edges = ancestors(str(fulfilled_event.id))
+            combined_edges.extend(chain_edges)
+            term_witnesses[str((fulfilled_event.causal_payload or {}).get("term_id", ""))] = {
+                "fulfilled_event_id": str(fulfilled_event.id),
+                "event_types": sorted({str(getattr(event, "event_type", "")) for event in chain.values()}),
+                "complete": required_types.issubset({str(getattr(event, "event_type", "")) for event in chain.values()}),
+            }
+        witness.update({
+            "proposal": str(proposal.id) if proposal else None,
+            "accepted": str(accepted.id) if accepted else None,
+            "commitment_id": commitment_id or None,
+            "term_ids": sorted(term_ids),
+            "two_reciprocal_legs": len(legs) == 2 and len(leg_shapes) == 2,
+            "transfers_match_accepted_legs": transfer_shapes == leg_shapes,
+            "term_witnesses": term_witnesses,
+            "two_complete_term_witnesses": len(term_witnesses) == 2 and all(item["complete"] for item in term_witnesses.values()),
+            "edges": combined_edges,
+        })
+        if proposal:
+            witness["memory_event_ids"] = sorted(memory_event_ids.intersection({str(proposal.id), *(str(event.id) for event in term_fulfillments)}))
+    elif fulfilled:
         chain, chain_edges = ancestors(str(fulfilled.id))
         required_types = {
-            "request_decision": "institutional_aid_request_interpretation_decision",
+            "request_decision": "institutional_resource_request_interpretation_decision",
             "requested": "institutional_aid_requested",
-            "response_decision": "institutional_aid_response_interpretation_decision",
+            "response_decision": "institutional_resource_response_interpretation_decision",
             "accepted": "institutional_aid_accepted",
-            "fulfillment_decision": "institutional_aid_fulfillment_interpretation_decision",
+            "fulfillment_decision": "institutional_commitment_fulfillment_interpretation_decision",
             "transfer": "regional_resource_transfer_completed",
             "fulfilled": "institutional_commitment_term_fulfilled",
         }
@@ -165,7 +270,7 @@ async def run_scenario(*, pressured: bool, seed: int, months: int) -> dict:
             witness[label] = str(event.id) if event is not None else None
         witness["edges"] = chain_edges
         witness["memory_event_ids"] = sorted(memory_event_ids.intersection(chain))
-    complete = all(witness.values()) if pressured else True
+    complete = all(witness.values()) if (pressured or commerce) else True
     audit = {
         "provider_call_count": provider.call_count,
         "provider_await_count": provider.await_count,
@@ -179,7 +284,7 @@ async def run_scenario(*, pressured: bool, seed: int, months: int) -> dict:
             and data["totals"]["broken_causes"] == 0
             and data["totals"]["story_mutations"] == 0
             and complete
-            and (not pressured or bool(witness.get("memory_event_ids")))
+            and (not (pressured or commerce) or bool(witness.get("memory_event_ids")))
         ),
     }
     if not audit["assertions_passed"]:
@@ -192,11 +297,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20260904)
     parser.add_argument("--months", type=int, default=120)
-    parser.add_argument("--scenario", choices=("natural", "pressured"), required=True)
+    parser.add_argument("--scenario", choices=("natural", "pressured", "commerce"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     data = asyncio.run(run_scenario(
-        pressured=args.scenario == "pressured", seed=args.seed, months=args.months,
+        pressured=args.scenario == "pressured", commerce=args.scenario == "commerce", seed=args.seed, months=args.months,
     ))
     args.output.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(data["totals"], sort_keys=True))

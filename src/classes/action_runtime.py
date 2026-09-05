@@ -2,7 +2,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List
-from enum import Enum
+from enum import Enum, StrEnum
+
+
+class ActionOrigin(StrEnum):
+    """Who actually put an action into an Avatar's hands.
+
+    This is engine-owned provenance, not an LLM parameter and not a name:
+    only the decision boundary may declare ``ACTOR_CHOICE``.  Everything else
+    -- a pre-empted fallback, a mutual-action response, a restored save --
+    stays ``REACTIVE_RESPONSE``, which is also the fail-closed default, so a
+    defensive or installed action can never be read as an initiating choice.
+
+    It is deliberately transient.  It is never persisted, so a restored save
+    proves nothing and therefore fails closed, and no save schema changes.
+    """
+
+    ACTOR_CHOICE = "actor_choice"
+    REACTIVE_RESPONSE = "reactive_response"
 
 
 class ActionStatus(Enum):
@@ -52,6 +69,11 @@ class ActionPlan:
     expiry_month: Optional[int] = None  # 到期月戳；None 为不过期
     max_retries: int = 0
     attempted: int = 0
+    # 谁把这个计划装进来的。默认是 REACTIVE_RESPONSE 而不是自主选择：
+    # 任何没有显式声明「这是本人自己选的」的路径（包括读档重建、
+    # 抢占注入、互动响应）都必须被当成被动反应，见 ActionOrigin。
+    # 这是运行时证据，不进存档：读档后没有证据，就 fail closed。
+    origin: ActionOrigin = ActionOrigin.REACTIVE_RESPONSE
     
     def to_dict(self) -> dict:
         """转换为可序列化的字典"""
@@ -85,4 +107,3 @@ class ActionInstance:
     action: Any  # src.classes.action.Action
     params: Dict[str, Any]
     status: str = "running"  # 遗留字段：Avatar 以字符串记录运行态
-

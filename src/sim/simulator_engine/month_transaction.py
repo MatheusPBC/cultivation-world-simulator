@@ -153,6 +153,13 @@ class SimulationMonthCheckpoint:
     random_state: object
     object_pairs: tuple[tuple[Any, Any], ...]
     registry_pairs: tuple[tuple[dict[Any, Any], dict[Any, Any]], ...]
+    # The runtime handles `capture` deliberately kept by identity rather than
+    # cloning: tasks, locks, connections, mocks, third-party objects.  They
+    # have to be held here so `restore` can seed its own memo with the *same*
+    # identities.  Without them a snapshot that references, say, a finished
+    # asyncio task would make restore try to deepcopy it, which raises
+    # "cannot pickle" and turns a normal rollback into a crash.
+    preserved_handles: tuple[Any, ...]
 
     @classmethod
     def capture(cls, world: Any) -> "SimulationMonthCheckpoint":
@@ -206,6 +213,7 @@ class SimulationMonthCheckpoint:
             random_state=random_state,
             object_pairs=object_pairs,
             registry_pairs=registry_pairs,
+            preserved_handles=tuple(preserved.values()),
         )
 
     def restore(self) -> None:
@@ -214,6 +222,10 @@ class SimulationMonthCheckpoint:
             for original, snapshot in self.object_pairs
         }
         snapshot_to_original[id(self.world)] = self.world
+        # Same rule as capture, and it must be the same rule: a preserved
+        # handle is restored as itself, never copied.
+        for handle in self.preserved_handles:
+            snapshot_to_original.setdefault(id(handle), handle)
 
         for original, snapshot in self.object_pairs:
             if isinstance(original, dict):

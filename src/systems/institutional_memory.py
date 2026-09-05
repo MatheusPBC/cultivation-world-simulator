@@ -76,14 +76,21 @@ def record_known_fact(
     institution_ids: tuple[str, ...],
     *,
     factors: Mapping[str, Any] | None = None,
+    channel: KnowledgeChannel = KnowledgeChannel.FORMAL_NOTICE,
 ) -> None:
     """Record a canonical fact and, when relevant, its initial memory.
 
     A duplicate invocation is idempotent: the knowledge record and memory ID
     are both canonical and no second delta is appended.
+
+    ``channel`` must describe how these institutions actually learned the
+    fact.  It changes nothing else: without explicit ``factors`` no memory is
+    created, whatever the channel.
     """
 
     _canonical_event(event)
+    if not isinstance(channel, KnowledgeChannel):
+        raise TypeError("channel must be a KnowledgeChannel")
     payload = event.causal_payload
     if not isinstance(payload, dict):
         raise TypeError("institutional fact event requires a causal payload")
@@ -96,7 +103,7 @@ def record_known_fact(
                 institution_id=institution_id,
                 event_id=event.id,
                 learned_month=int(world.month_stamp),
-                channel=KnowledgeChannel.FORMAL_NOTICE,
+                channel=channel,
                 learned_from_event_id=event.id,
             ),
             world.institutional_authority,
@@ -227,8 +234,15 @@ def decision_context(
     institution_id: str,
     *,
     event_overlays: tuple[Event, ...] = (),
+    authority_scope: AuthorityScope = AuthorityScope.COMMITMENT_NEGOTIATION,
 ) -> dict[str, Any]:
-    """Bounded actor-known facts plus current authorized holder projection."""
+    """Bounded actor-known facts plus current authorized holder projection.
+
+    ``authority_scope`` selects which office's current holder is projected.
+    Different institutional choices are authorized by different offices, and
+    projecting the wrong one would describe a leader who cannot actually take
+    the choice at hand.  This selects a projection only; it grants nothing.
+    """
 
     month = int(world.month_stamp)
     known = world.institutional_knowledge
@@ -282,10 +296,20 @@ def decision_context(
             "friendliness": relation.friendliness,
             "evidence_event_ids": list(relation.evidence_event_ids[-4:]),
         })
-    return {"known_facts": facts, "authorized_holder": _holder_projection(world, institution_id), "current_relations": sorted(relations, key=lambda item: item["counterpart_institution_id"])[:4]}
+    return {
+        "known_facts": facts,
+        "authorized_holder": _holder_projection(
+            world, institution_id, authority_scope
+        ),
+        "current_relations": sorted(
+            relations, key=lambda item: item["counterpart_institution_id"]
+        )[:4],
+    }
 
 
-def _holder_projection(world: Any, institution_id: str) -> dict[str, Any] | None:
+def _holder_projection(
+    world: Any, institution_id: str, authority_scope: AuthorityScope
+) -> dict[str, Any] | None:
     institution = world.institutional_authority.get_institution(institution_id)
     if institution is None:
         return None
@@ -293,7 +317,7 @@ def _holder_projection(world: Any, institution_id: str) -> dict[str, Any] | None
         world,
         institution.owner_ref,
         institution.owner_ref,
-        AuthorityScope.COMMITMENT_NEGOTIATION,
+        authority_scope,
         current_month=int(world.month_stamp),
     )
     office = world.institutional_authority.offices.get(verdict.office_id or "")
@@ -351,6 +375,36 @@ def _institutional_metadata(world: Any, event: Event) -> dict[str, Any]:
         and (isinstance(payload.get(key), (str, int, float, bool)) or payload.get(key) is None)
     }
     request = payload.get("institutional_aid_request")
+    offer = payload.get("institutional_trade_offer")
+    if isinstance(offer, Mapping):
+        legs = offer.get("legs")
+        bounded_legs = list(legs)[:2] if isinstance(legs, (list, tuple)) else []
+        # Both directions are canonical facts of the same exchange; showing one
+        # of them would misrepresent what was agreed or declined.
+        metadata["legs"] = [
+            {
+                key: leg[key]
+                for key in (
+                    "resource_id",
+                    "amount",
+                    "source_region_id",
+                    "destination_region_id",
+                )
+                if isinstance(leg.get(key), (str, int, float))
+            }
+            for leg in bounded_legs
+            if isinstance(leg, Mapping)
+        ]
+        parties = [
+            str(offer[key])
+            for key in ("proposer_institution_id", "counterparty_institution_id")
+            if isinstance(offer.get(key), str)
+        ]
+        if parties:
+            metadata["parties"] = [
+                {"institution_id": party, "name": _institution_name(world, party)}
+                for party in parties[:2]
+            ]
     if isinstance(request, Mapping):
         for key in ("resource_id", "amount", "source_region_id", "destination_region_id"):
             if isinstance(request.get(key), (str, int, float)):

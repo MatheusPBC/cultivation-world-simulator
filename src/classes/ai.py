@@ -88,18 +88,13 @@ class LLMAI(AI):
                 continue
                 
             r = res[avatar.name]
-            # 仅接受 action_name_params_pairs，不再支持单个 action_name/action_params
-            raw_pairs = r.get("action_name_params_pairs", [])
-            pairs: ACTION_NAME_PARAMS_PAIRS = []
-            
-            for p in raw_pairs:
-                if isinstance(p, list) and len(p) == 2:
-                    # LLM 可能返回 null 作为 params，需要转为空字典。
-                    pairs.append((p[0], p[1] or {}))
-                elif isinstance(p, dict) and "action_name" in p and "action_params" in p:
-                    pairs.append((p["action_name"], p["action_params"] or {}))
-                else:
-                    continue
+            # 仅接受 action_name_params_pairs，不再支持单个 action_name/action_params。
+            # 语法归一化由 src.systems.avatar_decision.parse_action_chain 单独拥有，
+            # 玩家扮演指令走的是同一个解析器，避免两套形状规则。
+            from src.systems.avatar_decision import parse_action_chain
+            pairs: ACTION_NAME_PARAMS_PAIRS = parse_action_chain(
+                r.get("action_name_params_pairs", [])
+            )
             
             # 至少有一个
             if not pairs:

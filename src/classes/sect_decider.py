@@ -26,13 +26,6 @@ from src.systems.single_choice import (
     SectRecruitmentRequest,
     resolve_sect_recruitment,
 )
-from src.systems.institutional_diplomacy import (
-    get_sect_diplomacy_state,
-    has_active_sect_institution,
-    sect_institution_id,
-    set_formal_peace,
-    set_formal_war,
-)
 from src.systems.sect_member_support import transfer_sect_member_support
 from src.utils.config import CONFIG
 from src.utils.llm import call_llm_with_task_name
@@ -49,22 +42,9 @@ if TYPE_CHECKING:
     from src.systems.sect_decision_context import SectDecisionContext
 
 
-DIPLOMACY_ACTION_DECLARE_WAR = "declare_war"
-DIPLOMACY_ACTION_SEEK_PEACE = "seek_peace"
-_VALID_DIPLOMACY_ACTIONS = frozenset(
-    {DIPLOMACY_ACTION_DECLARE_WAR, DIPLOMACY_ACTION_SEEK_PEACE}
-)
-
-# 语义外交状态，用于 StateDelta 的 before/after。
-_DIPLOMACY_STATUS_WAR = "war"
-_DIPLOMACY_STATUS_PEACE = "peace"
-
-
 @dataclass(slots=True)
 class SectDecisionResult:
     events: list[Event] = field(default_factory=list)
-    war_declared_count: int = 0
-    peace_made_count: int = 0
     recruitment_count: int = 0
     expulsion_count: int = 0
     technique_reward_count: int = 0
@@ -76,20 +56,7 @@ class SectDecisionResult:
 
 
 @dataclass(slots=True)
-class DiplomacyAction:
-    """一次已通过校验的外交动作及其引用的个人解读证据。
-
-    `appraisal_ids` 可以为空——纯战略动作不需要任何私人记忆作为依据。
-    """
-
-    action: str
-    other_sect_id: int
-    appraisal_ids: list[str] = field(default_factory=list)
-
-
-@dataclass(slots=True)
 class SectDecisionPlan:
-    diplomacy_actions: list[DiplomacyAction] = field(default_factory=list)
     recruit_avatar_ids: list[str] = field(default_factory=list)
     expel_avatar_ids: list[str] = field(default_factory=list)
     reward_avatar_ids: list[str] = field(default_factory=list)
@@ -132,7 +99,7 @@ class SectDecider:
             subject_kind="sect",
             subject_id=str(sect.id),
             source="rule" if deterministic_plan or plan is None else "llm",
-            considered_count=len(decision_context.diplomacy_targets),
+            considered_count=len(decision_context.member_candidates),
             thinking=str(getattr(plan, "thinking", "") or ""),
         )
         decision_event = Event(
@@ -153,16 +120,6 @@ class SectDecider:
             causal_payload={"deltas": [], "decision": decision.to_dict()},
         )
         result.decision_event = decision_event
-
-        cls._process_diplomacy(
-            sect=sect,
-            decision_context=decision_context,
-            world=world,
-            result=result,
-            actions=list(plan.diplomacy_actions) if plan is not None else [],
-            decision=decision,
-            decision_event=decision_event,
-        )
 
         await cls._process_recruitment(
             sect=sect,
@@ -329,7 +286,6 @@ class SectDecider:
             return deduped
 
         return SectDecisionPlan(
-            diplomacy_actions=cls._parse_diplomacy_actions(payload, decision_context),
             recruit_avatar_ids=_pick_ids("recruit_avatar_ids", recruit_valid),
             expel_avatar_ids=_pick_ids("expel_avatar_ids", member_valid),
             reward_avatar_ids=_pick_ids("reward_avatar_ids", member_valid),
@@ -338,250 +294,14 @@ class SectDecider:
         )
 
     @classmethod
-    def _parse_diplomacy_actions(
-        cls,
-        payload: dict[str, Any],
-        decision_context: "SectDecisionContext",
-    ) -> list[DiplomacyAction]:
-        """校验模型给出的外交动作与其引用的个人解读证据。
-
-        证据必须来自该目标自己的上下文——那份上下文已经保证了
-        “appraiser 是本宗现任在世掌门、focus 是对方现任在世掌门”。
-        因此未知、伪造、重复、跨目标以及引用了前任掌门（本轮上下文中
-        不存在）的引用，都会在这里被拒绝。任何一条引用不合法，只作废
-        该条外交动作，其余动作与其他决策字段照常执行。
-        """
-        allowed_appraisals_by_target: dict[int, set[str]] = {}
-        for item in decision_context.diplomacy_targets:
-            if item.get("other_sect_id") is None:
-                continue
-            allowed_appraisals_by_target[int(item["other_sect_id"])] = {
-                str(entry.get("appraisal_id", ""))
-                for entry in (item.get("personal_appraisals") or [])
-            }
-
-        raw_actions = payload.get("diplomacy_actions", [])
-        if not isinstance(raw_actions, list):
-            return []
-
-        actions: list[DiplomacyAction] = []
-        seen_targets: set[int] = set()
-        for raw in raw_actions:
-            if not isinstance(raw, dict):
-                continue
-            action_name = str(raw.get("action", ""))
-            if action_name not in _VALID_DIPLOMACY_ACTIONS:
-                continue
-            try:
-                other_sect_id = int(raw.get("other_sect_id"))
-            except (TypeError, ValueError):
-                continue
-            allowed_appraisals = allowed_appraisals_by_target.get(other_sect_id)
-            if allowed_appraisals is None:
-                # 目标不在本轮外交候选中：不允许凭空发明对手。
-                continue
-            # 同一目标只接受一条外交动作，避免同轮自相矛盾。
-            if other_sect_id in seen_targets:
-                continue
-
-            raw_ids = raw.get("appraisal_ids", [])
-            if not isinstance(raw_ids, list):
-                continue
-            citations: list[str] = [str(item) for item in raw_ids]
-            if len(set(citations)) != len(citations):
-                cls._warn_invalid_citation(
-                    other_sect_id, "duplicated appraisal citation"
-                )
-                continue
-            if any(citation not in allowed_appraisals for citation in citations):
-                cls._warn_invalid_citation(
-                    other_sect_id, "unknown or mismatched appraisal citation"
-                )
-                continue
-
-            seen_targets.add(other_sect_id)
-            actions.append(
-                DiplomacyAction(
-                    action=action_name,
-                    other_sect_id=other_sect_id,
-                    appraisal_ids=citations,
-                )
-            )
-        return actions
-
-    @classmethod
-    def _warn_invalid_citation(cls, other_sect_id: int, reason: str) -> None:
-        get_logger().logger.warning(
-            "Discarding sect diplomacy action against sect %s: %s",
-            other_sect_id,
-            reason,
-        )
-
-    @classmethod
-    def _process_diplomacy(
-        cls,
-        *,
-        sect: "Sect",
-        decision_context: "SectDecisionContext",
-        world: "World",
-        result: SectDecisionResult,
-        actions: list[DiplomacyAction],
-        decision: AgentDecision,
-        decision_event: Event,
-    ) -> None:
-        target_by_id = {
-            int(item["other_sect_id"]): item
-            for item in decision_context.diplomacy_targets
-            if item.get("other_sect_id") is not None
-        }
-        source_event_by_appraisal = cls._map_appraisal_to_source_event(decision_context)
-        cited_source_event_ids: list[str] = []
-
-        for action in actions:
-            target = target_by_id.get(int(action.other_sect_id))
-            if target is None:
-                continue
-            if not all(
-                has_active_sect_institution(
-                    world,
-                    sect_id,
-                    current_month=int(world.month_stamp),
-                )
-                for sect_id in (sect.id, action.other_sect_id)
-            ):
-                decision.rejected.append(
-                    {
-                        "action_name": action.action,
-                        "params": {"other_sect_id": int(action.other_sect_id)},
-                        "reason": "institutional identity is missing or inactive",
-                    }
-                )
-                continue
-
-            # 以“执行时的真实外交状态”为准，而不是上下文快照：同一轮里
-            # 另一个宗门可能已经改变了这对关系，用快照会写出错误的
-            # before 值，或重复执行一次已经成立的状态转移。
-            live_state = get_sect_diplomacy_state(
-                world,
-                int(sect.id),
-                int(action.other_sect_id),
-                current_month=int(world.month_stamp),
-            )
-            before_status = str(
-                live_state.get("status", _DIPLOMACY_STATUS_PEACE)
-                or _DIPLOMACY_STATUS_PEACE
-            )
-            live_relation = world.institutional_relations.get_relation(
-                sect_institution_id(sect.id),
-                sect_institution_id(action.other_sect_id),
-            )
-            before_kind = live_relation.kind.value if live_relation else "none"
-
-            if action.action == DIPLOMACY_ACTION_DECLARE_WAR:
-                if before_status == _DIPLOMACY_STATUS_WAR:
-                    continue
-                after_status = _DIPLOMACY_STATUS_WAR
-                result.war_declared_count += 1
-                content = t(
-                    "{sect_name} declared war on {target_name}; from this point on, the two sects are at war.",
-                    sect_name=sect.name,
-                    target_name=target["other_sect_name"],
-                )
-            else:
-                if before_status != _DIPLOMACY_STATUS_WAR:
-                    continue
-                after_status = _DIPLOMACY_STATUS_PEACE
-                result.peace_made_count += 1
-                content = t(
-                    "{sect_name} made peace with {target_name}, and the state of war between them came to an end.",
-                    sect_name=sect.name,
-                    target_name=target["other_sect_name"],
-                )
-
-            # Event 先建立（拿到它的真实 id），StateDelta 再引用该 id 构造——
-            # 避免先序列化一个 event_id="" 的 delta 再回填，那样容易在
-            # 忘记回填时留下一个不指向自己的 delta。
-            transition_event = Event(
-                month_stamp=world.month_stamp,
-                content=content,
-                related_sects=[int(sect.id), int(action.other_sect_id)],
-                is_major=True,
-                fact_kind=FactKind.STATE_TRANSITION,
-                causal_origin=CausalOrigin.ACTOR_DECISION,
-                render_params={
-                    "sect_id": str(sect.id),
-                    "target_sect_id": str(action.other_sect_id),
-                    "reason": str(target.get("other_sect_name", "") or ""),
-                },
-            )
-            relation = (
-                set_formal_war(
-                    world,
-                    int(sect.id),
-                    int(action.other_sect_id),
-                    current_month=int(world.month_stamp),
-                    evidence_event_ids=(transition_event.id,),
-                )
-                if after_status == _DIPLOMACY_STATUS_WAR
-                else set_formal_peace(
-                    world,
-                    int(sect.id),
-                    int(action.other_sect_id),
-                    current_month=int(world.month_stamp),
-                    evidence_event_ids=(transition_event.id,),
-                )
-            )
-            delta = StateDelta(
-                event_id=transition_event.id,
-                owner_kind="institutional_relation",
-                owner_id=relation.id,
-                aspect="kind",
-                before=before_kind,
-                after=relation.kind.value,
-            )
-            transition_event.causal_payload = {
-                "reason": str(target.get("other_sect_name", "") or ""),
-                "deltas": [delta.to_dict()],
-            }
-            # 结果事件由本次决策引发。
-            transition_event.causal_links.append(
-                CausalLink(
-                    event_id=transition_event.id,
-                    cause_event_id=decision_event.id,
-                    relation=CausalRelation.MOTIVATED_BY,
-                )
-            )
-            result.events.append(transition_event)
-
-            decision.chosen_chain.append(
-                {
-                    "action_name": action.action,
-                    "params": {"other_sect_id": int(action.other_sect_id)},
-                    "appraisal_ids": list(action.appraisal_ids),
-                }
-            )
-            for appraisal_id in action.appraisal_ids:
-                source_event_id = source_event_by_appraisal.get(appraisal_id)
-                if source_event_id and source_event_id not in cited_source_event_ids:
-                    cited_source_event_ids.append(source_event_id)
-
-        # 决策事件由被引用的那些原始事件所激励。
-        for source_event_id in cited_source_event_ids:
-            decision_event.causal_links.append(
-                CausalLink(
-                    event_id=decision_event.id,
-                    cause_event_id=source_event_id,
-                    relation=CausalRelation.MOTIVATED_BY,
-                )
-            )
-
-    @classmethod
     def _record_institutional_step(
         cls, decision: AgentDecision, action_name: str, avatar_id: str
     ) -> None:
-        """把一次已经执行的非外交制度动作记入审计链。
+        """把一次已经执行的宗门行政动作记入审计链。
 
-        `appraisal_ids` 恒为空：个人解读只是外交证据，不参与人事决策。
+        `appraisal_ids` 恒为空：个人解读从不参与人事决策，宣战也不再是
+        本执行器的输出——它是 ``src.systems.institutional_war`` 拥有的
+        独立制度决策。
         """
         decision.chosen_chain.append(
             {
@@ -590,19 +310,6 @@ class SectDecider:
                 "appraisal_ids": [],
             }
         )
-
-    @classmethod
-    def _map_appraisal_to_source_event(
-        cls, decision_context: "SectDecisionContext"
-    ) -> dict[str, str]:
-        mapping: dict[str, str] = {}
-        for item in decision_context.diplomacy_targets:
-            for entry in item.get("personal_appraisals") or []:
-                appraisal_id = str(entry.get("appraisal_id", ""))
-                source_event_id = str(entry.get("source_event_id", ""))
-                if appraisal_id and source_event_id:
-                    mapping[appraisal_id] = source_event_id
-        return mapping
 
     @classmethod
     async def _process_recruitment(
@@ -854,12 +561,6 @@ class SectDecider:
             parts.append(
                 t("recruited {count} rogue cultivators", count=result.recruitment_count)
             )
-        if result.war_declared_count:
-            parts.append(
-                t("declared war {count} times", count=result.war_declared_count)
-            )
-        if result.peace_made_count:
-            parts.append(t("made peace {count} times", count=result.peace_made_count))
         if result.expulsion_count:
             parts.append(t("expelled {count} members", count=result.expulsion_count))
         if result.technique_reward_count:

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from src.i18n import t
 from src.classes.event import Event
-from src.classes.action_runtime import ActionResult, ActionStatus
+from src.classes.action_runtime import ActionOrigin, ActionResult, ActionStatus
 from src.utils.params import filter_kwargs_for_callable
 
 if TYPE_CHECKING:
@@ -61,6 +61,11 @@ class Action(ABC):
     ACTION_NAME_ID: str = ""
     DESC_ID: str = ""
     REQUIREMENTS_ID: str = ""
+
+    # 计划来源：由 Avatar.commit_next_plan 在提交时写入。类上的兜底值是
+    # 「被动反应」，所以读档重建的动作、或任何绕过提交路径的动作，都不会
+    # 被误读成本人主动发起的选择。
+    action_origin: str = ActionOrigin.REACTIVE_RESPONSE
 
     # 是否允许参与聚会（如拍卖会、大比）
     ALLOW_GATHERING: bool | None = None
@@ -235,7 +240,6 @@ class ActualActionMixin():
         Returns:
             Event对象，is_major根据当前Action的IS_MAJOR类变量设置
         """
-        from src.classes.action.action import Action
         # 获取当前类的IS_MAJOR属性
         is_major = self.__class__.IS_MAJOR if hasattr(self.__class__, 'IS_MAJOR') else False
         return Event(

@@ -40,10 +40,23 @@ CONTRIBUTE_ACTION = "contribute_institutional_relationship_impact"
 ELIGIBLE_EVENT_TYPES = frozenset({
     "institutional_aid_accepted",
     "institutional_aid_refused",
+    "institutional_trade_accepted",
+    "institutional_trade_refused",
     "institutional_commitment_term_fulfilled",
     "institutional_commitment_term_breached",
     "institutional_commitment_term_remediated",
 })
+# A refusal opens no commitment, so its parties come from the refused proposal.
+_REFUSED_PROPOSAL_PARTY_KEYS = {
+    "institutional_aid_refused": (
+        "institutional_aid_request",
+        ("requester_institution_id", "provider_institution_id"),
+    ),
+    "institutional_trade_refused": (
+        "institutional_trade_offer",
+        ("proposer_institution_id", "counterparty_institution_id"),
+    ),
+}
 _CHOICES = (
     ("positive", "mild", 2),
     ("positive", "moderate", 4),
@@ -82,8 +95,10 @@ def _parties(
     if isinstance(commitment_id, str) and commitment_id:
         commitment = world.institutional_relations.commitments.get(commitment_id)
         return tuple(commitment.party_ids) if commitment is not None else ()
-    if event.event_type == "institutional_aid_refused":
-        request_event = next(
+    refused = _REFUSED_PROPOSAL_PARTY_KEYS.get(event.event_type)
+    if refused is not None:
+        payload_key, party_keys = refused
+        proposal_event = next(
             (
                 _event_by_id(world, link.cause_event_id, overlays)
                 for link in event.causal_links
@@ -91,10 +106,19 @@ def _parties(
             ),
             None,
         )
-        request = getattr(request_event, "causal_payload", {}).get("institutional_aid_request") if request_event is not None and isinstance(getattr(request_event, "causal_payload", None), dict) else None
-        if not isinstance(request, dict):
+        proposal_payload = (
+            getattr(proposal_event, "causal_payload", None)
+            if proposal_event is not None
+            else None
+        )
+        proposal = (
+            proposal_payload.get(payload_key)
+            if isinstance(proposal_payload, dict)
+            else None
+        )
+        if not isinstance(proposal, dict):
             return ()
-        return tuple(sorted({str(request[key]) for key in ("requester_institution_id", "provider_institution_id") if request.get(key)}))
+        return tuple(sorted({str(proposal[key]) for key in party_keys if proposal.get(key)}))
     return ()
 
 

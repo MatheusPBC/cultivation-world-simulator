@@ -15,11 +15,12 @@ from src.sim.simulator import Simulator
 from src.sim.simulator_engine.causal_recorder import CausalRecorder
 from src.sim.simulator_engine.context import SimulationStepContext
 from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
-from src.sim.simulator_engine.phases import annual, sect_war, world as world_phases
+from src.sim.simulator_engine.phases import annual, world as world_phases
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.systems.cultivation import Realm
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institutional_diplomacy import set_formal_war
+from src.classes.observe import is_within_observation
+from src.systems.institutional_diplomacy import are_sects_at_war, set_formal_war
 from src.systems.time import Month, Year, create_month_stamp
 from src.utils.llm.client import call_llm_with_task_name
 
@@ -334,7 +335,15 @@ async def test_phase_sect_periodic_decision_emits_summary_event(base_world, mock
 
 
 @pytest.mark.asyncio
-async def test_phase_handle_sect_wars_auto_battles_and_teleports_loser(base_world, mock_llm_managers):
+async def test_wartime_colocation_alone_never_forces_combat_or_teleport(base_world, mock_llm_managers):
+    """Sect war is an institutional relationship, not a combat trigger.
+
+    Two members of formally warring sects stand one tile apart and the whole
+    canonical month runs. Nobody chose `Attack`, so the month must not damage
+    anyone, must not move anyone to a headquarters, and must not pay war
+    contribution or weariness. This asserts the material outcome through the
+    real `Simulator.step()` path instead of the absence of a phase name.
+    """
     from src.classes.environment.sect_region import SectRegion
     from pathlib import Path
 
@@ -402,19 +411,25 @@ async def test_phase_handle_sect_wars_auto_battles_and_teleports_loser(base_worl
     defender.tile = base_world.map.get_tile(defender.pos_x, defender.pos_y)
     base_world.avatar_manager.avatars = {attacker.id: attacker, defender.id: defender}
 
-    sim = Simulator(base_world)
-    with patch(
-        "src.sim.simulator_engine.phases.sect_war.decide_battle",
-        return_value=(attacker, defender, 20, 5),
-    ), patch(
-        "src.sim.simulator_engine.phases.sect_war.handle_battle_finish",
-        new=AsyncMock(return_value=[]),
-    ):
-        events = await sect_war.phase_handle_sect_wars(sim, [attacker, defender])
+    assert are_sects_at_war(base_world, 1, 2)
+    assert is_within_observation(attacker, defender)
+    for avatar in (attacker, defender):
+        avatar.hp.cur = avatar.hp.max
 
-    assert any("立即爆发战斗" in event.content for event in events)
-    assert defender.pos_x == 4 and defender.pos_y == 4
-    assert sect_b.war_weariness == 3
+    sim = Simulator(base_world)
+    await sim.step()
+
+    # No damage: co-location under a formal war is not itself a battle.
+    assert attacker.hp.cur == attacker.hp.max
+    assert defender.hp.cur == defender.hp.max
+    # No teleport back to any headquarters.
+    assert (attacker.pos_x, attacker.pos_y) == (1, 1)
+    assert (defender.pos_x, defender.pos_y) == (1, 2)
+    # No automatic war contribution and no war weariness from the encounter.
+    assert attacker.sect_contribution == 0
+    assert defender.sect_contribution == 0
+    assert sect_a.war_weariness == 0
+    assert sect_b.war_weariness == 0
 
 
 # --- Task 3 acceptance: passive causal recorder must not alter step() behavior ---

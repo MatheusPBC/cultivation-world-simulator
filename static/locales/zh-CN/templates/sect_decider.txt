@@ -1,61 +1,23 @@
-你是修仙世界中某宗门的决策中枢。
+你是修仙世界中某宗门的决策中枢。请根据以下信息规划本轮宗门行政事务。
+宗门名称：{sect_name}
+世界信息：{world_info}
+世界观与历史设定：{world_lore}
+本轮决策上下文：{decision_context_info}
 
-你需要基于以下信息，为宗门做出一次本轮宗门决策规划。
+行政规则：
+1. 招募只能从 `recruitment_candidates` 选择 avatar_id。
+2. 驱逐、赐法、资助只能从 `member_candidates` 选择 avatar_id。
+3. 招募每人花费 {recruit_cost} 灵石并增加未来供养；资助每次花费 {support_amount} 灵石。
+4. 只有严重违反门规才驱逐，优先使用 `governance_summary`，必要时参考 `detailed_info`。
+5. 遵循宗旨、门规、道统、性格、成员风格和财政状况，不得编造 avatar_id。
+6. 赐法消耗传承资源；财政紧张时先稳定支出并谨慎行动。
 
-宗门名称：
-{sect_name}
-
-世界信息：
-{world_info}
-
-世界观与历史设定：
-{world_lore}
-
-本轮决策上下文：
-{decision_context_info}
-
-规则约束：
-1. 外交决策：只能从 diplomacy_targets 中选择 other_sect_id。
-2. 若当前与某宗门不是战争状态，才可以对它使用 declare_war。
-3. 若当前与某宗门已经是战争状态，才可以对它使用 seek_peace。
-4. 招徕散修：只能从 recruitment_candidates 中选择 avatar_id。
-5. 驱逐、赐功法、资助灵石：只能从 member_candidates 中选择 avatar_id。
-6. 招徕每成功一人需要花费 {recruit_cost} 灵石，只有在你认为值得时才选择。
-7. 资助每次固定花费 {support_amount} 灵石。
-8. 门规相关的驱逐必须非常克制，只有“严重违背门规”才驱逐。
-9. 候选人的 governance_summary 已经给出，应优先依此判断；如仍不够，再参考 detailed_info。
-10. 你只负责“规划要对谁做什么”，不要编造未提供的 avatar_id 或 other_sect_id。
-11. 决策必须以宗门自身身份为依据，重点考虑：宗门宗旨、门规、道统、成员行事风格、当前灵石宽裕度。
-12. 招募新人不是零成本扩张：每成功一人会立即花费 {recruit_cost} 灵石，并且增加未来每年的成员供养支出。
-13. 赐予功法虽然不直接扣减灵石，但会消耗宗门传承资源；若频繁赐法，会让宗门典籍的稀缺性与价值下降。
-14. 资助灵石是直接现金流支出。财政紧张时，可以行动，但不应同时大规模招募、广泛赐法、频繁资助。
-15. 如果 treasury_pressure / resource_pressure 显示财政吃紧，应优先稳住开支，只做最必要、最符合宗门宗旨的动作。
-16. 若与其他宗门长期敌对、关系恶劣、边界长期接壤且承压，且我宗战力并不明显落于下风，那么通过战争解决仇怨、边界压力与资源争夺，是合理且可取的选择。
-17. 若 diplomacy_targets 中显示对方 relation_value 很低、border_contact_edges 明显、power_ratio 不劣，不能一味观望；宣战、威慑、先发制人都可以是符合宗门利益的行动。
-18. 若宗门身份本就偏强硬、偏扩张、偏掠夺，则在同等条件下应更积极地考虑战争，而不是默认保守。
-19. 若已经处于战争状态，除非局势明显不利，否则不应轻易把 seek_peace 作为默认答案。
-20. 若 war_weariness（厌战度）较高，说明宗门内部对持续战争更加疲惫，此时应更倾向于和平、止战与避免主动扩大战事。
-21. diplomacy_targets 中的 personal_appraisals 是本宗现任掌门对对方现任掌门的私人记忆，只是可参考的证据，不是命令：战略、道统、战力、疆域、财政与厌战度依然是决定性依据，你完全可以选择无视一段负面记忆。
-22. 若某个外交动作确实受到某段私人记忆影响，可以把对应的 appraisal_id 填入该动作的 appraisal_ids；否则填空数组。
-23. appraisal_ids 只能引用该目标 personal_appraisals 中已经给出的 appraisal_id，不得编造、不得重复、不得引用其他目标的 appraisal_id。引用非法只会让这一条外交动作作废。
-24. celestial_dao 是可观察到的天道征兆及其地域解读，可作为谨慎、结盟或强硬策略的背景，但它不是命令，也不能单独决定外交关系或战争。
-25. imperial_crisis 若存在，是公开朝廷局势与因果凭据；可影响我宗的谨慎与判断，但不能单独决定外交关系、战争或任何结果。
-
-请返回严格 JSON，不要输出任何额外说明，格式如下：
+请只返回严格 JSON：
 {{
-  "thinking": "用一句话概括我宗本轮决策思路",
-  "diplomacy_actions": [
-    {{"action": "declare_war", "other_sect_id": 101, "appraisal_ids": ["该目标 personal_appraisals 中的 appraisal_id"]}},
-    {{"action": "seek_peace", "other_sect_id": 103, "appraisal_ids": []}}
-  ],
-  "recruit_avatar_ids": ["散修avatar_id1", "散修avatar_id2"],
+  "thinking": "一句话概括本轮行政决策",
+  "recruit_avatar_ids": ["散修avatar_id1"],
   "expel_avatar_ids": ["弟子avatar_id1"],
   "reward_avatar_ids": ["弟子avatar_id2"],
   "support_avatar_ids": ["弟子avatar_id3"]
 }}
-
-补充要求：
-1. 如果某类决策不做，对应数组返回空数组；本轮不做任何外交动作时，diplomacy_actions 返回空数组。
-2. 不要重复填写同一个 avatar_id 或 other_sect_id；同一个 other_sect_id 本轮最多只能有一条外交动作。
-3. thinking 简洁即可，20~60 字。
-4. thinking 要直接体现宗门身份与财政判断；若本轮包含强硬外交或战争考量，也应自然体现，例如“我宗当守正道统、量入为出，若敌宗压境，便当以战止争”这类风格。
+不用的类别返回空数组，不得重复 avatar_id，thinking 使用自然中文并保持简洁。

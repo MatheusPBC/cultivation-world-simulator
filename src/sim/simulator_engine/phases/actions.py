@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from src.classes.agent_decision import AgentDecision
-from src.classes.causal_origin import CausalOrigin
-from src.classes.actions import get_action_infos
+from src.classes.action_runtime import ActionOrigin
 from src.classes.ai import llm_ai
 from src.classes.core.avatar import Avatar
-from src.classes.event import Event, FactKind, is_null_event
+from src.classes.event import Event, is_null_event
 from src.config.providers import StaticConfigProvider
-from src.i18n import t
 from src.run.log import get_logger
 from src.sim.runtime_capabilities import get_decision_boundary_gateway
+from src.systems.avatar_decision import (
+    DECISION_SOURCE_LLM,
+    adopt_avatar_decision,
+    build_avatar_decision_event,
+    offered_actions,
+)
 from src.utils.llm.exceptions import LLMError, ProviderCallError
 
 
@@ -32,52 +35,6 @@ class RequiredDecisionFailed(Exception):
         super().__init__(
             message or f"required decision failed while deciding for avatars: {', '.join(self.avatar_ids)}"
         )
-
-
-def _record_agent_decision(
-    world,
-    avatar: Avatar,
-    action_name_params_pairs,
-    avatar_thinking: str,
-    short_term_objective: str,
-) -> Event:
-    """
-    在决策边界把一次 LLM 决策记录为审计用的 fact_kind=DECISION 事件。
-
-    这是一条审计记录，不是并行的规划器：模拟器内没有任何地方会读取它来
-    做决策，`chosen_chain` 只是复制 `load_decide_result_chain` 已经入队
-    的计划。事件本身默认被 EventQuery.include_decisions 过滤，不出现在
-    时间线/记忆/世界志中，见 docs/specs/causal-world-kernel.md 5.4。
-    """
-    decision = AgentDecision(
-        month_stamp=int(world.month_stamp),
-        subject_kind="avatar",
-        subject_id=str(avatar.id),
-        source="llm",
-        considered_count=len(get_action_infos(avatar)),
-        chosen_chain=[
-            {"action_name": name, "params": params}
-            for name, params in action_name_params_pairs
-        ],
-        thinking=avatar_thinking,
-        short_term_objective=short_term_objective,
-    )
-    causal_payload = {"deltas": [], "decision": decision.to_dict()}
-    event = Event(
-        world.month_stamp,
-        t("{avatar} committed to an action chain", avatar=avatar.name),
-        related_avatars=[avatar.id],
-        is_major=False,
-        is_story=False,
-        fact_kind=FactKind.DECISION,
-        causal_origin=CausalOrigin.LLM_INTERPRETATION,
-        causal_payload=causal_payload,
-    )
-    # 运行时身份：一次决策可能跨月消费多个计划（见 commit_next_plan），
-    # 这两个字段不随存档保存，读档/重置后随 Avatar 重建自然清空。
-    avatar.current_decision_event_id = event.id
-    avatar._current_decision_payload = causal_payload
-    return event
 
 
 async def phase_decide_actions(world, living_avatars: list[Avatar]) -> list[Event]:
@@ -121,12 +78,22 @@ async def phase_decide_actions(world, living_avatars: list[Avatar]) -> list[Even
             action_name_params_pairs,
             avatar_thinking,
             short_term_objective,
+            origin=ActionOrigin.ACTOR_CHOICE,
         )
-        decision_events.append(
-            _record_agent_decision(
-                world, avatar, action_name_params_pairs, avatar_thinking, short_term_objective
-            )
+        # 审计事实由 src.systems.avatar_decision 统一构造；这里在事件随
+        # finalize_step 入库前就把它认领为当前决策，让同月内的动作可以引用
+        # 它（见 avatar_aggression 读取运行时决策载荷）。
+        decision_event = build_avatar_decision_event(
+            world,
+            avatar,
+            action_name_params_pairs,
+            avatar_thinking,
+            short_term_objective,
+            source=DECISION_SOURCE_LLM,
+            offered=offered_actions(avatar),
         )
+        adopt_avatar_decision(avatar, decision_event)
+        decision_events.append(decision_event)
     return decision_events
 
 

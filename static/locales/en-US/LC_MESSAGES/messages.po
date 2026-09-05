@@ -2410,6 +2410,31 @@ msgstr "{avatar} discovered a grave at {location}: {poi}"
 msgid "{avatar} discovered a point of interest at {location}: {poi}"
 msgstr "{avatar} discovered a point of interest at {location}: {poi}"
 
+# Institutional peace negotiation
+msgid ""
+"{proposer} proposed to {counterparty} that the war between them be ended."
+msgstr ""
+"{proposer} proposed to {counterparty} that the war between them be ended."
+
+msgid "{proposer} and {counterparty} agreed to end the war between them."
+msgstr "{proposer} and {counterparty} agreed to end the war between them."
+
+msgid ""
+"{counterparty} refused to end the war with {proposer}, and the war goes on."
+msgstr ""
+"{counterparty} refused to end the war with {proposer}, and the war goes on."
+
+# Grounded war declaration
+msgid "{initiator} deliberately attacked {target}, a member of another sect."
+msgstr "{initiator} deliberately attacked {target}, a member of another sect."
+
+msgid ""
+"{declaring} declared war on {target} over a deliberate attack on one of its "
+"members."
+msgstr ""
+"{declaring} declared war on {target} over a deliberate attack on one of its "
+"members."
+
 # Execution Results
 msgid "{avatar_name} {done} {grade} {label}『{item_name}』."
 msgstr "{avatar_name} {done} {grade} {label}『{item_name}』."

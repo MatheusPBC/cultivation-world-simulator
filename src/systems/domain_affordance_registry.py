@@ -7,7 +7,9 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from src.classes.agent_decision import AgentDecision
 from src.classes.domain_affordance import DomainAffordance
+from src.classes.domain_affordance import DomainDecisionKind
 from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import Event
@@ -30,6 +32,96 @@ AffordanceExecutor = Callable[..., Event]
 
 class StaleAffordanceError(ValueError):
     pass
+
+
+def event_lookup(
+    world: Any, overlays: Iterable[Event] = ()
+) -> Callable[[str], Event | None]:
+    """Resolve an event id from explicit step-local evidence, then the store.
+
+    Overlays are the canonical events this very step produced, which are not
+    queryable until the finalizer persists them.  Nothing else may be injected
+    here: an arbitrary object carrying a familiar id is not canonical
+    evidence, and in particular a caller's own trigger object is never trusted
+    as its own source.
+    """
+
+    by_id = {
+        event.id: event
+        for event in overlays
+        if isinstance(event, Event) and event.id
+    }
+    resolved: dict[str, Event | None] = {}
+
+    def lookup(event_id: str) -> Event | None:
+        key = str(event_id)
+        if key in resolved:
+            return resolved[key]
+        found = by_id.get(key)
+        if not isinstance(found, Event):
+            manager = getattr(world, "event_manager", None)
+            getter = getattr(manager, "get_event_by_id", None)
+            stored = getter(key) if callable(getter) else None
+            found = stored if isinstance(stored, Event) else None
+        resolved[key] = found
+        return found
+
+    return lookup
+
+
+def validate_actor_decision(
+    decision_event: Any,
+    context: "AffordanceContext",
+    option: DomainAffordance,
+    *,
+    label: str,
+) -> None:
+    """Only this actor's real, current decision may move canonical state.
+
+    Shared by every collective domain: the decision must be a canonical
+    `DECISION` fact carrying no delta, authored this month by this very actor,
+    selecting exactly this option, and answering this trigger.
+    """
+
+    if not isinstance(decision_event, Event):
+        raise StaleAffordanceError(f"{label} decision is absent")
+    payload = (
+        decision_event.causal_payload
+        if isinstance(decision_event.causal_payload, dict)
+        else {}
+    )
+    decision = payload.get("decision")
+    interpretation = payload.get("interpretation")
+    try:
+        audit = AgentDecision.from_dict(decision)
+    except (AttributeError, TypeError, ValueError):
+        raise StaleAffordanceError(f"{label} decision is not canonical") from None
+    render_params = decision_event.render_params or {}
+    if (
+        decision_event.fact_kind is not FactKind.DECISION
+        or decision_event.is_story
+        or payload.get("deltas") != []
+        or not isinstance(decision, dict)
+        or not isinstance(interpretation, dict)
+        or set(decision) != set(audit.to_dict())
+        or audit.month_stamp != int(context.world.month_stamp)
+        or not audit.id
+        or audit.subject_kind != context.actor_ref.kind
+        or str(audit.subject_id) != context.actor_ref.id
+        or audit.source not in {"llm", "rule", "injected"}
+        or audit.chosen_chain != [{"selected_affordance_id": option.id}]
+        or render_params.get("domain") != context.domain
+        or render_params.get("actor_kind") != context.actor_ref.kind
+        or str(render_params.get("actor_id")) != context.actor_ref.id
+        or interpretation.get("decision") != DomainDecisionKind.ACT.value
+        or str(interpretation.get("selected_affordance_id", "")) != option.id
+        or not any(
+            link.relation is CausalRelation.RESPONSE_TO
+            and link.cause_event_id == context.trigger_event.id
+            for link in decision_event.causal_links
+        )
+    ):
+        raise StaleAffordanceError(f"{label} decision is not canonical")
 
 
 class DomainAffordanceRegistry:
@@ -149,5 +241,7 @@ __all__ = [
     "DOMAIN_AFFORDANCES",
     "DomainAffordanceRegistry",
     "StaleAffordanceError",
+    "event_lookup",
     "stale_affordance_blocked_event",
+    "validate_actor_decision",
 ]

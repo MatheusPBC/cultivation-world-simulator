@@ -2558,6 +2558,32 @@ msgstr ""
 msgid "The Dao considered an institutional petition."
 msgstr "O Dao considerou uma petição institucional."
 
+# Institutional peace negotiation
+msgid ""
+"{proposer} proposed to {counterparty} that the war between them be ended."
+msgstr "{proposer} propôs a {counterparty} encerrar a guerra entre as duas."
+
+msgid "{proposer} and {counterparty} agreed to end the war between them."
+msgstr ""
+"{proposer} e {counterparty} concordaram em encerrar a guerra entre as duas."
+
+msgid ""
+"{counterparty} refused to end the war with {proposer}, and the war goes on."
+msgstr ""
+"{counterparty} recusou encerrar a guerra com {proposer}, e a guerra "
+"continua."
+
+# Grounded war declaration
+msgid "{initiator} deliberately attacked {target}, a member of another sect."
+msgstr "{initiator} atacou deliberadamente {target}, membro de outra seita."
+
+msgid ""
+"{declaring} declared war on {target} over a deliberate attack on one of its "
+"members."
+msgstr ""
+"{declaring} declarou guerra a {target} por um ataque deliberado contra um de"
+" seus membros."
+
 # Execution Results
 msgid "{avatar_name} {done} {grade} {label}『{item_name}』."
 msgstr "{avatar_name} {done} {label} de grau {grade} \"{item_name}\"."

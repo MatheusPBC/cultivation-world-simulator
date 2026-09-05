@@ -17,14 +17,20 @@ from src.systems.economy_interpreter import (
     economy_affordance_context,
     interpret_resource_shortage,
 )
-from src.systems.institutional_aid import (
-    has_institutional_aid_request_option,
-    has_institutional_aid_requester,
-    process_institutional_aid_deadlines,
-    process_institutional_aid_fulfillment,
-    process_institutional_aid_remediation,
-    process_institutional_aid_shortage,
+from src.systems.institutional_resource_commitment import (
+    has_institutional_negotiator,
+    has_institutional_request_option,
+    negotiation_outcome_event_types,
+    process_commitment_deadlines,
+    process_commitment_fulfillment,
+    process_commitment_remediation,
+    process_institutional_resource_negotiation,
 )
+
+# Importing the verticals registers their affordance providers, executors and
+# proposal handlers on the shared negotiation domains.
+import src.systems.institutional_aid  # noqa: F401
+import src.systems.institutional_commerce  # noqa: F401
 
 
 def _config_value(world: Any, name: str, default: float) -> float:
@@ -103,7 +109,7 @@ async def process_economy_reactivity(
     processed: set[str] = set()
 
     produced.extend(
-        await process_institutional_aid_fulfillment(
+        await process_commitment_fulfillment(
             world,
             invalidations=invalidations,
             llm_call=llm_call,
@@ -113,7 +119,7 @@ async def process_economy_reactivity(
                 int(
                     _config_value(
                         world,
-                        "institutional_aid_fulfillment_evaluation_budget_per_month",
+                        "institutional_commitment_fulfillment_evaluation_budget_per_month",
                         8,
                     )
                 ),
@@ -123,7 +129,7 @@ async def process_economy_reactivity(
                 int(
                     _config_value(
                         world,
-                        "institutional_aid_fulfillment_llm_budget_per_month",
+                        "institutional_commitment_fulfillment_llm_budget_per_month",
                         2,
                     )
                 ),
@@ -131,7 +137,7 @@ async def process_economy_reactivity(
         )
     )
     produced.extend(
-        await process_institutional_aid_remediation(
+        await process_commitment_remediation(
             world,
             llm_call=llm_call,
             budget=budget,
@@ -140,7 +146,7 @@ async def process_economy_reactivity(
                 int(
                     _config_value(
                         world,
-                        "institutional_aid_fulfillment_evaluation_budget_per_month",
+                        "institutional_commitment_fulfillment_evaluation_budget_per_month",
                         8,
                     )
                 ),
@@ -150,7 +156,7 @@ async def process_economy_reactivity(
                 int(
                     _config_value(
                         world,
-                        "institutional_aid_fulfillment_llm_budget_per_month",
+                        "institutional_commitment_fulfillment_llm_budget_per_month",
                         2,
                     )
                 ),
@@ -172,8 +178,8 @@ async def process_economy_reactivity(
             continue
         params = shortage.render_params or {}
         destination_id = str(params.get("region_id", ""))
-        if has_institutional_aid_requester(world, destination_id):
-            has_request_option = has_institutional_aid_request_option(world, shortage)
+        if has_institutional_negotiator(world, destination_id):
+            has_request_option = has_institutional_request_option(world, shortage)
             request_uses_llm = has_request_option and (
                 llm_calls < llm_budget and budget.consume_interpreter_call()
             )
@@ -184,7 +190,7 @@ async def process_economy_reactivity(
             )
             if response_uses_llm:
                 llm_calls += 1
-            aid_events = await process_institutional_aid_shortage(
+            negotiation_events = await process_institutional_resource_negotiation(
                 world,
                 shortage,
                 llm_call=llm_call,
@@ -192,8 +198,8 @@ async def process_economy_reactivity(
                 response_force_rule=not response_uses_llm,
                 budget=budget,
             )
-            produced.extend(aid_events)
-            decision_event = aid_events[0] if aid_events else None
+            produced.extend(negotiation_events)
+            decision_event = negotiation_events[0] if negotiation_events else None
             if decision_event is not None:
                 interpretation = (decision_event.causal_payload or {}).get(
                     "interpretation", {}
@@ -205,12 +211,8 @@ async def process_economy_reactivity(
                     decision=str(interpretation.get("decision", "maintain")),
                     affordance_id=interpretation.get("selected_affordance_id"),
                     completed=any(
-                        event.event_type
-                        in {
-                            "institutional_aid_accepted",
-                            "institutional_aid_refused",
-                        }
-                        for event in aid_events
+                        event.event_type in negotiation_outcome_event_types()
+                        for event in negotiation_events
                     )
                     or str(interpretation.get("decision")) == "maintain",
                 )
@@ -273,7 +275,7 @@ async def process_economy_reactivity(
             ),
         )
     produced.extend(
-        process_institutional_aid_deadlines(
+        process_commitment_deadlines(
             world,
             budget=budget,
             evaluation_budget=min(
@@ -283,7 +285,7 @@ async def process_economy_reactivity(
                     int(
                         _config_value(
                             world,
-                            "institutional_aid_fulfillment_evaluation_budget_per_month",
+                            "institutional_commitment_fulfillment_evaluation_budget_per_month",
                             8,
                         )
                     ),

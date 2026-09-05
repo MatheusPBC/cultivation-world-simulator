@@ -1168,6 +1168,41 @@
 - summary 写入事件系统；
 - 原始对话不上正式事件流。
 
+### 15.5 决策审计与持久化边界（已实现）
+
+角色扮演的已接受命令必须复用共享的 Avatar 决策审计路径：通过序列化
+事件 API 持久化一个 canonical `DecisionEvent`，而不是另建 roleplay
+事件日志。命令原文、聊天消息和 `RoleplaySession` 都是运行时数据，不进入
+存档。决策接受、计划装载、动作执行和攻击归因仍由各自的 canonical owner
+负责，不能由 roleplay service 越权执行。
+
+已实现的 acceptance 必须保持以下不变量：
+
+- 接受失败时不产生计划；
+- 后续月份的回滚保留已经接受的 decision event；
+- plan origin 只存在于运行时，读档后缺失时 fail closed；
+- event storage 中已经持久化的事实不因该 transient origin 缺失而删除或
+  重写；
+- `Attack` 是 `actual=False` 的内部动作，不在玩家看到的 public catalogue
+  中；roleplay 不得通过该 audit 把它变成可提交动作；
+- 自然 public hostile entry 是 `MutualAttack`：已接受的 player decision 若精确
+  选择了该 action 与 `target_avatar`，会在真实执行边界产生一次发起 aggression
+  fact；它不制造 battle，目标独立选择 Escape 或内部 Attack；
+- 防御 response 保持 `REACTIVE_RESPONSE`，只能以 `RESPONSE_TO` 指回这次
+  initiative，不能反向产生 casus；它自己的 player/LLM/fallback choice 是单独、
+  无 delta 的 DecisionEvent；
+- 该 attribution 只覆盖可观察、存活、未被同名替换的锁定目标和有效 runtime
+  origin；读档后的 in-flight plan、stale response、非宗门成员或无审计决定均
+  fail closed。是否宣战始终由知情的受害机构独立决定，既不保证也不强迫战争。
+
+共享 `avatar_decision.py` 与 `roleplay_service.py` 已实现上述 acceptance。
+focused public `Rest` runtime witness 已证明 owner 写出的 HP transition 指向
+同一个 player decision，并证明结束月 persistence failure 后 HP、elapsed
+action state 回滚、accepted decision event 不丢失，retry 不重复。另有 focused
+`MutualAttack` witnesses：public acceptance、successful Escape、defensive
+Attack、player response、institutional maintain 和 response-time rollback 都验证
+上述边界；这不是对战争、军队或自动战斗的扩展。
+
 ## 16. 测试建议
 
 ## 16.1 后端

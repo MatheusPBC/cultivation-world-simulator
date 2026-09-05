@@ -134,3 +134,22 @@ msgstr "{region}的民众举行地方仪式，声称它回应了当地的压力�
 
 msgid "{avatar_name}'s {severity} injury has recovered."
 msgstr "{avatar_name}的{severity}伤势已经痊愈。"
+
+# Institutional peace negotiation
+
+msgid "{proposer} proposed to {counterparty} that the war between them be ended."
+msgstr "{proposer}向{counterparty}提议结束双方之间的战争。"
+
+msgid "{proposer} and {counterparty} agreed to end the war between them."
+msgstr "{proposer}与{counterparty}达成一致，结束了双方之间的战争。"
+
+msgid "{counterparty} refused to end the war with {proposer}, and the war goes on."
+msgstr "{counterparty}拒绝与{proposer}停战，战争仍在继续。"
+
+# Grounded war declaration
+
+msgid "{initiator} deliberately attacked {target}, a member of another sect."
+msgstr "{initiator}蓄意攻击了他宗门人{target}。"
+
+msgid "{declaring} declared war on {target} over a deliberate attack on one of its members."
+msgstr "{declaring}以门人遭蓄意攻击为由，向{target}宣战。"

@@ -20,7 +20,7 @@ from src.systems.domain_affordance_registry import (
 )
 from src.systems.economy_reactivity import process_economy_reactivity
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institutional_aid import FULFILLMENT_DOMAIN, REQUEST_DOMAIN
+from src.systems.institutional_resource_commitment import FULFILLMENT_DOMAIN, REQUEST_DOMAIN
 from src.systems.institutional_memory import (
     decision_context,
     effective_salience,
@@ -99,9 +99,9 @@ async def test_request_and_independent_acceptance_create_terms_without_moving_st
     )
 
     assert [event.event_type for event in events[:4]] == [
-        "institutional_aid_request_interpretation_decision",
+        "institutional_resource_request_interpretation_decision",
         "institutional_aid_requested",
-        "institutional_aid_response_interpretation_decision",
+        "institutional_resource_response_interpretation_decision",
         "institutional_aid_accepted",
     ]
     assert [event.event_type for event in events[4:]].count(
@@ -171,7 +171,7 @@ async def test_aid_template_receives_bounded_known_context_in_real_prompt_builde
         "inst:city:302",
         event_overlays=(accepted,),
     )
-    template = Path("static/locales/en-US/templates/institutional_aid_interpreter.txt").read_text(
+    template = Path("static/locales/en-US/templates/institutional_commitment_interpreter.txt").read_text(
         encoding="utf-8"
     )
     prompt = build_prompt(
@@ -283,10 +283,10 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         llm_call=_select_first,
     )
     assert [event.event_type for event in events[:4]] == [
-        "institutional_aid_fulfillment_interpretation_decision",
+        "institutional_commitment_fulfillment_interpretation_decision",
         "regional_resource_transfer_completed",
         "institutional_commitment_term_fulfilled",
-        "institutional_aid_request_interpretation_decision",
+        "institutional_resource_request_interpretation_decision",
     ]
     assert [event.event_type for event in events[4:]].count(
         "institutional_relationship_impact_interpretation_decision"
@@ -366,7 +366,7 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         llm_call=_select_first,
     )
     assert [event.event_type for event in remediation_events] == [
-        "institutional_aid_remediation_interpretation_decision",
+        "institutional_commitment_remediation_interpretation_decision",
         "institutional_commitment_remediation_proposed",
     ]
     remediating = base_world.institutional_relations.commitments[commitment.id]
@@ -406,7 +406,7 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         llm_call=_select_first,
     )
     assert [event.event_type for event in renewed_remediation_events] == [
-        "institutional_aid_remediation_interpretation_decision",
+        "institutional_commitment_remediation_interpretation_decision",
         "institutional_commitment_remediation_proposed",
     ]
     assert base_world.event_manager.commit_step(renewed_remediation_events)
@@ -419,7 +419,7 @@ async def test_fulfillment_revalidates_the_exact_term_before_material_transfer(
         llm_call=_select_first,
     )
     assert [event.event_type for event in resolved_events[:3]] == [
-        "institutional_aid_fulfillment_interpretation_decision",
+        "institutional_commitment_fulfillment_interpretation_decision",
         "regional_resource_transfer_completed",
         "institutional_commitment_term_remediated",
     ]
@@ -497,6 +497,6 @@ async def test_chain_projects_real_aid_decisions_and_material_transfer(base_worl
     )
 
     event_types = {event["event_type"] for event in chain["events"]}
-    assert "institutional_aid_fulfillment_interpretation_decision" in event_types
+    assert "institutional_commitment_fulfillment_interpretation_decision" in event_types
     assert "regional_resource_transfer_completed" in event_types
     assert "institutional_commitment_term_fulfilled" in event_types

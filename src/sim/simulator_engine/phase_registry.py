@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from .finalizer import finalize_step
-from .phases import actions, annual, appraisal, lifecycle, poi, sect_war, social, world as world_phases
+from .phases import actions, annual, appraisal, lifecycle, poi, social, world as world_phases
 
 
 PhaseHandler = Callable[[Any, Any], Any]
@@ -115,10 +115,6 @@ async def passive_effects(simulator, ctx):
 
 async def autonomous_custom_creation(simulator, ctx):
     ctx.add_events(await world_phases.phase_autonomous_custom_creation(simulator.world, ctx.living_avatars))
-
-
-async def sect_wars(simulator, ctx):
-    ctx.add_events(await sect_war.phase_handle_sect_wars(simulator, ctx.living_avatars))
 
 
 async def nickname_generation(_simulator, ctx):
@@ -478,32 +474,31 @@ SIMULATION_PHASES: tuple[SimulationPhase, ...] = (
     SimulationPhase("passive_effects", 18, "passive_effects", passive_effects),
     SimulationPhase("resolve_individual_consequences", 19, "resolve_individual_consequences", resolve_individual_consequences),
     SimulationPhase("autonomous_custom_creation", 20, "autonomous_custom_creation", autonomous_custom_creation),
-    SimulationPhase("sect_wars", 21, "sect_wars", sect_wars),
-    SimulationPhase("nickname_generation", 22, "nickname_generation", nickname_generation),
-    SimulationPhase("update_celestial_phenomenon", 23, "update_celestial_phenomenon", update_celestial_phenomenon),
-    SimulationPhase("update_city_population", 24, "update_city_population", update_city_population),
-    SimulationPhase("update_regional_economy", 25, "update_regional_economy", update_regional_economy),
-    SimulationPhase("react_economy", 26, "react_economy", react_economy),
-    SimulationPhase("advance_urban_capacity_projects", 27, "advance_urban_capacity_projects", advance_urban_capacity_projects),
-    SimulationPhase("update_dynasty_and_officials", 28, "update_dynasty_and_officials", update_dynasty_and_officials),
-    SimulationPhase("handle_interactions_second", 29, "handle_interactions", handle_interactions),
-    SimulationPhase("update_calculated_relations", 30, "update_calculated_relations", update_calculated_relations),
-    SimulationPhase("process_dao_rites", 31, "process_dao_rites", process_dao_rites),
-    SimulationPhase("annual_maintenance", 32, "annual_maintenance", annual_maintenance),
-    SimulationPhase("update_regional_climate", 33, "update_regional_climate", update_regional_climate),
-    SimulationPhase("update_regional_floods", 34, "update_regional_floods", update_regional_floods),
-    SimulationPhase("resolve_material_hazard_impacts", 35, "resolve_material_hazard_impacts", resolve_material_hazard_impacts),
-    SimulationPhase("restore_infrastructure_sites", 36, "restore_infrastructure_sites", restore_infrastructure_sites),
-    SimulationPhase("update_route_infrastructure_dependencies", 37, "update_route_infrastructure_dependencies", update_route_infrastructure_dependencies),
-    SimulationPhase("evaluate_semantic_world", 38, "evaluate_semantic_world", evaluate_semantic_world),
-    SimulationPhase("react_government", 39, "react_government", react_government),
-    SimulationPhase("react_organization", 40, "react_organization", react_organization),
-    SimulationPhase("react_city", 41, "react_city", react_city),
-    SimulationPhase("react_population", 42, "react_population", react_population),
-    SimulationPhase("carry_forward_mechanical_invalidations", 43, "carry_forward_mechanical_invalidations", carry_forward_mechanical_invalidations),
-    SimulationPhase("generate_event_appraisals", 44, "generate_event_appraisals", generate_event_appraisals),
-    SimulationPhase("generate_chronicle", 45, "generate_chronicle", generate_chronicle),
-    SimulationPhase("finalize_step", 46, "finalize_step", finalize_step_phase, reset_check_after=False),
+    SimulationPhase("nickname_generation", 21, "nickname_generation", nickname_generation),
+    SimulationPhase("update_celestial_phenomenon", 22, "update_celestial_phenomenon", update_celestial_phenomenon),
+    SimulationPhase("update_city_population", 23, "update_city_population", update_city_population),
+    SimulationPhase("update_regional_economy", 24, "update_regional_economy", update_regional_economy),
+    SimulationPhase("react_economy", 25, "react_economy", react_economy),
+    SimulationPhase("advance_urban_capacity_projects", 26, "advance_urban_capacity_projects", advance_urban_capacity_projects),
+    SimulationPhase("update_dynasty_and_officials", 27, "update_dynasty_and_officials", update_dynasty_and_officials),
+    SimulationPhase("handle_interactions_second", 28, "handle_interactions", handle_interactions),
+    SimulationPhase("update_calculated_relations", 29, "update_calculated_relations", update_calculated_relations),
+    SimulationPhase("process_dao_rites", 30, "process_dao_rites", process_dao_rites),
+    SimulationPhase("annual_maintenance", 31, "annual_maintenance", annual_maintenance),
+    SimulationPhase("update_regional_climate", 32, "update_regional_climate", update_regional_climate),
+    SimulationPhase("update_regional_floods", 33, "update_regional_floods", update_regional_floods),
+    SimulationPhase("resolve_material_hazard_impacts", 34, "resolve_material_hazard_impacts", resolve_material_hazard_impacts),
+    SimulationPhase("restore_infrastructure_sites", 35, "restore_infrastructure_sites", restore_infrastructure_sites),
+    SimulationPhase("update_route_infrastructure_dependencies", 36, "update_route_infrastructure_dependencies", update_route_infrastructure_dependencies),
+    SimulationPhase("evaluate_semantic_world", 37, "evaluate_semantic_world", evaluate_semantic_world),
+    SimulationPhase("react_government", 38, "react_government", react_government),
+    SimulationPhase("react_organization", 39, "react_organization", react_organization),
+    SimulationPhase("react_city", 40, "react_city", react_city),
+    SimulationPhase("react_population", 41, "react_population", react_population),
+    SimulationPhase("carry_forward_mechanical_invalidations", 42, "carry_forward_mechanical_invalidations", carry_forward_mechanical_invalidations),
+    SimulationPhase("generate_event_appraisals", 43, "generate_event_appraisals", generate_event_appraisals),
+    SimulationPhase("generate_chronicle", 44, "generate_chronicle", generate_chronicle),
+    SimulationPhase("finalize_step", 45, "finalize_step", finalize_step_phase, reset_check_after=False),
 )
 
 

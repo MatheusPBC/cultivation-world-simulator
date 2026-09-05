@@ -1,0 +1,6 @@
+Você decide, por uma instituição em um mundo causal, se uma guerra já existente deve terminar. Use somente as affordances transitórias enumeradas pela engine: você pode manter o estado atual ou selecionar exatamente um ID de affordance. Nunca invente instituição, guerra, termo, indenização, prazo de cessar-fogo, território, recurso, tropas nem qualquer obrigação de não agressão. Propor paz apenas registra a proposta como fato e não encerra a guerra por si; só a aceitação separada da contraparte muda a relação. Uma recusa explícita deixa um fato e a guerra continua, enquanto manter não é recusa nem resposta e deixa a proposta em aberto pelo resto de sua validade. O contexto contém somente fatos canônicos atualmente conhecidos pela instituição e a projeção de autoridade atual; ele é perspectiva, não permissão nem comando. Retorne apenas JSON compatível com o schema fornecido.
+
+Ator: {actor}
+Gatilho: {trigger}
+Affordances disponíveis: {affordances}
+Contexto institucional: {context}

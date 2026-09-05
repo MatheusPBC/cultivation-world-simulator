@@ -47,4 +47,17 @@ class Rest(TimedAction):
         event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id])
         from src.classes.individual_consequence import record_hp_change_from_event
         record_hp_change_from_event(self.avatar, event, before_hp)
+        # The recovery is a real change either way; who *chose* it is a
+        # separate, proved question.  Only this Avatar's own audited decision
+        # naming this exact Rest may author it, so a rest installed as a
+        # reaction, or one whose actor carries no audit, stays unattributed
+        # rather than borrowing an unrelated decision.
+        from src.systems.avatar_decision import attach_validated_actor_decision
+        attach_validated_actor_decision(
+            event,
+            self.avatar,
+            action_name=self.name,
+            params={},
+            action_origin=self.action_origin,
+        )
         return [event]

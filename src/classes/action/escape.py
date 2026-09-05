@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from src.i18n import t
 from src.classes.action import InstantAction
 from src.classes.action.param_options import ParamOptionSource
@@ -8,12 +10,19 @@ from src.systems.battle import get_escape_success_rate
 from src.classes.action.event_helper import EventHelper
 from src.utils.resolution import resolve_query
 
+if TYPE_CHECKING:
+    from src.classes.core.avatar import Avatar
+
 
 class Escape(InstantAction):
     """
     逃离：尝试从对方身边脱离（有成功率）。
     成功：抢占并进入 MoveAwayFromAvatar(6个月)。
     失败：抢占并进入 Attack。
+
+    这是一条回应，不是发起：它永远由引擎安装（`MutualAttack` 的应对），
+    因此它的事实回指那次发起，而不产生新的敌意事实。逃脱成功也一样——
+    发起已经发生过了，逃掉的是后果，不是发起。
     """
     
     # 多语言 ID
@@ -39,9 +48,16 @@ class Escape(InstantAction):
         avatar.current_action = None
 
     def _execute(self, avatar_name: str) -> None:
+        from src.systems.avatar_aggression import (
+            carry_initiating_aggression,
+            initiating_aggression_event_id,
+            link_response_to_initiative,
+        )
+
         target = self._find_avatar_by_name(avatar_name)
         if target is None:
             return
+        aggression_event_id = initiating_aggression_event_id(self)
         escape_rate = float(get_escape_success_rate(target, self.avatar))
         import random as _r
 
@@ -50,6 +66,8 @@ class Escape(InstantAction):
         content = t("{avatar} attempted to escape from {target}: {result}",
                    avatar=self.avatar.name, target=target.name, result=result_text)
         result_event = Event(self.world.month_stamp, content, related_avatars=[self.avatar.id, target.id])
+        # 没有被告知发起来源（读档重建、独立安装）时不挂任何链接。
+        link_response_to_initiative(result_event, aggression_event_id)
         EventHelper.push_pair(result_event, initiator=self.avatar, target=target, to_sidebar_once=True)
         if success:
             self._preempt_avatar(self.avatar)
@@ -59,6 +77,10 @@ class Escape(InstantAction):
             self._preempt_avatar(self.avatar)
             self.avatar.load_decide_result_chain([("Attack", {"avatar_name": avatar_name})], self.avatar.thinking, "")
             self.avatar.commit_next_plan()
+            # 逃脱失败接上的战斗仍然是同一次发起的后果，把来源继续传下去，
+            # 这样战斗结果也回指那一条侵略事实，而不是变成孤立记录。
+            current = getattr(self.avatar, "current_action", None)
+            carry_initiating_aggression(getattr(current, "action", None), aggression_event_id)
 
     def can_start(self, avatar_name: str) -> tuple[bool, str]:
         return True, ""
@@ -77,5 +99,3 @@ class Escape(InstantAction):
 
     async def finish(self, avatar_name: str) -> list[Event]:
         return []
-
-

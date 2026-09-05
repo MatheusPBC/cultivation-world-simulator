@@ -36,8 +36,11 @@ async def run_annual_maintenance(simulator, ctx) -> None:
     # 1. 刷新排行榜
     # 2. 更新宗门状态
     # 3. 执行配置驱动的宗门决策周期
-    # 4. 生成宗门周期思考
-    # 5. 清理长期死亡角色、已故档案与过期 POI
+    # 4. 同一周期内推进机构和平谈判（回应先于新提议）
+    # 5. 同一周期内处理正式宣战（和平之后，所以本周期新起的战争不会
+    #    在同一轮里被自己提议停战）
+    # 6. 生成宗门周期思考
+    # 7. 清理长期死亡角色、已故档案与过期 POI
     if not ctx.is_january:
         return
 
@@ -53,6 +56,8 @@ async def run_annual_maintenance(simulator, ctx) -> None:
         ctx.events.extend(sect_events)
 
     ctx.events.extend(await phase_sect_periodic_decision(simulator))
+    ctx.events.extend(await phase_institutional_peace_negotiation(simulator, ctx))
+    ctx.events.extend(await phase_institutional_war_declaration(simulator, ctx))
     ctx.events.extend(await phase_sect_periodic_thinking(simulator))
 
     cleaned_count = world.avatar_manager.cleanup_long_dead_avatars(
@@ -144,6 +149,66 @@ async def phase_sect_periodic_thinking(simulator) -> list[Event]:
     if not _should_run_sect_thinking_cycle(world):
         return []
 
+    return await _run_sect_periodic_thinking(simulator)
+
+
+async def phase_institutional_peace_negotiation(simulator, ctx) -> list[Event]:
+    """Advance bilateral peace negotiation on the sect decision cadence.
+
+    Deliberately outside the per-sect ``try/except`` of the decision cycle: a
+    failure here would leave a half-written relation with its facts dropped,
+    so it must surface as a real step failure instead of being swallowed.
+    Events produced earlier in this same step are handed over as explicit
+    overlays because they are not queryable until the finalizer persists them.
+    """
+
+    world = simulator.world
+    if world.month_stamp.get_month() != Month.JANUARY:
+        return []
+    if not _should_run_sect_decision_cycle(world):
+        return []
+
+    from src.systems.institutional_peace import (
+        process_institutional_peace_negotiation,
+    )
+
+    return await process_institutional_peace_negotiation(
+        world,
+        event_overlays=tuple(ctx.events),
+        budget=ctx.causal_budget,
+    )
+
+
+async def phase_institutional_war_declaration(simulator, ctx) -> list[Event]:
+    """Advance formal war declaration on the same sect decision cadence.
+
+    Like peace negotiation, this is deliberately outside the per-sect
+    ``try/except`` of the decision cycle: a failure here would leave a
+    half-written relation with its facts dropped, so it must surface as a real
+    step failure instead of being swallowed.  Events produced earlier in this
+    same step are handed over as explicit overlays because they are not
+    queryable until the finalizer persists them.
+    """
+
+    world = simulator.world
+    if world.month_stamp.get_month() != Month.JANUARY:
+        return []
+    if not _should_run_sect_decision_cycle(world):
+        return []
+
+    from src.systems.institutional_war import (
+        process_institutional_war_declaration,
+    )
+
+    return await process_institutional_war_declaration(
+        world,
+        event_overlays=tuple(ctx.events),
+        budget=ctx.causal_budget,
+    )
+
+
+async def _run_sect_periodic_thinking(simulator) -> list[Event]:
+    world = simulator.world
     sect_context = getattr(world, "sect_context", None)
     active_sects = (
         sect_context.get_active_sects()

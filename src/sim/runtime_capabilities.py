@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol
@@ -68,7 +69,13 @@ class RuntimeDecisionBoundaryGateway:
         session["controlled_avatar_id"] = str(avatar.id)
         session["status"] = "awaiting_decision"
         session["pending_request"] = {
-            "request_id": f"roleplay-decision-{avatar.id}-{int(time.time() * 1000)}",
+            # Same contract as `make_pending_decision_request`: the token must
+            # be unique, because it is the only proof that a submitted command
+            # answers the boundary that is currently open.  A millisecond
+            # timestamp collides.  This gateway deliberately depends on
+            # nothing above the runtime session shape, so the shape is
+            # restated here rather than imported from the server layer.
+            "request_id": f"roleplay-decision-{avatar.id}-{uuid.uuid4().hex}",
             "type": "decision",
             "avatar_id": str(avatar.id),
             "title": t("{avatar_name} needs a new command", avatar_name=avatar.name),

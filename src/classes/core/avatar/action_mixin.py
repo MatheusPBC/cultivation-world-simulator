@@ -9,7 +9,13 @@ if TYPE_CHECKING:
     from src.classes.core.avatar.core import Avatar
 
 from src.classes.action import Action
-from src.classes.action_runtime import ActionStatus, ActionResult, ActionPlan, ActionInstance
+from src.classes.action_runtime import (
+    ActionInstance,
+    ActionOrigin,
+    ActionPlan,
+    ActionResult,
+    ActionStatus,
+)
 from src.classes.action.registry import ActionRegistry
 from src.classes.event import Event
 from src.classes.typings import ACTION_NAME, ACTION_NAME_PARAMS_PAIRS
@@ -43,7 +49,8 @@ class ActionMixin:
         action_name_params_pairs: ACTION_NAME_PARAMS_PAIRS,
         avatar_thinking: str,
         short_term_objective: str,
-        prepend: bool = False
+        prepend: bool = False,
+        origin: ActionOrigin = ActionOrigin.REACTIVE_RESPONSE,
     ):
         """
         加载AI的决策结果（动作链），立即设置第一个为当前动作，其余进入队列。
@@ -53,13 +60,21 @@ class ActionMixin:
             avatar_thinking: 思考内容
             short_term_objective: 短期目标
             prepend: 是否插队到最前面（默认False，即追加到末尾）
+            origin: 计划来源（见 ActionOrigin）。默认是被动反应：只有真正
+                的决策边界（以及玩家扮演的直接指令）才显式声明
+                ACTOR_CHOICE，抢占注入与互动响应保持默认值。
         """
         if not action_name_params_pairs:
             return
         self.thinking = avatar_thinking
         self.short_term_objective = short_term_objective
         # 转为计划并入队（不立即提交，交由提交阶段统一触发开始事件）
-        plans: List[ActionPlan] = [ActionPlan(name, params) for name, params in action_name_params_pairs]
+        # 严格校验：未知来源直接抛错，而不是悄悄退化成某个默认值。
+        plan_origin = ActionOrigin(origin)
+        plans: List[ActionPlan] = [
+            ActionPlan(name, params, origin=plan_origin)
+            for name, params in action_name_params_pairs
+        ]
         if prepend:
             self.planned_actions[0:0] = plans
         else:
@@ -118,6 +133,9 @@ class ActionMixin:
             # 启动
             params_for_start = filter_kwargs_for_callable(action.start, plan.params)
             start_event = action.start(**params_for_start)
+            # 引擎在这里、且只在这里，把计划来源固定到真正被提交的动作实例上。
+            # 读档重建的动作不经过这里，因此保持类上的兜底值（被动反应）。
+            action.action_origin = ActionOrigin(plan.origin)
             self.current_action = ActionInstance(action=action, params=plan.params, status="running")
             # 标记为"本轮新设动作"，用于本月补充执行
             self._new_action_set_this_step = True
@@ -299,4 +317,3 @@ class ActionMixin:
         if self.current_action and self.current_action.action:
             return getattr(self.current_action.action, 'IS_MAJOR', False)
         return False
-

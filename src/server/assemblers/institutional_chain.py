@@ -12,7 +12,9 @@ from src.systems.institution_authority import can_actor_act_for
 from src.systems.institutional_memory import effective_salience
 
 _OWNER_KINDS = {"region": InstitutionKind.CITY, "sect": InstitutionKind.SECT, "dynasty": InstitutionKind.DYNASTY}
-_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated", "institutional_relationship_changed", "institutional_relationship_interpreted"}
+_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "institutional_trade_proposed", "institutional_trade_accepted", "institutional_trade_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated", "institutional_relationship_changed", "institutional_relationship_interpreted", "institutional_peace_proposed", "institutional_peace_accepted", "institutional_peace_rejected", "institutional_war_declared", "avatar_deliberate_attack"}
+_PEACE_EVENT_TYPES = {"institutional_peace_proposed", "institutional_peace_accepted", "institutional_peace_rejected", "institutional_war_declared"}
+_AGGRESSION_EVENT_TYPES = {"avatar_deliberate_attack"}
 _EVENT_SCAN_PAGE_SIZE = 128
 _EVENT_SCAN_PAGES = 3
 
@@ -90,6 +92,26 @@ def _party_ids(
     visited.add(event_id)
     payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
     result: set[str] = set()
+    # Sect participation is an explicit canonical fact on typed institutional
+    # diplomacy events.  Resolve it through the authority state so the
+    # projection emits the stable institution IDs used everywhere else.
+    if event.event_type in _PEACE_EVENT_TYPES:
+        for sect_id in event.related_sects or ():
+            try:
+                sect = world.institutional_authority.get_institution_for_owner(
+                    EntityRef("sect", str(sect_id))
+                )
+            except (AttributeError, TypeError, ValueError):
+                sect = None
+            if sect is not None:
+                result.add(str(sect.id))
+    aggression = payload.get("avatar_aggression")
+    if event.event_type in _AGGRESSION_EVENT_TYPES and isinstance(aggression, Mapping):
+        result.update(
+            str(aggression[key])
+            for key in ("initiator_institution_id", "target_institution_id")
+            if aggression.get(key)
+        )
     relationship_impact = payload.get("relationship_impact")
     if isinstance(relationship_impact, Mapping):
         result.update(
@@ -100,6 +122,20 @@ def _party_ids(
     request = payload.get("institutional_aid_request")
     if isinstance(request, Mapping):
         result.update(str(request[key]) for key in ("requester_institution_id", "provider_institution_id") if request.get(key))
+    offer = payload.get("institutional_trade_offer")
+    if isinstance(offer, Mapping):
+        result.update(
+            str(offer[key])
+            for key in ("proposer_institution_id", "counterparty_institution_id")
+            if offer.get(key)
+        )
+    peace_proposal = payload.get("peace_proposal")
+    if isinstance(peace_proposal, Mapping):
+        result.update(
+            str(peace_proposal[key])
+            for key in ("proposer_institution_id", "counterparty_institution_id")
+            if peace_proposal.get(key)
+        )
     commitment_id = payload.get("commitment_id")
     if commitment_id:
         commitment = world.institutional_relations.commitments.get(str(commitment_id))
@@ -124,7 +160,15 @@ def _party_ids(
         cause = world.event_manager.get_event_by_id(link.cause_event_id)
         if cause is not None:
             cause_payload = cause.causal_payload if isinstance(cause.causal_payload, Mapping) else {}
-            if isinstance(cause_payload.get("institutional_aid_request"), Mapping) or isinstance(cause_payload.get("decision"), Mapping):
+            if (
+                isinstance(cause_payload.get("institutional_aid_request"), Mapping)
+                or isinstance(cause_payload.get("institutional_trade_offer"), Mapping)
+                or isinstance(cause_payload.get("decision"), Mapping)
+                or isinstance(cause_payload.get("peace_proposal"), Mapping)
+                or cause.event_type in _PEACE_EVENT_TYPES
+                or isinstance(cause_payload.get("avatar_aggression"), Mapping)
+                or cause.event_type in _AGGRESSION_EVENT_TYPES
+            ):
                 result.update(_party_ids(world, cause, visited=visited, depth=depth + 1, memo=memo))
     if memo is not None:
         memo[event_id] = set(result)
@@ -149,7 +193,41 @@ def _decision(payload: Mapping[str, Any]) -> dict[str, str] | None:
 def _event_row(world: Any, event: Any) -> dict[str, Any]:
     payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
     links = list(world.event_manager.get_causal_links_for_event(event.id))
-    return {"event_id": str(event.id), "content": str(event.content or ""), "event_type": str(event.event_type or ""), "month_stamp": int(event.month_stamp), "fact_kind": getattr(event.fact_kind, "value", str(event.fact_kind)), "causal_origin": getattr(event.causal_origin, "value", str(event.causal_origin)), "commitment_id": str(payload["commitment_id"]) if payload.get("commitment_id") else None, "term_id": str(payload["term_id"]) if payload.get("term_id") else None, "relation": getattr(getattr(links[0], "relation", None), "value", None) if links else None, "source_event_ids": [str(link.cause_event_id) for link in links], "decision": _decision(payload)}
+    offer = payload.get("institutional_trade_offer")
+    trade_offer = None
+    if isinstance(offer, Mapping):
+        legs = offer.get("legs")
+        if isinstance(legs, list):
+            projected_legs = []
+            for leg in legs:
+                if not isinstance(leg, Mapping):
+                    continue
+                amount = leg.get("amount")
+                if isinstance(amount, bool) or not isinstance(amount, (int, float)):
+                    continue
+                projected = {
+                    "source_region_id": str(leg.get("source_region_id") or ""),
+                    "destination_region_id": str(leg.get("destination_region_id") or ""),
+                    "resource_id": str(leg.get("resource_id") or ""),
+                    "route_id": str(leg.get("route_id") or ""),
+                    "amount": amount,
+                    "source_institution_id": None,
+                    "destination_institution_id": None,
+                }
+                for field, output in (("source_region_id", "source_institution_id"), ("destination_region_id", "destination_institution_id")):
+                    region_id = leg.get(field)
+                    if region_id is not None:
+                        owner = world.institutional_authority.get_institution_for_owner(EntityRef("region", str(region_id)))
+                        if owner:
+                            projected[output] = owner.id
+                projected_legs.append(projected)
+            trade_offer = {
+                "proposer_institution_id": str(offer.get("proposer_institution_id") or ""),
+                "counterparty_institution_id": str(offer.get("counterparty_institution_id") or ""),
+                "urgency": offer.get("urgency"),
+                "legs": projected_legs,
+            }
+    return {"event_id": str(event.id), "content": str(event.content or ""), "event_type": str(event.event_type or ""), "month_stamp": int(event.month_stamp), "fact_kind": getattr(event.fact_kind, "value", str(event.fact_kind)), "causal_origin": getattr(event.causal_origin, "value", str(event.causal_origin)), "commitment_id": str(payload["commitment_id"]) if payload.get("commitment_id") else None, "term_id": str(payload["term_id"]) if payload.get("term_id") else None, "relation": getattr(getattr(links[0], "relation", None), "value", None) if links else None, "source_event_ids": [str(link.cause_event_id) for link in links], "decision": _decision(payload), "trade_offer": trade_offer}
 
 
 def _event_page(world: Any, institution_ids: set[str], cursor: str | None, limit: int) -> tuple[list[dict[str, Any]], str | None, bool, set[str]]:

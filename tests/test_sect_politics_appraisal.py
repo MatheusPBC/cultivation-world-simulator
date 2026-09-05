@@ -17,7 +17,6 @@ import pytest
 
 from src.classes.age import Age
 from src.classes.alignment import Alignment
-from src.classes.causal_link import CausalRelation
 from src.classes.causal_origin import CausalOrigin
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
@@ -26,8 +25,6 @@ from src.classes.emotions import EmotionType
 from src.classes.event import Event, FactKind
 from src.classes.event_appraisal import AppraisalSource, EventAppraisal
 from src.classes.event_storage import EventStorage
-from src.classes.institution import Institution, InstitutionKind
-from src.classes.mechanical_language import EntityRef
 from src.classes.root import Root
 from src.classes.sect_decider import SectDecider
 from src.systems.sect_decision_context import (
@@ -37,7 +34,10 @@ from src.systems.sect_decision_context import (
 from src.classes.sect_ranks import SectRank
 from src.systems.cultivation import Realm
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institutional_diplomacy import are_sects_at_war, set_formal_war
+from src.systems.institutional_diplomacy import (
+    are_sects_at_war,
+    set_formal_war,
+)
 from src.systems.sect_decision_context import SectDecisionContext, build_sect_decision_context
 from src.systems.time import Month, MonthStamp, Year, create_month_stamp
 
@@ -300,125 +300,6 @@ class TestPatriarchAppraisalContext:
 
 # --- 2. Decision contract ---
 
-class TestDiplomacyActionValidation:
-
-    @pytest.mark.asyncio
-    async def test_purely_strategic_action_with_empty_citations_is_accepted(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2)])
-        payload = {
-            "thinking": "Border pressure alone.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 2, "appraisal_ids": []}],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        assert are_sects_at_war(base_world, 1, 2)
-        assert result.war_declared_count == 1
-
-    @pytest.mark.asyncio
-    async def test_negative_memory_may_be_ignored_with_no_diplomacy_action(self, base_world):
-        """Strategy stays authoritative: heavy negative evidence, no action chosen."""
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2, appraisals=[_appraisal_entry()])])
-        payload = {"thinking": "Not worth a war.", "diplomacy_actions": []}
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        assert not are_sects_at_war(base_world, 1, 2)
-        assert result.war_declared_count == 0
-        assert result.decision_event is not None  # the round is still audited
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "bad_ids,reason",
-        [
-            (["fabricated-id"], "fabricated"),
-            (["ap-1", "ap-1"], "duplicated"),
-            (["ap-cross"], "cross-target"),
-            (["ap-stale"], "stale-patriarch"),
-        ],
-    )
-    async def test_bad_citation_invalidates_only_that_action(self, base_world, bad_ids, reason):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        # Target 2 owns ap-1; target 3's ap-cross and the retired patriarch's
-        # ap-stale are both absent from target 2's supplied context.
-        ctx = _minimal_ctx([
-            _target(2, appraisals=[_appraisal_entry("ap-1", "ev-1")]),
-            _target(3, status="war", appraisals=[_appraisal_entry("ap-cross", "ev-cross")]),
-        ])
-        base_world.institutional_authority.add_institution(
-            Institution(
-                kind=InstitutionKind.SECT,
-                owner_ref=EntityRef("sect", "3"),
-                founded_month=int(base_world.month_stamp),
-            )
-        )
-        set_formal_war(
-            base_world, 1, 3, current_month=int(base_world.month_stamp),
-            evidence_event_ids=("event:existing-war",),
-        )
-        payload = {
-            "thinking": "Mixed evidence.",
-            "diplomacy_actions": [
-                {"action": "declare_war", "other_sect_id": 2, "appraisal_ids": bad_ids},
-                {"action": "seek_peace", "other_sect_id": 3, "appraisal_ids": []},
-            ],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        assert not are_sects_at_war(base_world, 1, 2), f"{reason} citation must invalidate its action"
-        assert result.war_declared_count == 0
-        # The unrelated, well-formed action still executes.
-        assert result.peace_made_count == 1
-        assert not are_sects_at_war(base_world, 1, 3)
-
-    @pytest.mark.asyncio
-    async def test_valid_citation_is_recorded_on_the_executed_action(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2, appraisals=[_appraisal_entry("ap-1", "ev-1")])])
-        payload = {
-            "thinking": "Old grudge plus border pressure.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 2, "appraisal_ids": ["ap-1"]}],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        chain = result.decision_event.causal_payload["decision"]["chosen_chain"]
-        war_steps = [step for step in chain if step["action_name"] == "declare_war"]
-        assert len(war_steps) == 1
-        assert war_steps[0]["appraisal_ids"] == ["ap-1"]
-        assert war_steps[0]["params"]["other_sect_id"] == 2
-
-    @pytest.mark.asyncio
-    async def test_unknown_target_or_action_name_is_rejected(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2)])
-        payload = {
-            "thinking": "Invented targets.",
-            "diplomacy_actions": [
-                {"action": "declare_war", "other_sect_id": 99, "appraisal_ids": []},
-                {"action": "annex", "other_sect_id": 2, "appraisal_ids": []},
-            ],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        assert result.war_declared_count == 0
-        assert not are_sects_at_war(base_world, 1, 2)
-
-    def test_legacy_target_id_arrays_are_gone(self):
-        from src.classes.sect_decider import SectDecisionPlan
-
-        plan = SectDecisionPlan()
-        assert not hasattr(plan, "declare_war_target_ids")
-        assert not hasattr(plan, "seek_peace_target_ids")
-        assert plan.diplomacy_actions == []
-
-
-# --- 3. Audit ---
-
 class TestSectDecisionAudit:
 
     @pytest.mark.asyncio
@@ -452,48 +333,8 @@ class TestSectDecisionAudit:
         assert len(decision_events) == 1
         assert decision_events[0].causal_payload["decision"]["source"] == "rule"
         assert decision_events[0].causal_origin is CausalOrigin.ACTOR_DECISION
-        assert result.war_declared_count == 0
 
     @pytest.mark.asyncio
-    async def test_decision_event_links_motivated_by_each_cited_source_event(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([
-            _target(2, appraisals=[
-                _appraisal_entry("ap-1", "ev-1"),
-                _appraisal_entry("ap-2", "ev-1"),  # same source event, must dedupe
-                _appraisal_entry("ap-3", "ev-3"),
-            ]),
-        ])
-        payload = {
-            "thinking": "Two grudges.",
-            "diplomacy_actions": [
-                {"action": "declare_war", "other_sect_id": 2, "appraisal_ids": ["ap-1", "ap-2", "ap-3"]},
-            ],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        links = result.decision_event.causal_links
-        assert all(link.relation is CausalRelation.MOTIVATED_BY for link in links)
-        assert sorted(link.cause_event_id for link in links) == ["ev-1", "ev-3"]
-
-    @pytest.mark.asyncio
-    async def test_war_event_links_motivated_by_the_decision_event(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2, appraisals=[_appraisal_entry("ap-1", "ev-1")])])
-        payload = {
-            "thinking": "Settle it.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 2, "appraisal_ids": ["ap-1"]}],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        war_events = [e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION]
-        assert len(war_events) == 1
-        causes = [link.cause_event_id for link in war_events[0].causal_links
-                  if link.relation is CausalRelation.MOTIVATED_BY]
-        assert causes == [result.decision_event.id]
-
     @pytest.mark.asyncio
     async def test_summary_event_is_causally_linked_to_the_decision_event(self, base_world):
         from src.sim.simulator_engine.phases.annual import phase_sect_periodic_decision
@@ -522,40 +363,18 @@ class TestSectDecisionAudit:
         assert summaries, "each sect's summary event must link back to its decision event"
 
 
-# --- 4. Diplomacy state transitions ---
 
-class TestDiplomacyStateTransitions:
 
-    @pytest.mark.asyncio
-    async def test_war_event_carries_semantic_state_delta_with_normalized_pair(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([_target(2)])
-        payload = {
-            "thinking": "War.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 2, "appraisal_ids": []}],
-        }
 
-        result = await _decide(sect_a, ctx, base_world, payload)
+# --- 4. The periodic sect decision can never touch a war ---
 
-        war_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
-        assert war_event.causal_origin is CausalOrigin.ACTOR_DECISION
-        deltas = war_event.causal_payload["deltas"]
-        assert len(deltas) == 1
-        delta = deltas[0]
-        assert delta["event_id"] == war_event.id
-        assert delta["owner_kind"] == "institutional_relation"
-        assert delta["owner_id"] == "relation:inst:sect:1:inst:sect:2"
-        assert delta["aspect"] == "kind"
-        assert delta["before"] == "none"
-        assert delta["after"] == "at_war"
-        relation = base_world.institutional_relations.get_relation(
-            "inst:sect:1", "inst:sect:2"
-        )
-        assert relation is not None
-        assert war_event.id in relation.evidence_event_ids
+
+class TestSectDeciderNeverTouchesWar:
+    """War is owned elsewhere: no periodic sect plan can start or end one."""
 
     @pytest.mark.asyncio
-    async def test_peace_event_carries_semantic_state_delta_with_correct_event_id(self, base_world):
+    async def test_sect_decider_output_can_never_end_a_war(self, base_world):
+        """Peace is a bilateral negotiation; no periodic plan can reach it."""
         _, sect_a, _ = _make_world_with_two_sects(base_world)
         set_formal_war(
             base_world, 1, 2, current_month=int(base_world.month_stamp),
@@ -564,124 +383,13 @@ class TestDiplomacyStateTransitions:
         ctx = _minimal_ctx([_target(2, status="war")])
         payload = {
             "thinking": "Peace.",
-            "diplomacy_actions": [{"action": "seek_peace", "other_sect_id": 2, "appraisal_ids": []}],
+            "diplomacy_actions": [
+                {"action": "seek_peace", "other_sect_id": 2, "appraisal_ids": []}
+            ],
         }
 
         result = await _decide(sect_a, ctx, base_world, payload)
 
-        peace_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
-        deltas = peace_event.causal_payload["deltas"]
-        assert len(deltas) == 1
-        delta = deltas[0]
-        assert delta["event_id"] == peace_event.id
-        assert delta["owner_kind"] == "institutional_relation"
-        assert delta["owner_id"] == "relation:inst:sect:1:inst:sect:2"
-        assert delta["aspect"] == "kind"
-        assert delta["before"] == "at_war"
-        assert delta["after"] == "neutral"
-
-    @pytest.mark.asyncio
-    async def test_normalized_pair_is_stable_regardless_of_which_sect_acts(self, base_world):
-        _, sect_a, sect_b = _make_world_with_two_sects(base_world)
-        ctx = _minimal_ctx([{**_target(1), "other_sect_id": 1, "other_sect_name": "Sect1"}])
-        payload = {
-            "thinking": "War.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 1, "appraisal_ids": []}],
-        }
-
-        result = await _decide(sect_b, ctx, base_world, payload)
-
-        war_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
-        assert (
-            war_event.causal_payload["deltas"][0]["owner_id"]
-            == "relation:inst:sect:1:inst:sect:2"
-        )
-
-    @pytest.mark.asyncio
-    async def test_no_op_transition_is_skipped_using_live_state_not_stale_context(self, base_world):
-        """The context snapshot says 'peace', but the pair is already at war --
-        the live state must win, so no duplicate contradictory transition."""
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
-        set_formal_war(
-            base_world, 1, 2, current_month=int(base_world.month_stamp),
-            evidence_event_ids=("event:existing-war",),
-        )
-        ctx = _minimal_ctx([_target(2, status="peace")])  # deliberately stale
-        payload = {
-            "thinking": "War again.",
-            "diplomacy_actions": [{"action": "declare_war", "other_sect_id": 2, "appraisal_ids": []}],
-        }
-
-        result = await _decide(sect_a, ctx, base_world, payload)
-
-        assert result.war_declared_count == 0
+        assert are_sects_at_war(base_world, 1, 2)
         assert [e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION] == []
-
-
-# --- 5. Integration: the Why-ready chain ---
-
-class TestCausalChainIntegration:
-
-    @pytest.mark.asyncio
-    async def test_conflict_to_appraisal_to_cited_decision_to_war_chain(self, base_world):
-        world, sect_a, sect_b = _make_world_with_two_sects(base_world)
-        pa = _make_avatar(world, avatar_id="pa", name="PatriarchA")
-        pb = _make_avatar(world, avatar_id="pb", name="PatriarchB")
-        pa.join_sect(sect_a, SectRank.Patriarch)
-        pb.join_sect(sect_b, SectRank.Patriarch)
-
-        storage = _storage()
-        try:
-            conflict_event, appraisal = _write_appraisal(
-                storage, world, appraiser=pa, focus=pb, summary="He humiliated me."
-            )
-            ctx = build_sect_decision_context(sect_a, world, storage, history_limit=0)
-            entries = _target_for(ctx, 2)["personal_appraisals"]
-            assert [e["appraisal_id"] for e in entries] == [appraisal.id]
-
-            payload = {
-                "thinking": "Avenge the humiliation.",
-                "diplomacy_actions": [
-                    {"action": "declare_war", "other_sect_id": 2, "appraisal_ids": [appraisal.id]},
-                ],
-            }
-            result = await _decide(sect_a, ctx, world, payload)
-        finally:
-            _close(storage)
-
-        # conflict event -> decision event
-        decision_event = result.decision_event
-        assert [l.cause_event_id for l in decision_event.causal_links] == [conflict_event.id]
-        # decision event -> war event
-        war_event = next(e for e in result.events if e.fact_kind is FactKind.STATE_TRANSITION)
-        assert decision_event.id in [l.cause_event_id for l in war_event.causal_links]
-        # the citation survives into the audit chain for the Why view
-        chain = decision_event.causal_payload["decision"]["chosen_chain"]
-        assert any(step.get("appraisal_ids") == [appraisal.id] for step in chain)
-        assert are_sects_at_war(world, 1, 2)
-
-    @pytest.mark.asyncio
-    async def test_same_conflict_with_military_inferiority_may_end_in_peace_or_inaction(self, base_world):
-        """The opposite path from identical personal evidence: strategy wins."""
-        world, sect_a, sect_b = _make_world_with_two_sects(base_world)
-        pa = _make_avatar(world, avatar_id="pa", name="PatriarchA")
-        pb = _make_avatar(world, avatar_id="pb", name="PatriarchB")
-        pa.join_sect(sect_a, SectRank.Patriarch)
-        pb.join_sect(sect_b, SectRank.Patriarch)
-
-        storage = _storage()
-        try:
-            _write_appraisal(storage, world, appraiser=pa, focus=pb, summary="He humiliated me.")
-            ctx = build_sect_decision_context(sect_a, world, storage, history_limit=0)
-            assert _target_for(ctx, 2)["personal_appraisals"], "same negative evidence is present"
-
-            # Militarily inferior: the model declines to act on the grudge.
-            payload = {"thinking": "We would lose. Endure it.", "diplomacy_actions": []}
-            result = await _decide(sect_a, ctx, world, payload)
-        finally:
-            _close(storage)
-
-        assert not are_sects_at_war(world, 1, 2)
-        assert result.war_declared_count == 0
-        assert result.decision_event is not None
-        assert result.decision_event.causal_links == []
+        assert not hasattr(result, "peace_made_count")

@@ -197,25 +197,13 @@ class RelationDeltaService:
             },
         )
         if changed:
-            deltas = []
-            for owner_id, before, after in (
-                (f"{avatar_a.id}->{avatar_b.id}", before_a_to_b, after_a_to_b),
-                (f"{avatar_b.id}->{avatar_a.id}", before_b_to_a, after_b_to_a),
-            ):
-                if before == after:
-                    continue
-                deltas.append(
-                    StateDelta(
-                        event_id=event.id,
-                        owner_kind="relationship",
-                        owner_id=owner_id,
-                        aspect="friendliness",
-                        before=str(before),
-                        after=str(after),
-                        magnitude=after - before,
-                    ).to_dict()
-                )
-            event.causal_payload["deltas"] = deltas
+            event.causal_payload["deltas"] = cls.build_friendliness_deltas(
+                event.id,
+                (
+                    (f"{avatar_a.id}->{avatar_b.id}", before_a_to_b, after_a_to_b),
+                    (f"{avatar_b.id}->{avatar_a.id}", before_b_to_a, after_b_to_a),
+                ),
+            )
         event.causal_links.append(
             CausalLink(
                 event_id=event.id,
@@ -224,6 +212,38 @@ class RelationDeltaService:
             )
         )
         return event
+
+    @staticmethod
+    def build_friendliness_deltas(
+        event_id: str,
+        transitions,
+    ) -> list[dict]:
+        """Evidence for directional friendliness changes, in one shape.
+
+        A relationship is directional, so each direction is its own owner
+        (``"<from>-><to>"``).  Directions that did not actually move are
+        dropped rather than recorded as no-ops: the evidence has to describe a
+        real change, and ``before``/``after`` are read from the relation state
+        itself, never assumed from the configured delta -- clamping and the
+        identity friendliness floor can both absorb part of it.
+        """
+
+        deltas: list[dict] = []
+        for owner_id, before, after in transitions:
+            if int(before) == int(after):
+                continue
+            deltas.append(
+                StateDelta(
+                    event_id=str(event_id),
+                    owner_kind="relationship",
+                    owner_id=str(owner_id),
+                    aspect="friendliness",
+                    before=str(before),
+                    after=str(after),
+                    magnitude=float(int(after) - int(before)),
+                ).to_dict()
+            )
+        return deltas
 
     @staticmethod
     def apply_bidirectional_delta(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
@@ -16,7 +17,14 @@ def ensure_no_pending_request(session: dict[str, Any]) -> None:
 
 def make_pending_decision_request(*, avatar) -> dict[str, Any]:
     return {
-        "request_id": f"roleplay-decision-{avatar.id}-{int(time.time() * 1000)}",
+        # The token has to identify *this* request and nothing else: it is the
+        # only proof a submission is answering the boundary that is currently
+        # open.  A millisecond timestamp is not unique -- two boundaries opened
+        # in the same millisecond mint the same token, and a stale command
+        # would then be accepted as current -- so identity comes from a uuid.
+        # The timestamp stays for readability, and `created_at` remains the
+        # field anything time-related should read.
+        "request_id": f"roleplay-decision-{avatar.id}-{uuid.uuid4().hex}",
         "type": "decision",
         "avatar_id": str(avatar.id),
         "title": t("{avatar_name} needs a new command", avatar_name=avatar.name),

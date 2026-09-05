@@ -21,4 +21,36 @@ describe('InstitutionalChainPanel', () => {
     await wrapper.get('[data-testid="institutional-relations"] button').trigger('click'); expect(eventApi.fetchEventCausalDetail).toHaveBeenCalledWith('rel-1')
     await wrapper.findAll('button').at(-1)!.trigger('click'); expect(eventApi.fetchEventCausalDetail).toHaveBeenCalledWith('event-1')
   })
+
+  it('renders both reciprocal trade legs with readable status badge and Why', async () => {
+    vi.mocked(institutionalChainApi.fetch).mockResolvedValue({
+      owner: { name: 'Cidade Norte' }, currentMonth: 3,
+      institutions: [{ id: 'inst:city:1', name: 'Cidade Norte' }, { id: 'inst:city:2', name: 'Cidade Sul' }],
+      relations: [], commitments: [],
+      events: [{ event_id: 'trade-1', event_type: 'institutional_trade_proposed', content: 'Proposta de troca.', source_event_ids: [], decision: null, trade_offer: {
+        proposer_institution_id: 'inst:city:1', counterparty_institution_id: 'inst:city:2', urgency: 0.8,
+        legs: [
+          { source_institution_id: 'inst:city:1', destination_institution_id: 'inst:city:2', resource_id: 'grain', amount: 3 },
+          { source_institution_id: 'inst:city:2', destination_institution_id: 'inst:city:1', resource_id: 'salt', amount: 2 },
+        ],
+      } }], memories: [], commitmentCursor: { hasMore: false }, eventCursor: { hasMore: false },
+    } as any)
+    const i18n = createI18n({ legacy: false, locale: 'pt-BR', messages: { 'pt-BR': { game: {
+      institutional_chain: { title: 'Compromissos', refresh: 'Atualizar', loading: 'Carregando', error: 'Erro', month: 'mês {month}', empty: 'Vazio', more_commitments: 'Mais', more_events: 'Mais', evidence: 'Evidência', relevance: 'Relevância', trade_legs: 'Termos recíprocos', institutional_trade_proposed: 'Barter proposto', unknown_institution: 'Instituição desconhecida' },
+      info_panel: { region: { economy: { resources: { grain: 'Grão', salt: 'Sal' } } } }, world_journal: { why_button: 'Por quê?' },
+    } } } })
+    const wrapper = mount(InstitutionalChainPanel, { props: { ownerKind: 'region', ownerId: '1' }, global: { plugins: [createPinia(), i18n] } })
+    await Promise.resolve(); await Promise.resolve()
+    const offer = wrapper.get('[data-testid="institutional-trade-offer"]')
+    const offerText = offer.text()
+    expect(offerText).toContain('Cidade Norte')
+    expect(offerText).toContain('Cidade Sul')
+    expect(offerText).toContain('3 Grão')
+    expect(offerText).toContain('2 Sal')
+    expect(offer.findAll('.trade-leg')[0].text()).toContain('Cidade Norte→Cidade Sul')
+    expect(offer.findAll('.trade-leg')[1].text()).toContain('Cidade Sul→Cidade Norte')
+    expect(wrapper.text()).toContain('Barter proposto')
+    await wrapper.findAll('button').at(-1)!.trigger('click')
+    expect(eventApi.fetchEventCausalDetail).toHaveBeenCalledWith('trade-1')
+  })
 })

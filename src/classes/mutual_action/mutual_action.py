@@ -31,11 +31,20 @@ class _MutualActionResponseScenario:
         return self.request
 
     async def apply_decision(self, decision):
+        # Data only.  This coroutine runs as a background task alongside the
+        # step loop, so it must not touch canonical state: a rollback would
+        # otherwise have to undo a write made outside any step.  The
+        # resolver's own provenance therefore travels *in the result* -- who
+        # decided (player, model, or configured fallback) is a fact about this
+        # response, and dropping it would leave the defender's own record
+        # unattributable -- and every material change happens in `step`.
         return {
             self.target_avatar.name: {
                 "thinking": decision.thinking,
                 "response": decision.selected_key,
                 "feedback": decision.selected_key,
+                "response_source": getattr(decision.source, "value", str(decision.source)),
+                "used_fallback": bool(decision.used_fallback),
             }
         }
 
@@ -120,6 +129,10 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
         self._response_cached: dict | None = None
         # 记录动作开始时间，用于生成事件的时间戳
         self._start_month_stamp: int | None = None
+        # 目标这次响应的出处（`ChoiceSource` 的值）。由 `step` 在消费任务
+        # 结果时写入，因此始终发生在 step 内部；运行时证据，不进存档，读档
+        # 后为空，任何依赖响应出处的记录都必须失败封闭。
+        self._response_source: str = ""
 
     def _get_template_path(self) -> Path:
         return CONFIG.paths.templates / "mutual_action.txt"
@@ -229,9 +242,13 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
         action_params: dict,
         *,
         push_start_event: bool = True,
-    ) -> None:
+    ) -> bool:
         """
         将响应决定落地为目标角色的立即动作（清空后加载单步动作链）。
+
+        返回是否真的由本次响应装载了该动作。返回 False 表示目标本来就在做
+        同名同参的动作：那个动作有它自己的来历，调用方不得把本次响应的出处
+        记到它头上。
         """
         # 若当前已是同类同参动作，直接跳过，避免重复“发起战斗”等事件刷屏
         try:
@@ -240,7 +257,7 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
                 cur_name = getattr(cur.action, "__class__", type(cur.action)).__name__
                 if cur_name == action_name:
                     if getattr(cur, "params", {}) == dict(action_params):
-                        return
+                        return False
         except Exception:
             pass
         # 抢占：清空后续计划并中断其当前动作
@@ -252,6 +269,7 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
         if push_start_event and start_event is not None and start_event != NULL_EVENT:
             # 侧边栏仅推送一次（由动作发起方承担），另一侧仅写历史
             EventHelper.push_pair(start_event, initiator=self.avatar, target=target_avatar, to_sidebar_once=True)
+        return True
 
     def _settle_response(self, target_avatar: "Avatar", response_name: str) -> None:
         """
@@ -267,6 +285,9 @@ class MutualAction(DefineAction, LLMAction, ActualActionMixin, TargetingMixin):
         thinking = result.get("thinking", "")
         response = result.get("response", result.get("feedback", ""))
 
+        # Read inside `step`, before the response is settled, so a subclass
+        # recording the defender's own decision knows who actually chose it.
+        self._response_source = str(result.get("response_source", "") or "")
         target_avatar.thinking = thinking
         self._settle_response(target_avatar, response)
 

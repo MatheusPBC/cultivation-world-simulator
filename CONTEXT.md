@@ -11,7 +11,8 @@ uses factual evidence only. SQLite schema 3 uses a required, versioned sidecar
 with atomic publication; when overwriting an active save the old sidecar is
 retained intentionally, with a known disk-growth limitation and no automated
 sweep or live-data cleanup. Causal storage has lazy bulk links and a detailed
-causal getter. Three institutional-aid locale templates match actual payload
+causal getter. Three institutional commitment locale templates (en-US, pt-BR,
+zh-CN, neutral for aid and reciprocal exchange alike) match actual payload
 interpolation. Wave 6 is not wholly complete: qualitative institutional
 relationship impacts are implemented with enabled defaults (evaluation 8,
 LLM budget 2), while aid `identity_anchor_impact` is currently zero. Each
@@ -40,8 +41,7 @@ Both
 still contain 147 untyped events and 27 conditions activated/0 resolved, so this is
 not full production-world quality proof. No whole-roadmap claim is valid.
 
-Wave 8 has a first, deliberately narrow slice, still local WIP on top of the
-committed checkpoint 07330fb5: a fixed
+Wave 8 has a first, deliberately narrow slice, committed as fef7c882: a fixed
 institutional prehistory of at most three months, clamped to the calendar that
 exists before the playable January (a year-0 world legitimately gets zero
 months). The world, dynasty, avatars and institutional authority are all
@@ -75,7 +75,51 @@ timeout with an idle thread pool and asyncio selector, while the same isolated
 test passes on the host in 0.89 s. No whole-suite or long-smoke claim is made
 for this block, and nothing was deployed or run against real data.
 
-Commerce/war/religion/civil-disorder composition remains
+A bounded institutional commerce vertical now exists as local WIP on top of
+fef7c882, not committed, pushed or deployed: a city facing a grounded
+shortage sees, in one proposer decision, both the existing aid requests and
+every enumerated reciprocal barter offer, and may select only an enumerated
+affordance ID. Each offer pairs two `RESOURCE_TRANSFER` terms of different
+resources inside one existing commitment, over canonical routes, with each leg
+bounded independently by the actual deficit, the donor's surplus after
+retaining its own demand stock, destination headroom and route capacity; no
+price, currency, treasury, planner or unit parity exists, and the raw offered
+terms are shown to both decision contexts. The counterparty accepts or
+maintains on its own; acceptance reserves nothing and moves nothing, and each
+obligor later decides its own shipment through the shared material commitment
+lifecycle (`institutional_resource_commitment`), which owns fulfillment,
+deadlines, breach and remediation for aid and trade alike and never executes a
+reciprocal leg automatically. Limits: barter is shortage-driven between cities
+only, the two legs are non-atomic and can be fulfilled, breached or remediated
+separately, an unknown demand rate blocks export instead of reading as zero,
+and a malformed or materially impossible response records no refusal.
+
+Evidence for this commerce slice, and for nothing wider: the consolidated
+backend selection passed 86 tests with 1 deliberately deselected (the unchanged
+`real_initialization_wires_genesis_prehistory_and_publication`) in 21.46 s, and
+the commerce vertical plus commerce runtime files passed 14 tests in 11.22 s;
+those two runs overlap and must not be summed. The prehistory/domain/resources/
+settings group timed out at 90 s in the sandbox after 44 dots, while the exact
+same command on the host passed 52 tests with 1 deselected in 6.67 s with the
+pre-existing StarletteDeprecationWarning: that is a sandbox execution limit, not
+a production defect, and nothing was changed for it. The frontend panel and
+composable tests passed 3 tests in 1.42 s, `npm run build` (tsc plus vite)
+passed in 10.31 s with the pre-existing >550 kB chunk warning, and
+`git diff --check` is clean. Two audited 120-month long smokes both exited 0
+with a true JSON audit: the natural run
+(`/tmp/cws-commerce-natural120.json`) produced 3,193 events at causal depth 16
+with 0 institutional transfers and no injected decision policy, and the
+pressured commerce run (`/tmp/cws-commerce-pressured120.json`) produced 3,949
+events at causal depth 9 with 20 institutional transfers, including exactly two
+reciprocal accepted legs and both complete term witnesses. The pressured run
+uses an injected fixture decision policy; the natural run uses none, so a
+barter world is reachable but never guaranteed. Both runs recorded zero broken
+links, zero out-of-window events, zero story mutations, zero provider calls or
+awaits, and no story material ancestors. Both also still carry 147 untyped
+events and 27 conditions activated with 0 resolved, so this is explicitly not a
+general world-quality or whole-suite claim.
+
+War/religion/civil-disorder composition remains
 deferred and is not a completed wave 8+. The committed hydrology correction
 now applies a nonlinear severe-weather and soil response, then a bounded
 geography susceptibility multiplier, and finally drainage as subtractive
@@ -130,6 +174,80 @@ the current relation.
 Orchestration is user-directed by the root agent: Claude Opus implemented this
 provenance block, Terra reviewed it, and the root agent integrated it. This
 ledger records current state, not a redesign of the frozen architecture.
+
+The autonomous `sect_wars` simulation phase is removed (module, registry entry
+and phase export), with the canonical phase registry renumbered to a contiguous
+1-45. Nothing replaces it: there is no random wartime battle, no forced
+teleport to a headquarters, and no automatic war contribution or war weariness
+from an encounter. A formal war is an institutional relationship between sects,
+and war status alone no longer initiates combat: two members of warring sects
+standing on adjacent tiles fight only if one of them actually chooses to.
+`Attack` remains an internal action (`actual=False`), used by existing combat
+mechanics rather than exposed in the public action catalogue. `MutualAttack`
+is now the natural public hostile entry: a precise accepted player/AI decision
+and a valid execution boundary record one initiating aggression fact, including
+the deciding actor, locked target, witnessed institutions and decision link.
+It creates no battle; the target independently chooses Escape or internal
+Attack. A defensive response is runtime-reactive, points back to the initiative
+and cannot create/reverse a casus. Stale, renamed, dead, out-of-range, restored
+or unaudited paths fail closed. Other avatar interactions that can end in a
+fight, such as `Spar` and `Assassinate`, keep their own owners and are unchanged.
+`Attack` now refuses a self target and a target outside the attacker's own
+observation radius, and it revalidates the same predicate at the execution
+boundary, failing the action instead of fighting a target that died, moved away
+or stopped resolving between commit and execution. Observation stays directed,
+so a weaker avatar cannot counterattack an initiator it cannot perceive.
+Bilateral peace negotiation is now implemented in
+`src/systems/institutional_peace.py` during January maintenance on the
+configured sect decision cycle (currently every three years). Pending
+proposals are canonical typed events and institutional-knowledge facts;
+transient affordances are only the runtime choice surface. Proposing does not
+end a war: on a later recipient cycle the counterparty may accept, reject, or
+maintain, and acceptance rechecks both negotiating authority, the exact war
+episode, and proposal expiry before preserving the relation's friendliness.
+This slice adds no magic resources or non-aggression obligation, and the old
+`seek_peace` path and sect-decider war output are removed. Unilateral formal
+war declaration remains normal; it is no longer an administrative decision
+field. The institutional war domain in `src/systems/institutional_war.py`
+grounds a witnessed `MutualAttack` initiative in its chosen decision provenance.
+The responsible office holder must be a participant or observe both avatars,
+and the victim institution may decide through its own domain affordance; it may
+also maintain, so aggression never forces war. There are no troops or automatic
+military battles. Persisted aggression facts remain eligible after load;
+restored in-flight plans without transient origin cannot create new aggression
+evidence, and the same causal source is not spent twice.
+
+The source-player decision acceptance audit is implemented through the shared
+`avatar_decision.py`/`roleplay_service.py` path: one canonical `DecisionEvent`
+is persisted through the serialized event API only after a roleplay command,
+its offered public action chain and its immediate boundary are accepted. Raw
+command text, chat messages and the runtime roleplay session remain transient
+and never enter the save. Decision acceptance, plan adoption, action execution
+and aggression attribution keep their separate canonical owners. A
+rejected/failed acceptance creates no plan; a later-month rollback preserves
+an already accepted decision event; and plan origin is transient, so load fails
+closed while persisted event storage remains intact. The focused public `Rest`
+runtime witness verifies its owner-authored HP causal link and final-month
+rollback/retry proof. The public `MutualAttack` provenance/casus path is now
+implemented with the limits above: it does not make internal `Attack` public,
+does not invent a battle on Escape, and does not force an institutional war.
+
+Focused MutualAttack evidence now covers accepted public initiative, successful
+Escape, defensive internal Attack, player-selected response, victim `maintain`,
+stale target rejection and response-time rollback without duplicate aggression.
+The consolidated backend selection passed 171 tests with 3 deselected in
+21.27 seconds (MutualAttack, war runtime/chain and roleplay-decision contracts);
+lint and diff checks passed. The exclusions are the baseline
+`test_spar_finish_generates_story` AttributeError and the timeout-prone baseline
+`test_get_target_avatar_not_found` / `test_step_running_then_completed`, so this
+does not claim universal-suite green. Two 120-month
+provider-free smokes also completed within a 300-second allowance: natural
+produced 3,198 events at causal depth 17 and pressured 3,669 at depth 10 with
+20 transfers and the existing seven-event aid/memory witness. Both audit zero
+broken/out-of-window causes, Story mutations/material ancestors and provider
+calls/awaits. This is not war-stress or world-quality acceptance: the harness
+does not force war, and both runs still report 147 untyped events and 27
+activated, zero-resolved conditions.
 
 ## Celestial Dao
 

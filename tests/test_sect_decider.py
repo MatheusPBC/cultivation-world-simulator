@@ -8,7 +8,8 @@ from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.institution import Institution, InstitutionKind
 from src.classes.mechanical_language import EntityRef
-from src.classes.sect_decider import SectDecider
+from src.classes.event import FactKind
+from src.classes.sect_decider import SectDecider, SectDecisionPlan
 from src.classes.sect_ranks import get_rank_from_realm
 from src.classes.technique import (
     Technique,
@@ -559,7 +560,8 @@ async def test_sect_decider_llm_plan_receives_detailed_info(base_world):
 
 
 @pytest.mark.asyncio
-async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
+async def test_sect_decider_output_can_no_longer_declare_war(base_world):
+    """The periodic sect plan has no war channel left, in any shape."""
     sect = Sect(
         id=1,
         name="War Sect",
@@ -622,9 +624,13 @@ async def test_sect_decider_can_declare_war_from_llm_plan(base_world):
     ):
         result = await SectDecider.decide(sect, ctx, base_world)
 
-    assert are_sects_at_war(base_world, 1, 2)
-    assert result.war_declared_count == 1
-    assert any("宣战" in event.content for event in result.events)
+    assert not are_sects_at_war(base_world, 1, 2)
+    assert not hasattr(result, "war_declared_count")
+    plan_fields = set(SectDecisionPlan().__slots__)
+    assert "diplomacy_actions" not in plan_fields
+    assert [
+        event for event in result.events if event.fact_kind is FactKind.STATE_TRANSITION
+    ] == []
 
 
 def test_sect_decider_llm_available_uses_runtime_config():

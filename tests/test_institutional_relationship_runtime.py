@@ -20,7 +20,7 @@ from src.sim.simulator_engine.phase_registry import SimulationPhase
 from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.systems.domain_affordance_registry import DOMAIN_AFFORDANCES
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
-from src.systems.institutional_aid import process_institutional_aid_shortage
+from src.systems.institutional_resource_commitment import process_institutional_resource_negotiation
 from src.systems.institutional_memory import decision_context
 from src.systems.institutional_relationship_impact import (
     RELATIONSHIP_IMPACT_DOMAIN,
@@ -77,7 +77,7 @@ def _setup_serializable_aid_world(world, emperor):
 
 
 async def _accepted_aid(world, shortage):
-    events = await process_institutional_aid_shortage(
+    events = await process_institutional_resource_negotiation(
         world,
         shortage,
         llm_call=_accept_first_affordance,

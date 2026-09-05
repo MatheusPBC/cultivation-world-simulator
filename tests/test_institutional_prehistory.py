@@ -109,7 +109,6 @@ def test_prehistory_phases_are_a_filter_over_the_canonical_registry() -> None:
         "execute_actions",
         "update_age_and_birth",
         "resolve_death",
-        "sect_wars",
         "update_regional_climate",
         "generate_chronicle",
     }
@@ -154,9 +153,9 @@ async def test_pressured_prehistory_builds_a_real_chain_through_the_same_owners(
     # transfer is executed by the canonical economy owner, not by prehistory.
     for required in (
         "regional_resource_shortage",
-        "institutional_aid_request_interpretation_decision",
+        "institutional_resource_request_interpretation_decision",
         "institutional_aid_requested",
-        "institutional_aid_response_interpretation_decision",
+        "institutional_resource_response_interpretation_decision",
         "institutional_aid_accepted",
         "regional_resource_transfer_completed",
         "institutional_commitment_term_fulfilled",
