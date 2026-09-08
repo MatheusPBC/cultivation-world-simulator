@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from src.classes.story_event_service import StoryEventKind, StoryEventService
 from src.classes.event import Event
@@ -35,6 +35,9 @@ async def test_gathering_story_always_triggers(dummy_avatar):
     assert event is not None
     assert event.is_story is True
     assert event.content == "Gathering story"
+    assert event.event_type == "gathering_story"
+    assert event.causal_payload is None
+    assert event.causal_links[0].relation == CausalRelation.CONTRIBUTED_TO
 
 
 @pytest.mark.asyncio
@@ -89,6 +92,7 @@ async def test_story_created_when_probability_hits(dummy_avatar):
     assert event.is_story is True
     assert event.content == "Story body"
     assert event.is_major is False
+    assert event.event_type == "action_story"
     assert event.causal_payload is None
     assert event.causal_links[0].relation == CausalRelation.CONTRIBUTED_TO
     mock_tell.assert_awaited_once()

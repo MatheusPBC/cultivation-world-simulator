@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.classes.environment.region import CityRegion
+from src.classes.regional_economy import QUANTITY_EPSILON
 from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import Event, FactKind
@@ -28,7 +29,12 @@ def phase_update_regional_economy(
     one.  Transport and inter-city flow can be added later when the map owns
     an actual route graph.
     """
-    events: list[Event] = []
+    from src.systems.civil_petition import expire_work_stoppages
+
+    # A stoppage lasts exactly one cycle, and its duration alone ends it.
+    # Retiring it here, before any output is computed, means production really
+    # resumes this month and does not depend on any other phase running.
+    events: list[Event] = list(expire_work_stoppages(world))
     for region in world.map.regions.values():
         if not isinstance(region, CityRegion):
             continue
@@ -40,9 +46,16 @@ def phase_update_regional_economy(
             if resource_id not in economy.stocks:
                 continue
             before = float(economy.stocks[resource_id])
+            # One headroom, read before anything is produced or consumed, so
+            # the counterfactual below compares like with like.
+            headroom_before = _headroom(economy, resource_id)
             produced = min(
-                float(economy.production_rates.get(resource_id, 0.0)),
-                _headroom(economy, resource_id),
+                # The owner's own effective rate, so a stoppage is felt here
+                # and in every FLOW reading identically.
+                economy.effective_production_rate(
+                    resource_id, int(world.month_stamp)
+                ),
+                headroom_before,
             )
             reserved = sum(
                 resources.get(resource_id, 0.0)
@@ -53,9 +66,34 @@ def phase_update_regional_economy(
             consumed = min(demand, available_after_production)
             after = before + produced - consumed
             economy.set_stock(resource_id, after)
+            # Float arithmetic leaves noise far below any real quantity; the
+            # owner's own epsilon decides whether stock actually moved.
+            net_changed = abs(after - before) > QUANTITY_EPSILON
 
-            if after != before:
-                events.append(_build_balance_event(
+            # What the stoppage really cost, at the warehouse: output that
+            # would have been stored but was not. A full warehouse loses
+            # nothing, and nothing is claimed to have been lost.
+            stoppage = economy.work_stoppage
+            forgone = 0.0
+            if stoppage is not None and stoppage.is_active(int(world.month_stamp)):
+                forgone = max(
+                    0.0,
+                    min(
+                        float(economy.production_rates.get(resource_id, 0.0)),
+                        headroom_before,
+                    )
+                    - produced,
+                )
+            if forgone > 0.0 and not net_changed:
+                # A real flow fact with no net stock change: stated as flow,
+                # never as an invented before/after delta.
+                events.append(_build_stoppage_flow_event(
+                    world, region, resource_id,
+                    produced=produced, consumed=consumed, forgone=forgone,
+                    start_event_id=str(stoppage.start_event_id),
+                ))
+            if net_changed:
+                balance = _build_balance_event(
                     world,
                     region,
                     resource_id,
@@ -65,7 +103,18 @@ def phase_update_regional_economy(
                     consumed=consumed,
                     causal=causal,
                     invalidations=invalidations,
-                ))
+                )
+                # Only when this resource really lost output to the stoppage:
+                # a non-labour concept and a full warehouse forgo nothing and
+                # are never attributed to it.
+                if forgone > 0.0:
+                    balance.render_params["forgone"] = forgone
+                    balance.causal_links.append(CausalLink(
+                        event_id=balance.id,
+                        cause_event_id=str(stoppage.start_event_id),
+                        relation=CausalRelation.CONTRIBUTED_TO,
+                    ))
+                events.append(balance)
             if consumed < demand:
                 from src.systems.semantic_world.resolvers import resolve_metric
 
@@ -119,6 +168,15 @@ def phase_update_regional_economy(
                         resource_id,
                     )
                 )
+                # The stoppage is a real cause of this shortage only where it
+                # really cost output.
+                if forgone > 0.0:
+                    shortage.render_params["forgone"] = forgone
+                    shortage.causal_links.append(CausalLink(
+                        event_id=shortage.id,
+                        cause_event_id=str(stoppage.start_event_id),
+                        relation=CausalRelation.CONTRIBUTED_TO,
+                    ))
                 events.append(shortage)
     return events
 
@@ -180,6 +238,48 @@ def _headroom(economy: Any, resource_id: str) -> float:
     if capacity is None:
         return float("inf")
     return max(0.0, float(capacity) - float(economy.stocks.get(resource_id, 0.0)))
+
+
+def _build_stoppage_flow_event(
+    world: Any,
+    region: CityRegion,
+    resource_id: str,
+    *,
+    produced: float,
+    consumed: float,
+    forgone: float,
+    start_event_id: str,
+) -> Event:
+    """Output really forgone to a stoppage, when stock did not move.
+
+    An OCCURRENCE with no delta: nothing transitioned, so nothing is claimed
+    to have. The flow figures and the stoppage that caused them are the fact.
+    """
+    event = Event(
+        world.month_stamp,
+        t(
+            "{region} produced less {resource} during the work stoppage.",
+            region=region.name,
+            resource=resource_id,
+        ),
+        event_type="regional_production_forgone",
+        fact_kind=FactKind.OCCURRENCE,
+        causal_origin=CausalOrigin.DETERMINISTIC,
+        render_params={
+            "region_id": str(region.id),
+            "resource_id": resource_id,
+            "produced": produced,
+            "consumed": consumed,
+            "forgone": forgone,
+        },
+        causal_payload={"deltas": []},
+    )
+    event.causal_links.append(CausalLink(
+        event_id=event.id,
+        cause_event_id=start_event_id,
+        relation=CausalRelation.TRIGGERED_BY,
+    ))
+    return event
 
 
 def _build_balance_event(

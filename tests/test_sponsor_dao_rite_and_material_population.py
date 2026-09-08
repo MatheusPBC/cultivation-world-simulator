@@ -7,7 +7,7 @@ from src.classes.action import Educate, HelpPeople, PlunderPeople, SponsorDaoRit
 from src.classes.action.param_options import ParamOptionSource, build_param_options
 from src.classes.celestial_dao import DaoTradition
 from src.classes.core.dynasty import Dynasty
-from src.classes.event import Event, FactKind
+from src.classes.event import Event, FactKind, is_null_event
 from src.classes.environment.region import CityRegion
 from src.classes.mechanical_language import ConditionInstance
 from src.classes.regional_economy import RegionalEconomyState
@@ -16,6 +16,7 @@ from src.systems.celestial_dao_service import (
     _popular_rite_regions,
     process_grounded_dao_rites,
 )
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
 from src.systems.regional_economy import phase_update_regional_economy
 
 
@@ -231,12 +232,16 @@ def test_sponsor_dao_rite_uses_event_id_options_and_one_per_institution(
     base_world, dummy_avatar
 ):
     region = _city_avatar(base_world, dummy_avatar)
+    base_world.avatar_manager.register_avatar(dummy_avatar)
     base_world.dynasty = Dynasty(
         id=1,
         name="Test",
         desc="",
         current_emperor_id=dummy_avatar.id,
     )
+    # Sponsorship is authorized through `can_actor_act_for`, which has no
+    # permissive fallback, so the dynasty must be a real institution.
+    bootstrap_institutional_authority(base_world)
     rite = _popular_rite(base_world, region)
 
     options = build_param_options(SponsorDaoRite, dummy_avatar)
@@ -246,20 +251,23 @@ def test_sponsor_dao_rite_uses_event_id_options_and_one_per_institution(
 
     action = SponsorDaoRite(dummy_avatar, base_world)
     assert action.can_start(rite.id) == (True, "")
-    event = action.start(rite.id)
-    assert event.fact_kind is FactKind.DECISION
-    assert event.causal_payload["dao_rite"]["is_sponsorship"] is True
-    assert action.can_start(rite.id)[0] is False
+    # Starting sponsors nothing: the sponsorship fact belongs to the execution
+    # boundary, where the engine has already installed the plan's origin.
+    assert is_null_event(action.start(rite.id))
 
 
 def test_sponsor_requires_presence_and_knowledge(base_world, dummy_avatar):
     region = _city_avatar(base_world, dummy_avatar)
+    base_world.avatar_manager.register_avatar(dummy_avatar)
     base_world.dynasty = Dynasty(
         id=1,
         name="Test",
         desc="",
         current_emperor_id=dummy_avatar.id,
     )
+    # Sponsorship is authorized through `can_actor_act_for`, which has no
+    # permissive fallback, so the dynasty must be a real institution.
+    bootstrap_institutional_authority(base_world)
     rite = _popular_rite(base_world, region)
     action = SponsorDaoRite(dummy_avatar, base_world)
 

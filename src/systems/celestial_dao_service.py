@@ -15,6 +15,10 @@ from src.classes.state_delta import StateDelta
 from src.i18n import t
 from src.i18n.template_resolver import resolve_locale_template_path
 from src.run.log import get_logger
+from src.classes.institution import AuthorityScope, InstitutionKind, KnowledgeChannel
+from src.systems.avatar_decision import attach_validated_actor_decision
+from src.systems.institution_authority import can_actor_act_for
+from src.systems.institutional_memory import decision_context, record_known_fact
 from src.systems.sect_decision_context import find_living_patriarch
 from src.classes.mechanical_language import EntityRef
 from src.utils.llm import call_llm_with_task_name
@@ -31,6 +35,15 @@ DAO_PETITION_SCHEMA: dict[str, Any] = {
 RITE_WINDOW_MONTHS = 12
 RITES_REQUIRED_FOR_AUDIENCE = 3
 AUDIENCE_COOLDOWN_MONTHS = 12
+SPONSORSHIP_ACTION_NAME = "SponsorDaoRite"
+# Endorsing a mortal rite is recognition, not disposition of anything material.
+SPONSORSHIP_SCOPE = AuthorityScope.RECOGNITION
+# An institution witnesses through the office that could later react to what
+# it saw; witnessing itself grants nothing.
+WITNESS_SCOPE = AuthorityScope.COMMITMENT_NEGOTIATION
+# The decision sources the engine itself writes; anything else is not an
+# audited choice.  Kept in step with the aggression path's identical rule.
+_AUDITED_DECISION_SOURCES = frozenset({"llm", "rule", "injected", "player"})
 
 # These are regular bookkeeping facts, not regional pressure that would make
 # a public rite meaningful.  Keep the exclusion explicit: a positive monthly
@@ -104,6 +117,13 @@ def _event_region_id(event: Event) -> int | None:
         return None
 
 
+def _month_stamp(event: Event) -> int | None:
+    try:
+        return int(getattr(event, "month_stamp", None))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def _has_nonzero_material_delta(event: Event) -> bool:
     """Return whether an event records a meaningful domain state change."""
     payload = getattr(event, "causal_payload", None) or {}
@@ -138,8 +158,13 @@ def _is_eligible_regional_event(event: Event) -> bool:
     return event_type in _MATERIAL_REGIONAL_EVENT_TYPES or _has_nonzero_material_delta(event)
 
 
-def _institution_for_avatar(world: Any, avatar: Any) -> tuple[str, str, str] | None:
-    """Return the single institution whose public voice the avatar may use."""
+def _institution_candidate(world: Any, avatar: Any) -> tuple[str, str, str] | None:
+    """Return the single institution whose public voice the avatar may claim.
+
+    This answers identity only -- who this avatar would be speaking for -- and
+    deliberately grants nothing.  Whether that voice is actually authorized
+    right now is `can_actor_act_for`'s answer, in `_sponsoring_institution`.
+    """
     dynasty = getattr(world, "dynasty", None)
     if dynasty is not None and str(getattr(dynasty, "current_emperor_id", "")) == str(getattr(avatar, "id", "")):
         return (
@@ -154,8 +179,64 @@ def _institution_for_avatar(world: Any, avatar: Any) -> tuple[str, str, str] | N
     return None
 
 
+def _sponsoring_institution(
+    world: Any, avatar: Any
+) -> tuple[str, str, str, str] | None:
+    """The candidate voice plus the canonical institution that authorizes it.
+
+    Sponsoring a rite is a public endorsement, so the authorizing scope is
+    `RECOGNITION`: the one scope both the dynasty's sovereign office and a
+    sect's patriarch office actually hold, and the one that grants no
+    resources, troops or territory.  There is no permissive fallback -- a
+    world with no bootstrapped authority state simply has nobody who can
+    sponsor, rather than everybody.
+
+    ``"court"`` stays a Dao-domain label for the payload; the canonical
+    identity is the returned `Institution` ID, resolved from the dynasty or
+    sect `EntityRef`.
+    """
+    candidate = _institution_candidate(world, avatar)
+    if candidate is None:
+        return None
+    kind, owner_id, name = candidate
+    if not owner_id.strip():
+        return None
+    verdict = can_actor_act_for(
+        world,
+        EntityRef("avatar", str(getattr(avatar, "id", ""))),
+        EntityRef("dynasty" if kind == "court" else "sect", owner_id),
+        SPONSORSHIP_SCOPE,
+        current_month=int(world.month_stamp),
+    )
+    if not verdict.allowed or not verdict.institution_id:
+        return None
+    return kind, owner_id, name, verdict.institution_id
+
+
 def _sponsorship_payload(event: Event) -> dict[str, Any]:
     return dict((getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {})
+
+
+def _register_sponsorship_event(world: Any, event: Event) -> None:
+    """Keep this step's not-yet-stored sponsorships visible to the same month.
+
+    Only the current rite window is retained: older sponsorships are already
+    canonical events, so keeping them here would make a live session refuse
+    what a reloaded one allows, and would grow without bound for the lifetime
+    of the world.
+    """
+    transient = getattr(world, "_dao_sponsorship_events_this_step", None)
+    if not isinstance(transient, dict):
+        transient = {}
+        setattr(world, "_dao_sponsorship_events_this_step", transient)
+    oldest = int(world.month_stamp) - RITE_WINDOW_MONTHS + 1
+    for event_id in [
+        key
+        for key, item in transient.items()
+        if (month := _month_stamp(item)) is None or month < oldest
+    ]:
+        del transient[event_id]
+    transient[event.id] = event
 
 
 def _known_sponsorship_events(world: Any) -> list[Event]:
@@ -167,7 +248,7 @@ def _known_sponsorship_events(world: Any) -> list[Event]:
 def get_sponsor_dao_rite_blocker(
     world: Any, avatar: Any, cause_event_id: str
 ) -> str | None:
-    institution = _institution_for_avatar(world, avatar)
+    institution = _sponsoring_institution(world, avatar)
     if institution is None:
         return "Only the reigning emperor or a living sect patriarch may sponsor a Dao rite."
 
@@ -178,22 +259,32 @@ def get_sponsor_dao_rite_blocker(
     if cause is None:
         return "The sponsoring institution does not know this public Dao rite."
     payload = _sponsorship_payload(cause)
-    if str(getattr(cause, "event_type", "")) != "dao_rite" or not bool(payload.get("is_popular")):
+    if (
+        str(getattr(cause, "event_type", "")) != "dao_rite"
+        or not bool(payload.get("is_popular"))
+        or bool(getattr(cause, "is_story", False))
+    ):
         return "Only a popular regional Dao rite can be sponsored."
+    # The sponsorable set is exactly the rite window the institution can still
+    # see.  An older rite, and a rite stamped after the current month (a
+    # replayed or rolled-back step), are both outside what it knows now.
+    cause_month = _month_stamp(cause)
+    month = int(world.month_stamp)
+    if cause_month is None or not (month - RITE_WINDOW_MONTHS < cause_month <= month):
+        return "The sponsoring institution does not know this public Dao rite."
     region_id = _event_region_id(cause)
     current_region = _region_for_avatar(avatar)
     if region_id is None or current_region is None or int(getattr(current_region, "id", -1)) != region_id:
         return "The sponsor must be present in the rite's region."
 
-    month = int(world.month_stamp)
-    kind, institution_id, _name = institution
+    kind, owner_id, _name, _institution_id = institution
     for event in _known_sponsorship_events(world):
         existing = _sponsorship_payload(event)
         if not bool(existing.get("is_sponsorship")):
             continue
         same_institution = (
             str(existing.get("sponsor_kind", existing.get("initiator_kind", ""))) == kind
-            and str(existing.get("sponsor_id", existing.get("initiator_id", ""))) == institution_id
+            and str(existing.get("sponsor_id", existing.get("initiator_id", ""))) == owner_id
         )
         if not same_institution:
             continue
@@ -205,38 +296,169 @@ def get_sponsor_dao_rite_blocker(
 
 
 def can_sponsor_dao_rite(world: Any, avatar: Any) -> bool:
-    return _institution_for_avatar(world, avatar) is not None
+    return _sponsoring_institution(world, avatar) is not None
 
 
-def sponsor_dao_rite(world: Any, avatar: Any, cause_event_id: str) -> Event:
-    blocker = get_sponsor_dao_rite_blocker(world, avatar, cause_event_id)
-    if blocker is not None:
-        raise ValueError(t(blocker))
-    institution = _institution_for_avatar(world, avatar)
+def _living_office_holder(world: Any, institution: Any) -> Any | None:
+    """The institution's current negotiating holder, if it has a living one."""
+    state = getattr(world, "institutional_authority", None)
+    if state is None:
+        return None
+    office = state.office_for_scope(institution.id, WITNESS_SCOPE)
+    if office is None or office.holder_ref is None:
+        return None
+    if not can_actor_act_for(
+        world,
+        office.holder_ref,
+        institution.owner_ref,
+        WITNESS_SCOPE,
+        current_month=int(world.month_stamp),
+    ).allowed:
+        return None
+    getter = getattr(getattr(world, "avatar_manager", None), "get_avatar", None)
+    holder = getter(str(office.holder_ref.id)) if callable(getter) else None
+    return holder if holder is not None and not bool(getattr(holder, "is_dead", False)) else None
+
+
+def _witness_institution_ids(
+    world: Any, sponsor_avatar: Any, sponsor_institution_id: str
+) -> tuple[str, ...]:
+    """Institutions whose own negotiating holder actually saw this sponsorship.
+
+    Witnessing is a fact about people, captured at the exact moment the act
+    happens and never recomputed from where anyone stands later.  Sharing a
+    region, sharing a membership or being mentioned in prose proves nothing:
+    the institution's current holder must be alive, actually authorized under
+    `COMMITMENT_NEGOTIATION`, and have the sponsoring avatar inside its own
+    observation radius.  The sponsor is never its own witness, and only
+    dynasties and sects can witness -- a city institution holds no office that
+    could have been present.
+    """
+    from src.classes.observe import is_within_observation
+
+    state = getattr(world, "institutional_authority", None)
+    if state is None or sponsor_avatar is None:
+        return ()
+    month = int(world.month_stamp)
+    witnesses: list[str] = []
+    for institution in state.institutions.values():
+        if institution.id == sponsor_institution_id:
+            continue
+        if institution.kind not in (InstitutionKind.DYNASTY, InstitutionKind.SECT):
+            continue
+        if not institution.is_active(month):
+            continue
+        holder = _living_office_holder(world, institution)
+        if holder is None or holder is sponsor_avatar:
+            continue
+        try:
+            seen = is_within_observation(holder, sponsor_avatar)
+        except (AttributeError, TypeError):
+            continue
+        if seen:
+            witnesses.append(institution.id)
+    return tuple(sorted(witnesses))
+
+
+def _identity_anchor_impact(world: Any, institution_id: str, region_id: int) -> float:
+    """Whether this institution's own identity is anchored in the rite's region."""
+    state = getattr(world, "institutional_authority", None)
+    anchors = getattr(state, "identity_anchors", None) or {}
+    subject = EntityRef("region", str(region_id))
+    return (
+        1.0
+        if any(
+            anchor.institution_id == institution_id and anchor.subject == subject
+            for anchor in anchors.values()
+        )
+        else 0.0
+    )
+
+
+def _sponsorship_memory_factors(
+    world: Any, institution_id: str, region_id: int
+) -> dict[str, float]:
+    """The four frozen engine factors, each read from canonical state.
+
+    ``relative_scale`` is this one act's share of the domain's own audience
+    threshold: a single sponsorship is exactly one of the
+    `RITES_REQUIRED_FOR_AUDIENCE` an audience takes.  It is deliberately not
+    cumulative -- counting the institution's prior sponsorships would read the
+    persisted window and the runtime cache together, double-counting an event
+    present in both and giving the same fact a different weight after a
+    reload.  Sponsoring changes no office and breaches no commitment, so those
+    two factors are zero as a matter of fact rather than as a default.  No LLM
+    weighting is involved anywhere.
+    """
+    return {
+        "relative_scale": 1.0 / RITES_REQUIRED_FOR_AUDIENCE,
+        "institutional_change": 0.0,
+        "commitment_breach": 0.0,
+        "identity_anchor_impact": _identity_anchor_impact(
+            world, institution_id, region_id
+        ),
+    }
+
+
+def get_sponsor_institution_memory(world: Any, avatar: Any) -> dict[str, Any] | None:
+    """This avatar's own institution's bounded memory, or nothing.
+
+    Knowledge is not omniscient and this is not a broadcast: only the avatar
+    who may currently speak for the institution under `RECOGNITION` sees it,
+    an ordinary member sees nothing, and the projection is the shared bounded
+    `decision_context` rather than a second reading of the same state.
+    """
+    institution = _sponsoring_institution(world, avatar)
+    if institution is None:
+        return None
+    return decision_context(
+        world, institution[3], authority_scope=SPONSORSHIP_SCOPE
+    )
+
+
+def record_dao_rite_sponsorship(
+    world: Any,
+    avatar: Any,
+    cause_event_id: str,
+    *,
+    action_origin: Any,
+) -> Event | None:
+    """The institution's sponsorship fact, only when its own decision chose it.
+
+    This runs at the execution boundary, not at ``start``: the engine writes
+    ``ActionOrigin.ACTOR_CHOICE`` onto the committed action only after
+    ``start`` returns, so authorship can only be proved here.  Two independent
+    witnesses are required and neither is forgeable by prose or by a direct
+    call: the shared owner in ``avatar_decision`` must find this exact
+    ``SponsorDaoRite`` step with this exact cause in the actor's own audited
+    decision, and the sponsorship rule must still hold now.  A reactive
+    install, a restored save, a decision that chose something else and a rite
+    that went stale between commit and execution all return ``None`` -- no
+    sponsorship fact exists, rather than an unauthored one.
+
+    Authority is asked the same way at both ends: the blocker resolves the
+    canonical institution through `can_actor_act_for` under `RECOGNITION`, so
+    an office that lost its holder, changed hands or lost the scope between
+    commit and execution refuses here and mutates nothing.
+
+    The fact itself is an OCCURRENCE that transitions no domain owner --
+    sponsoring moves no resource and changes no office.  The only deltas it
+    carries are the ones institutional knowledge and memory append for
+    themselves when the institution records its own act.
+    """
+    if get_sponsor_dao_rite_blocker(world, avatar, cause_event_id) is not None:
+        return None
+    institution = _sponsoring_institution(world, avatar)
     assert institution is not None
     cause = world.event_manager.get_event_by_id(str(cause_event_id))
     assert cause is not None
     region_id = _event_region_id(cause)
     assert region_id is not None
     region = world.map.regions[region_id]
-    kind, institution_id, institution_name = institution
-    decision_event_id = str(getattr(avatar, "current_decision_event_id", "") or "")
-    parent_payload = getattr(avatar, "_current_decision_payload", None) or {}
-    parent_decision = parent_payload.get("decision", {}) if isinstance(parent_payload, Mapping) else {}
-    decision_source = str(parent_decision.get("source", "") or "player")
-    audit = AgentDecision(
-        month_stamp=int(world.month_stamp),
-        subject_kind="avatar",
-        subject_id=str(avatar.id),
-        source=decision_source,
-        considered_count=1,
-        chosen_chain=[
-            {
-                "action_name": "SponsorDaoRite",
-                "params": {"cause_event_id": str(cause.id)},
-            }
-        ],
-    )
+    kind, owner_id, institution_name, institution_id = institution
+    # Captured now, from who is actually present now.  This snapshot is the
+    # historical fact; nothing downstream recomputes it from later positions.
+    witness_institution_ids = _witness_institution_ids(world, avatar, institution_id)
     event = Event(
         world.month_stamp,
         t(
@@ -245,19 +467,22 @@ def sponsor_dao_rite(world: Any, avatar: Any, cause_event_id: str) -> Event:
             region=getattr(region, "name", str(region_id)),
         ),
         related_avatars=[str(avatar.id)],
-        related_sects=[int(institution_id)] if kind == "sect" else None,
-        fact_kind=FactKind.DECISION,
-        causal_origin=CausalOrigin.ACTOR_DECISION,
+        related_sects=[int(owner_id)] if kind == "sect" else None,
+        fact_kind=FactKind.OCCURRENCE,
         event_type="dao_rite",
         render_params={"region_id": str(region_id), "cause_event_id": str(cause.id)},
         causal_payload={
             "deltas": [],
-            "decision": audit.to_dict(),
             "dao_rite": {
+                # ``sponsor_kind``/``sponsor_id`` stay the legacy Dao labels
+                # ("court" is not an EntityRef kind); the canonical identity is
+                # ``sponsor_institution_id``.
                 "initiator_kind": kind,
-                "initiator_id": institution_id,
+                "initiator_id": owner_id,
                 "sponsor_kind": kind,
-                "sponsor_id": institution_id,
+                "sponsor_id": owner_id,
+                "sponsor_institution_id": institution_id,
+                "witness_institution_ids": list(witness_institution_ids),
                 "institution_name": institution_name,
                 "region_id": region_id,
                 "tradition": region.dao_tradition.value,
@@ -267,26 +492,54 @@ def sponsor_dao_rite(world: Any, avatar: Any, cause_event_id: str) -> Event:
                 "is_sponsorship": True,
                 "month_stamp": int(world.month_stamp),
             },
-            "decision_source": {
-                "kind": "avatar_action",
-                "action_name": "SponsorDaoRite",
-                "avatar_id": str(avatar.id),
-                "decision_event_id": decision_event_id or None,
-            },
         },
     )
     event.causal_links.append(
-        CausalLink(event_id=event.id, cause_event_id=str(cause.id), relation=CausalRelation.MOTIVATED_BY)
-    )
-    if decision_event_id:
-        event.causal_links.append(
-            CausalLink(event_id=event.id, cause_event_id=decision_event_id, relation=CausalRelation.ENABLED_BY)
+        CausalLink(
+            event_id=event.id,
+            cause_event_id=str(cause.id),
+            relation=CausalRelation.MOTIVATED_BY,
         )
-    transient = getattr(world, "_dao_sponsorship_events_this_step", None)
-    if transient is None:
-        transient = {}
-        setattr(world, "_dao_sponsorship_events_this_step", transient)
-    transient[event.id] = event
+    )
+    # The single owner of "which decision authored this consequence".  It sets
+    # the actor-decision origin and the persisted ``decision_source`` citation
+    # that the audience path reads back; without a proved decision it writes
+    # nothing and the fact is discarded.
+    if (
+        attach_validated_actor_decision(
+            event,
+            avatar,
+            action_name=SPONSORSHIP_ACTION_NAME,
+            params={"cause_event_id": str(cause_event_id)},
+            action_origin=action_origin,
+        )
+        is None
+    ):
+        return None
+    # The institution learns what it itself did, through `OWN_ACTION`.  This is
+    # still not a public announcement: the only others who learn are the
+    # institutions whose own holder was actually present, on their own channel
+    # below.  The knowledge and memory deltas are appended by their owners onto
+    # this still uncommitted event, so no already-persisted fact is mutated.
+    record_known_fact(
+        world,
+        event,
+        (institution_id,),
+        factors=_sponsorship_memory_factors(world, institution_id, region_id),
+        channel=KnowledgeChannel.OWN_ACTION,
+    )
+    if witness_institution_ids:
+        # Those who were actually there learn the same fact through a different
+        # channel, on the same uncommitted event.  No memory is fabricated for
+        # them: what a sponsorship is worth to an onlooker has no engine-owned
+        # weight, so they know it without yet remembering it.
+        record_known_fact(
+            world,
+            event,
+            witness_institution_ids,
+            channel=KnowledgeChannel.MEMBER_WITNESS,
+        )
+    _register_sponsorship_event(world, event)
     return event
 
 
@@ -460,9 +713,99 @@ def _region_for_avatar(avatar: Any) -> Any | None:
     return getattr(getattr(avatar, "tile", None), "region", None)
 
 
-def _is_institutional_rite(event: Event) -> bool:
+def _cited_decision_authored_sponsorship(
+    world: Any, event: Event, overlays: Mapping[str, Event]
+) -> bool:
+    """Follow the citation to the decision and check it really chose this.
+
+    A ``decision_source`` is a pointer, not evidence, so it is resolved rather
+    than trusted: the cited event must exist, be a real ``DECISION`` fact
+    carrying no delta of its own, belong to the avatar named by the citation,
+    and its audited chain must contain a ``SponsorDaoRite`` step naming this
+    exact rite.  A forged pointer, a pointer to some other decision, and a
+    decision that chose a different action or a different rite all fail here.
+    """
     payload = _sponsorship_payload(event)
-    return bool(payload.get("is_sponsorship"))
+    cause_event_id = str(payload.get("cause_event_id") or "").strip()
+    source = (getattr(event, "causal_payload", {}) or {}).get("decision_source")
+    if not cause_event_id or not isinstance(source, Mapping):
+        return False
+    if str(source.get("action_name", "")) != SPONSORSHIP_ACTION_NAME:
+        return False
+    avatar_id = str(source.get("avatar_id") or "").strip()
+    decision_event_id = str(source.get("decision_event_id") or "").strip()
+    fact_month = _month_stamp(event)
+    if not avatar_id or not decision_event_id or fact_month is None:
+        return False
+    # A decision taken in this same step is not queryable yet, so the step's
+    # own events are searched before the store.
+    decision_event = overlays.get(decision_event_id) or world.event_manager.get_event_by_id(
+        decision_event_id
+    )
+    if not isinstance(decision_event, Event):
+        return False
+    decision_payload = decision_event.causal_payload
+    if not isinstance(decision_payload, Mapping):
+        return False
+    decision = decision_payload.get("decision")
+    if not isinstance(decision, Mapping):
+        return False
+    try:
+        audit = AgentDecision.from_dict(dict(decision))
+    except (AttributeError, TypeError, ValueError):
+        return False
+    if (
+        decision_event.fact_kind is not FactKind.DECISION
+        or decision_event.is_story
+        or decision_payload.get("deltas") != []
+        # A partial record must not be blessed by dataclass defaults.
+        or set(decision) != set(audit.to_dict())
+        or not isinstance(audit.id, str)
+        or not audit.id.strip()
+        or audit.source not in _AUDITED_DECISION_SOURCES
+        # A malformed month is not comparable and must never raise here.
+        or isinstance(audit.month_stamp, bool)
+        or type(audit.month_stamp) is not int
+        or audit.month_stamp != int(decision_event.month_stamp)
+        or audit.subject_kind != "avatar"
+        or str(audit.subject_id) != avatar_id
+        # A decision taken after the fact it supposedly authored is not its
+        # author.  Who holds the office *today* is deliberately not rechecked:
+        # a later leadership change does not unmake a sponsorship that happened.
+        or int(decision_event.month_stamp) > fact_month
+    ):
+        return False
+    chosen_params = {"cause_event_id": cause_event_id}
+    return any(
+        isinstance(step, Mapping)
+        and str(step.get("action_name", "")) == SPONSORSHIP_ACTION_NAME
+        and isinstance(step.get("params"), Mapping)
+        and dict(step["params"]) == chosen_params
+        for step in audit.chosen_chain
+    )
+
+
+def _is_institutional_rite(
+    world: Any, event: Event, overlays: Mapping[str, Event]
+) -> bool:
+    """Count a sponsorship towards an audience only if the fact proves itself.
+
+    Every witness read here is persisted with the event, so a sponsorship
+    reloaded from a save is judged exactly as it was in the step that produced
+    it.  ``causal_links`` are deliberately not consulted: the windowed query
+    used to gather rites does not rehydrate them, so a link-based rule would
+    silently stop recognising stored sponsorships.  A Story, a hand-written
+    ``is_sponsorship`` payload and a fact whose cited decision does not
+    actually name this rite are all simply not sponsorships.
+    """
+    payload = _sponsorship_payload(event)
+    if not bool(payload.get("is_sponsorship")) or bool(getattr(event, "is_story", False)):
+        return False
+    if getattr(event, "fact_kind", None) is not FactKind.OCCURRENCE:
+        return False
+    if getattr(event, "causal_origin", None) is not CausalOrigin.ACTOR_DECISION:
+        return False
+    return _cited_decision_authored_sponsorship(world, event, overlays)
 
 
 def _build_popular_rite(
@@ -679,7 +1022,12 @@ async def process_grounded_dao_rites(world: Any, events: list[Event]) -> list[Ev
         return result
 
     historical_rites = _recent_rite_events(world, current_events=[*events, *result])
-    sponsorships = [item for item in historical_rites if _is_institutional_rite(item)]
+    # This step's own facts, including the decisions taken this month, are not
+    # in the store yet, so they are offered to the citation check as overlays.
+    overlays = {str(item.id): item for item in [*events, *result]}
+    sponsorships = [
+        item for item in historical_rites if _is_institutional_rite(world, item, overlays)
+    ]
     by_institution: dict[tuple[str, str], list[Event]] = {}
     for sponsorship in sponsorships:
         payload = _sponsorship_payload(sponsorship)

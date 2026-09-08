@@ -361,6 +361,9 @@ async def process_city_reactivity(
                 context,
                 decision.selected_affordance_id or "",
                 decision_event_id=decision_event.id,
+                # The decision fact itself, so the executor validates the
+                # city's real authorship instead of trusting an ID.
+                decision_event=decision_event,
                 invalidations=invalidations,
             )
         except StaleAffordanceError:

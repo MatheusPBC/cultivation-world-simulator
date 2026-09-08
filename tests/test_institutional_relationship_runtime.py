@@ -10,7 +10,6 @@ from src.classes.environment.city_state import CityGovernance
 from src.classes.environment.region import CityRegion
 from src.classes.environment.route import Route
 from src.classes.event import Event
-from src.classes.mechanical_language import EntityRef
 from src.classes.regional_economy import RegionalEconomyState
 from src.sim.load.load_game import load_game
 from src.sim.save.save_game import save_game
@@ -20,6 +19,9 @@ from src.sim.simulator_engine.phase_registry import SimulationPhase
 from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.systems.domain_affordance_registry import DOMAIN_AFFORDANCES
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
+# The generic commitment service owns the lifecycle; this test also exercises
+# the Aid vertical, whose providers/executors are registered on import.
+import src.systems.institutional_aid  # noqa: F401
 from src.systems.institutional_resource_commitment import process_institutional_resource_negotiation
 from src.systems.institutional_memory import decision_context
 from src.systems.institutional_relationship_impact import (

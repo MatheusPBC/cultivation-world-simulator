@@ -1,9 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from src.classes.gathering.auction import Auction
-from src.classes.items.item import Item
-from src.classes.items.weapon import Weapon
-from src.classes.items.auxiliary import Auxiliary
+from src.classes.gathering.auction import Auction, AuctionLot
+from src.classes.items.magic_stone import MagicStone
 from src.classes.prices import prices
 from src.utils.config import CONFIG
 
@@ -51,6 +49,11 @@ def test_calculate_bid(dummy_avatar, mock_item_data):
     # Case 4: 需求 5 (梭哈) -> 出价 = 余额
     assert auction._calculate_bid(item, 5, 5000) == 5000
 
+def _lot(item, bucket: str, index: int) -> AuctionLot:
+    """A lot exactly as the auction enumerates one from circulation."""
+    return AuctionLot(key=f"{bucket}#{index}", bucket=bucket, index=index, item=item)
+
+
 def test_resolve_auctions_basic(dummy_avatar, mock_item_data):
     """测试基本的竞价结算逻辑（单物品）"""
     auction = Auction()
@@ -66,21 +69,22 @@ def test_resolve_auctions_basic(dummy_avatar, mock_item_data):
     avatar2.name = "A2"
     avatar2.__hash__ = MagicMock(return_value=123) # Make it hashable for dict keys
     
-    # 模拟需求字典
+    # 模拟需求字典（按 lot key）
+    lots = [_lot(item, "weapon", 0)]
     needs = {
-        item: {
+        lots[0].key: {
             avatar1: 4, # High need
             avatar2: 2  # Low need
         }
     }
-    
+
     # Mock prices
     with patch("src.classes.prices.prices.get_price", return_value=100):
-        deal_results, unsold, willing = auction.resolve_auctions(needs)
-        
+        deal_results, unsold, willing = auction.resolve_auctions(needs, lots)
+
     # 验证结果
-    assert item in deal_results
-    winner, price = deal_results[item]
+    assert lots[0].key in deal_results
+    winner, price = deal_results[lots[0].key]
     
     # A1 出价: 100 * 3.0 = 300
     # A2 出价: 100 * 0.8 = 80
@@ -98,9 +102,12 @@ def test_resolve_auctions_asset_protection(dummy_avatar, mock_item_data):
     avatar = dummy_avatar
     avatar.magic_stone = 100  # 总共只有 100
     
+    lot1 = _lot(item1, "weapon", 0)
+    lot2 = _lot(item2, "auxiliary", 0)
+    lots = [lot1, lot2]
     needs = {
-        item1: {avatar: 5}, # 梭哈 item1
-        item2: {avatar: 5}  # 梭哈 item2
+        lot1.key: {avatar: 5}, # 梭哈 item1
+        lot2.key: {avatar: 5}  # 梭哈 item2
     }
     
     # Mock prices: item1=80, item2=50
@@ -111,21 +118,22 @@ def test_resolve_auctions_asset_protection(dummy_avatar, mock_item_data):
     # item2 成交价 = max(1, 40 * 0.6) = 24。
     
     def get_price_side_effect(item):
-        if item == item1: return 80
+        if item == item1:
+            return 80
         return 50
         
     with patch("src.classes.prices.prices.get_price", side_effect=get_price_side_effect):
-        deal_results, unsold, willing = auction.resolve_auctions(needs)
-    
+        deal_results, unsold, willing = auction.resolve_auctions(needs, lots)
+
     # 验证 item1
-    assert item1 in deal_results
-    winner1, price1 = deal_results[item1]
+    assert lot1.key in deal_results
+    winner1, price1 = deal_results[lot1.key]
     assert winner1 == avatar
     assert price1 == 60 # 100 * 0.6
-    
+
     # 验证 item2
-    assert item2 in deal_results
-    winner2, price2 = deal_results[item2]
+    assert lot2.key in deal_results
+    winner2, price2 = deal_results[lot2.key]
     assert winner2 == avatar
     # 此时余额只剩 40，出价 40，成交价 40 * 0.6 = 24
     assert price2 == 24
@@ -139,15 +147,16 @@ def test_resolve_auctions_unsold(mock_item_data):
     item = mock_item_data["obj_weapon"]
     
     # 空需求或者需求都很低导致不出价
+    lots = [_lot(item, "weapon", 0)]
     needs = {
-        item: {}
+        lots[0].key: {}
     }
-    
+
     with patch("src.classes.prices.prices.get_price", return_value=100):
-        deal_results, unsold, willing = auction.resolve_auctions(needs)
-        
-    assert item not in deal_results
-    assert item in unsold
+        deal_results, unsold, willing = auction.resolve_auctions(needs, lots)
+
+    assert lots[0].key not in deal_results
+    assert lots[0] in unsold
 
 @pytest.mark.asyncio
 async def test_execute_flow(base_world, dummy_avatar, mock_item_data):
@@ -163,8 +172,9 @@ async def test_execute_flow(base_world, dummy_avatar, mock_item_data):
     
     # 设置 Avatar
     dummy_avatar.magic_stone = 1000
+    dummy_avatar.magic_stone = MagicStone(int(dummy_avatar.magic_stone))
     dummy_avatar.weapon = None # 确保没有武器
-    dummy_avatar.auxiliary = None 
+    dummy_avatar.auxiliary = None
     
     # 确保 avatar 在 avatar_manager 中
     base_world.avatar_manager.avatars[dummy_avatar.id] = dummy_avatar
@@ -173,13 +183,21 @@ async def test_execute_flow(base_world, dummy_avatar, mock_item_data):
     # 1. get_related_avatars
     auction.get_related_avatars = MagicMock(return_value=[dummy_avatar.id])
     
-    # 2. get_needs (Async) -> 让 item_sold 有人买，item_unsold 没人买
-    async def mock_get_needs(*args, **kwargs):
+    # 2. 出价意向按 lot key 给出：item_sold 有人买，item_unsold 无人问津
+    async def mock_collect(world, avatars, lots):
+        by_item = {id(lot.item): lot.key for lot in lots}
         return {
-            item_sold: {dummy_avatar: 4}, # High need
-            item_unsold: {dummy_avatar: 1} # No need
+            str(dummy_avatar.id): {
+                "source": "llm",
+                "levels": {
+                    by_item[id(item_sold)]: 4,   # High need
+                    by_item[id(item_unsold)]: 1, # No need
+                },
+                "rejected_lot_keys": [],
+                "offered_balance": int(dummy_avatar.magic_stone),
+            }
         }
-    auction.get_needs = mock_get_needs
+    auction.collect_bid_preferences = mock_collect
     
     # 3. Mock StoryTeller to avoid LLM
     with patch("src.classes.story_teller.StoryTeller.tell_gathering_story", new_callable=AsyncMock) as mock_story:
@@ -197,8 +215,9 @@ async def test_execute_flow(base_world, dummy_avatar, mock_item_data):
     # item_sold 应该不在 circulation 中
     assert item_sold not in base_world.circulation.sold_weapons
     
-    # item_unsold 应该被销毁 (不在 circulation 中，也不在 avatar 背包/装备 中)
-    assert item_unsold not in base_world.circulation.sold_auxiliaries
+    # item_unsold 无人出价：既不成交，也不会因此被销毁，仍留在流通池中。
+    # 只有真正被出价却没能成交的拍品才算流拍。
+    assert any(item is item_unsold for item in base_world.circulation.sold_auxiliaries)
     assert dummy_avatar.auxiliary != item_unsold
     
     # 2. 资金扣除
@@ -276,26 +295,28 @@ def test_resolve_auctions_tie_breaking(dummy_avatar, mock_item_data):
     avatar2.__hash__ = MagicMock(return_value=12345) 
     
     # 手动构建 needs 字典，控制 key 的顺序
+    lots = [_lot(item, "weapon", 0)]
+    key = lots[0].key
     # 情况1: A1 在前
     needs1 = {
-        item: {avatar1: 5, avatar2: 5}
+        key: {avatar1: 5, avatar2: 5}
     }
-    
+
     with patch("src.classes.prices.prices.get_price", return_value=100):
-        deal_results1, _, _ = auction.resolve_auctions(needs1)
-        
-    winner1, _ = deal_results1[item]
+        deal_results1, _, _ = auction.resolve_auctions(needs1, lots)
+
+    winner1, _ = deal_results1[key]
     # 如果是稳定排序，且 bid 相等，应该保持顺序，winner 是 A1
     assert winner1 == avatar1
-    
+
     # 情况2: A2 在前
     needs2 = {
-        item: {avatar2: 5, avatar1: 5}
+        key: {avatar2: 5, avatar1: 5}
     }
     with patch("src.classes.prices.prices.get_price", return_value=100):
-        deal_results2, _, _ = auction.resolve_auctions(needs2)
-    
-    winner2, _ = deal_results2[item]
+        deal_results2, _, _ = auction.resolve_auctions(needs2, lots)
+
+    winner2, _ = deal_results2[key]
     # winner 应该是 A2
     assert winner2 == avatar2
 
@@ -313,9 +334,12 @@ def test_resolve_auctions_no_refund_consideration(dummy_avatar, mock_item_data):
     avatar.weapon = old_weapon
     # 但 resolve_auctions 只看 snapshot，不看装备退款
     
+    lot1 = _lot(item1, "weapon", 0)
+    lot2 = _lot(item2, "elixir", 0)
+    lots = [lot1, lot2]
     needs = {
-        item1: {avatar: 5}, # 梭哈 item1, cost 100
-        item2: {avatar: 5}  # 梭哈 item2
+        lot1.key: {avatar: 5}, # 梭哈 item1, cost 100
+        lot2.key: {avatar: 5}  # 梭哈 item2
     }
     
     # Mock prices: item1=80, item2=50
@@ -326,23 +350,24 @@ def test_resolve_auctions_no_refund_consideration(dummy_avatar, mock_item_data):
     # Bid 90 -> Deal 54.
     
     def get_price_side_effect(item):
-        if item == item1: return 80
+        if item == item1:
+            return 80
         return 50
         
     with patch("src.classes.prices.prices.get_price", side_effect=get_price_side_effect):
-        deal_results, _, _ = auction.resolve_auctions(needs)
-        
+        deal_results, _, _ = auction.resolve_auctions(needs, lots)
+
     # item1 应该成交，消耗 60 (100 * 0.6)
-    assert deal_results[item1][0] == avatar
-    assert deal_results[item1][1] == 60
-    
+    assert deal_results[lot1.key][0] == avatar
+    assert deal_results[lot1.key][1] == 60
+
     # item2 应该成交，消耗 24 (40 * 0.6)
     # 证明使用了 40 的余额，而不是 90 (如果包含退款)
-    assert item2 in deal_results
-    assert deal_results[item2][1] == 24
-    
+    assert lot2.key in deal_results
+    assert deal_results[lot2.key][1] == 24
+
     # 总消耗 84 <= 100
-    assert deal_results[item1][1] + deal_results[item2][1] <= 100
+    assert deal_results[lot1.key][1] + deal_results[lot2.key][1] <= 100
 
 @pytest.mark.asyncio
 async def test_execute_item_types(base_world, dummy_avatar, mock_item_data):
@@ -350,31 +375,29 @@ async def test_execute_item_types(base_world, dummy_avatar, mock_item_data):
     auction = Auction()
     elixir = mock_item_data["obj_elixir"]
     
-    dummy_avatar.magic_stone = 1000
+    dummy_avatar.magic_stone = MagicStone(1000)
     base_world.circulation.sold_elixirs = [elixir]
     
     # Register avatar
     base_world.avatar_manager.avatars[dummy_avatar.id] = dummy_avatar
     
-    # Mock resolve_auctions
-    auction.resolve_auctions = MagicMock(return_value=(
-        {elixir: (dummy_avatar, 100)}, 
-        [], 
-        {}
-    ))
-    
-    # Mock dependencies
+    # 真实的选择与真实的结算：只有实际选过的等级才会成交
+    async def mock_collect(world, avatars, lots):
+        return {
+            str(dummy_avatar.id): {
+                "source": "llm",
+                "levels": {lots[0].key: 4},
+                "rejected_lot_keys": [],
+                "offered_balance": int(dummy_avatar.magic_stone),
+            }
+        }
+
     auction.get_related_avatars = MagicMock(return_value=[dummy_avatar.id])
-    auction.get_needs = AsyncMock(return_value={}) # ignored by mocked resolve
-    auction._generate_deal_events = MagicMock(return_value=[])
-    auction._generate_rivalry_events = MagicMock(return_value=[])
+    auction.collect_bid_preferences = mock_collect
     auction._generate_story = AsyncMock(return_value=[])
-    
-    # Mock circulation remove
-    base_world.circulation.remove_item = MagicMock()
-    
+
     # Mock consume_elixir
-    dummy_avatar.consume_elixir = MagicMock()
+    dummy_avatar.consume_elixir = MagicMock(return_value=True)
     
     # Ensure items are "in" circulation logic (count > 0)
     # Circulation.sold_item_count is a property, depends on lists.
@@ -385,41 +408,34 @@ async def test_execute_item_types(base_world, dummy_avatar, mock_item_data):
     # Verify consume_elixir called
     dummy_avatar.consume_elixir.assert_called_once_with(elixir)
     
-    # Verify remove_item called
-    base_world.circulation.remove_item.assert_called_once_with(elixir)
+    # Verify the exact instance really left circulation
+    assert not any(item is elixir for item in base_world.circulation.sold_elixirs)
 
 @pytest.mark.asyncio
-async def test_get_needs_parsing(base_world, dummy_avatar, mock_item_data):
-    """测试 get_needs 的 LLM 结果解析逻辑"""
+async def test_bid_preference_parsing(base_world, dummy_avatar, mock_item_data):
+    """测试出价意向的解析逻辑（按 lot key，严格校验等级）"""
     auction = Auction()
     item = mock_item_data["obj_weapon"]
-    # Mock circulation
     base_world.circulation.sold_weapons = [item]
-    
-    # Mock LLM response
-    mock_response = {
-        dummy_avatar.name: {
-            str(item.id): 5  # High need
-        }
-    }
-    
+    lots = auction.enumerate_lots(base_world)
+    key = lots[0].key
+
     with patch("src.classes.gathering.auction.call_llm_with_template", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = mock_response
-        
-        needs = await auction.get_needs(base_world, [dummy_avatar])
-        
-    assert item in needs
-    assert needs[item][dummy_avatar] == 5
-    
-    # Test filtering of low needs (<=1)
-    mock_response_low = {
-        dummy_avatar.name: {
-            str(item.id): 1 
-        }
-    }
+        mock_llm.return_value = {key: 5}  # High need
+        selections = await auction.collect_bid_preferences(
+            base_world, [dummy_avatar], lots
+        )
+
+    assert selections[str(dummy_avatar.id)]["levels"] == {key: 5}
+    needs = auction.build_needs([dummy_avatar], lots, selections)
+    assert needs[key][dummy_avatar] == 5
+
+    # 等级 1 表示不出价，会被过滤掉
     with patch("src.classes.gathering.auction.call_llm_with_template", new_callable=AsyncMock) as mock_llm:
-        mock_llm.return_value = mock_response_low
-        needs = await auction.get_needs(base_world, [dummy_avatar])
-        
-    # Should be empty because score 1 is filtered
-    assert item not in needs or not needs.get(item)
+        mock_llm.return_value = {key: 1}
+        selections = await auction.collect_bid_preferences(
+            base_world, [dummy_avatar], lots
+        )
+
+    assert selections[str(dummy_avatar.id)]["levels"] == {key: 1}
+    assert auction.build_needs([dummy_avatar], lots, selections) == {}

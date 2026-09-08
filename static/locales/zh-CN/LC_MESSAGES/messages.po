@@ -3072,6 +3072,19 @@ msgstr "{sect_name}完成了一轮宗门决策"
 msgid "Urban capacity project in {region}: {outcome}."
 msgstr "{region}的城市扩建工程：{outcome}。"
 
+msgid ""
+"The people of {region} publicly petition their government over {label}."
+msgstr "{region}的百姓就{label}公开向官府请命。"
+
+msgid "The people of {region} stop working for one cycle."
+msgstr "{region}的百姓停工一个周期。"
+
+msgid "Work resumes in {region} as the stoppage ends."
+msgstr "停工结束，{region}复工。"
+
+msgid "{region} produced less {resource} during the work stoppage."
+msgstr "停工期间，{region}的{resource}产量减少。"
+
 # Item exchange - general
 msgid "decided to equip it"
 msgstr "决定更换装备"

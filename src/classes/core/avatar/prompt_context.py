@@ -89,7 +89,10 @@ def build_avatar_prompt_context(
     world = avatar.world
     current_month = int(getattr(world, "month_stamp", 0))
     region = avatar.tile.region if avatar.tile is not None else None
-    from src.systems.celestial_dao_service import get_dao_context
+    from src.systems.celestial_dao_service import (
+        get_dao_context,
+        get_sponsor_institution_memory,
+    )
     observed = []
     for other in (co_region_avatars or [])[:8]:
         observed.append(
@@ -177,6 +180,10 @@ def build_avatar_prompt_context(
             "region": region.get_info() if region is not None else t("None"),
             "nearby_avatars": observed,
             "celestial_dao": get_dao_context(world, region_id=getattr(region, "id", None), initiator_id=str(avatar.id)),
+            # Only an avatar who may currently speak for its institution sees
+            # that institution's own bounded memory; an ordinary member gets
+            # nothing, and nothing about other institutions is projected here.
+            "own_institution_memory": get_sponsor_institution_memory(world, avatar),
         },
         "recent_memory": {
             "major_events": [str(getattr(ev, "content", "")) for ev in major_events],

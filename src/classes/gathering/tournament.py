@@ -1,8 +1,8 @@
-from typing import List, Dict, TYPE_CHECKING
-import random
+from typing import List, TYPE_CHECKING
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.gathering.gathering import Gathering, register_gathering
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
 from src.classes.story_event_service import StoryEventService
 from src.classes.relation.relation_delta_service import (
     RelationDeltaService,
@@ -14,7 +14,9 @@ from src.systems.battle import decide_battle, get_base_strength
 
 if TYPE_CHECKING:
     from src.classes.core.world import World
-    from src.classes.core.avatar import Avatar
+
+TOURNAMENT_CANCELLED_EVENT_TYPE = "tournament_cancelled"
+
 
 @register_gathering
 class Tournament(Gathering):
@@ -239,10 +241,15 @@ class Tournament(Gathering):
                     events.append(story_event)
             
         if not events:
+            # A cancelled tournament changed nothing: it is a fact that it did
+            # not happen, so it stays delta-free and only gains its type.
             events.append(Event(
                 world.month_stamp,
                 t("tournament_cancelled_due_to_insufficient_participants"),
-                is_major=True
+                is_major=True,
+                event_type=TOURNAMENT_CANCELLED_EVENT_TYPE,
+                fact_kind=FactKind.OCCURRENCE,
+                causal_origin=CausalOrigin.DETERMINISTIC,
             ))
             
         return events

@@ -1,12 +1,12 @@
 import pytest
-import copy
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from src.classes.prices import prices, Prices
+from src.classes.prices import prices
+from src.classes.items.magic_stone import MagicStone
 from src.systems.cultivation import Realm
 from src.classes.material import materials_by_id
-from src.classes.items.weapon import weapons_by_id, Weapon, get_random_weapon_by_realm
-from src.classes.items.auxiliary import auxiliaries_by_id, Auxiliary, get_random_auxiliary_by_realm
+from src.classes.items.weapon import weapons_by_id, get_random_weapon_by_realm
+from src.classes.items.auxiliary import auxiliaries_by_id, get_random_auxiliary_by_realm
 
 
 class TestPrices:
@@ -80,7 +80,7 @@ class TestAvatarSell:
         
         item = next(iter(materials_by_id.values()))
         dummy_avatar.materials = {}  # 清空背包
-        dummy_avatar.magic_stone.value = 0
+        dummy_avatar.magic_stone = MagicStone(0)
         
         # 添加物品
         dummy_avatar.add_material(item, 5)
@@ -101,7 +101,7 @@ class TestAvatarSell:
         
         item = next(iter(materials_by_id.values()))
         dummy_avatar.materials = {}
-        dummy_avatar.magic_stone.value = 100
+        dummy_avatar.magic_stone = MagicStone(100)
         
         dummy_avatar.add_material(item, 2)
         
@@ -118,7 +118,7 @@ class TestAvatarSell:
         if not weapon:
             pytest.skip("No Foundation Establishment weapons available")
         
-        dummy_avatar.magic_stone.value = 0
+        dummy_avatar.magic_stone = MagicStone(0)
         
         gained = dummy_avatar.sell_weapon(weapon)
         
@@ -132,7 +132,7 @@ class TestAvatarSell:
         if not aux:
             pytest.skip("No Core Formation auxiliaries available")
         
-        dummy_avatar.magic_stone.value = 0
+        dummy_avatar.magic_stone = MagicStone(0)
         
         gained = dummy_avatar.sell_auxiliary(aux)
         
@@ -147,7 +147,7 @@ class TestAvatarSell:
         
         item = next(iter(materials_by_id.values()))
         dummy_avatar.materials = {}
-        dummy_avatar.magic_stone.value = 0
+        dummy_avatar.magic_stone = MagicStone(0)
         dummy_avatar.add_material(item, 1)
         
         base_price = prices.get_material_price(item)
@@ -183,7 +183,7 @@ class TestAvatarSell:
         if not weapon:
             pytest.skip("No Qi Refinement weapons available")
         
-        dummy_avatar.magic_stone.value = 0
+        dummy_avatar.magic_stone = MagicStone(0)
         base_price = prices.get_weapon_price(weapon)
         
         expected_total = int(base_price * 1.5)

@@ -37,9 +37,509 @@ valid in the natural scenario. Runtime tests also cover same-month refusal,
 injected real-owner +6 and -2 choices yielding 4, roundtrip/replay/rollback,
 and factual context/known-fact handling; current-authority and stale-counterpart
 guards are implemented and reviewed.
-Both
-still contain 147 untyped events and 27 conditions activated/0 resolved, so this is
-not full production-world quality proof. No whole-roadmap claim is valid.
+At capture time, both artifacts still contained 147 untyped events and 27
+conditions activated/0 resolved, so that evidence was not full production-world
+quality proof. No whole-roadmap claim is valid.
+
+### Validation evidence (2026-09-06)
+
+Fresh artifacts under `/tmp/cws-validation-20260906/` record natural120 with
+3,194 events and causal depth 16, and pressured120 with 3,666 events, causal
+depth 10, and 20 economic transfers. Both audits are true and report zero
+broken causes, out-of-window causes, story mutations, and provider calls or
+awaits. The 27 activated conditions decompose into 8 positive conditions and
+19 healing-access deficits (aggregate/group readings). That counter tracks
+`semantic_condition` activations only; it says nothing about hydrology, and no
+conclusion about flooding may be drawn from it. Floods are counted separately
+in the artifacts' own `event_types`: the historical
+`/tmp/cws-validation-20260906/natural.json` records 5
+`regional_flood_started` and 5 `regional_flood_resolved`, and the newer
+`/tmp/cws-wallet-natural120.json` records 4 and 4. Healing access is grounded
+in the five classic CityRegions, with
+declared demand and existing healing assets, but only roughly 9%-22% baseline
+access; `CityState`/urban capacity projects remain the canonical capacity owner.
+
+The historical 147-untyped-event observation above predates the current causal
+correction checkpoint. `sect_annual_settlement` now emits a typed
+`DETERMINISTIC` transition with `StateDelta` evidence owned by the canonical
+Sect/Avatar domains, using `.value`-serialized before/after values for
+treasury/upkeep/weariness. `celestial_phenomenon_update` now emits an
+`EXTERNAL_EVENT` typed fact with explicit stochastic catalog-sampling evidence
+and deltas for phenomenon ID/start-year changes. Existing calculations,
+sampling cadence and same-ID reselection remain unchanged; neither path
+fabricates an `AgentDecision`.
+
+These two diagnosed gaps are now implemented, but this was not a claim that all
+causal-coverage gaps were solved. At that checkpoint, gathering and story
+events and hidden-domain mutations were still untyped, and the MagicStone
+double-truth mutation was still an open risk; both are addressed further below
+and this paragraph is kept as the state at that point, not as current state.
+The smoke audits only validate the causal links and invariants they
+inspect; they do not prove coverage of every canonical mutation. The definitive religious long smoke
+now adds
+`tests/test_sponsorship_long_smoke.py`: one pressured 120-month run passed in
+154.14s with no provider calls, Story deltas, broken causes, or out-of-window
+causes; Ruff also passed. Its existing world factory places the canonical
+emperor in city 305 and synchronizes one titular patriarch into authority.
+Injected policies choose only canonical `SponsorDaoRite`/Rest options and a
+positive mild witness reaction; the popular rite is produced by the engine,
+not a fake fixture event. It proves the exact decision -> sponsorship ->
+`MEMBER_WITNESS` -> independent typed reaction/receipt chain. This is an
+in-memory pressured-world witness: it does not prove SQLite roundtrip or
+natural probability, does not cover every world's ancestry, and its global
+story-mutation assertion is not equivalent to full mutation coverage.
+
+An independent focused selection over 8 files passed 77 tests in 9.52s; Ruff
+passed for the 4 changed Python files, and `git diff --check` is clean. The
+natural120 owner-delta artifact at
+`/tmp/cws-owner-deltas-natural120.json` recorded 3,198 events, causal depth 17,
+and 5 untyped events (down from the historical 147), with `audit=true`, zero
+broken causes, zero out-of-window causes, zero Story mutations, and zero
+provider calls or awaits. This is focused evidence only: it is not a full-suite
+claim, does not establish zero untyped events, and does not prove global
+mutation coverage.
+
+`MagicStone` no longer carries two numbers. It was an `int` subclass that also
+stored the amount in a `.value` attribute, and its in-place `__iadd__` and
+`__isub__` updated only that attribute while the immutable `int` base stayed
+frozen -- so after `wallet += 50` a wallet created at 100 answered 150 to
+`.value` and 100 to `int()`, and any owner building evidence from the stale
+read produced a wrong `before`. It is now an immutable amount: `.value` is a
+read-only property derived from the object itself, so the two reads cannot
+disagree; `+` and `-` return a new `MagicStone`, so `+=` rebinds the holder's
+attribute instead of mutating an object other holders alias; and operands go
+through `operator.index`, which accepts `int` and `MagicStone` and rejects a
+string or a float rather than parsing `"10"` or truncating `1.9`. The two
+remaining `.value` writes in production, `fortune.py` 535 and 747, became
+canonical wallet assignments. No gain or loss rule changed, no clamp was added,
+no compatibility setter or migration exists, and the test fixtures that wrote
+`.value` directly now assign a real `MagicStone`.
+
+Read the untyped-event snapshots in order. The 147 figure predates both the
+typed annual sect settlement and the celestial phenomenon typing. The 5 figure
+was captured *after* those two landed, and *before* the wallet correction
+described here and before the `hidden_domain`, story and tournament typing
+below. Neither reflects the current tree.
+
+The current figure is 0. Root's final artifact
+`/tmp/cws-wallet-typed-final120.json` records 3,191 events at causal depth 16
+with 0 untyped events, `audit=true`, and zero broken causes, out-of-window
+causes, Story mutations, and provider calls or awaits. Read that scope
+literally: it is **one** natural 120-month world run without a provider. It is
+not a multi-world result, not a pressured-scenario result, and not a full-suite
+claim; a single world reaching zero untyped events does not establish that
+every canonical mutation everywhere is typed.
+
+The annual sect settlement emits a typed `sect_annual_settlement` carrying one
+delta per field that really changed on its Sect and Avatar owners,
+`STATE_TRANSITION` when anything moved and `OCCURRENCE` when nothing did, with
+an engine-owned breakdown of the income, upkeep, net change and war inputs it
+used. Alongside it, `hidden_domain_opened`, `hidden_domain_injury`,
+`hidden_domain_empty_handed`, `action_story` and `gathering_story` are now
+typed as well, with no new effect and no rule change. A tournament cancelled
+for insufficient participants is likewise typed `tournament_cancelled` as a
+delta-free `OCCURRENCE`: the cancellation moved no owner's state, and its
+trigger condition is untouched.
+
+Root's independent selection over 12 files passed 115 tests in 60.56 s, and the
+final wallet/tournament/hidden-domain/story/month-rollback subset passed 45
+tests in 5.52 s; those two overlap and must not be summed. `ruff check` passed
+on all 18 changed files and `git diff --check` is clean.
+
+Hidden-domain treasure is now factual as well. The loot rules are unchanged --
+the same drops, the same prices, the same automatic equipping, the same RNG --
+but the mutations that path already performed are recorded on a typed
+`hidden_domain_treasure` fact. Its `causal_origin` is `EXTERNAL_EVENT`, because
+loot is drawn by the world and nobody chose it, so no decision is cited or
+fabricated. It carries one delta per canonical save field that really moved,
+read back after the Avatar's own setters ran: `weapon_id`,
+`weapon_proficiency`, `auxiliary_id`, `technique_id`, `magic_stone` and `hp`.
+Re-equipping the same item ID therefore records no equipment change while
+still recording the proficiency reset `change_weapon` performs, and a repeated
+technique records nothing at all and stays an `OCCURRENCE`. The `hp` delta
+exists because both equipment setters call `recalc_effects`, which clamps
+`hp.cur` down when new gear lowers maximum HP; losing max HP is not an injury
+and is deliberately not routed through the injury owner. Derived values such
+as max HP and max lifespan are recomputed from effects and are not duplicated
+as state. The structured `hidden_domain_loot` account holds JSON primitives
+only -- domain, avatar, loot kind/ID/name, target realm, the effective
+`drop_prob` that draw already used, the replaced item ID and the actual resale
+amount -- and the fact links back to the real `hidden_domain_opened` of the
+same step as `ENABLED_BY`, since entering the domain permitted the draw rather
+than causing a reward. Stories remain non-causal and carry no delta.
+
+Evidence for this slice is focused: `tests/test_hidden_domain_loot_causality.py`
+passes 11 tests covering weapon, auxiliary with and without an old item to
+resell, technique, the same-ID no-ops, the max-HP clamp, a SQLite round trip
+that stores the opening too and reads the stored causal link back to it, and a
+real failed month transaction through `SimulationPhaseRunner` that restores
+equipment, proficiency, wallet, calendar, event count and RNG state together.
+Root's independent verification passed 62 tests in 7.37 s over exactly
+`tests/test_hidden_domain_loot_causality.py`, `tests/test_hidden_domain.py`,
+`tests/test_story_event_service.py`, `tests/test_magic_stone_wallet.py`,
+`tests/test_month_transaction.py`, `tests/systems/test_fortune.py` and
+`tests/test_tournament.py`, with scoped `ruff check` and `git diff --check`
+clean. Note that `tests/test_hidden_domain_loot_causality.py` is a new,
+untracked file and has to be named explicitly to be collected.
+
+The auction now closes its authorship instead of hiding it. Bidding really is
+an actor choice, so it is recorded as one: `auction_bid_decision` is a
+`DECISION` fact per participating actor, built from a validated selection
+*before* any effect, whose `AgentDecision.source` is the existing
+`ChoiceSource` value -- `llm` when a model really selected, `fallback` (with a
+`test_mode` or `unusable_answer` reason) when it did not. Its `causal_origin`
+follows that honestly, `LLM_INTERPRETATION` or `DETERMINISTIC`; a choice is
+never relabelled deterministic to make it look engine-owned.
+
+The choice itself is now bounded. Each actor is asked on its own, with its own
+context and its own call, addressed by ID rather than display name, and it
+selects one of the engine's enumerated levels 1-5. Strict integer validation
+rejects a bool, a float, a numeric string, an unknown lot key and any
+out-of-range number outright: an invalid or omitted answer is no bid, never a
+coerced one. The prompt, updated in all seven locales, now also states what
+each level materially commits and shows the per-lot ceilings computed by the
+engine's own `_calculate_bid` at that actor's current balance, so a level 5 no
+longer secretly authorizes spending the whole wallet unseen; if that balance
+changes before resolution, the bid is refused rather than settled on terms the
+actor never saw.
+
+A catalog ID is not a lot identity. Circulation holds independent instances
+that can share an ID and compare equal, so a transient `AuctionLot` keyed by
+offered position now carries the auction end to end -- prompt, resolver,
+settlement and evidence -- replacing the old `dict[Item]` contract, which is
+removed rather than wrapped. `CirculationManager.remove_item` was corrected to
+remove the exact instance by identity and to return whether it did, so a sale
+can no longer retire a different equal copy; settlement refuses a lot whose
+instance is gone, and lots that left circulation between offer and resolution
+are filtered out beforehand so they cannot consume a hypothetical budget and
+depress later lots.
+
+Settlement records what it moved: `auction_settled` is `ACTOR_DECISION`,
+motivated by the winner's decision and contributed to by the runner-up's,
+since the second price is that actor's doing. It carries deltas for
+`magic_stone`, `weapon_id`, `weapon_special_data`, `weapon_proficiency`,
+`auxiliary_id`, `auxiliary_special_data`, `hp`, `consumed_elixirs` and the
+circulation pool count owned by the playthrough, with gross price and refund
+stated even when they cancel out. It is also the single deal fact: the old
+untyped duplicate event is gone, and the existing localized wording and
+runner-up relation pair moved onto it. An unsold lot leaves circulation
+through its own deterministic `auction_lot_unsold` fact, and a lot nobody bid
+on is untouched -- no bid never destroys stock. Pricing, second price, tie
+ordering, auto-equipping, refunds and the destruction of replaced equipment are
+unchanged. A failed `consume_elixir` keeps the existing payment and removal and
+records `elixir_consumed: false` with no elixir delta, so the loss is visible
+rather than a phantom benefit; correcting that economics was deliberately out
+of scope. The unreachable `Material` branch was removed.
+
+Evidence: `tests/test_auction_causality.py` passes 27 tests, most of them
+driving a full `execute` rather than a helper: strict level validation,
+malformed answers leaving the whole auction untouched, test-mode abstention
+through both the World RunConfig and the ContextVar with a provider proved
+un-awaited, two actors sharing a display name asked once each by ID with the
+runner-up's decision linked `CONTRIBUTED_TO` the second price, a runner-up
+that goes stale after answering setting no price, duplicate catalog IDs as
+separate lots, a stale first lot not depressing a later one, a changed balance
+cancelling a bid, the failed elixir, the recorded owners and cited decision, a
+SQLite round trip of the settlement and its decision link, and a failed month
+that rolls back wallet, equipment, circulation, calendar and RNG.
+
+Root's independent verification passed 100 tests in 12.10 s over exactly
+`tests/test_auction.py`, `tests/test_auction_causality.py`,
+`tests/test_circulation.py`, `tests/test_hidden_domain_loot_causality.py`,
+`tests/test_magic_stone_wallet.py`, `tests/test_month_transaction.py`,
+`tests/test_story_event_service.py`, `tests/test_llm_test_mode.py` and
+`tests/test_causal_authorship.py`, with `ruff check` clean on the 4 changed
+Python files and `git diff --check` clean. Note that
+`tests/test_auction_causality.py` is a new, untracked file and has to be named
+explicitly to be collected.
+
+## Wave 10 civil disorder: a first partial slice (2026-09-06)
+
+Wave 10 lists commerce, war, religion **and civil disorder**. The first three
+have verticals; civil disorder had no code at all. This adds its smallest
+end-to-end path, and **only** that path: `pressure -> population decision ->
+public petition -> independent government answer -> existing material owners`.
+
+`src/systems/civil_petition.py` owns the petition fact and nothing else.
+A `file_public_petition` affordance is offered by `population_affordances`
+**beside** the existing migration options, so the population may petition,
+migrate, or do neither; `NO_ACTION` stays valid and no threshold forces a
+protest. Availability is grounded in the mechanical grammar, not in an event
+type or a disaster's name: only a condition whose metric dimension is `RISK`
+or `LOAD` is a grievance, so a high `access` or `quality` reading offers
+nothing. Filing additionally requires a real population, the condition to be
+this region's registered live instance, a non-Story cause resolvable from the
+step's own events or storage, and an institution that actually governs here.
+
+This is protest, not rebellion: no organization, no named leader, no faction,
+no prestige or hostility, no fabricated population, and no obligation. On
+filing, only the addressed institution learns the fact, through
+`KnowledgeChannel.FORMAL_NOTICE`, with **no** memory factors -- what a protest
+is worth to a government has no engine-owned weight. The petition carries the
+condition's cause as evidence and cites the population's own canonical
+decision, which is validated by the shared `validate_actor_decision` and whose
+id must match the cited one, before any knowledge or receipt is written.
+
+The government phase runs before the population phase, so an answer arrives on
+the next cycle. `enqueue_pending_petitions` finds unanswered petitions by a
+bounded scan of the response window plus this step's events, and the
+government answers the petition itself, with the condition still attached as
+evidence. Authority is checked as an institution, never as a stand-in for its
+current office holder: `can_actor_act_for` under `URBAN_ADMINISTRATION` with
+material control, and the controller must be the one actually addressed, so a
+region that changed hands answers nothing. That check is repeated during
+recomposition after the interpreter's await, so losing authority mid-decision
+empties the menu and blocks the reaction instead of mutating or raising.
+Maintaining is a real answer and closes the petition; an act closes it only
+once attempted, so exhausting the budget leaves the grievance pending rather
+than burying it. Material responses remain the existing `_city_options`
+maintenance and capacity-project owners; nothing auto-executes and no repair
+is compelled.
+
+The vertical is wired into the monthly step: `react_government` in the
+canonical phase registry calls `enqueue_pending_petitions` with the step's own
+events, so the government really answers in `Simulator.step` rather than only
+under a direct helper call. Rebuilding the government's affordance context is
+itself treated as a revalidation: authority, controller or condition changing
+while the interpreter awaited blocks the reaction instead of raising and taking
+the month down. The stale attempt is audited on the context captured *before*
+the await, through the existing `stale_affordance_blocked_event`, and the
+receipt keeps `act` with the selected affordance -- a blocked attempt does not
+rewrite the actor's real choice into a maintain. That attempt happened, so it
+closes the petition: it is not a retry. Retrying is the separate case of
+budget exhaustion, where nothing is attempted at all and the grievance stays
+pending for the next cycle.
+
+Evidence: `tests/test_civil_petition.py` passes 17 tests -- detrimental-only
+grounding, petition offered beside migration, uninhabited/ungoverned regions,
+a free-standing condition object authorizing nothing, a step-local condition
+still petitionable, the recorded fact with only the addressed institution
+knowing and no memory, a mismatched decision id refused, the same grievance
+not petitioned twice, a changed controller answering nothing, test-mode
+reaching no provider, a SQLite round trip, and a month rollback reopening the
+grievance. The end-to-end proof runs the real phases: `react_population`
+produces the petition through the real interpreter with an injected choice,
+the facts are persisted, the month advances, and `react_government` answers
+with a specific `city_maintenance_completed` or `urban_capacity_project_started`
+linked to that government decision and carrying a real owner transition -- not
+merely any event that happens to hold a delta -- and a further month answers
+nothing more. Budget exhaustion leaves the grievance pending and a fresh
+budget then answers it. A state round trip of `MechanicalLanguageState` and
+`InstitutionalKnowledgeState` keeps both the receipt and the knowledge, so a
+reloaded world does not re-file the same grievance. Losing the controller
+while the answer is being decided produces a blocked audit and moves no asset.
+
+Root's independent verification passed 89 tests in 28.57 s over a group of 15
+files -- civil petition, the institutional civil chain, trade, war, rite and
+peace, and the population, government, domain, city, phase, month-transaction
+and causal-authorship suites -- with `ruff check` clean on 9 Python files and
+`git diff --check` clean. Two provider-free 120-month smokes were run *after*
+the phase connection, so unlike the earlier baseline they actually exercise
+this path: `/tmp/cws-main-plan-final-natural.json` recorded 3,199 events at
+causal depth 19, and `/tmp/cws-main-plan-final-pressured.json` 3,665 events
+with 20 transfers at depth 10, including the complete aid witness of request,
+acceptance, fulfillment and memory. Both audits passed with zero broken
+causes, out-of-window causes, Story mutations, untyped events and provider
+calls. The read model surfaces the petition, the government's response and the
+address history, so the chain is navigable through the existing Why path with
+no new panel.
+
+Read that scope literally. Those are focused runs and a focused selection:
+they are not a whole-suite result and not a whole-plan result. The civil slice
+itself is the 17 isolated tests above.
+
+A minimal, real **work stoppage** now extends the civil slice, owned by
+`RegionalEconomyState` itself rather than by a parallel planner. Its premise is
+declared, not inferred: `city_economy.csv` gained a `labor_dependence` column,
+set to 1.0 for `grain`, `timber` and `stone` -- local agricultural and
+extractive output that rests on collective labour -- and 0.0 for
+`spirit_stone`, because this V1 does not model that concept's labour substrate
+and therefore must not affect it. The runtime never guesses this from a
+concept's name; a resource is immune unless config says otherwise.
+
+`WorkStoppage` is one concrete record per region, never a list and never a
+modifier DSL: a participation share bounded by `MAX_STOPPAGE_PARTICIPATION`
+(0.20) scaled by the pressure's own severity, starting on the next productive
+cycle and covering exactly that cycle -- `ends_month` is validated to be
+`started_month + 1`, so a longer stoppage would have to be a new decision.
+Base `production_rates` are never written. The owner answers
+`effective_production_rate = base * (1 - participation * declared_dependence)`,
+and both the monthly balance and every FLOW reading call that same method, so
+metrics and stock can never disagree. Nothing is snapshotted or restored: a
+base rate that really changes mid-stoppage keeps its new value afterwards.
+
+Availability is grounded: a real population, an active canonical `RISK`/`LOAD`
+condition of this region, a prior real local petition, and at least one
+resource with declared labour, real output, a stock entry and actual headroom
+-- so the option is never decorative. The petition it rests on is *resolved*,
+not trusted: its authoring population decision must exist, be a `DECISION`
+fact with no deltas, name subject `population`/`region:<id>`, share the
+petition's month, select exactly this affordance, and answer the condition's
+own cause. A forged payload with real evidence and no decision authorizes
+nothing. Migration and `NO_ACTION` stay valid throughout. Each pressure
+instance admits **one** petition and **one** stoppage, held by their own
+receipts; a second of either requires a genuinely new pressure instance and
+therefore a new decision, so nothing renews itself.
+
+A legacy dispatcher bug in `population_reactivity` had to be corrected for this
+to be reachable at all: every outcome other than `population_transfer_completed`
+was treated as a failed migration and pushed the whole condition into a
+twelve-month backoff, so a *successful* petition silently locked its own
+grievance out of any further choice. A civil success is now scheduled like any
+other success -- reconsidered next month -- and skips the transfer bookkeeping
+that belongs only to migration. Failures and stale affordances keep the
+existing backoff.
+
+Attribution is honest at the warehouse: forgone output is
+`min(base, headroom_before) - produced`, computed from one headroom read
+before anything moved, so a full warehouse and a non-labour concept forgo
+nothing and are never blamed on the stoppage. Where output really was lost,
+the monthly balance and any shortage link `CONTRIBUTED_TO` the stoppage's
+start fact; where stock did not move at all, a `regional_production_forgone`
+OCCURRENCE states the flow with no invented before/after delta. The start fact
+is a `STATE_TRANSITION` carrying the real record as its delta, and expiry --
+run at the head of the economy phase, so production resumes regardless of any
+other phase -- carries the reverse. Save schema rose to 5; older saves are
+rejected outright, with no migration and no real data rewritten.
+
+Evidence: `tests/test_civil_work_stoppage.py` passes 18 tests, including a
+twelve-month `Simulator.step` run with no provider that reaches the whole chain
+from the scenario's own pressure -- start, recorded cost linked back to it, and
+end -- rather than driving phases by hand. Twelve months is a window chosen to
+respect the engine's real activation timing, not a parameter the engine
+imposes: the canonical condition definitions need about seven months to
+activate, so a six-month window reaches no grievance at all, and only the
+cities the smoke scenario actually governs can be petitioned. With the
+petition, population, economy, government, city, economy-reactivity, save-schema
+and domain-reactivity suites the focused selection passes 82 tests in 38.24 s
+with `ruff check` clean.
+
+Root's independent focused run after the scheduling correction passed 167 tests
+in 51.19 s, including
+`test_a_short_real_simulation_produces_the_whole_stoppage_chain`, with the
+frontend at 2 tests in 1.72 s, `ruff check` clean across every file in this
+vertical and `git diff --check` clean. Read that as a focused selection: it is
+not a whole-suite result.
+
+Both 120-month smokes were then re-run after the scheduling correction and
+exited 0: natural recorded 3,205 events at max causal depth 18, and pressured
+3,665 events at max depth 9 with 20 transfers. Both report zero broken causes,
+out-of-window causes, Story mutations, untyped events and failed affordances.
+Their JSON audits confirm it: `provider_call_count` and `provider_await_count`
+are 0, `story_as_material_cause_ids` is empty, and `assertions_passed` is true
+in both; the pressured run also carries `witness.fulfilled` with its complete
+chain. Those are general world-health runs: they say the corrected scheduling
+did not damage the world, and they are **not** the proof that a stoppage works.
+That proof is the twelve-month `Simulator.step` test above.
+Backend PT-BR and zh-CN strings were added and compiled with the existing
+`tools/i18n/build_mo.py`.
+
+### The government's answer to a work stoppage
+
+The stoppage now has a counterpart: the institution that actually administers
+the region may answer it, on its own decision. The start fact records
+institutional knowledge for **that one institution only**, through
+`KnowledgeChannel.PUBLIC_FACT`, and `enqueue_pending_stoppages` -- called from
+the existing `react_government` hook, with no new phase -- offers only
+stoppages that institution really knows and has not yet answered. One answer
+per institution per start fact, keyed by its own receipt.
+
+Three decouplings were needed and are deliberate. `_city_options` no longer
+requires a `ConditionInstance`: without one it still derives the menu from
+current material state, and its urgency from real damage headroom and the real
+settlement ratio rather than from a condition's intensity or from the kind of
+event that triggered the reaction. Maintenance is not offered at all when
+administrative capacity is zero, so the menu states what the city can do rather
+than what it would like to. The expansion target for the condition-free path
+reuses `DEFAULT_TARGET_SETTLEMENT_RATIO`, the owner's own existing default,
+named rather than newly invented.
+
+A resolved grievance does not block the answer and does not get a substitute:
+the government answers the fact that really happened, the interpreter's context
+carries `condition: None`, and the stoppage's own dates plus the region
+economy's live record say whether the interruption is still under way -- so an
+expired stoppage is never presented as ongoing. When no condition is live there
+is no condition receipt to write; the response receipt is the whole record.
+
+`stoppage_payload` now requires the fact to be a `STATE_TRANSITION` of
+`ACTOR_DECISION` origin carrying a coherent record, and
+`canonical_stoppage_payload` re-reads it from the event store, so a forged or
+unknown trigger authorizes nothing even when a perfectly valid condition is in
+hand. `civil_response_is_open` is the single gate -- unanswered, known,
+authorized under `URBAN_ADMINISTRATION` with material control, and about *this*
+region -- and it is asked in `government_affordances` as well as on both sides
+of the interpreter's await, so a direct registry call cannot bypass it. The
+urban executors (`urban_maintenance`, `urban_capacity_project`) now validate
+the acting body's real decision event through the shared
+`validate_actor_decision`, not a bare ID; both callers pass the fact.
+
+Evidence: `tests/test_civil_stoppage_response.py` passes 11 tests -- the real
+chain with two independent audited decisions (`population` vs `dynasty`), a
+deterministic maintain with an empty menu, a resolved pressure answered on real
+damage with real urgency, missing knowledge, lost authority, an unrecognised or
+foreign stoppage, a stale post-await block that keeps the choice audited as an
+act, budget exhaustion leaving the fact unanswered, and a month rollback that
+releases the receipt while knowledge survives, checked through the current
+`MechanicalLanguageState` / `InstitutionalKnowledgeState` serializers. The
+integrated proof is the existing twelve-month `Simulator.step` run in
+`tests/test_civil_work_stoppage.py`, now also requiring a
+`RESPONSE_TO`-linked government decision on the persisted start fact, its
+`AgentDecision` subject being the dynasty, and a completed response receipt
+naming that decision; it passes in 11.36 s with no provider call.
+
+Root's independent focused run for this slice passed **106 tests in 25.99 s**
+across the new response suite plus the stoppage, civil, government, city,
+domain-affordance, rollback, save/load and query suites, with `ruff check` and
+`git diff --check` clean. The earlier 167-test, 49.84 s regression from the
+stoppage slice still stands alongside it. Both are focused selections, not a
+whole-suite result.
+
+The 120-month smokes were re-run on this runtime and exited 0: natural recorded
+3,206 events at max causal depth 18, and pressured 3,658 events at max depth 9
+with 20 transfers. Both report zero broken causes, out-of-window causes, Story
+mutations, untyped events and failed affordances, and their JSON audits carry
+`provider_call_count` 0, `provider_await_count` 0, an empty
+`story_as_material_cause_ids` and `assertions_passed` true, with the pressured
+run's fulfilment witness present. These are world-health runs for *this*
+runtime and are a separate measurement from the smokes recorded above for the
+petition and stoppage slices; neither set is the proof that a government answer
+works. That proof is the twelve-month `Simulator.step` test.
+
+Two failures were observed **outside this slice's cut** and reproduced
+independently:
+`tests/test_city_state.py::test_urban_capability_quality_is_discovered_from_assets_not_a_fixed_catalog`
+and
+`tests/test_urban_service_metrics.py::test_available_service_surface_contains_aggregate_and_group_access_keys`.
+Both reach `available_metric_keys(None, ...)` and die at
+`src/systems/regional_hydrology.py:113` on `world.map`, entered from the
+enumeration at `src/systems/semantic_world/resolvers.py:817`; neither test nor
+either file was changed by this slice. That is what was observed, not a
+baseline: no clean-checkout run was performed to confirm the failures predate
+this work, and they are deliberately left unfixed here rather than repaired as
+an unrelated feature.
+
+Limitation: the answer reuses the existing urban menu only. There is no force,
+no repression, no new resource, no concession, no negotiation and no bargaining
+state; a maintain remains a legitimate answer and nothing compels a repair.
+
+Limitation: this is a work stoppage, not a general strike. It reduces declared
+labour output for one cycle in one region and touches nothing else -- no
+demand, no transfers, no routes, no projects, no leadership, no organization,
+no police, and no escalation ladder.
+
+Status, honestly: this is a **partial** wave 10 -- the civil slice's protest
+path, now with a bounded work stoppage. A *general* strike, riot, mob violence,
+civic movement, rebellion and revolution are all still absent by design: what
+exists is one petition and one single-cycle stoppage per pressure instance,
+with no organization, no leadership and no escalation between them. Rebellion
+in particular remains gated on the spec's own requirement of organization,
+leadership and material capacity.
+Wave 11 (intrigue, conspiracy, mythical threats) stays conditional on
+long-run evidence and is not started. No whole-plan claim is valid.
+
+That is coverage for these paths only. It is explicitly not global material
+coverage: other effect and reward routes were outside this scope and remain
+unexamined.
 
 Wave 8 has a first, deliberately narrow slice, committed as fef7c882: a fixed
 institutional prehistory of at most three months, clamped to the calendar that
@@ -248,6 +748,170 @@ broken/out-of-window causes, Story mutations/material ancestors and provider
 calls/awaits. This is not war-stress or world-quality acceptance: the harness
 does not force war, and both runs still report 147 untyped events and 27
 activated, zero-resolved conditions.
+
+Dao rite sponsorship authorship is corrected as local WIP on top of 31457838,
+not committed, pushed or deployed. `SponsorDaoRite` no longer fabricates its
+own `AgentDecision` with a defaulted `player` source, and no longer asserts a
+sponsorship at `start`: the engine installs the plan origin only after `start`
+returns, so `start` records nothing and the fact is written at the execution
+boundary, as `MutualAttack` already does. The sponsorship is now a
+`FactKind.OCCURRENCE` with no material effect -- it moves no resource and
+changes no office, and the only deltas it carries are the institutional
+knowledge and memory ones described below -- and is
+authored only when the shared `avatar_decision` owner proves the actor's own
+audited chain contains this exact `SponsorDaoRite` step with this exact cause
+under `ActionOrigin.ACTOR_CHOICE`; an action rebuilt outside the commit path, a
+reactive install and a chain that chose another rite all produce no
+sponsorship at all. The blocker
+now also rejects a Story cause and any cause outside the 12-month rite window,
+including a future month stamp, and it is revalidated at the boundary, so a
+rite that goes stale between commit and execution is refused. Duplicate
+sponsorship per institution is preserved. `_sponsorable_dao_rite_options`
+delegates to that blocker instead of restating the rule, so already-sponsored
+and out-of-window rites are no longer offered. The audience path now resolves
+the cited decision instead of trusting the payload, with the same rigor as
+`_grounded_source`: exact `AgentDecision` field set, allowed source, decision
+month not after the fact, matching subject, and an exact
+`{cause_event_id}` parameter match; a dangling pointer, a pointer to another
+action's decision and a hand-written `is_sponsorship` payload count towards no
+Celestial Audience. Current office holding is deliberately not rechecked in
+history, so a later leadership change does not unmake a past sponsorship.
+Sponsorship is now grounded in institutional authority and memory, still as
+local WIP. The loose emperor/patriarch gate is only a candidate check
+(`_institution_candidate`); the actual permission is `can_actor_act_for` under
+`AuthorityScope.RECOGNITION`, chosen because it is the one scope both the
+dynasty's sovereign office and a sect's patriarch office hold and the one that
+disposes of nothing material. Emperor and living patriarch remain the only
+candidates, no office, claim or recognition is created, and there is no
+permissive fallback: a world with no bootstrapped authority state has nobody
+who can sponsor. Authority is revalidated at the execution boundary alongside
+the rite window, so an office that loses its holder or its scope between commit
+and execution refuses and mutates nothing. The fact carries
+`dao_rite.sponsor_institution_id`, the canonical `Institution` ID; `"court"`
+stays a legacy Dao label and never becomes an `EntityRef` kind. On success the
+acting institution alone records the fact through `record_known_fact` with
+`KnowledgeChannel.OWN_ACTION` -- no broadcast, no omniscience -- and one memory
+built from the four frozen engine factors: `relative_scale` is this act's
+single share of `RITES_REQUIRED_FOR_AUDIENCE`, deliberately not cumulative
+because counting prior sponsorships would read the persisted window and the
+runtime cache together, double-count an event present in both, and reweigh the
+same fact after a reload; `identity_anchor_impact` is a real read of the
+institution's anchors for that region; `institutional_change` and
+`commitment_breach` are zero as a matter of fact. No LLM weighting and no
+automatic hostility. The sponsorship stays a single Avatar action with no
+duplicate `DomainAffordance`. `build_avatar_prompt_context` gains
+`local_world.own_institution_memory`, the shared bounded
+`institutional_memory.decision_context` under the same scope, visible only to
+the avatar who may currently speak for the institution; an ordinary member
+sees nothing. History survives a leadership change: current office holding is
+not rechecked over past facts. Note that nothing in the engine ever creates an
+`InstitutionalIdentityAnchor` today, so that factor reads 0.0 in a real world
+and is exercised only by seeding an anchor in a test.
+
+Other institutions may now interpret a sponsorship they actually witnessed,
+reusing the existing relationship-impact engine with no new planner, church,
+war path or schema. `record_dao_rite_sponsorship` captures
+`dao_rite.witness_institution_ids` at the exact moment of the act: a dynasty or
+sect (never the sponsor, never a city) whose current `COMMITMENT_NEGOTIATION`
+holder is alive, passes `can_actor_act_for`, and has the sponsoring avatar
+inside its own observation radius. Nothing is inferred from shared region,
+membership or prose, and the snapshot is never recomputed from where anyone
+stands later. Witnesses learn the same still-uncommitted fact through
+`KnowledgeChannel.MEMBER_WITNESS` while the sponsor keeps `OWN_ACTION`; no
+memory is fabricated for a witness, because what a sponsorship is worth to an
+onlooker has no engine-owned weight. There is no broadcast to the world.
+
+In `institutional_relationship_impact`, observer enumeration and pair
+resolution are now separate: `_observer_candidates` lists who may react, and
+`_reaction_pair` returns the commitment's own two parties for the existing
+facts and always `(witness, sponsor)` for a sponsorship, so witnesses never
+pair with each other and the sponsor never reacts to itself. A valid source is
+only what the Dao owner's `_is_institutional_rite` accepts -- the cited
+decision resolved and proved -- never a loose `is_sponsorship` flag, so a
+popular rite sharing the `dao_rite` event type is not reactable. IDs are
+resolved against the authority state rather than coerced: a non-string, a
+dangling witness or an unresolvable sponsor fails closed, and an unresolvable
+sponsor offers no options and makes no interpreter call. `maintain` remains the
+test-mode default and neither valence forces a relation kind or war. The
+interpreter templates in en-US, pt-BR and zh-CN now say institutional fact
+rather than aid, and pass the rite's canonical tradition as context for how the
+act reads, explicitly not as a rule about who must resent whom. One adjacent
+correction: `record_maintained_reaction` now rechecks authority, and the phase
+skips instead of crashing when a reaction goes stale mid-interpretation, so a
+receipt is never spent without permission.
+
+Limits: no new religion, engine, owner, institution, church schema, event type
+or persisted affordance was added, and no shared authority, model or LLM
+interface was changed. Witnessing grants nothing by itself and creates no
+relation on its own. The transient `_dao_sponsorship_events_this_step` cache is
+now pruned to the rite window instead of growing for the world's lifetime, but
+it remains runtime-only; a `SimulationMonthCheckpoint` rollback releases it
+with the rest of the World, so a rolled-back sponsorship is decidable again.
+Knowledge and memory append their deltas onto the still-uncommitted
+sponsorship event, so no persisted fact is mutated, and
+`validate_causal_integrity` accepts the decision and the fact collected
+together.
+
+Evidence is focused only. The dedicated authorship file now passes 19 tests,
+adding to the 10 below: own-institution knowledge with `OWN_ACTION` and nobody
+else learning, the exact four factors and their salience, an anchored region
+raising the remembered weight, the holder reading its own memory through the
+real `build_avatar_prompt_context(...)["local_world"]["own_institution_memory"]`
+while an ordinary avatar reads `None` on that same path, a dead holder and a
+removed `RECOGNITION` scope between commit and finish each mutating nothing,
+survival of a leadership change, idempotent re-recording, causal-integrity
+acceptance, and rollback releasing knowledge and memory. The earlier 10 are
+the
+authored occurrence fact, month 0, a SQLite re-read of the stored fact and its
+decision with no step overlay and no dedup cache, an already-sponsored rite
+dropping out of
+`param_options`, checkpoint rollback and retry, a decision naming another rite,
+a rite that goes stale between commit and execution, future/Story causes, and
+three forged sponsorships. The forged cases carry the actor-decision origin on
+purpose, so they reach the pointer lookup rather than dying on the structural
+guard; that was verified by mutation (neutralising the lookup fails the test).
+The witness slice adds `tests/test_sponsorship_witness_reaction.py`, 11 focused
+tests on a fixture of a sponsoring emperor, two patriarchs inside observation
+radius and one deliberately out of range: witness capture excluding the
+outsider and the sponsor, witness knowledge without memory, each witness
+pairing only with the sponsor, a popular rite and a forged flag being
+unreactable, dangling and malformed IDs failing closed, test-mode maintain
+creating no relation, injected positive and negative readings moving only the
+shared scalar and never the relation kind, the real `process_economy_reactivity`
+gateway carrying the sponsorship to both witnesses, a receipt closing the fact
+with a rollback reopening it while the earlier sponsorship knowledge survives,
+and the two risk cases: moving a holder out of range afterwards does not unmake
+the historical snapshot, and losing the scope mid-interpretation spends no
+receipt for that observer while the other one still closes its own. That
+receipt case was mutation-checked -- removing the new authority recheck fails
+it. The fixture declares `test_mode` on the World itself and an autouse stub
+makes any provider call fail, so nothing depends on ambient shell state.
+`ruff check` on the changed files passed.
+
+The current focused evidence for this slice is root's independent integrated
+regression across 16 test files: 110 tests passed in 15.32 s. The
+`tests/test_institutional_relationship_runtime.py` failure root saw at an
+earlier baseline was a test-side defect, resolved by Luna with an explicit
+`institutional_aid` import in that test; no production path was involved and
+nothing here fixed it. The earlier authorship-only slice passed 94 tests in
+11.66 s: sponsor
+authorship and rites/material, Luna's institutional rite chain and the
+institutional chain assembler projection built on
+`dao_rite.sponsor_institution_id`, authority, persistence, avatar prompt, the
+Dao phase and public services, param options, roleplay decision, causal
+authorship and month transaction. `ruff check` passed on eight Python files
+and `git diff --check` is clean. Nothing was committed, pushed or deployed.
+Sponsorship tests now have to bootstrap institutional authority, which is the
+intended consequence of removing the permissive fallback rather than a fixture
+convenience. The
+baseline `test_spar_finish_generates_story` AttributeError still fails and is
+unrelated and untouched. No save/load round trip specific to this path was
+written: the SQLite witness re-reads the two facts out of the event store, the
+checkpoint witness rolls back a month, and the fail-closed witness rebuilds the
+action object directly, which is the shape a loader produces rather than a
+reloaded world. Persistence coverage for this slice is the generic persistence
+suite in the integrated run, not a sponsorship-specific one. No whole-suite,
+long-smoke or world-quality claim is made.
 
 ## Celestial Dao
 

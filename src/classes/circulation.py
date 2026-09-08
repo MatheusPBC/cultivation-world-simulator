@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Dict, List, TYPE_CHECKING, Any
+from typing import List, TYPE_CHECKING, Any
 import copy
 
 if TYPE_CHECKING:
@@ -73,23 +73,37 @@ class CirculationManager:
             self.add_elixir(item)
         # 未来扩展其他类型...
 
-    def remove_item(self, item: Any) -> None:
+    def remove_item(self, item: Any) -> bool:
         """
-        从流通池移除物品
+        从流通池移除物品（按实例身份移除）。
+
+        Removes the exact instance that was handed in, not merely an equal
+        one. Items are dataclasses whose equality compares fields while
+        ``__hash__`` is the catalog ID, so two circulating copies of the same
+        catalog item are indistinguishable by ``==``; removing by equality
+        could retire a different copy than the one that was actually sold.
+
+        Returns whether that exact instance was present and removed. A missing
+        instance stays a no-op, and the caller can refuse to settle it.
         """
         from src.classes.items.weapon import Weapon
         from src.classes.items.auxiliary import Auxiliary
         from src.classes.items.elixir import Elixir
-        
+
         if isinstance(item, Weapon):
-            if item in self.sold_weapons:
-                self.sold_weapons.remove(item)
+            pool = self.sold_weapons
         elif isinstance(item, Auxiliary):
-            if item in self.sold_auxiliaries:
-                self.sold_auxiliaries.remove(item)
+            pool = self.sold_auxiliaries
         elif isinstance(item, Elixir):
-            if item in self.sold_elixirs:
-                self.sold_elixirs.remove(item)
+            pool = self.sold_elixirs
+        else:
+            return False
+
+        for index, candidate in enumerate(pool):
+            if candidate is item:
+                del pool[index]
+                return True
+        return False
     
     def to_save_dict(self) -> dict:
         """序列化为字典以便存档"""

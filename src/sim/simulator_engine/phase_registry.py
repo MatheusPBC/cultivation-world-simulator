@@ -329,6 +329,8 @@ async def evaluate_semantic_world(simulator, ctx):
 async def react_government(simulator, ctx):
     from src.systems.institution_bootstrap import synchronize_institutional_authority
     from src.systems.government_reactivity import (
+        enqueue_pending_petitions,
+        enqueue_pending_stoppages,
         enqueue_unreacted_government_conditions,
         process_government_reactivity,
     )
@@ -340,6 +342,15 @@ async def react_government(simulator, ctx):
         )
     )
     enqueue_unreacted_government_conditions(simulator.world, ctx.invalidations)
+    # This phase runs before the population's, so a petition filed last month
+    # is answered here, on the next cycle. The step's own events are offered
+    # too, so a petition already produced this month is not missed.
+    enqueue_pending_petitions(
+        simulator.world, ctx.invalidations, current_events=ctx.events
+    )
+    # A public work stoppage the government knows about asks for an answer the
+    # same way, whether or not its cycle is already over.
+    enqueue_pending_stoppages(simulator.world, ctx.invalidations)
     ctx.add_events(await process_government_reactivity(
         simulator.world,
         current_events=ctx.events,

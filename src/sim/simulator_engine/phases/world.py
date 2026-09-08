@@ -6,6 +6,7 @@ from src.classes.core.avatar import Avatar
 from src.classes.celestial_phenomenon import get_random_celestial_phenomenon
 from src.classes.environment.region import CityRegion
 from src.classes.event import Event, FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.state_delta import StateDelta
 from src.classes.observe import get_avatar_observation_radius
 from src.i18n import t
@@ -131,6 +132,29 @@ def phase_update_celestial_phenomenon(world) -> list[Event]:
     if not new_phenomenon:
         return events
 
+    old_id = old_phenomenon.id if old_phenomenon is not None else None
+    old_start_year = world.phenomenon_start_year
+    transition = "init" if is_init else "expiry"
+    deltas: list[StateDelta] = []
+    world_owner_id = str(world.playthrough_id)
+    if old_id != new_phenomenon.id:
+        deltas.append(StateDelta(
+            owner_kind="world",
+            owner_id=world_owner_id,
+            aspect="current_phenomenon_id",
+            before=str(old_id) if old_id is not None else None,
+            after=str(new_phenomenon.id),
+        ))
+    if old_start_year != current_year:
+        deltas.append(StateDelta(
+            owner_kind="world",
+            owner_id=world_owner_id,
+            aspect="phenomenon_start_year",
+            before=str(old_start_year),
+            after=str(current_year),
+            magnitude=current_year - old_start_year,
+        ))
+
     # 切换世界级环境状态后，再补一条公开事件供前端和历史系统消费。
     world.current_phenomenon = new_phenomenon
     world.phenomenon_start_year = current_year
@@ -149,7 +173,37 @@ def phase_update_celestial_phenomenon(world) -> list[Event]:
             new_desc=new_phenomenon.desc,
         )
 
-    events.append(Event(world.month_stamp, desc, related_avatars=None))
+    event = Event(
+        world.month_stamp,
+        desc,
+        related_avatars=None,
+        event_type="celestial_phenomenon_update",
+        fact_kind=FactKind.STATE_TRANSITION if deltas else FactKind.OCCURRENCE,
+        causal_origin=CausalOrigin.EXTERNAL_EVENT,
+        causal_payload={
+            "cause": {
+                "kind": "stochastic_catalog_sampling",
+                "trigger": transition,
+            },
+            "sampling": {
+                "catalog": "celestial_phenomenon",
+                "method": "weighted_random",
+                "selected_id": new_phenomenon.id,
+                "selected_weight": new_phenomenon.weight,
+            },
+            "transition": {
+                "old_phenomenon_id": old_id,
+                "new_phenomenon_id": new_phenomenon.id,
+                "old_start_year": old_start_year,
+                "new_start_year": current_year,
+                "new_duration_years": new_phenomenon.duration_years,
+            },
+        },
+    )
+    for delta in deltas:
+        delta.event_id = event.id
+    event.causal_payload["deltas"] = [delta.to_dict() for delta in deltas]
+    events.append(event)
     return events
 
 

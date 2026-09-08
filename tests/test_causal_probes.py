@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from src.classes.items.magic_stone import MagicStone
 import sys
 
 import pytest
@@ -183,7 +184,7 @@ def test_institutional_world_setup_is_idempotent_and_uses_canonical_entities(bas
     assert first.sect.magic_stone >= 600
 
     first.sect.magic_stone = 123
-    first.member.magic_stone.value = 77
+    first.member.magic_stone = MagicStone(77)
     third = prepare_institutional_urban_strain_world(base_world)
 
     assert third.sect.magic_stone == 123

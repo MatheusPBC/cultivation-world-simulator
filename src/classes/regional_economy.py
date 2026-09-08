@@ -26,6 +26,82 @@ def _ratio(value: float, *, field_name: str) -> float:
     return number
 
 
+MAX_STOPPAGE_PARTICIPATION = 0.20
+
+
+@dataclass(frozen=True)
+class WorkStoppage:
+    """One region's collective work stoppage, for one productive cycle.
+
+    Concrete and single, not a modifier system: a participation share, the
+    cycle it covers, and the canonical facts that authored it. It reduces
+    *effective* output only; the region's base `production_rates` are never
+    written, so a rate that really changes during a stoppage keeps its new
+    value once the stoppage ends.
+    """
+
+    started_month: int
+    ends_month: int
+    participation: float
+    source_event_id: str
+    decision_event_id: str
+    start_event_id: str
+
+    def __post_init__(self) -> None:
+        for name in ("started_month", "ends_month"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"work stoppage {name} must be an int")
+        if self.started_month < 0:
+            raise ValueError("work stoppage cannot start before the calendar")
+        # Exactly one productive cycle, by contract. A longer stoppage would
+        # be a renewal, and renewals are a new decision, not a longer record.
+        if self.ends_month != self.started_month + 1:
+            raise ValueError("work stoppage must last exactly one cycle")
+        participation = _ratio(self.participation, field_name="participation")
+        if participation <= 0.0 or participation > MAX_STOPPAGE_PARTICIPATION:
+            raise ValueError("work stoppage participation is out of range")
+        object.__setattr__(self, "participation", participation)
+        for name in ("source_event_id", "decision_event_id", "start_event_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"work stoppage {name} must be a non-empty id")
+
+    def is_active(self, month: int) -> bool:
+        """Active for its own cycle; `ends_month` is exclusive."""
+        return self.started_month <= int(month) < self.ends_month
+
+    def has_expired(self, month: int) -> bool:
+        return int(month) >= self.ends_month
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "started_month": self.started_month,
+            "ends_month": self.ends_month,
+            "participation": self.participation,
+            "source_event_id": self.source_event_id,
+            "decision_event_id": self.decision_event_id,
+            "start_event_id": self.start_event_id,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "WorkStoppage":
+        expected = {
+            "started_month", "ends_month", "participation",
+            "source_event_id", "decision_event_id", "start_event_id",
+        }
+        if not isinstance(data, dict) or set(data) != expected:
+            raise ValueError("work stoppage has invalid fields")
+        return cls(
+            started_month=data["started_month"],
+            ends_month=data["ends_month"],
+            participation=data["participation"],
+            source_event_id=data["source_event_id"],
+            decision_event_id=data["decision_event_id"],
+            start_event_id=data["start_event_id"],
+        )
+
+
 @dataclass
 class RegionalEconomyState:
     """Canonical quantitative economy owned by one region.
@@ -41,8 +117,14 @@ class RegionalEconomyState:
     demand_rates: dict[str, float] = field(default_factory=dict)
     access: dict[str, float] = field(default_factory=dict)
     dependencies: dict[str, float] = field(default_factory=dict)
+    # How much of a concept's local output rests on collective labour, per
+    # resource, declared in canonical config. Zero unless declared: the runtime
+    # never infers this from a concept's name.
+    labor_dependence: dict[str, float] = field(default_factory=dict)
     reservations: dict[str, dict[str, float]] = field(default_factory=dict)
     project_resources: dict[str, str] = field(default_factory=dict)
+    # At most one stoppage, active or scheduled. Never a list, never stacked.
+    work_stoppage: "WorkStoppage | None" = None
 
     def __post_init__(self) -> None:
         self.stocks = self._normalize_non_negative_map(self.stocks, "stock")
@@ -53,6 +135,13 @@ class RegionalEconomyState:
         self.demand_rates = self._normalize_non_negative_map(self.demand_rates, "demand rate")
         self.access = self._normalize_ratio_map(self.access, "access")
         self.dependencies = self._normalize_ratio_map(self.dependencies, "dependency")
+        self.labor_dependence = self._normalize_ratio_map(
+            self.labor_dependence, "labor dependence"
+        )
+        if self.work_stoppage is not None and not isinstance(
+            self.work_stoppage, WorkStoppage
+        ):
+            raise ValueError("work_stoppage must be a WorkStoppage")
         self.reservations = self._normalize_reservations(self.reservations)
         self.project_resources = self._normalize_project_resources(self.project_resources)
         self._validate_invariants()
@@ -222,6 +311,40 @@ class RegionalEconomyState:
     def set_dependency(self, concept_id: str, value: float) -> None:
         self.dependencies[str(concept_id)] = _ratio(value, field_name="dependency")
 
+    def set_labor_dependence(self, concept_id: str, value: float) -> None:
+        self.labor_dependence[str(concept_id)] = _ratio(
+            value, field_name="labor dependence"
+        )
+
+    def effective_production_rate(self, concept_id: str, month: int) -> float:
+        """The output this region actually achieves this month.
+
+        The single owner-side answer, so the monthly balance and every FLOW
+        reading agree by construction. A stoppage withholds only the declared
+        labour share of a concept: what no declared labour produces is
+        untouched, and the base rate is never written.
+        """
+        base = float(self.production_rates.get(str(concept_id), 0.0))
+        stoppage = self.work_stoppage
+        if stoppage is None or not stoppage.is_active(month) or base <= 0.0:
+            return base
+        dependence = float(self.labor_dependence.get(str(concept_id), 0.0))
+        if dependence <= 0.0:
+            return base
+        return max(0.0, base * (1.0 - stoppage.participation * dependence))
+
+    def begin_work_stoppage(self, stoppage: WorkStoppage) -> None:
+        """Schedule the region's single stoppage; never stack or renew."""
+        if not isinstance(stoppage, WorkStoppage):
+            raise ValueError("work stoppage must be a WorkStoppage")
+        if self.work_stoppage is not None:
+            raise ValueError("region already has a work stoppage")
+        self.work_stoppage = stoppage
+
+    def clear_work_stoppage(self) -> WorkStoppage | None:
+        expired, self.work_stoppage = self.work_stoppage, None
+        return expired
+
     def to_dict(self) -> dict[str, Any]:
         self._validate_invariants()
         return {
@@ -231,6 +354,10 @@ class RegionalEconomyState:
             "demand_rates": dict(self.demand_rates),
             "access": dict(self.access),
             "dependencies": dict(self.dependencies),
+            "labor_dependence": dict(self.labor_dependence),
+            "work_stoppage": (
+                self.work_stoppage.to_dict() if self.work_stoppage else None
+            ),
             "reservations": {
                 project_id: dict(resources)
                 for project_id, resources in self.reservations.items()
@@ -249,12 +376,16 @@ class RegionalEconomyState:
             "demand_rates",
             "access",
             "dependencies",
+            "labor_dependence",
+            "work_stoppage",
             "reservations",
             "project_resources",
         }
+        # Strict: a save without the new fields is rejected outright. There is
+        # no fallback and no migration, and no real data is ever rewritten.
         if set(data) != expected:
             raise ValueError("regional economy has invalid fields")
-        for field_name in expected:
+        for field_name in expected - {"work_stoppage"}:
             if not isinstance(data[field_name], dict):
                 raise ValueError(f"regional economy {field_name} must be an object")
         if any(not isinstance(resources, dict) for resources in data["reservations"].values()):
@@ -266,6 +397,12 @@ class RegionalEconomyState:
             demand_rates=dict(data["demand_rates"]),
             access=dict(data["access"]),
             dependencies=dict(data["dependencies"]),
+            labor_dependence=dict(data["labor_dependence"]),
+            work_stoppage=(
+                WorkStoppage.from_dict(data["work_stoppage"])
+                if data["work_stoppage"] is not None
+                else None
+            ),
             reservations={
                 project_id: {
                     resource_id: quantity

@@ -532,7 +532,7 @@ async def try_trigger_fortune(avatar: Avatar) -> list[Event]:
 
     elif kind == FortuneKind.SPIRIT_STONE:
         amount = _get_spirit_stone_amount(avatar)
-        avatar.magic_stone.value += amount
+        avatar.magic_stone = avatar.magic_stone + amount
         from src.i18n import t
         res_text = t("{avatar_name} obtained {amount} spirit stones",
                     avatar_name=avatar.name, amount=amount)
@@ -744,7 +744,7 @@ async def try_trigger_misfortune(avatar: Avatar) -> list[Event]:
         # 或者完全随机
         loss = random.randint(50, 300)
         loss = min(loss, max_loss)
-        avatar.magic_stone.value -= loss
+        avatar.magic_stone = avatar.magic_stone - loss
         res_text = t("misfortune_result_loss_spirit_stone", name=avatar.name, amount=loss)
         
     elif kind == MisfortuneKind.INJURY:

@@ -1,5 +1,5 @@
-You are {actor}, evaluating your own institution's response to a known canonical aid fact.
+You are {actor}, evaluating your own institution's response to a known canonical institutional fact, such as aid, trade, a commitment outcome, or a rite your own holder witnessed another institution sponsor.
 Factual trigger: {trigger}
 Offered options: {affordances}
 Known context: {context}
-Friendliness is a shared bilateral climate, not a private opinion. Consider holder personas, known facts, and the current relation. You are not obligated to reward help or punish refusal. Maintain, neutral, and ambivalent are valid. Select only an offered ID; invent no terms, targets, numbers, war, or alliance.
+Friendliness is a shared bilateral climate, not a private opinion. Consider holder personas, known facts, and the current relation. A rite's tradition, when given, is context for how the act reads, never a rule about who must resent whom. You are not obligated to reward help, punish refusal, or take offence at a sponsorship. Maintain, neutral, and ambivalent are valid. Select only an offered ID; invent no terms, targets, numbers, war, or alliance.

@@ -1,21 +1,36 @@
-Você avalia o valor de itens em um mundo Xianxia e deve determinar o quanto certos itens são necessários para alguns NPCs.
+Você decide, para um único cultivador, o quanto ele precisa de cada lote ofertado em um leilão.
 
-O dict[AvatarName, info] dos NPCs que você deve avaliar é:
-{avatar_infos}
-Os itens cuja necessidade deve ser avaliada são:
-{items}
+O cultivador para quem você decide:
+avatar_id: {avatar_id}
+{avatar_info}
 
-Observação: retorne somente o resultado em formato JSON.
-O formato é:
+Saldo atual deste cultivador: {current_balance} pedras espirituais.
+
+Os lotes ofertados são estes, cada um com o máximo que este cultivador
+realmente comprometeria em cada nível:
+{lots}
+
+O que cada nível compromete materialmente:
+- 1: nenhum lance.
+- 2: até 0,8x o preço base.
+- 3: até 1,5x o preço base.
+- 4: até 3x o preço base.
+- 5: todo o saldo atual.
+Todos os níveis são limitados pelo saldo mostrado, e compras anteriores no
+mesmo leilão reduzem o que resta. Você escolhe um nível, nunca um preço.
+
+Atenção: retorne o resultado apenas em formato JSON.
+O formato é um mapeamento plano de lot_key para nível de necessidade:
 {{
-    "{{avatar_name_1}}": {{
-        "{{item_id_1}}": int, # 1-5
-        "{{item_id_2}}": int,
-        ...
-    }}, ...
+    "{{lot_key_1}}": int,
+    "{{lot_key_2}}": int,
+    ...
 }}
 
 Requisitos:
-1. Todos os personagens devem avaliar todos os itens. Portanto, o resultado final terá num_avatar * num_item avaliações, sem omitir nenhuma.
-2. Analise a situação de cada personagem e atribua o nível de necessidade de acordo com suas circunstâncias. Por exemplo, alguém próximo de morrer de velhice teria máxima necessidade de pílulas de longevidade.
-3. Os níveis variam de 1 a 5: 1 significa totalmente desnecessário e 5 significa absolutamente necessário.
+1. Decida apenas para este único cultivador. Não mencione nem decida por mais ninguém.
+2. Refira-se a cada lote pela string exata de lot_key. Dois lotes podem compartilhar o mesmo item_id; ainda assim são lotes diferentes e são avaliados separadamente.
+3. O nível de necessidade deve ser um dos inteiros 1, 2, 3, 4, 5 — nada além disso. 1 significa totalmente desnecessário, 5 significa absolutamente necessário.
+4. Retorne um inteiro puro, nunca um decimal, nunca uma string entre aspas, e nunca um valor fora de 1-5. Qualquer outro valor é rejeitado e conta como nenhum lance.
+5. Você pode omitir um lote; um lote omitido simplesmente conta como nenhum lance.
+6. Julgue pelas circunstâncias do próprio cultivador. Por exemplo, quem está perto do fim da longevidade precisa mais de um elixir de longevidade.

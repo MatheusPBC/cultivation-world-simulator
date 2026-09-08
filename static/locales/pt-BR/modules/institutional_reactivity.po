@@ -29,3 +29,15 @@ msgstr "Projeto de capacidade urbana em {region}: {outcome}."
 
 msgid "{region} interpreted an urban risk as {decision}: {reason}"
 msgstr "{region} interpretou um risco urbano como {decision}: {reason}"
+
+msgid "The people of {region} publicly petition their government over {label}."
+msgstr "O povo de {region} peticiona publicamente ao seu governo sobre {label}."
+
+msgid "The people of {region} stop working for one cycle."
+msgstr "O povo de {region} para de trabalhar por um ciclo."
+
+msgid "Work resumes in {region} as the stoppage ends."
+msgstr "O trabalho recomeça em {region} com o fim da paralisação."
+
+msgid "{region} produced less {resource} during the work stoppage."
+msgstr "{region} produziu menos {resource} durante a paralisação."

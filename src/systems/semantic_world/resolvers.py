@@ -490,9 +490,17 @@ def _regional_economy_value(
             else {}
         )
         if concept_id in values:
+            # Production is read through the owner's effective rate, so a work
+            # stoppage is visible to metrics exactly as it is to the monthly
+            # balance. Demand is unaffected by a stoppage.
+            value = (
+                economy.effective_production_rate(concept_id, month)
+                if flow_kind == "production"
+                else values[concept_id]
+            )
             return exact_reading(
                 key,
-                values[concept_id],
+                value,
                 "units_per_month",
                 month,
                 f"region:{subject.id}:{flow_kind}:{concept_id}",

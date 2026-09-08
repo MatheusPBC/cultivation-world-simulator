@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.classes.age import Age
+from src.classes.items.magic_stone import MagicStone
 from src.classes.alignment import Alignment
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
@@ -349,8 +350,8 @@ async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world
     )
 
     member.technique = low_technique
-    member.magic_stone.value = 0
-    breaker.magic_stone.value = 100
+    member.magic_stone = MagicStone(0)
+    breaker.magic_stone = MagicStone(100)
     member.join_sect(sect, get_rank_from_realm(member.cultivation_progress.realm))
     breaker.join_sect(sect, get_rank_from_realm(breaker.cultivation_progress.realm))
 

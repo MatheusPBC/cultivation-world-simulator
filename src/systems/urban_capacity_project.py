@@ -26,6 +26,10 @@ from src.sim.simulator_engine.domain_invalidation import (
 )
 
 
+# The settlement ratio this owner already defaults to. Named so callers
+# without a condition of their own can reuse it instead of restating it.
+DEFAULT_TARGET_SETTLEMENT_RATIO = 0.75
+
 PROJECT_KIND = "settlement_capacity_expansion"
 BASE_PROJECT_MONTHS = 3
 MAX_PROJECT_MONTHS = 24
@@ -170,7 +174,7 @@ def _project_affordance(
 def can_start_urban_capacity_project(
     region: CityRegion,
     *,
-    target_settlement_ratio: float = 0.75,
+    target_settlement_ratio: float = DEFAULT_TARGET_SETTLEMENT_RATIO,
 ) -> bool:
     plan, _ = _project_affordance(
         region,
@@ -224,7 +228,7 @@ def start_urban_capacity_project(
     *,
     decision_event_id: str,
     trigger_event_id: str,
-    target_settlement_ratio: float = 0.75,
+    target_settlement_ratio: float = DEFAULT_TARGET_SETTLEMENT_RATIO,
     invalidations: DomainInvalidationQueue | None = None,
 ) -> Event:
     plan, reason = _project_affordance(

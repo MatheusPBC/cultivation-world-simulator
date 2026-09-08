@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 
-SAVE_SCHEMA_VERSION = 4
+# 5: RegionalEconomyState gained `labor_dependence` and `work_stoppage`.
+# Older saves are rejected outright by `load_game`; nothing is migrated and no
+# real save data is rewritten.
+SAVE_SCHEMA_VERSION = 5
 
 if TYPE_CHECKING:
     from src.classes.core.sect import Sect

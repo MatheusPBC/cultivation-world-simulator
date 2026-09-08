@@ -3,6 +3,7 @@ from unittest.mock import patch, AsyncMock
 
 from src.systems.fortune import try_trigger_fortune, try_trigger_misfortune
 from src.classes.core.avatar import Avatar
+from src.classes.items.magic_stone import MagicStone
 from src.classes.death import handle_death
 from src.classes.death_reason import DeathReason, DeathType
 from src.classes.causal_origin import CausalOrigin
@@ -91,7 +92,7 @@ async def test_try_trigger_fortune(dummy_avatar: Avatar, mock_game_configs, mock
 @pytest.mark.asyncio
 async def test_try_trigger_misfortune(dummy_avatar: Avatar, mock_game_configs, mock_story_teller):
     dummy_avatar.personas = [_find_persona_by_key("JINX")]
-    dummy_avatar.magic_stone.value = 1000
+    dummy_avatar.magic_stone = MagicStone(1000)
     
     # Set current action for dynamic prompt
     action = Respire(dummy_avatar, dummy_avatar.world)
@@ -147,7 +148,7 @@ async def test_misfortune_injury_records_external_hp_delta(
 @pytest.mark.asyncio
 async def test_negative_misfortune_probability_is_clamped_to_zero(dummy_avatar: Avatar, mock_game_configs, mock_story_teller):
     dummy_avatar.goldfinger = _find_goldfinger_by_key("CHILD_OF_FORTUNE")
-    dummy_avatar.magic_stone.value = 1000
+    dummy_avatar.magic_stone = MagicStone(1000)
 
     with patch('random.random', return_value=0.0):
         events = await try_trigger_misfortune(dummy_avatar)

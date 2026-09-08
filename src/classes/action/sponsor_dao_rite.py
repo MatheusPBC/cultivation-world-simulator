@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from src.classes.action import InstantAction
 from src.classes.action.param_options import ParamOptionSource
-from src.classes.event import Event
+from src.classes.event import NULL_EVENT, Event
 from src.i18n import t
 from src.systems.celestial_dao_service import (
     can_sponsor_dao_rite,
     get_sponsor_dao_rite_blocker,
-    sponsor_dao_rite,
+    record_dao_rite_sponsorship,
 )
 
 
@@ -43,10 +43,19 @@ class SponsorDaoRite(InstantAction):
         return (False, t(blocker)) if blocker is not None else (True, "")
 
     def start(self, cause_event_id: str) -> Event:
-        return sponsor_dao_rite(self.world, self.avatar, cause_event_id)
+        # Nothing is sponsored yet: the engine installs ``action_origin`` only
+        # after ``start`` returns, so the authorship of this sponsorship can
+        # only be proved at the execution boundary below.
+        return NULL_EVENT
 
     def _execute(self, cause_event_id: str) -> None:
         return
 
     async def finish(self, cause_event_id: str) -> list[Event]:
-        return []
+        event = record_dao_rite_sponsorship(
+            self.world,
+            self.avatar,
+            cause_event_id,
+            action_origin=self.action_origin,
+        )
+        return [event] if event is not None else []

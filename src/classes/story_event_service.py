@@ -125,6 +125,7 @@ class StoryEventService:
             related_avatars=cls._normalize_related_avatar_ids(related_avatar_ids),
             is_major=False,
             is_story=True,
+            event_type="action_story",
             causal_origin=CausalOrigin.LLM_INTERPRETATION,
         )
         story_event.causal_links.append(CausalLink(
@@ -167,6 +168,7 @@ class StoryEventService:
             related_avatars=[avatar.id for avatar in related_avatars],
             is_major=False,
             is_story=True,
+            event_type="gathering_story",
             causal_origin=CausalOrigin.LLM_INTERPRETATION,
         )
         story_event.causal_links.append(CausalLink(

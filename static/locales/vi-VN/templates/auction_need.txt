@@ -1,22 +1,35 @@
-Ngươi là một thẩm định giả giá trị trong tiên hiệp tu chân giới, phụ trách đánh giá mức hữu dụng của một số vật phẩm đối với các NPC.
+Ngươi quyết định, cho **một** tu sĩ duy nhất, mức độ cần thiết của từng lô hàng được đấu giá đối với vị đó.
 
-Dict[AvatarName, info] của NPC cần được thẩm định:
-{avatar_infos}
+Tu sĩ mà ngươi quyết định cho:
+avatar_id: {avatar_id}
+{avatar_info}
 
-Các vật phẩm cần đánh giá nhu cầu:
-{items}
+Số dư hiện tại của tu sĩ này: {current_balance} linh thạch.
 
-Chú ý: chỉ hoàn trả kết quả JSON.
-Định dạng:
+Các lô hàng được đấu giá, kèm mức tối đa mà tu sĩ này thực sự sẽ bỏ ra ở từng cấp:
+{lots}
+
+Mỗi cấp cam kết điều gì trên thực tế:
+- 1: không đấu giá.
+- 2: tối đa 0,8 lần giá gốc.
+- 3: tối đa 1,5 lần giá gốc.
+- 4: tối đa 3 lần giá gốc.
+- 5: toàn bộ số dư hiện tại.
+Mọi cấp đều bị giới hạn bởi số dư nêu trên, và những lần mua trước trong cùng
+phiên đấu giá sẽ làm giảm phần còn lại. Ngươi chọn một cấp, không phải một giá.
+
+Chú ý: chỉ trả về kết quả ở định dạng JSON.
+Định dạng là ánh xạ phẳng từ lot_key tới mức độ cần thiết:
 {{
-    "{{avatar_name_1}}": {{
-        {{item_id_1}}: int, # 1~5
-        {{item_id_2}}: int,
-        ...
-    }}, ...
+    "{{lot_key_1}}": int,
+    "{{lot_key_2}}": int,
+    ...
 }}
 
 Yêu cầu:
-1. Mọi nhân vật đều phải được đánh giá đối với mọi vật phẩm; kết quả cuối cùng phải có đủ num_avatar * num_item ước lượng.
-2. Phân tích cảnh ngộ từng nhân vật rồi trả về mức nhu cầu. Ví dụ, người sắp hết thọ nguyên sẽ rất cần đan dược kéo dài tuổi thọ.
-3. Mức nhu cầu từ 1 đến 5: 1 là hoàn toàn không cần, 5 là cực kỳ cần.
+1. Chỉ quyết định cho một tu sĩ này. Không nhắc tới và không quyết định thay cho bất kỳ ai khác.
+2. Hãy gọi mỗi lô hàng bằng đúng chuỗi lot_key của nó. Hai lô có thể trùng item_id; chúng vẫn là hai lô khác nhau và được đánh giá riêng.
+3. Mức độ cần thiết phải là một trong các số nguyên 1, 2, 3, 4, 5 — không gì khác. 1 nghĩa là hoàn toàn không cần, 5 nghĩa là tuyệt đối cần.
+4. Chỉ trả về số nguyên thuần, không dùng số thập phân, không dùng chuỗi trong dấu ngoặc kép, và không dùng giá trị ngoài 1-5. Mọi giá trị khác đều bị từ chối và coi như không đấu giá.
+5. Ngươi có thể bỏ qua một lô; lô bị bỏ qua đơn giản là không đấu giá.
+6. Hãy phán đoán dựa trên hoàn cảnh của chính tu sĩ này. Ví dụ kẻ sắp hết thọ nguyên cần đan dược diên thọ nhất.

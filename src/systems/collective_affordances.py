@@ -23,6 +23,8 @@ from src.systems.city_maintenance import execute_urban_maintenance
 from src.systems.domain_affordance_registry import (
     AffordanceContext,
     DOMAIN_AFFORDANCES,
+    StaleAffordanceError,
+    validate_actor_decision,
 )
 from src.systems.resource_transfer import resolve_resource_transfer
 from src.systems.sect_member_support import (
@@ -63,6 +65,70 @@ def _actor_region_id(actor_ref: EntityRef) -> str:
     return actor_ref.id.split(":", 1)[1] if actor_ref.id.startswith("region:") else actor_ref.id
 
 
+def _petition_option(context: AffordanceContext, origin) -> tuple[DomainAffordance, ...]:
+    """Addressing the government is an option, never an obligation."""
+    from src.systems.civil_petition import PETITION_ACTION, can_file_public_petition
+
+    condition = context.condition
+    # The condition that opened this reaction was activated in this very step,
+    # so its cause is still only in the phase's own events, not in storage.
+    if not can_file_public_petition(
+        context.world, origin, condition, overlays=(context.trigger_event,)
+    ):
+        return ()
+    from src.systems.civil_petition import governing_institution_ref
+
+    institution_ref = governing_institution_ref(context.world, origin)
+    return (DomainAffordance(
+        domain=context.domain,
+        actor_ref=context.actor_ref,
+        action_kind=PETITION_ACTION,
+        target_refs=(EntityRef("region", str(origin.id)), institution_ref),
+        parameters={
+            "region_id": str(origin.id),
+            "condition_instance_id": str(condition.id),
+        },
+        urgency=_condition_urgency(context),
+        motivation_event_ids=(context.trigger_event.id,),
+    ),)
+
+
+def _stoppage_option(context: AffordanceContext, origin) -> tuple[DomainAffordance, ...]:
+    """Stopping work is one option, never a required next step."""
+    from src.systems.civil_petition import (
+        STOPPAGE_ACTION,
+        can_declare_work_stoppage,
+        labor_bearing_resources,
+        prior_local_petition,
+        stoppage_participation,
+    )
+
+    condition = context.condition
+    if not can_declare_work_stoppage(
+        context.world, origin, condition, overlays=(context.trigger_event,)
+    ):
+        return ()
+    petition = prior_local_petition(
+        context.world, origin, condition=condition,
+        current_events=(context.trigger_event,),
+    )
+    return (DomainAffordance(
+        domain=context.domain,
+        actor_ref=context.actor_ref,
+        action_kind=STOPPAGE_ACTION,
+        target_refs=(EntityRef("region", str(origin.id)),),
+        parameters={
+            "region_id": str(origin.id),
+            "condition_instance_id": str(condition.id),
+            "petition_event_id": str(petition.id),
+            "participation": stoppage_participation(condition),
+            "affected_resource_ids": labor_bearing_resources(origin),
+        },
+        urgency=_condition_urgency(context),
+        motivation_event_ids=(context.trigger_event.id,),
+    ),)
+
+
 def population_affordances(context: AffordanceContext):
     origin = _region(context.world, _actor_region_id(context.actor_ref))
     condition = context.condition
@@ -74,10 +140,15 @@ def population_affordances(context: AffordanceContext):
         or not condition.is_active(int(context.world.month_stamp))
     ):
         return ()
+    # Offered alongside migration, so the population chooses between speaking
+    # to its government, leaving, or doing neither.
+    petition = _petition_option(context, origin)
+    stoppage = _stoppage_option(context, origin)
     population = float(origin.population)
     capacity = float(origin.population_capacity)
     if population <= 0 or capacity <= 0 or population / capacity <= 0.85:
-        return ()
+        # Not crowded enough to migrate, but the grievance can still be voiced.
+        return (*petition, *stoppage)
     urgency = _condition_urgency(context)
     desired_fraction = min(
         MAX_POPULATION_TRANSFER_FRACTION,
@@ -131,7 +202,7 @@ def population_affordances(context: AffordanceContext):
                 motivation_event_ids=(context.trigger_event.id,),
             )
         )
-    return tuple(options)
+    return (*options, *petition, *stoppage)
 
 
 def economy_affordances(context: AffordanceContext):
@@ -199,58 +270,90 @@ def economy_affordances(context: AffordanceContext):
     )
 
 
+def _settlement_target(context: AffordanceContext, condition) -> float:
+    """The settlement ratio this expansion should aim at.
+
+    A live condition states its own resolve threshold, which is the most
+    grounded answer available. Without one the canonical owner default is
+    used, so no new number is introduced for the condition-free path.
+    """
+    from src.systems.urban_capacity_project import (
+        DEFAULT_TARGET_SETTLEMENT_RATIO,
+    )
+
+    if condition is None:
+        return DEFAULT_TARGET_SETTLEMENT_RATIO
+    definition = context.world.mechanical_language.condition_definitions.get(
+        condition.definition_id
+    )
+    return float(
+        getattr(definition, "resolve_below", DEFAULT_TARGET_SETTLEMENT_RATIO)
+    )
+
+
 def _city_options(
     context: AffordanceContext, region: CityRegion
 ) -> tuple[DomainAffordance, ...]:
     condition = context.condition
-    if condition is None:
-        return ()
     urgency = _condition_urgency(context)
     options: list[DomainAffordance] = []
-    relevant = set(
-        derive_eligible_capability_ids(
-            context.world,
-            region,
-            condition,
-            region.city_state.assets,
-        )
-    )
-    damaged_capabilities = {
-        capability
-        for asset in region.city_state.assets
-        if asset.integrity < 1.0
-        for capability in asset.capability_ids
-    }
-    for capability_id in sorted(damaged_capabilities):
-        options.append(
-            DomainAffordance(
-                domain=context.domain,
-                actor_ref=context.actor_ref,
-                action_kind="urban_maintenance",
-                target_refs=(EntityRef("region", str(region.id)),),
-                parameters={
-                    "region_id": str(region.id),
-                    "capability_id": capability_id,
-                },
-                urgency=(urgency if capability_id in relevant else urgency * 0.5),
-                motivation_event_ids=(context.trigger_event.id,),
+    # The menu is what this city can materially do right now. A live condition
+    # enriches it by saying which capabilities are relevant; its absence is not
+    # a reason to offer nothing, and a substitute condition is never invented.
+    relevant = (
+        set(
+            derive_eligible_capability_ids(
+                context.world,
+                region,
+                condition,
+                region.city_state.assets,
             )
         )
-    if (
-        float(region.population_capacity) > 0
-        and float(region.population) / float(region.population_capacity) > 0.85
-        and can_start_urban_capacity_project(
-            region,
-            target_settlement_ratio=float(
-                getattr(
-                    context.world.mechanical_language.condition_definitions.get(
-                        condition.definition_id
+        if condition is not None
+        else set()
+    )
+    # Damage headroom per capability: the real, current shortfall of the worst
+    # asset that provides it. Without a condition this is the only honest
+    # urgency available, and it is read from the assets, never from the prose
+    # or the kind of event that triggered the reaction.
+    damage: dict[str, float] = {}
+    for asset in region.city_state.assets:
+        headroom = max(0.0, 1.0 - float(asset.integrity))
+        if headroom <= 0.0:
+            continue
+        for capability in asset.capability_ids:
+            damage[capability] = max(damage.get(capability, 0.0), headroom)
+    # Maintenance costs administrative capacity the city may simply not have.
+    # Offering it anyway would make the menu a wish list instead of a
+    # statement of what this government can do.
+    if float(region.city_state.governance.administrative_capacity) > 0:
+        for capability_id in sorted(damage):
+            options.append(
+                DomainAffordance(
+                    domain=context.domain,
+                    actor_ref=context.actor_ref,
+                    action_kind="urban_maintenance",
+                    target_refs=(EntityRef("region", str(region.id)),),
+                    parameters={
+                        "region_id": str(region.id),
+                        "capability_id": capability_id,
+                    },
+                    urgency=(
+                        (urgency if capability_id in relevant else urgency * 0.5)
+                        if condition is not None
+                        else damage[capability_id]
                     ),
-                    "resolve_below",
-                    0.75,
+                    motivation_event_ids=(context.trigger_event.id,),
                 )
-            ),
-        )
+            )
+    settlement_ratio = (
+        float(region.population) / float(region.population_capacity)
+        if float(region.population_capacity) > 0
+        else 0.0
+    )
+    if settlement_ratio > 0.85 and can_start_urban_capacity_project(
+        region,
+        target_settlement_ratio=_settlement_target(context, condition),
     ):
         options.append(
             DomainAffordance(
@@ -261,13 +364,15 @@ def _city_options(
                 parameters={
                     "region_id": str(region.id),
                     "project_kind": PROJECT_KIND,
-                    "target_settlement_ratio": float(
-                        context.world.mechanical_language.condition_definitions[
-                            condition.definition_id
-                        ].resolve_below
+                    "target_settlement_ratio": _settlement_target(
+                        context, condition
                     ),
                 },
-                urgency=urgency,
+                urgency=(
+                    urgency
+                    if condition is not None
+                    else min(1.0, settlement_ratio)
+                ),
                 motivation_event_ids=(context.trigger_event.id,),
             )
         )
@@ -285,14 +390,52 @@ def city_affordances(context: AffordanceContext):
 
 
 def government_affordances(context: AffordanceContext):
+    from src.systems.civil_petition import (
+        canonical_stoppage_payload,
+        civil_response_is_open,
+        petition_payload,
+    )
+
+    from src.systems.civil_petition import STOPPAGE_EVENT_TYPE
+
     condition = context.condition
-    if condition is None:
+    civil_kind = "petition"
+    civil = petition_payload(context.trigger_event)
+    if civil is None:
+        civil_kind = "stoppage"
+        # Read from the stored fact, so composing against a loose object that
+        # merely looks like a stoppage offers nothing. The government answers
+        # on a later cycle than the stoppage, so the fact is genuinely stored.
+        civil = canonical_stoppage_payload(context.world, context.trigger_event)
+        if civil is None and (
+            context.trigger_event.event_type == STOPPAGE_EVENT_TYPE
+        ):
+            # A trigger claiming to be a stoppage that canonical state does not
+            # recognise offers nothing, even alongside a perfectly valid
+            # condition: the condition must not launder the unknown fact.
+            return ()
+    if condition is not None:
+        region = _region(context.world, str(condition.target_id))
+    elif civil is not None:
+        # A civil fact names its own region. Its grievance may already have
+        # been resolved; that removes the enrichment, not the government's
+        # ability to answer what actually happened.
+        region = _region(context.world, str(civil.get("region_id", "")))
+    else:
         return ()
-    region = _region(context.world, str(condition.target_id))
     if region is None:
         return ()
     governance = region.city_state.governance
     if governance.controller_kind != "dynasty" or governance.controller_id != context.actor_ref.id:
+        return ()
+    # When the trigger is a civil fact, the institution that was actually
+    # addressed must still govern here and still hold the authority to answer.
+    # Recomposition runs after the interpreter's await, so losing authority
+    # while deciding empties the menu and the reaction is blocked rather than
+    # mutating anything.
+    if civil is not None and not civil_response_is_open(
+        context.world, region, context.trigger_event, civil, civil_kind
+    ):
         return ()
     return _city_options(context, region)
 
@@ -427,6 +570,20 @@ def _execute_population(
     return event
 
 
+def _require_urban_authorship(
+    context, option, decision_event, decision_event_id: str, *, label: str
+) -> None:
+    """The acting body's own decision, as a fact, authorizes an urban action.
+
+    The same shared validator every other collective domain uses. An ID alone
+    proves nothing, and validating one decision while citing another would
+    leave the authorship broken.
+    """
+    validate_actor_decision(decision_event, context, option, label=label)
+    if str(getattr(decision_event, "id", "")) != str(decision_event_id):
+        raise StaleAffordanceError(f"{label} decision id does not match")
+
+
 def _execute_resource(context, option, *, decision_event_id: str, invalidations=None, **_):
     destination = _region(context.world, str(option.parameters["destination_region_id"]))
     if destination is None:
@@ -444,7 +601,13 @@ def _execute_resource(context, option, *, decision_event_id: str, invalidations=
     return event
 
 
-def _execute_maintenance(context, option, *, decision_event_id: str, invalidations=None, **_):
+def _execute_maintenance(
+    context, option, *, decision_event_id: str, decision_event=None,
+    invalidations=None, **_,
+):
+    _require_urban_authorship(
+        context, option, decision_event, decision_event_id, label="urban maintenance"
+    )
     region = _region(context.world, str(option.parameters["region_id"]))
     if region is None:
         raise ValueError("city affordance target disappeared")
@@ -460,7 +623,14 @@ def _execute_maintenance(context, option, *, decision_event_id: str, invalidatio
     return event
 
 
-def _execute_project(context, option, *, decision_event_id: str, invalidations=None, **_):
+def _execute_project(
+    context, option, *, decision_event_id: str, decision_event=None,
+    invalidations=None, **_,
+):
+    _require_urban_authorship(
+        context, option, decision_event, decision_event_id,
+        label="urban capacity project",
+    )
     region = _region(context.world, str(option.parameters["region_id"]))
     if region is None:
         raise ValueError("city affordance target disappeared")
@@ -492,6 +662,90 @@ def _execute_support(context, option, *, decision_event_id: str, **_):
     return event
 
 
+def _execute_petition(
+    context, option, *, decision_event_id: str, decision_event=None, **_
+):
+    """Revalidate at the boundary, then let the petition owner record it.
+
+    The population's own canonical decision is validated by the shared
+    collective validator before anything is written; an ID alone authorizes
+    nothing, and no actor decision is ever fabricated here.
+    """
+    from src.systems.civil_petition import (
+        can_file_public_petition,
+        record_public_petition,
+    )
+
+    validate_actor_decision(decision_event, context, option, label="public petition")
+    # Validating one fact while citing another id would leave the authorship
+    # broken; the object and the citation must be the same decision.
+    if str(getattr(decision_event, "id", "")) != str(decision_event_id):
+        raise StaleAffordanceError("public petition decision id does not match")
+    region = _region(context.world, str(option.parameters["region_id"]))
+    condition = context.condition
+    if (
+        region is None
+        or condition is None
+        or str(condition.id) != str(option.parameters["condition_instance_id"])
+        or not can_file_public_petition(
+            context.world, region, condition, overlays=(context.trigger_event,)
+        )
+    ):
+        raise StaleAffordanceError("public petition is absent or stale")
+    event = record_public_petition(
+        context.world,
+        region=region,
+        condition=condition,
+        decision_event_id=decision_event_id,
+        affordance_id=option.id,
+        source_event=context.trigger_event,
+    )
+    event.causal_payload["affordance_id"] = option.id
+    return event
+
+
+def _execute_stoppage(
+    context, option, *, decision_event_id: str, decision_event=None, **_
+):
+    """Revalidate at the boundary, then let the civil owner record it."""
+    from src.systems.civil_petition import (
+        can_declare_work_stoppage,
+        prior_local_petition,
+        record_work_stoppage,
+    )
+
+    validate_actor_decision(decision_event, context, option, label="work stoppage")
+    if str(getattr(decision_event, "id", "")) != str(decision_event_id):
+        raise StaleAffordanceError("work stoppage decision id does not match")
+    region = _region(context.world, str(option.parameters["region_id"]))
+    condition = context.condition
+    if (
+        region is None
+        or condition is None
+        or str(condition.id) != str(option.parameters["condition_instance_id"])
+        or not can_declare_work_stoppage(
+            context.world, region, condition, overlays=(context.trigger_event,)
+        )
+    ):
+        raise StaleAffordanceError("work stoppage is absent or stale")
+    petition = prior_local_petition(
+        context.world, region, condition=condition,
+        current_events=(context.trigger_event,),
+    )
+    if petition is None or petition.id != str(option.parameters["petition_event_id"]):
+        raise StaleAffordanceError("work stoppage cites a stale petition")
+    event = record_work_stoppage(
+        context.world,
+        region=region,
+        condition=condition,
+        petition_event=petition,
+        decision_event_id=decision_event_id,
+        affordance_id=option.id,
+    )
+    event.causal_payload["affordance_id"] = option.id
+    return event
+
+
 for _domain, _provider in (
     ("population", population_affordances),
     ("economy", economy_affordances),
@@ -507,6 +761,8 @@ for _action, _executor in (
     ("urban_maintenance", _execute_maintenance),
     ("urban_capacity_project", _execute_project),
     ("support_member", _execute_support),
+    ("file_public_petition", _execute_petition),
+    ("declare_work_stoppage", _execute_stoppage),
 ):
     DOMAIN_AFFORDANCES.register_executor(_action, _executor)
 

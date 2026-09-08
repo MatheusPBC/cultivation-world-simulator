@@ -1,21 +1,36 @@
-Vous êtes un évaluateur de valeur dans un monde Xianxia, responsable d'évaluer la valeur de certains objets pour certains PNJs.
+Vous décidez, pour un seul cultivateur, à quel point il a besoin de chaque lot proposé lors d'une vente aux enchères.
 
-Le dictionnaire [NomAvatar, infos] des PNJs pour lesquels vous devez prendre des décisions est :
-{avatar_infos}
-Les objets nécessitant une évaluation sont :
-{items}
+Le cultivateur pour lequel vous décidez :
+avatar_id: {avatar_id}
+{avatar_info}
 
-Note : Retournez les résultats en format JSON uniquement.
-Le format est :
+Solde actuel de ce cultivateur : {current_balance} pierres spirituelles.
+
+Voici les lots proposés, chacun avec le maximum que ce cultivateur engagerait
+réellement à chaque niveau :
+{lots}
+
+Ce que chaque niveau engage matériellement :
+- 1 : aucune enchère.
+- 2 : jusqu'à 0,8x le prix de base.
+- 3 : jusqu'à 1,5x le prix de base.
+- 4 : jusqu'à 3x le prix de base.
+- 5 : la totalité du solde actuel.
+Chaque niveau est plafonné par le solde indiqué, et les achats antérieurs dans
+la même vente réduisent ce qui reste. Vous choisissez un niveau, jamais un prix.
+
+Attention : ne retournez le résultat qu'au format JSON.
+Le format est une correspondance plate de lot_key vers un niveau de besoin :
 {{
-    "{{avatar_name_1}}": {{
-        "{{item_id_1}}": int, # 1-5
-        "{{item_id_2}}": int,
-        ...
-    }}, ...
+    "{{lot_key_1}}": int,
+    "{{lot_key_2}}": int,
+    ...
 }}
 
 Exigences :
-1. Tous les personnages doivent évaluer tous les objets ici, ce qui signifie que le retour final est nombre_avatar * nombre_objet. Chacun doit avoir une estimation.
-2. Analysez la situation de chaque personnage et retournez le niveau de besoin basé sur leur circonstances. Par exemple, une personne proche de mourir de vieillesse aurait besoin des pilules de longévité au maximum.
-3. Les niveaux de besoin vont de 1 à 5, où 1 signifie complètement inutile et 5 signifie absolument nécessaire.
+1. Ne décidez que pour ce seul cultivateur. Ne mentionnez personne d'autre et ne décidez pour personne d'autre.
+2. Désignez chaque lot par sa chaîne lot_key exacte. Deux lots peuvent partager le même item_id ; ce sont malgré tout des lots différents, évalués séparément.
+3. Le niveau de besoin doit être l'un des entiers 1, 2, 3, 4, 5 — rien d'autre. 1 signifie totalement inutile, 5 signifie absolument nécessaire.
+4. Retournez un entier simple, jamais un décimal, jamais une chaîne entre guillemets, et jamais une valeur hors de 1-5. Toute autre valeur est rejetée et compte comme aucune enchère.
+5. Vous pouvez omettre un lot ; un lot omis compte simplement comme aucune enchère.
+6. Jugez selon la situation propre de ce cultivateur. Par exemple, celui qui approche de la fin de sa longévité a le plus besoin d'un élixir de longévité.

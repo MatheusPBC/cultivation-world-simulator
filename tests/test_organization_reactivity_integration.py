@@ -4,6 +4,7 @@ import pytest
 
 from src.classes.age import Age
 from src.classes.alignment import Alignment
+from src.classes.items.magic_stone import MagicStone
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.environment.region import CityRegion
@@ -58,7 +59,7 @@ def _setup(world):
     avatar.personas = []
     avatar.tile.region = city
     avatar.join_sect(sect, get_rank_from_realm(avatar.cultivation_progress.realm))
-    avatar.magic_stone.value = 0
+    avatar.magic_stone = MagicStone(0)
     world.existed_sects = [sect]
     world.sect_context.from_existed_sects(world.existed_sects)
     trigger = Event(

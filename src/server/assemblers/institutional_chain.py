@@ -5,18 +5,154 @@ import base64
 import json
 from typing import Any, Mapping
 
+from src.classes.causal_link import CausalRelation
 from src.classes.event_query import EventQuery
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
 from src.classes.institution import AuthorityScope, InstitutionKind
 from src.classes.mechanical_language import EntityRef
 from src.systems.institution_authority import can_actor_act_for
 from src.systems.institutional_memory import effective_salience
 
 _OWNER_KINDS = {"region": InstitutionKind.CITY, "sect": InstitutionKind.SECT, "dynasty": InstitutionKind.DYNASTY}
-_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "institutional_trade_proposed", "institutional_trade_accepted", "institutional_trade_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated", "institutional_relationship_changed", "institutional_relationship_interpreted", "institutional_peace_proposed", "institutional_peace_accepted", "institutional_peace_rejected", "institutional_war_declared", "avatar_deliberate_attack"}
+_EVENT_TYPES = {"institutional_aid_requested", "institutional_aid_accepted", "institutional_aid_refused", "institutional_trade_proposed", "institutional_trade_accepted", "institutional_trade_refused", "regional_resource_transfer_completed", "institutional_commitment_term_fulfilled", "institutional_commitment_term_breached", "institutional_commitment_remediation_proposed", "institutional_commitment_term_remediated", "institutional_relationship_changed", "institutional_relationship_interpreted", "institutional_peace_proposed", "institutional_peace_accepted", "institutional_peace_rejected", "institutional_war_declared", "avatar_deliberate_attack", "dao_rite", "civil_public_petition", "city_maintenance_completed", "urban_capacity_project_started", "civil_work_stoppage_started", "civil_work_stoppage_ended", "regional_production_forgone"}
 _PEACE_EVENT_TYPES = {"institutional_peace_proposed", "institutional_peace_accepted", "institutional_peace_rejected", "institutional_war_declared"}
 _AGGRESSION_EVENT_TYPES = {"avatar_deliberate_attack"}
 _EVENT_SCAN_PAGE_SIZE = 128
 _EVENT_SCAN_PAGES = 3
+
+
+def _civil_petition_party_ids(world: Any, payload: Mapping[str, Any]) -> set[str]:
+    """Resolve only the petition's recorded institution and city identities."""
+    region_id = payload.get("region_id")
+    institution_id = payload.get("addressed_institution_id")
+    addressed = payload.get("addressed_institution_ref")
+    if not isinstance(region_id, str) or not region_id:
+        return set()
+    if not isinstance(institution_id, str) or not institution_id:
+        return set()
+    if not isinstance(addressed, Mapping):
+        return set()
+    kind, owner_id = addressed.get("kind"), addressed.get("id")
+    if not isinstance(kind, str) or not isinstance(owner_id, str) or not owner_id:
+        return set()
+    try:
+        region_institution = world.institutional_authority.get_institution_for_owner(
+            EntityRef("region", region_id)
+        )
+        addressed_institution = world.institutional_authority.get_institution(
+            institution_id
+        )
+    except (AttributeError, TypeError, ValueError):
+        return set()
+    if region_institution is None or addressed_institution is None:
+        return set()
+    if addressed_institution.owner_ref != EntityRef(kind, owner_id):
+        return set()
+    return {str(region_institution.id), str(addressed_institution.id)}
+
+
+def _civil_stoppage_party_ids(world: Any, event: Any) -> set[str]:
+    payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
+    stoppage = payload.get("civil_work_stoppage")
+    if (
+        event.fact_kind is not FactKind.STATE_TRANSITION
+        or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+        or not isinstance(stoppage, Mapping)
+    ):
+        return set()
+    region_id = stoppage.get("region_id")
+    condition_id = stoppage.get("condition_instance_id")
+    petition_id = stoppage.get("petition_event_id")
+    if not all(isinstance(value, str) and value for value in (region_id, condition_id, petition_id)):
+        return set()
+    try:
+        city = world.institutional_authority.get_institution_for_owner(
+            EntityRef("region", region_id)
+        )
+        petition = world.event_manager.get_event_by_id(petition_id)
+    except (AttributeError, TypeError, ValueError):
+        return set()
+    if (
+        city is None
+        or petition is None
+        or petition.event_type != "civil_public_petition"
+        or petition.is_story
+        or petition.fact_kind is not FactKind.OCCURRENCE
+        or petition.causal_origin is not CausalOrigin.ACTOR_DECISION
+        or _party_ids(world, petition) == set()
+    ):
+        return set()
+    links = world.event_manager.get_causal_links_for_event(event.id)
+    if not any(
+        link.cause_event_id == petition_id
+        and link.relation is CausalRelation.MOTIVATED_BY
+        for link in links
+    ):
+        return set()
+    condition_event = None
+    decision_event = None
+    for link in links:
+        if link.cause_event_id == petition_id:
+            continue
+        cause = world.event_manager.get_event_by_id(link.cause_event_id)
+        if cause is None or cause.is_story:
+            continue
+        if (
+            link.relation is CausalRelation.ENABLED_BY
+            and cause.event_type == "semantic_condition_activated"
+            and str((cause.render_params or {}).get("region_id", "")) == region_id
+        ):
+            condition_event = cause
+        if (
+            link.relation is CausalRelation.TRIGGERED_BY
+            and cause.fact_kind is FactKind.DECISION
+            and cause.causal_origin is CausalOrigin.ACTOR_DECISION
+            and isinstance(cause.causal_payload, Mapping)
+            and isinstance(cause.causal_payload.get("decision"), Mapping)
+        ):
+            decision_event = cause
+    if condition_event is None or decision_event is None:
+        return set()
+    return _party_ids(world, petition) | {str(city.id)}
+
+
+def _civil_stoppage_transition_party_ids(world: Any, event: Any) -> set[str]:
+    if event.fact_kind is not FactKind.STATE_TRANSITION or event.causal_origin is not CausalOrigin.DETERMINISTIC:
+        return set()
+    links = world.event_manager.get_causal_links_for_event(event.id)
+    start = next(
+        (world.event_manager.get_event_by_id(link.cause_event_id)
+         for link in links
+         if link.relation is CausalRelation.RESOLVES
+         and link.cause_event_id
+         and (world.event_manager.get_event_by_id(link.cause_event_id) is not None)
+         and world.event_manager.get_event_by_id(link.cause_event_id).event_type
+         == "civil_work_stoppage_started"),
+        None,
+    )
+    if start is None or start.event_type != "civil_work_stoppage_started":
+        return set()
+    return _civil_stoppage_party_ids(world, start)
+
+
+def _civil_forgone_party_ids(world: Any, event: Any) -> set[str]:
+    if event.fact_kind is not FactKind.OCCURRENCE or event.causal_origin is not CausalOrigin.DETERMINISTIC:
+        return set()
+    links = world.event_manager.get_causal_links_for_event(event.id)
+    start = next(
+        (world.event_manager.get_event_by_id(link.cause_event_id)
+         for link in links
+         if link.relation is CausalRelation.TRIGGERED_BY
+         and link.cause_event_id
+         and (world.event_manager.get_event_by_id(link.cause_event_id) is not None)
+         and world.event_manager.get_event_by_id(link.cause_event_id).event_type
+         == "civil_work_stoppage_started"),
+        None,
+    )
+    if start is None or start.event_type != "civil_work_stoppage_started":
+        return set()
+    return _civil_stoppage_party_ids(world, start)
 
 
 def _encode_cursor(month: int, item_id: str) -> str:
@@ -74,6 +210,36 @@ def _controlled_cities(world: Any, kind: str, owner_id: str) -> list[Any]:
     return sorted(result, key=lambda item: item.id)
 
 
+def _sponsoring_institution_id(world: Any, event: Any) -> str | None:
+    """Return the canonical sponsor for a valid institutional rite projection."""
+    if str(getattr(event, "event_type", "")) != "dao_rite":
+        return None
+    if bool(getattr(event, "is_story", False)):
+        return None
+    if getattr(event, "fact_kind", None) is not FactKind.OCCURRENCE:
+        return None
+    if getattr(event, "causal_origin", None) is not CausalOrigin.ACTOR_DECISION:
+        return None
+    payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
+    rite = payload.get("dao_rite")
+    if (
+        not isinstance(rite, Mapping)
+        or rite.get("is_sponsorship") is not True
+        or rite.get("is_popular") is True
+    ):
+        return None
+    sponsor_id = rite.get("sponsor_institution_id")
+    if not isinstance(sponsor_id, str) or not sponsor_id:
+        return None
+    try:
+        institution = world.institutional_authority.get_institution(sponsor_id)
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if institution is None or str(getattr(institution, "id", "")) != sponsor_id:
+        return None
+    return sponsor_id
+
+
 def _party_ids(
     world: Any,
     event: Any,
@@ -83,6 +249,8 @@ def _party_ids(
     memo: dict[str, set[str]] | None = None,
 ) -> set[str]:
     """Correlate events by canonical payload, EntityRef, and causal links only."""
+    if bool(getattr(event, "is_story", False)):
+        return set()
     event_id = str(event.id)
     if memo is not None and event_id in memo:
         return set(memo[event_id])
@@ -92,6 +260,43 @@ def _party_ids(
     visited.add(event_id)
     payload = event.causal_payload if isinstance(event.causal_payload, Mapping) else {}
     result: set[str] = set()
+    if event.event_type == "civil_work_stoppage_started":
+        return _civil_stoppage_party_ids(world, event)
+    if event.event_type == "civil_work_stoppage_ended":
+        return _civil_stoppage_transition_party_ids(world, event)
+    if event.event_type == "regional_production_forgone":
+        return _civil_forgone_party_ids(world, event)
+    # Owner transitions for city maintenance/projects carry the factual region
+    # in render_params; project history must not depend on today's controller.
+    if event.event_type in {"city_maintenance_completed", "urban_capacity_project_started"}:
+        region_id = (event.render_params or {}).get("region_id") if isinstance(event.render_params, Mapping) else None
+        if region_id is not None:
+            try:
+                city = world.institutional_authority.get_institution_for_owner(
+                    EntityRef("region", str(region_id))
+                )
+            except (AttributeError, TypeError, ValueError):
+                city = None
+            if city is not None:
+                result.add(str(city.id))
+    civil_petition = payload.get("civil_petition")
+    if event.event_type == "civil_public_petition":
+        # This is a closed projection shape: malformed petition facts must not
+        # inherit institutions from otherwise-valid ancestor links.
+        if (
+            event.fact_kind is not FactKind.OCCURRENCE
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or not isinstance(civil_petition, Mapping)
+        ):
+            return set()
+        return _civil_petition_party_ids(world, civil_petition)
+    sponsor_id = _sponsoring_institution_id(world, event)
+    if str(getattr(event, "event_type", "")) == "dao_rite":
+        if sponsor_id is not None:
+            result.add(sponsor_id)
+        if memo is not None:
+            memo[event_id] = set(result)
+        return result
     # Sect participation is an explicit canonical fact on typed institutional
     # diplomacy events.  Resolve it through the authority state so the
     # projection emits the stable institution IDs used everywhere else.
@@ -168,6 +373,7 @@ def _party_ids(
                 or cause.event_type in _PEACE_EVENT_TYPES
                 or isinstance(cause_payload.get("avatar_aggression"), Mapping)
                 or cause.event_type in _AGGRESSION_EVENT_TYPES
+                or cause.event_type in {"civil_public_petition", "city_maintenance_completed", "urban_capacity_project_started"}
             ):
                 result.update(_party_ids(world, cause, visited=visited, depth=depth + 1, memo=memo))
     if memo is not None:

@@ -1,7 +1,12 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch
 
-from src.classes.gathering.tournament import Tournament
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
+from src.classes.gathering.tournament import (
+    TOURNAMENT_CANCELLED_EVENT_TYPE,
+    Tournament,
+)
 from src.systems.time import Month, Year, create_month_stamp
 from src.systems.cultivation import Realm
 from src.classes.core.avatar import Avatar, Gender
@@ -89,6 +94,12 @@ async def test_tournament_execute_insufficient_participants(mock_get_strength, b
     assert len(events) == 1
     assert t("tournament_cancelled_due_to_insufficient_participants") in events[0].content
     assert events[0].is_major is True
+    # A cancellation is a typed fact that nothing happened: it carries no
+    # delta, because it moved no owner's state.
+    assert events[0].event_type == TOURNAMENT_CANCELLED_EVENT_TYPE
+    assert events[0].fact_kind is FactKind.OCCURRENCE
+    assert events[0].causal_origin is CausalOrigin.DETERMINISTIC
+    assert (events[0].causal_payload or {}).get("deltas", []) == []
 
 
 @pytest.mark.asyncio

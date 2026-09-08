@@ -1,9 +1,8 @@
 import pytest
-import random
 from unittest.mock import MagicMock, patch, AsyncMock
 from src.classes.gathering.hidden_domain import HiddenDomain
 from src.systems.cultivation import Realm
-from src.classes.death_reason import DeathReason, DeathType
+from src.classes.death_reason import DeathType
 from src.classes.items.item import Item
 
 @pytest.fixture
@@ -135,6 +134,8 @@ async def test_execute_entry_restriction(hidden_domain, base_world, dummy_avatar
     # Mock _generate_loot to return a dummy item
     mock_item = MagicMock(spec=Item)
     mock_item.name = "TestTreasure"
+    # The loot fact records the item's canonical ID, so the mock must have one.
+    mock_item.id = 90001
     hidden_domain._generate_loot = MagicMock(return_value=mock_item)
     
     # Mock story generation to return nothing
@@ -151,6 +152,13 @@ async def test_execute_entry_restriction(hidden_domain, base_world, dummy_avatar
     
     # Check opening event
     assert any("Low Realm Domain" in t for t in event_texts)
+    opening = next(event for event in events if "Low Realm Domain" in event.content)
+    assert opening.event_type == "hidden_domain_opened"
+    assert opening.related_avatars == [dummy_avatar.id]
+    assert opening.render_params == {
+        "domain_id": "domain_low",
+        "entrant_ids": [dummy_avatar.id],
+    }
     
     # Check loot event for eligible avatar
     # Since tests run in zh-CN (forced by fixture), we check for Chinese text
@@ -208,6 +216,7 @@ async def test_execute_loot_drop(hidden_domain, base_world, dummy_avatar):
     from src.classes.items.weapon import Weapon
     mock_weapon = MagicMock(spec=Weapon)
     mock_weapon.name = "GodSlayer"
+    mock_weapon.id = 90002
     
     hidden_domain._generate_loot = MagicMock(return_value=mock_weapon)
     dummy_avatar.change_weapon = MagicMock()
@@ -225,6 +234,28 @@ async def test_execute_loot_drop(hidden_domain, base_world, dummy_avatar):
     # Check event
     event_texts = [e.content for e in events]
     assert any("GodSlayer" in t for t in event_texts)
+
+
+@pytest.mark.asyncio
+async def test_execute_injury_is_typed(hidden_domain, base_world, dummy_avatar):
+    configs = hidden_domain._load_configs()
+    domain = configs[0]
+    domain.danger_prob = 1.0
+    domain.hp_loss_percent = 0.1
+    domain.drop_prob = 0.0
+    hidden_domain._active_domains = [domain]
+
+    dummy_avatar.cultivation_progress.realm = Realm.Qi_Refinement
+    base_world.avatar_manager.get_living_avatars = MagicMock(return_value=[dummy_avatar])
+    hidden_domain._generate_story = AsyncMock(return_value=None)
+
+    events = await hidden_domain.execute(base_world)
+
+    injury = next(event for event in events if "受伤" in event.content)
+    assert injury.event_type == "hidden_domain_injury"
+    assert injury.related_avatars == [dummy_avatar.id]
+    assert injury.render_params == {"domain_id": "domain_low", "damage": 10}
+
 
 @pytest.mark.asyncio
 async def test_execute_empty_handed(hidden_domain, base_world, dummy_avatar):
@@ -254,6 +285,10 @@ async def test_execute_empty_handed(hidden_domain, base_world, dummy_avatar):
     expected_text_part = "一无所获，空手而归"
     assert any(expected_text_part in t for t in event_texts), f"Expected '{expected_text_part}' in events: {event_texts}"
     assert any(dummy_avatar.name in t for t in event_texts)
+    empty_handed = next(event for event in events if expected_text_part in event.content)
+    assert empty_handed.event_type == "hidden_domain_empty_handed"
+    assert empty_handed.related_avatars == [dummy_avatar.id]
+    assert empty_handed.render_params == {"domain_id": "domain_low"}
     
     # Verify that _generate_story was called
     # This implies that even with no loot/death, the system considers it a valid story-worthy execution

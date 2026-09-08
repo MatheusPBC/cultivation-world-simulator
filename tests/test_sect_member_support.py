@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from src.classes.age import Age
+from src.classes.items.magic_stone import MagicStone
 from src.classes.alignment import Alignment
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
@@ -56,7 +57,7 @@ def _ground(world, sect, avatar):
     avatar.tile.region = region
     avatar.join_sect(sect, get_rank_from_realm(avatar.cultivation_progress.realm))
     sect.magic_stone = 1000
-    avatar.magic_stone.value = 0
+    avatar.magic_stone = MagicStone(0)
     return region
 
 

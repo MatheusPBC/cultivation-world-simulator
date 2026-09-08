@@ -1,21 +1,36 @@
-You are a value evaluator in a Xianxia world, responsible for evaluating the value of certain items for some NPCs.
+You are deciding, for one single cultivator, how much that cultivator needs each lot on offer at an auction.
 
-The dict[AvatarName, info] of the NPCs you need to make decisions for is:
-{avatar_infos}
-The items needing need evaluation are:
-{items}
+The cultivator you decide for:
+avatar_id: {avatar_id}
+{avatar_info}
+
+This cultivator's current balance: {current_balance} spirit stones.
+
+The lots on offer are, each with the maximum this cultivator would actually
+commit at every level:
+{lots}
+
+What each level commits materially:
+- 1: no bid at all.
+- 2: up to 0.8x the base price.
+- 3: up to 1.5x the base price.
+- 4: up to 3x the base price.
+- 5: the entire current balance.
+Every level is capped by the balance shown, and earlier purchases in the same
+auction reduce what remains. You choose a level, never a price.
 
 Note: Return the results in JSON format only.
-The format is:
+The format is a flat mapping from lot_key to need level:
 {{
-    "{{avatar_name_1}}": {{
-        "{{item_id_1}}": int, # 1-5
-        "{{item_id_2}}": int,
-        ...
-    }}, ...
+    "{{lot_key_1}}": int,
+    "{{lot_key_2}}": int,
+    ...
 }}
 
 Requirements:
-1. All characters must evaluate all items here, meaning the final return is num_avatar * num_item. Each must have an estimate.
-2. Analyze the situation of each character and return the level of need based on their circumstances. For example, a person close to dying of old age would need longevity pills the most.
-3. Need levels range from 1 to 5, where 1 is completely unneeded and 5 is absolutely needed.
+1. Decide only for this one cultivator. Do not mention or decide for anybody else.
+2. Address each lot by its exact lot_key string. Two lots may share the same item_id; they are still different lots and are judged separately.
+3. The need level must be one of the integers 1, 2, 3, 4, 5 — nothing else. 1 means completely unneeded, 5 means absolutely needed.
+4. Return a plain integer, never a decimal, never a quoted string, and never a value outside 1-5. Any other value is rejected and counts as no bid.
+5. You may omit a lot; an omitted lot simply counts as no bid.
+6. Judge from this cultivator's own circumstances. For example, someone near the end of their lifespan needs a longevity elixir most.

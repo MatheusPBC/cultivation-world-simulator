@@ -3,10 +3,26 @@ from hashlib import md5
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
-from src.classes.event import Event
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import Event, FactKind
+from src.classes.state_delta import StateDelta
 from src.systems.battle import get_base_strength
 from src.systems.institutional_diplomacy import are_sects_at_war
 from src.utils.config import CONFIG
+
+SECT_SETTLEMENT_EVENT_TYPE = "sect_annual_settlement"
+
+
+# Each owner is read the way that owner canonically stores its amount.
+# ``Avatar.magic_stone`` is a ``MagicStone`` and ``Sect.magic_stone`` is a
+# plain ``int``; ``MagicStone`` is now an immutable amount whose ``.value`` is
+# derived from the object itself, so ``.value`` and ``int()`` cannot disagree.
+# Neither holding is ever passed through ``str()`` before becoming a number:
+# ``MagicStone.__str__`` is localized prose, and prose must not reach a
+# StateDelta.
+# The existing yearly recovery already applied by this settlement; named here
+# only so the fact can state the input it used, not to change the rule.
+WAR_WEARINESS_YEARLY_RECOVERY = 3
 
 if TYPE_CHECKING:
     from src.classes.core.sect import Sect
@@ -385,7 +401,7 @@ class SectManager:
         for sect in active_sects:
             raw_income = income_by_sect_id.get(sect.id, 0.0)
             income = int(raw_income)
-            stipend_total, _stipend_breakdown = sect.estimate_yearly_member_upkeep()
+            stipend_total, stipend_breakdown = sect.estimate_yearly_member_upkeep()
             net_change = income - stipend_total
             active_war_count = sum(
                 1
@@ -394,15 +410,61 @@ class SectManager:
                 and are_sects_at_war(self.world, int(sect.id), int(other.id))
             )
 
+            # One evidence per change, and only for changes that really
+            # happened: the before/after values are read back from the owners
+            # after their own setters ran, so a clamped or zero-valued
+            # adjustment records nothing rather than an imagined transition.
+            deltas: List[StateDelta] = []
+            paid_avatar_ids: List[str] = []
+
             for avatar in getattr(sect, "members", {}).values():
                 if getattr(avatar, "is_dead", False):
                     continue
+                stones_before = int(avatar.magic_stone.value)
                 avatar.magic_stone = avatar.magic_stone + sect.get_member_upkeep_for_avatar(avatar)
+                stones_after = int(avatar.magic_stone.value)
+                if stones_after != stones_before:
+                    deltas.append(
+                        StateDelta(
+                            owner_kind="avatar",
+                            owner_id=str(avatar.id),
+                            aspect="magic_stone",
+                            before=str(stones_before),
+                            after=str(stones_after),
+                            magnitude=float(stones_after - stones_before),
+                        )
+                    )
+                    paid_avatar_ids.append(str(avatar.id))
 
+            treasury_before = int(sect.magic_stone)
             sect.magic_stone += net_change
+            treasury_after = int(sect.magic_stone)
+            if treasury_after != treasury_before:
+                deltas.append(
+                    StateDelta(
+                        owner_kind="sect",
+                        owner_id=str(sect.id),
+                        aspect="magic_stone",
+                        before=str(treasury_before),
+                        after=str(treasury_after),
+                        magnitude=float(treasury_after - treasury_before),
+                    )
+                )
+
             weariness_before = int(getattr(sect, "war_weariness", 0) or 0)
-            sect.change_war_weariness(active_war_count - 3)
+            sect.change_war_weariness(active_war_count - WAR_WEARINESS_YEARLY_RECOVERY)
             weariness_after = int(getattr(sect, "war_weariness", 0) or 0)
+            if weariness_after != weariness_before:
+                deltas.append(
+                    StateDelta(
+                        owner_kind="sect",
+                        owner_id=str(sect.id),
+                        aspect="war_weariness",
+                        before=str(weariness_before),
+                        after=str(weariness_after),
+                        magnitude=float(weariness_after - weariness_before),
+                    )
+                )
             content = t(
                 "game.sect_update_event",
                 sect_name=sect.name,
@@ -422,7 +484,38 @@ class SectManager:
                 month_stamp=self.world.month_stamp,
                 content=content,
                 related_sects=[sect.id],
+                # Only the members whose stones actually moved.
+                related_avatars=paid_avatar_ids or None,
+                event_type=SECT_SETTLEMENT_EVENT_TYPE,
+                # A settlement that changed nothing is still a fact that it
+                # happened; it is simply not a transition.
+                fact_kind=(
+                    FactKind.STATE_TRANSITION if deltas else FactKind.OCCURRENCE
+                ),
+                causal_origin=CausalOrigin.DETERMINISTIC,
+                causal_payload={
+                    "deltas": [],
+                    # Engine-owned figures this settlement actually used. No
+                    # interpretation, no decision record: nobody chose this.
+                    "sect_annual_settlement": {
+                        "sect_id": int(sect.id),
+                        "income": income,
+                        "upkeep_total": stipend_total,
+                        "upkeep_breakdown": stipend_breakdown,
+                        "net_change": net_change,
+                        "paid_member_count": len(paid_avatar_ids),
+                        "active_war_count": active_war_count,
+                        "war_weariness_yearly_recovery": (
+                            WAR_WEARINESS_YEARLY_RECOVERY
+                        ),
+                        "war_weariness_before": weariness_before,
+                        "war_weariness_after": weariness_after,
+                    },
+                },
             )
+            for delta in deltas:
+                delta.event_id = event.id
+            event.causal_payload["deltas"] = [delta.to_dict() for delta in deltas]
             events.append(event)
 
         return events

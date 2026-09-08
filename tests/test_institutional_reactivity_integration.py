@@ -4,6 +4,7 @@ from dataclasses import replace
 import pytest
 
 from src.classes.alignment import Alignment
+from src.classes.items.magic_stone import MagicStone
 from src.classes.core.dynasty import Dynasty
 from src.classes.environment.region import CityRegion
 from src.classes.event import Event, FactKind
@@ -57,7 +58,7 @@ def _attach_eligible_sect_member(base_world, city):
     member.tile = base_world.map.get_tile(member.pos_x, member.pos_y)
     if getattr(getattr(member.tile, "region", None), "id", None) != city.id:
         member.tile.region = city
-    member.magic_stone.value = 0
+    member.magic_stone = MagicStone(0)
     member.join_sect(sect, get_rank_from_realm(member.cultivation_progress.realm))
     base_world.avatar_manager.avatars[member.id] = member
     base_world.existed_sects = [sect]

@@ -1,4 +1,4 @@
-"""Bounded institutional climate contributions from known aid facts.
+"""Bounded institutional climate contributions from known institutional facts.
 
 V1 ``InstitutionalRelation.friendliness`` is bilateral relationship climate,
 not either institution's private, directional opinion.  Each observer may make
@@ -46,6 +46,10 @@ ELIGIBLE_EVENT_TYPES = frozenset({
     "institutional_commitment_term_breached",
     "institutional_commitment_term_remediated",
 })
+# A sponsorship is a `dao_rite` fact, but only a validated institutional one is
+# reactable; the popular rites sharing this event type never are.
+SPONSORSHIP_EVENT_TYPE = "dao_rite"
+REACTABLE_EVENT_TYPES = ELIGIBLE_EVENT_TYPES | {SPONSORSHIP_EVENT_TYPE}
 # A refusal opens no commitment, so its parties come from the refused proposal.
 _REFUSED_PROPOSAL_PARTY_KEYS = {
     "institutional_aid_refused": (
@@ -122,6 +126,112 @@ def _parties(
     return ()
 
 
+def _sponsorship(
+    world: Any, event: Event, overlays: Mapping[str, Event]
+) -> dict[str, Any] | None:
+    """The sponsorship this fact really is, or nothing.
+
+    The Dao owner decides what counts: `_is_institutional_rite` resolves the
+    cited decision and proves it chose this exact sponsorship.  A loose
+    ``is_sponsorship`` flag never reaches this module.
+    """
+    from src.systems.celestial_dao_service import _is_institutional_rite
+
+    if event.event_type != SPONSORSHIP_EVENT_TYPE:
+        return None
+    if not _is_institutional_rite(world, event, overlays):
+        return None
+    payload = event.causal_payload if isinstance(event.causal_payload, dict) else {}
+    rite = payload.get("dao_rite")
+    if not isinstance(rite, Mapping):
+        return None
+    authority = world.institutional_authority
+    sponsor_id = rite.get("sponsor_institution_id")
+    witnesses = rite.get("witness_institution_ids")
+    # Only genuine ID strings that still resolve to an institution are read.
+    # Nothing is coerced: a dict, a None or a dangling ID is not an identity,
+    # and a sponsor who no longer resolves offers no options at all.
+    if (
+        not isinstance(sponsor_id, str)
+        or not sponsor_id.strip()
+        or authority.get_institution(sponsor_id) is None
+        or not isinstance(witnesses, (list, tuple))
+    ):
+        return None
+    return {
+        "sponsor_institution_id": sponsor_id,
+        # The snapshot taken when it happened, never recomputed from today.
+        # Unknown or malformed entries are dropped rather than trusted.
+        "witness_institution_ids": tuple(
+            dict.fromkeys(
+                item
+                for item in witnesses
+                if isinstance(item, str)
+                and item.strip()
+                and item != sponsor_id
+                and authority.get_institution(item) is not None
+            )
+        ),
+    }
+
+
+def _sponsorship_context(
+    world: Any, event: Event, overlays: Mapping[str, Event]
+) -> dict[str, Any]:
+    """The rite's canonical tradition, offered as context and nothing more.
+
+    A tradition describes how a region reads the one Celestial Dao.  It is not
+    a rule about who must resent whom: the observer stays free to maintain.
+    """
+    if _sponsorship(world, event, overlays) is None:
+        return {}
+    payload = event.causal_payload if isinstance(event.causal_payload, dict) else {}
+    rite = payload.get("dao_rite")
+    if not isinstance(rite, Mapping):
+        return {}
+    return {
+        "sponsored_rite": {
+            "sponsor_institution_name": str(rite.get("institution_name", "")),
+            "region_id": str(rite.get("region_id", "")),
+            "tradition": str(rite.get("tradition", "")),
+        }
+    }
+
+
+def _observer_candidates(
+    world: Any, event: Event, overlays: Mapping[str, Event]
+) -> tuple[str, ...]:
+    """Institutions allowed to react to this fact at all."""
+    if event.event_type in ELIGIBLE_EVENT_TYPES:
+        return _parties(world, event, event_overlays=overlays)
+    sponsorship = _sponsorship(world, event, overlays)
+    return sponsorship["witness_institution_ids"] if sponsorship else ()
+
+
+def _reaction_pair(
+    world: Any,
+    institution_id: str,
+    event: Event,
+    overlays: Mapping[str, Event],
+) -> tuple[str, ...]:
+    """The two institutions whose shared climate this observer may move.
+
+    For a commitment fact the pair is the commitment's own parties.  For a
+    sponsorship it is always (witness, sponsor): witnesses form no pair with
+    each other, and the sponsor never reacts to itself.
+    """
+    if event.event_type in ELIGIBLE_EVENT_TYPES:
+        parties = _parties(world, event, event_overlays=overlays)
+        return parties if institution_id in parties and len(parties) == 2 else ()
+    sponsorship = _sponsorship(world, event, overlays)
+    if sponsorship is None:
+        return ()
+    sponsor_id = sponsorship["sponsor_institution_id"]
+    if institution_id == sponsor_id or institution_id not in sponsorship["witness_institution_ids"]:
+        return ()
+    return (institution_id, sponsor_id)
+
+
 def _receipt_id(institution_id: str, event_id: str) -> str:
     return DomainReactionReceipt.create(
         f"institutional-relationship:{institution_id}:{event_id}",
@@ -143,11 +253,13 @@ def _is_eligible(
         event.is_story
         or event.causal_origin is CausalOrigin.LLM_INTERPRETATION
         or event.fact_kind is FactKind.DECISION
-        or event.event_type not in ELIGIBLE_EVENT_TYPES
+        or event.event_type not in REACTABLE_EVENT_TYPES
     ):
         return ()
-    parties = _parties(world, event, event_overlays=event_overlays)
-    if institution_id not in parties or len(parties) != 2:
+    parties = _reaction_pair(
+        world, institution_id, event, event_overlays or {}
+    )
+    if len(parties) != 2:
         return ()
     if not world.institutional_knowledge.contains(institution_id, event.id):
         return ()
@@ -220,7 +332,21 @@ def record_maintained_reaction(
     decision_event_id: str,
     event_overlays: Mapping[str, Event] | None = None,
 ) -> None:
-    """Persist a no-change decision once, so the same fact is not reconsidered."""
+    """Persist a no-change decision once, so the same fact is not reconsidered.
+
+    Authority is rechecked here for the same reason the acting path rechecks
+    it: a receipt closes this fact for this institution, so an office that lost
+    its holder or its scope while the interpreter ran must not spend one.
+    """
+    institution = world.institutional_authority.get_institution(institution_id)
+    if institution is None or not can_actor_act_for(
+        world,
+        institution.owner_ref,
+        institution.owner_ref,
+        AuthorityScope.COMMITMENT_NEGOTIATION,
+        current_month=int(world.month_stamp),
+    ).allowed:
+        raise StaleAffordanceError("institutional relationship reaction is absent or stale")
     if not _is_eligible(
         world, institution_id, evidence_event, event_overlays=event_overlays
     ):
@@ -341,9 +467,9 @@ def execute_relationship_impact(
     event = Event(
         context.world.month_stamp,
         (
-            "An institution updated shared relationship climate after a known aid fact."
+            "An institution updated shared relationship climate after a known institutional fact."
             if changed
-            else "An institution assessed a known aid fact without changing shared relationship climate."
+            else "An institution assessed a known institutional fact without changing shared relationship climate."
         ),
         event_type="institutional_relationship_changed" if changed else "institutional_relationship_interpreted",
         fact_kind=FactKind.STATE_TRANSITION if changed else FactKind.OCCURRENCE,
@@ -403,9 +529,9 @@ async def process_institutional_relationship_impacts(
     evaluations = 0
     llm_calls = 0
     for source in tuple(current_events):
-        if source.event_type not in ELIGIBLE_EVENT_TYPES:
+        if source.event_type not in REACTABLE_EVENT_TYPES:
             continue
-        for institution_id in _parties(world, source, event_overlays=overlays):
+        for institution_id in _observer_candidates(world, source, overlays):
             if (
                 evaluations >= max(0, int(evaluation_budget))
                 or not budget.consume_propagation_step()
@@ -451,9 +577,12 @@ async def process_institutional_relationship_impacts(
                 affordances=options,
                 task_name="institutional_relationship_interpreter",
                 template_name="institutional_relationship_interpreter.txt",
-                extra_context={"institution": institutional_decision_context(
-                    world, institution_id, event_overlays=tuple(overlays.values())
-                )},
+                extra_context={
+                    "institution": institutional_decision_context(
+                        world, institution_id, event_overlays=tuple(overlays.values())
+                    ),
+                    **_sponsorship_context(world, source, overlays),
+                },
                 llm_call=llm_call if uses_llm else None,
                 force_rule=not uses_llm,
                 injected_decision=injected or (
@@ -469,13 +598,19 @@ async def process_institutional_relationship_impacts(
             produced.append(decision_event)
             overlays[decision_event.id] = decision_event
             if decision.decision is DomainDecisionKind.MAINTAIN:
-                record_maintained_reaction(
-                    world,
-                    institution_id=institution_id,
-                    evidence_event=source,
-                    decision_event_id=decision_event.id,
-                    event_overlays=overlays,
-                )
+                try:
+                    record_maintained_reaction(
+                        world,
+                        institution_id=institution_id,
+                        evidence_event=source,
+                        decision_event_id=decision_event.id,
+                        event_overlays=overlays,
+                    )
+                except StaleAffordanceError:
+                    # The reaction went stale while it was being interpreted.
+                    # Leaving the fact open is the safe outcome: no receipt is
+                    # spent and no state moves.
+                    pass
                 continue
             if not budget.consume_domain_mutation():
                 continue

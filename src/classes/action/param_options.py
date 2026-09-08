@@ -149,28 +149,33 @@ def _active_imperial_claim_options(
 
 
 def _sponsorable_dao_rite_options(avatar: "Avatar") -> list[dict[str, Any]]:
-    """Return public popular rites whose event IDs the executor accepts."""
+    """Return public popular rites whose event IDs the executor accepts.
+
+    The sponsorship rule itself is not restated here: the celestial Dao owner
+    answers whether this exact avatar could sponsor this exact rite right now,
+    so an already-sponsored, out-of-window, foreign-region or Story rite is
+    never offered.  Authorship is a separate question and stays at the
+    execution boundary, so it is deliberately not enumerated against.
+    """
+    from src.systems.celestial_dao_service import (
+        RITE_WINDOW_MONTHS,
+        get_sponsor_dao_rite_blocker,
+    )
+
     world = getattr(avatar, "world", None)
     manager = getattr(world, "event_manager", None)
     if manager is None:
         return []
     month = int(getattr(world, "month_stamp", 0))
     try:
-        events = manager.get_events_between_months(month - 11, month)
+        events = manager.get_events_between_months(month - RITE_WINDOW_MONTHS + 1, month)
     except Exception:
         return []
-    current_region = getattr(getattr(avatar, "tile", None), "region", None)
-    current_region_id = getattr(current_region, "id", None)
     options: list[dict[str, Any]] = []
     for event in sorted(events, key=lambda item: (int(getattr(item, "month_stamp", 0)), str(getattr(item, "id", "")))):
         payload = dict((getattr(event, "causal_payload", {}) or {}).get("dao_rite", {}) or {})
         region_id = payload.get("region_id")
-        if (
-            str(getattr(event, "event_type", "")) != "dao_rite"
-            or not bool(payload.get("is_popular"))
-            or current_region_id is None
-            or str(region_id) != str(current_region_id)
-        ):
+        if get_sponsor_dao_rite_blocker(world, avatar, str(getattr(event, "id", ""))) is not None:
             continue
         options.append({
             "value": str(event.id),

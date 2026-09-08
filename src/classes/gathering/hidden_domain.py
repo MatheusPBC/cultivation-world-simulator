@@ -2,8 +2,11 @@ from typing import List, Dict, Optional, TYPE_CHECKING
 import random
 from dataclasses import dataclass
 
+from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.gathering.gathering import Gathering, register_gathering
-from src.classes.event import Event
+from src.classes.event import Event, FactKind
+from src.classes.state_delta import StateDelta
 if TYPE_CHECKING:
     from src.classes.core.world import World
     from src.classes.core.avatar import Avatar
@@ -129,6 +132,78 @@ class HiddenDomain(Gathering):
             return REALM_ORDER[current_idx + 1]
         return None
 
+    @staticmethod
+    def _loot_deltas(
+        avatar: "Avatar",
+        *,
+        before_weapon_id,
+        before_weapon_proficiency: float,
+        before_auxiliary_id,
+        before_technique_id,
+        before_stones: int,
+        before_hp_cur: int,
+    ) -> List[StateDelta]:
+        """One delta per field this loot actually moved, and no others.
+
+        The before/after values are the canonical save fields -- `weapon_id`,
+        `weapon_proficiency`, `auxiliary_id`, `technique_id`, `magic_stone` --
+        read back from the Avatar after its own setters ran. Re-equipping the
+        same item ID therefore records no equipment change, while the
+        proficiency reset that `change_weapon` performs is still recorded,
+        because that really did move.
+
+        `recalc_effects`, which both equipment setters call, clamps `hp.cur`
+        down when the new gear lowers max HP. That is a real change to a real
+        owner field, so it is recorded here as an ordinary `hp` transition --
+        losing max HP is not an injury and is deliberately not routed through
+        the injury owner. Derived values such as max HP and max lifespan are
+        recomputed from effects and are not duplicated as state.
+        """
+        after_weapon_id = avatar.weapon.id if avatar.weapon else None
+        after_auxiliary_id = avatar.auxiliary.id if avatar.auxiliary else None
+        after_technique_id = avatar.technique.id if avatar.technique else None
+        after_weapon_proficiency = float(avatar.weapon_proficiency)
+        after_stones = int(avatar.magic_stone.value)
+
+        owner_id = str(avatar.id)
+        deltas: List[StateDelta] = []
+
+        def _record(aspect: str, before, after, magnitude=None) -> None:
+            if before == after:
+                return
+            deltas.append(StateDelta(
+                owner_kind="avatar",
+                owner_id=owner_id,
+                aspect=aspect,
+                before=None if before is None else str(before),
+                after=None if after is None else str(after),
+                magnitude=magnitude,
+            ))
+
+        _record("weapon_id", before_weapon_id, after_weapon_id)
+        _record(
+            "weapon_proficiency",
+            before_weapon_proficiency,
+            after_weapon_proficiency,
+            magnitude=after_weapon_proficiency - before_weapon_proficiency,
+        )
+        _record("auxiliary_id", before_auxiliary_id, after_auxiliary_id)
+        _record("technique_id", before_technique_id, after_technique_id)
+        _record(
+            "magic_stone",
+            before_stones,
+            after_stones,
+            magnitude=float(after_stones - before_stones),
+        )
+        after_hp_cur = int(avatar.hp.cur)
+        _record(
+            "hp",
+            before_hp_cur,
+            after_hp_cur,
+            magnitude=float(after_hp_cur - before_hp_cur),
+        )
+        return deltas
+
     def _generate_loot(self, avatar: "Avatar", next_realm: Realm) -> Optional[Item]:
         """生成掉落物：优先给予高一阶的物品"""
         # 掉落类型权重：兵器(40%), 防具(40%), 功法(20%)
@@ -185,7 +260,17 @@ class HiddenDomain(Gathering):
             open_event_content = t("Hidden Domain {name} opened! Entry restricted to {realm} only. No one entered.", 
                                    name=domain.name, 
                                    realm=str(domain.required_realm))
-        events.append(Event(month_stamp, open_event_content))
+        open_event = Event(
+            month_stamp,
+            open_event_content,
+            related_avatars=[av.id for av in entrants],
+            event_type="hidden_domain_opened",
+            render_params={
+                "domain_id": domain.id,
+                "entrant_ids": [av.id for av in entrants],
+            },
+        )
+        events.append(open_event)
                 
         if not entrants:
             return events
@@ -237,7 +322,14 @@ class HiddenDomain(Gathering):
                     continue # 死了就不能拿奖励了
 
                 event_content = t("{name} was injured in the hidden domain {domain} for {damage} HP.", name=av.name, domain=domain.name, damage=damage)
-                injury_event = Event(month_stamp, event_content, related_avatars=[av.id], is_major=False)
+                injury_event = Event(
+                    month_stamp,
+                    event_content,
+                    related_avatars=[av.id],
+                    is_major=False,
+                    event_type="hidden_domain_injury",
+                    render_params={"domain_id": domain.id, "damage": damage},
+                )
                 from src.classes.individual_consequence import record_hp_change_from_event
                 record_hp_change_from_event(av, injury_event, before_hp)
                 events.append(injury_event)
@@ -263,32 +355,101 @@ class HiddenDomain(Gathering):
                     from src.classes.prices import prices
                     
                     loot_name = loot.name
-                    
+
+                    # Read every field this loot can move, before it moves.
+                    # The equipping semantics below are unchanged: the same
+                    # drops, the same prices, the same automatic equip; only
+                    # the resulting transitions are now recorded.
+                    before_weapon_id = av.weapon.id if av.weapon else None
+                    before_weapon_proficiency = float(av.weapon_proficiency)
+                    before_auxiliary_id = av.auxiliary.id if av.auxiliary else None
+                    before_technique_id = av.technique.id if av.technique else None
+                    before_stones = int(av.magic_stone.value)
+                    # Equipping recalculates effects, which can clamp current
+                    # HP down when the new gear lowers the maximum.
+                    before_hp_cur = int(av.hp.cur)
+                    old = None
+                    loot_kind = None
+
                     if isinstance(loot, Weapon):
+                        loot_kind = "weapon"
                         old = av.weapon
                         av.change_weapon(loot)
                         if old: # 回收旧物
                             av.magic_stone += prices.get_selling_price(old, av)
-                            
+
                     elif isinstance(loot, Auxiliary):
+                        loot_kind = "auxiliary"
                         old = av.auxiliary
                         av.change_auxiliary(loot)
                         if old:
                             av.magic_stone += prices.get_selling_price(old, av)
-                            
+
                     elif isinstance(loot, Technique):
+                        loot_kind = "technique"
                         # 只有当比当前功法好，或者还没功法时才更换？
                         # 或者直接放入背包（如果有）？目前 Avatar 没有通用背包，通常直接修习
                         # 简化逻辑：直接修习
                         av.technique = loot
-                    
+
+                    deltas = self._loot_deltas(
+                        av,
+                        before_weapon_id=before_weapon_id,
+                        before_weapon_proficiency=before_weapon_proficiency,
+                        before_auxiliary_id=before_auxiliary_id,
+                        before_technique_id=before_technique_id,
+                        before_stones=before_stones,
+                        before_hp_cur=before_hp_cur,
+                    )
+
                     # 记录事件
                     event_content = t("{name} found a treasure {loot} in {domain}!", name=av.name, loot=loot_name, domain=domain.name)
                     event = Event(
                         month_stamp,
                         event_content,
-                        related_avatars=[av.id]
+                        related_avatars=[av.id],
+                        event_type="hidden_domain_treasure",
+                        # Loot is drawn by the world, not chosen by anybody:
+                        # there is no decision here to cite or invent.
+                        fact_kind=(
+                            FactKind.STATE_TRANSITION if deltas else FactKind.OCCURRENCE
+                        ),
+                        causal_origin=CausalOrigin.EXTERNAL_EVENT,
+                        render_params={"domain_id": domain.id},
+                        causal_payload={
+                            "deltas": [],
+                            "hidden_domain_loot": {
+                                "domain_id": domain.id,
+                                "avatar_id": str(av.id),
+                                "loot_kind": loot_kind,
+                                "loot_id": loot.id,
+                                "loot_name": loot_name,
+                                "target_realm": str(target_realm),
+                                # The effective probability this draw used,
+                                # base plus the avatar's own bonus. Read from
+                                # the value already computed above; no second
+                                # draw and no re-derivation happens here.
+                                "drop_prob": drop_prob,
+                                "replaced_item_id": old.id if old else None,
+                                "resale_amount": (
+                                    int(av.magic_stone.value) - before_stones
+                                ),
+                            },
+                        },
                     )
+                    for delta in deltas:
+                        delta.event_id = event.id
+                    event.causal_payload["deltas"] = [
+                        delta.to_dict() for delta in deltas
+                    ]
+                    # The opening this loot was found in is a real fact of this
+                    # same step. It is ENABLED_BY, not TRIGGERED_BY: entering
+                    # the domain permitted the draw, it did not cause a reward.
+                    event.causal_links.append(CausalLink(
+                        event_id=event.id,
+                        cause_event_id=open_event.id,
+                        relation=CausalRelation.ENABLED_BY,
+                    ))
                     events.append(event)
                     
                     event_texts.append(event_content)
@@ -309,7 +470,9 @@ class HiddenDomain(Gathering):
             events.append(Event(
                 month_stamp,
                 empty_event_content,
-                related_avatars=[av.id for av in empty_handed_avatars]
+                related_avatars=[av.id for av in empty_handed_avatars],
+                event_type="hidden_domain_empty_handed",
+                render_params={"domain_id": domain.id},
             ))
             event_texts.append(empty_event_content)
             # 也要加入 related_avatars_set 以便 story teller 知道他们参与了

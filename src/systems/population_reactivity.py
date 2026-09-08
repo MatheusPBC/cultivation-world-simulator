@@ -25,6 +25,15 @@ from src.systems.domain_affordance_registry import (
 from src.sim.simulator_engine.causal_budget import CausalBudget
 
 
+# Civil outcomes that really happened. They are successes of this domain, but
+# they move no population, so they are scheduled like a success and skip the
+# transfer bookkeeping that belongs only to migration.
+CIVIL_SUCCESS_EVENT_TYPES = frozenset({
+    "civil_public_petition",
+    "civil_work_stoppage_started",
+})
+
+
 def enqueue_population_transitions(
     world: Any,
     events: list[Event],
@@ -282,6 +291,9 @@ async def process_population_reactivity(
                 context,
                 decision.selected_affordance_id or "",
                 decision_event_id=decision_event.id,
+                # The decision fact itself, so an executor can validate the
+                # population's real authorship instead of trusting an ID.
+                decision_event=decision_event,
                 invalidations=invalidations,
             )
         except StaleAffordanceError:
@@ -291,6 +303,21 @@ async def process_population_reactivity(
                 selected_affordance_id=decision.selected_affordance_id or "",
             )
         produced.append(transfer_event)
+        if transfer_event.event_type in CIVIL_SUCCESS_EVENT_TYPES:
+            # A civil action that succeeded is a success, not a failed
+            # migration: the same persistent pressure may be weighed again next
+            # month in the light of the new fact. It moves no population, so
+            # none of the migration-only transfer bookkeeping below applies.
+            _mark_condition_reacted(
+                world,
+                condition,
+                decision_event.id,
+                next_reaction_month=int(world.month_stamp) + 1,
+                completed=False,
+                decision="act",
+                affordance_id=decision.selected_affordance_id,
+            )
+            continue
         if transfer_event.event_type != "population_transfer_completed":
             retry_after_months = max(1, int(_config_value(
                 world,

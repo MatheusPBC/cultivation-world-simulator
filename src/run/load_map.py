@@ -249,6 +249,8 @@ def _load_city_economy() -> dict[int, RegionalEconomyState]:
         economy.set_demand_rate(concept_id, get_float(row, "demand_rate"))
         economy.set_access(concept_id, get_float(row, "access"))
         economy.set_dependency(concept_id, get_float(row, "dependency"))
+        # Declared in config, never inferred from the concept's name.
+        economy.set_labor_dependence(concept_id, get_float(row, "labor_dependence"))
         project_kind = get_str(row, "project_kind")
         if project_kind:
             previous_resource_id = economy.project_resources.get(project_kind)
