@@ -3,29 +3,37 @@
 ## Current implementation ledger (2026-09-04)
 
 Sect annual administration now has its own `SECT_ADMINISTRATION` authority:
-only sect offices receive it, never dynasty offices. Explicit annual plans
-select every recruitment, expulsion, technique reward, and support action;
-an absent, failed, or malformed plan selects nobody. An explicit plan may end
-an actually incompatible living member's membership or replace a member's
-technique with the deterministic best permitted ID. Each owner transition cites
-the annual decision and carries canonical ID-based deltas. Treasury actions
-remain independently gated. Focused rollback tests
-cover failed commits; this is implementation evidence, not a deployment claim.
+only sect offices receive it, never dynasty offices. Each annual round now
+offers current grounded actions and selects at most one by `DomainDecision` ID
+through the shared registry's async execution boundary. Recruitment records an
+independent avatar response decision, then revalidates the selected option
+after that response before any owner debit or membership change. Expulsion,
+reward, and support keep their specific authority gates, canonical ID deltas,
+and decision links. Provider failure maintains rather than selecting an action;
+the obsolete target-list plan and its templates were removed. Annual execution
+errors propagate to the phase runner so its rollback can restore partial work.
+This is implementation evidence, not a deployment claim. Root's final
+validation passed 105 tests across 16 files in 13.30 seconds; ruff and diff
+checks were clean, and the production web build/typecheck passed with only its
+preexisting chunk warning.
 The latest no-plan slice passed 77 focused tests across 12 files in 9.85
 seconds; ruff and diff checks were clean. Its coverage exercises unavailable,
 failed, and malformed planning with a real authority, eligible recruit, and
 needy member, verifying an auditable no-op rather than implicit selection.
-The final 120-month institutional smoke artifacts also completed with audit
-clean: natural recorded 3,225 events at causal depth 18, and pressured 3,676
-at depth 10 with 20 transfers plus the seven-fact witness/memory chain. Both
+The final annual 120-month institutional smoke artifacts completed with audit
+clean: natural recorded 3,233 events at causal depth 18 with no transfers, and
+pressured recorded 3,671 at depth 9 with 20 transfers plus the full
+seven-fact witness/memory chain. Both
 reported zero broken or out-of-window links, Story mutations, untyped material
 ancestors, provider calls/awaits, and failed affordances. They exercise broad
 simulation health, not a substitute for the focused administration assertions.
-Those 120-month artifacts are evidence from the earlier administrative slice;
-they were not rerun for the no-plan change.
 Both activated 27 conditions and resolved none; this is a pending observation,
-without a causal attribution. Root's consolidated institutional check passed
+without a causal attribution. The 27 are eight positive or operational
+conditions plus 19 healing deficits, not a flood-condition count. Root's consolidated institutional check passed
 66 tests across 11 files in 8.07 seconds; ruff and diff checks were clean.
+The VPS remains healthy on old revision `01e27796`; deployment is not done,
+pending human confirmation because preserved old saves are incompatible with
+schema 6.
 
 The current working tree contains the institutional backbone pieces through the
 urban aid vertical: authority, relations, knowledge and memory remain separate

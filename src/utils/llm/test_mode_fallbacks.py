@@ -519,7 +519,9 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
         }
     if task_name == "semantic_discovery":
         return _semantic_discovery(infos)
-    if task_name in {"sect_decider", "interaction_feedback", "fate_revelation"}:
+    if task_name == "sect_annual_interpreter":
+        return {"decision": "maintain", "reason": "No explicit annual action was selected."}
+    if task_name in {"interaction_feedback", "fate_revelation"}:
         return {}
     if task_name.startswith("world_lore_"):
         raise TestModeLLMUnavailable("world_lore_rewrite")
@@ -531,7 +533,7 @@ def resolve_test_mode_task(task_name: str, infos: Mapping[str, Any]) -> dict[str
 def registered_test_mode_tasks() -> frozenset[str]:
     return frozenset({
         "action_decision", "backstory", "long_term_objective", "nickname", "story_teller",
-        "relation_resolver", "relationship_impact", "single_choice", "sect_thinker", "sect_decider",
+        "relation_resolver", "relationship_impact", "single_choice", "sect_thinker", "sect_annual_interpreter",
         "interaction_feedback", "fate_revelation", "event_appraisal",
         "custom_content_generation", "roleplay_conversation_turn", "roleplay_conversation_summary", "chronicle_chapter",
         "live_guide_ask", "dao_petition", "semantic_discovery",

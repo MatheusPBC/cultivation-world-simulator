@@ -3128,6 +3128,12 @@ msgstr "该请命并未指向现存的机构"
 msgid "You have already endorsed that petition"
 msgstr "你已声援过该请命"
 
+msgid "{sect_name} opened its annual administration round."
+msgstr "{sect_name} 开启了年度行政轮次。"
+
+msgid "The selected annual sect action made no canonical change."
+msgstr "所选宗门年度行动未产生规范状态变更。"
+
 # Item exchange - general
 msgid "decided to equip it"
 msgstr "决定更换装备"

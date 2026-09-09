@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -15,7 +15,7 @@ from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.event import FactKind
 from src.classes.root import Root
-from src.classes.sect_decider import SectDecider, SectDecisionPlan
+from src.classes.sect_decider import SectDecider
 from src.classes.sect_ranks import SectRank, get_rank_from_realm
 from src.classes.technique import (
     Technique,
@@ -66,13 +66,21 @@ def _member_context(*members: Avatar) -> SectDecisionContext:
     )
 
 
+def _select(action: str, avatar_id: str):
+    async def llm_call(_task, _template, context, **_kwargs):
+        option = next(item for item in context["affordances"] if item["action_kind"] == action and item["parameters"].get("avatar_id") == avatar_id)
+        return {"decision": "act", "reason": "rollback probe", "selected_affordance_id": option["id"]}
+    return llm_call
+
+
 @pytest.mark.asyncio
-async def test_failed_annual_commit_restores_expel_and_technique_reward(
-    base_world, monkeypatch, tmp_path
+@pytest.mark.parametrize("action", ("expel", "reward"))
+async def test_failed_annual_commit_restores_administration_action(
+    base_world, monkeypatch, tmp_path, action
 ) -> None:
     base_world.month_stamp = create_month_stamp(Year(100), Month.JANUARY)
     base_world.start_year = 100
-    base_world.run_config_snapshot = {"test_mode": True}
+    base_world.run_config_snapshot = {}
     base_world.event_manager = EventManager.create_with_db(tmp_path / "administration.db")
 
     sect = Sect(
@@ -127,8 +135,10 @@ async def test_failed_annual_commit_restores_expel_and_technique_reward(
 
         def fail_commit(events, _chapter):
             attempted.extend(events)
-            assert breaker.sect is None
-            assert patriarch.technique is reward
+            if action == "expel":
+                assert breaker.sect is None
+            else:
+                assert patriarch.technique is reward
             return False
 
         phases = (
@@ -142,22 +152,19 @@ async def test_failed_annual_commit_restores_expel_and_technique_reward(
             ),
         )
         monkeypatch.setattr(base_world.event_manager, "commit_step", fail_commit)
+        original_decide = SectDecider.decide.__func__
+
+        selected_action = f"sect_annual_{action}"
+        selected_id = breaker.id if action == "expel" else patriarch.id
+        async def decide_selected(cls, chosen_sect, ctx, world, **_kwargs):
+            return await original_decide(cls, chosen_sect, ctx, world, llm_call=_select(selected_action, selected_id))
 
         with (
-            patch(
-                "src.classes.core.sect.get_sect_decision_context",
-                return_value=_member_context(patriarch, breaker),
-            ),
-            patch.object(
-                SectDecider,
-                "_plan",
-                new=AsyncMock(
-                    return_value=SectDecisionPlan(
-                        expel_avatar_ids=[breaker.id],
-                        reward_avatar_ids=[patriarch.id],
-                    )
+                patch(
+                    "src.classes.core.sect.get_sect_decision_context",
+                    return_value=_member_context(patriarch, breaker),
                 ),
-            ),
+                patch.object(SectDecider, "decide", classmethod(decide_selected)),
         ):
             with pytest.raises(EventPersistenceError):
                 await SimulationPhaseRunner(Simulator(base_world), phases=phases).run()
@@ -165,33 +172,18 @@ async def test_failed_annual_commit_restores_expel_and_technique_reward(
         decision_ids = {
             event.id for event in attempted if event.fact_kind is FactKind.DECISION
         }
-        expulsion = next(
+        mutation = next(
             event
             for event in attempted
             if any(
                 delta["owner_kind"] == "avatar"
-                and delta["owner_id"] == breaker.id
-                and delta["aspect"] == "sect_membership"
-                for delta in (event.causal_payload or {}).get("deltas", [])
-            )
-        )
-        reward_event = next(
-            event
-            for event in attempted
-            if any(
-                delta["owner_kind"] == "avatar"
-                and delta["owner_id"] == patriarch.id
-                and delta["aspect"] == "technique"
+                and delta["owner_id"] == selected_id
+                and delta["aspect"] == ("sect_membership" if action == "expel" else "technique")
                 for delta in (event.causal_payload or {}).get("deltas", [])
             )
         )
         assert decision_ids
-        for event in (expulsion, reward_event):
-            assert any(
-                link.relation is CausalRelation.MOTIVATED_BY
-                and link.cause_event_id in decision_ids
-                for link in event.causal_links
-            )
+        assert any(link.relation is CausalRelation.MOTIVATED_BY and link.cause_event_id in decision_ids for link in mutation.causal_links)
 
         assert sect.members == membership_before
         assert patriarch.sect is sect

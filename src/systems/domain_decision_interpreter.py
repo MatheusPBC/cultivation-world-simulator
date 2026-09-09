@@ -250,7 +250,10 @@ async def interpret_domain_affordances(
                 decision = _parse(raw, options)
             except (LLMError, ParseError, ProviderCallError):
                 source = "rule"
-                decision = conservative_decision(world, options)
+                decision = DomainDecision(
+                    DomainDecisionKind.MAINTAIN,
+                    "The domain provider was unavailable, so no action was selected.",
+                )
             except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                 # Invalid structured output is an explicit blocked decision.
                 # Selecting another option here would let malformed LLM output

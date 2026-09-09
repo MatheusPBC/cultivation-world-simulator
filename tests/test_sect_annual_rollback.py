@@ -14,7 +14,7 @@ from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.causal_link import CausalRelation
 from src.classes.event import FactKind
-from src.classes.sect_decider import SectDecider, SectDecisionPlan
+from src.classes.sect_decider import SectDecider
 from src.classes.sect_ranks import SectRank
 from src.sim.managers.event_manager import EventManager
 from src.sim.simulator import Simulator
@@ -24,6 +24,8 @@ from src.sim.simulator_engine.phase_runner import SimulationPhaseRunner
 from src.systems.cultivation import Realm
 from src.systems.institution_bootstrap import bootstrap_institutional_authority
 from src.systems.sect_decision_context import SectDecisionContext
+from src.systems.single_choice.models import ChoiceSource, SingleChoiceDecision
+from src.systems.single_choice.sect_recruitment import SectRecruitmentOutcome
 from src.systems.time import Month, Year, create_month_stamp
 
 
@@ -64,6 +66,13 @@ def _decision_context(rogue: Avatar) -> SectDecisionContext:
     )
 
 
+def _select_recruitment(avatar_id: str):
+    async def llm_call(_task, _template, context, **_kwargs):
+        option = next(item for item in context["affordances"] if item["action_kind"] == "sect_annual_recruit" and item["parameters"].get("avatar_id") == avatar_id)
+        return {"decision": "act", "reason": "rollback probe", "selected_affordance_id": option["id"]}
+    return llm_call
+
+
 @pytest.mark.asyncio
 async def test_failed_annual_commit_restores_authorized_sect_recruitment(
     base_world, monkeypatch, tmp_path
@@ -71,7 +80,7 @@ async def test_failed_annual_commit_restores_authorized_sect_recruitment(
     """The real annual phase spends, then its failed finalizer restores all owners."""
     base_world.month_stamp = create_month_stamp(Year(100), Month.JANUARY)
     base_world.start_year = 100
-    base_world.run_config_snapshot = {"test_mode": True}
+    base_world.run_config_snapshot = {}
     base_world.event_manager = EventManager.create_with_db(tmp_path / "annual-events.db")
 
     sect = Sect(
@@ -120,27 +129,24 @@ async def test_failed_annual_commit_restores_authorized_sect_recruitment(
         ),
     )
     monkeypatch.setattr(base_world.event_manager, "commit_step", fail_commit)
+    original_decide = SectDecider.decide.__func__
+
+    async def decide_recruit(cls, chosen_sect, ctx, world, **_kwargs):
+        return await original_decide(cls, chosen_sect, ctx, world, llm_call=_select_recruitment(rogue.id))
 
     with (
         patch(
             "src.classes.core.sect.get_sect_decision_context",
             return_value=_decision_context(rogue),
         ),
-        patch.object(
-            SectDecider,
-            "_plan",
-            new=AsyncMock(
-                return_value=SectDecisionPlan(recruit_avatar_ids=[rogue.id])
-            ),
-        ),
+        patch.object(SectDecider, "decide", classmethod(decide_recruit)),
         patch(
             "src.classes.sect_decider.resolve_sect_recruitment",
             new=AsyncMock(
-                return_value=type(
-                    "RecruitmentOutcome",
-                    (),
-                    {"accepted": True, "result_text": "Rogue accepted."},
-                )()
+                return_value=SectRecruitmentOutcome(
+                    decision=SingleChoiceDecision("ACCEPT", "accept", ChoiceSource.LLM, None, False),
+                    result_text="Rogue accepted.", accepted=True, sect_id=int(sect.id), avatar_id=rogue.id,
+                )
             ),
         ),
     ):
@@ -150,7 +156,7 @@ async def test_failed_annual_commit_restores_authorized_sect_recruitment(
     decision_ids = {
         event.id
         for event in attempted
-        if event.fact_kind is FactKind.DECISION and int(sect.id) in event.related_sects
+        if event.fact_kind is FactKind.DECISION and int(sect.id) in (event.related_sects or ())
     }
     assert decision_ids
     recruitment = next(

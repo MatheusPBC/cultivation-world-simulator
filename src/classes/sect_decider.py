@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
 
 from src.classes.agent_decision import AgentDecision
 from src.classes.alignment import Alignment
 from src.classes.causal_link import CausalLink, CausalRelation
 from src.classes.causal_origin import CausalOrigin
+from src.classes.domain_affordance import (
+    DomainAffordance,
+    DomainDecisionKind,
+)
 from src.classes.event import Event, FactKind
+from src.classes.mechanical_language import EntityRef
 from src.classes.sect_ranks import get_rank_from_realm
 from src.classes.state_delta import StateDelta
-from src.config import get_settings_service
 from src.i18n import t
-from src.i18n.template_resolver import resolve_locale_template_path
-from src.run.log import get_logger
 from src.classes.technique import (
     Technique,
     TechniqueAttribute,
@@ -25,14 +27,19 @@ from src.systems.single_choice import (
     SectRecruitmentRequest,
     resolve_sect_recruitment,
 )
-from src.systems.sect_member_support import transfer_sect_member_support
+from src.systems.sect_member_support import (
+    is_eligible_support_member,
+    transfer_sect_member_support,
+)
 from src.utils.config import CONFIG
-from src.utils.llm import call_llm_with_task_name
-from src.utils.llm.exceptions import LLMError, ParseError
-from src.utils.llm.runtime_mode import is_test_mode_enabled, is_world_test_mode
-from src.utils.llm.test_mode_fallbacks import resolve_test_mode_task
-from src.utils.llm.validation import is_llm_runtime_configured
-from src.utils.strings import to_json_str_with_intent
+from src.systems.domain_affordance_registry import (
+    AffordanceContext,
+    DOMAIN_AFFORDANCES,
+    StaleAffordanceError,
+    stale_affordance_blocked_event,
+    validate_actor_decision,
+)
+from src.systems.domain_decision_interpreter import interpret_domain_affordances
 
 if TYPE_CHECKING:
     from src.classes.core.avatar import Avatar
@@ -54,15 +61,6 @@ class SectDecisionResult:
     decision_event: Event | None = None
 
 
-@dataclass(slots=True)
-class SectDecisionPlan:
-    recruit_avatar_ids: list[str] = field(default_factory=list)
-    expel_avatar_ids: list[str] = field(default_factory=list)
-    reward_avatar_ids: list[str] = field(default_factory=list)
-    support_avatar_ids: list[str] = field(default_factory=list)
-    thinking: str = ""
-
-
 class SectDecider:
     """
     按配置周期执行的宗门行政决策执行器。
@@ -74,96 +72,65 @@ class SectDecider:
         sect: "Sect",
         decision_context: "SectDecisionContext",
         world: "World",
+        *,
+        llm_call: Callable[..., Awaitable[dict[str, Any]]] | None = None,
+        injected_decision=None,
     ) -> SectDecisionResult:
         result = SectDecisionResult()
-
-        recruit_cost = int(getattr(CONFIG.sect, "recruit_cost", 500))
-        support_amount = int(getattr(CONFIG.sect, "support_amount", 300))
-        # Recruiting and supporting both move `sect.magic_stone`, so the office
-        # that could authorize that has to have a living holder. Asked before
-        # planning: with nobody able to spend, no provider is consulted about
-        # spending, and the round still leaves an honest audit record.
-        may_spend = cls._may_dispose_treasury(sect, world)
-        may_administer = cls._may_administer_sect(sect, world)
-        # Planning is worth doing when the sect can do *something*; each act
-        # then asks for its own scope at its own mutation point.
-        plan = (
-            await cls._plan(
-                sect,
-                decision_context,
-                world,
-                recruit_cost=recruit_cost,
-                support_amount=support_amount,
-            )
-            if (may_spend or may_administer)
-            else None
-        )
-
-        deterministic_plan = bool(
-            plan is not None and (is_world_test_mode(world) or is_test_mode_enabled())
-        )
-
-        # 每一轮都要留下一条审计记录，包括规则兜底与“本轮什么都不做”。
-        # 决策事件先建立，后续制度动作才能把 MOTIVATED_BY 指向它。
-        decision = AgentDecision(
-            month_stamp=int(world.month_stamp),
-            subject_kind="sect",
-            subject_id=str(sect.id),
-            source="rule" if deterministic_plan or plan is None else "llm",
-            considered_count=len(decision_context.member_candidates),
-            thinking=str(getattr(plan, "thinking", "") or ""),
-        )
-        decision_event = Event(
+        trigger = Event(
             world.month_stamp,
-            t("{sect_name} concluded a round of sect decisions", sect_name=sect.name),
+            t("{sect_name} opened its annual administration round.", sect_name=sect.name),
+            event_type="sect_annual_administration_opened",
             related_sects=[int(sect.id)],
             is_major=False,
-            fact_kind=FactKind.DECISION,
-            causal_origin=(
-                CausalOrigin.DETERMINISTIC
-                if deterministic_plan
-                else (
-                    CausalOrigin.LLM_INTERPRETATION
-                    if plan is not None
-                    else CausalOrigin.ACTOR_DECISION
-                )
-            ),
-            causal_payload={"deltas": [], "decision": decision.to_dict()},
+            fact_kind=FactKind.OCCURRENCE,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+            render_params={"sect_id": str(sect.id)},
         )
+        context = AffordanceContext(
+            world, "sect_annual", EntityRef("sect", str(sect.id)), trigger
+        )
+        options = DOMAIN_AFFORDANCES.compose(context)
+        decision, decision_event = await interpret_domain_affordances(
+            world,
+            domain="sect_annual",
+            actor_ref=context.actor_ref,
+            actor_label=sect.name,
+            trigger_event=trigger,
+            affordances=options,
+            task_name="sect_annual_interpreter",
+            template_name="sect_annual_interpreter.txt",
+            extra_context={"sect": sect.name, "context": cls._serialize_context(decision_context)},
+            llm_call=llm_call,
+            injected_decision=injected_decision,
+        )
+        result.events.extend((trigger, decision_event))
         result.decision_event = decision_event
-
-        if may_spend:
-            await cls._process_recruitment(
-                sect=sect,
-                decision_context=decision_context,
-                world=world,
-                recruit_cost=recruit_cost,
-                result=result,
-                selected_ids=set(plan.recruit_avatar_ids) if plan is not None else set(),
-                decision=decision,
-                decision_event=decision_event,
-            )
-
-        cls._process_members(
-            sect=sect,
-            world=world,
-            support_amount=support_amount,
-            result=result,
-            # No plan means nobody was chosen, not everybody: an absent plan
-            # must never read as "expel every rule-breaker" or "reward all".
-            expel_ids=set(plan.expel_avatar_ids) if plan is not None else set(),
-            reward_ids=set(plan.reward_avatar_ids) if plan is not None else set(),
-            support_ids=set(plan.support_avatar_ids) if plan is not None else set(),
-            decision=decision,
-            decision_event=decision_event,
-            may_spend=may_spend,
-            may_administer=may_administer,
-        )
-
+        if decision.decision is DomainDecisionKind.ACT:
+            try:
+                option = next(
+                    (
+                        item for item in DOMAIN_AFFORDANCES.compose(context)
+                        if item.id == decision.selected_affordance_id
+                    ),
+                    None,
+                )
+                if option is None:
+                    raise StaleAffordanceError("annual sect affordance became stale")
+                executed = await DOMAIN_AFFORDANCES.execute_async(
+                    context, option.id, result=result, decision_event=decision_event
+                )
+                if executed not in result.events:
+                    result.events.append(executed)
+            except StaleAffordanceError:
+                result.events.append(
+                    stale_affordance_blocked_event(
+                        context,
+                        decision_event_id=decision_event.id,
+                        selected_affordance_id=decision.selected_affordance_id or "",
+                    )
+                )
         result.summary_text = cls._build_summary(sect, result)
-        # 制度动作全部执行完毕后，把最终的 chosen_chain 写回审计事件。
-        decision_event.causal_payload = {"deltas": [], "decision": decision.to_dict()}
-        result.events.append(decision_event)
         return result
 
     @staticmethod
@@ -207,78 +174,68 @@ class SectDecider:
         )
 
     @classmethod
-    async def _plan(
-        cls,
-        sect: "Sect",
-        decision_context: "SectDecisionContext",
-        world: "World",
-        *,
-        recruit_cost: int,
-        support_amount: int,
-    ) -> SectDecisionPlan | None:
-        infos = {
-            "sect_name": sect.name,
-            "world_info": to_json_str_with_intent(cls._serialize_world_info(world)),
-            "world_lore": world.world_lore.text,
-            "decision_context_info": to_json_str_with_intent(
-                cls._serialize_context(decision_context)
-            ),
-            "decision_interval_years": int(
-                getattr(CONFIG.sect, "decision_interval_years", 5)
-            ),
-            "recruit_cost": recruit_cost,
-            "support_amount": support_amount,
-        }
+    async def _execute_option(
+        cls, sect, context, world, option, result, decision_event
+    ) -> None:
+        """Execute one revalidated annual affordance.
 
-        if is_world_test_mode(world) or is_test_mode_enabled():
-            fallback = resolve_test_mode_task("sect_decider", infos)
-            return cls._parse_plan(fallback, decision_context)
-
-        if not cls._llm_available():
-            cls._warn_plan_skip(sect, "LLM runtime config unavailable")
-            return None
-
-        try:
-            result = await call_llm_with_task_name(
-                task_name="sect_decider",
-                template_path=cls._resolve_template_path(),
-                infos=infos,
+        The registry owns composition/recomposition. Recruitment remains here
+        because its canonical candidate response is asynchronous; its existing
+        executor rechecks authority, membership, funds and race after await.
+        """
+        decision = AgentDecision.from_dict(decision_event.causal_payload["decision"])
+        avatar_id = str(option.parameters["avatar_id"])
+        action = option.action_kind
+        if action == "sect_annual_recruit":
+            await cls._process_recruitment(
+                sect=sect, candidates=({"avatar_id": avatar_id, "alignment_recruitable": True, "race_recruitable": True},), world=world,
+                recruit_cost=int(option.parameters["recruit_cost"]), result=result,
+                selected_ids={avatar_id}, decision=decision, decision_event=decision_event,
+                revalidate=lambda: DOMAIN_AFFORDANCES.revalidate(context, option.id),
             )
-            return cls._parse_plan(result, decision_context)
-        except (LLMError, ParseError, Exception) as exc:
-            cls._warn_plan_skip(sect, f"LLM plan failed: {exc}")
-            return None
-
-    @classmethod
-    def _llm_available(cls) -> bool:
-        profile, api_key = get_settings_service().get_llm_runtime_config()
-        return is_llm_runtime_configured(profile, api_key)
-
-    @classmethod
-    def _warn_plan_skip(cls, sect: "Sect", reason: str) -> None:
-        get_logger().logger.warning(
-            "SectDecider skipping unplanned execution for %s(%s): %s",
-            getattr(sect, "name", "unknown"),
-            getattr(sect, "id", "unknown"),
-            reason,
-        )
-
-    @classmethod
-    def _resolve_template_path(cls) -> Path:
-        return resolve_locale_template_path(
-            "sect_decider.txt",
-            preferred_dir=CONFIG.paths.templates,
-        )
-
-    @classmethod
-    def _serialize_world_info(cls, world: "World") -> dict[str, Any]:
-        try:
-            info = world.get_info(detailed=True)
-            if isinstance(info, dict):
-                return info
-        except Exception:
-            pass
-        return {}
+        elif action == "sect_annual_expel":
+            cls._process_members(
+                sect=sect, world=world, support_amount=0, result=result,
+                expel_ids={avatar_id}, reward_ids=set(), support_ids=set(),
+                decision=decision, decision_event=decision_event, may_spend=False,
+                may_administer=True,
+            )
+        elif action == "sect_annual_reward":
+            expected = int(option.parameters["technique_id"])
+            current = getattr(
+                next(
+                    (item for item in sect.get_living_members_sorted_by_status() if str(item.id) == avatar_id),
+                    None,
+                ),
+                "technique",
+                None,
+            )
+            if str(option.parameters["before_technique_id"]) != str(
+                getattr(current, "id", "none") if current is not None else "none"
+            ):
+                raise StaleAffordanceError("member technique changed after selection")
+            avatar = next(
+                (item for item in sect.get_living_members_sorted_by_status() if str(item.id) == avatar_id),
+                None,
+            )
+            if avatar is None or getattr(cls._pick_reward_technique(sect, avatar), "id", None) != expected:
+                raise StaleAffordanceError("selected technique is no longer canonical")
+            cls._process_members(
+                sect=sect, world=world, support_amount=0, result=result,
+                expel_ids=set(), reward_ids={avatar_id}, support_ids=set(),
+                decision=decision, decision_event=decision_event, may_spend=False,
+                may_administer=True,
+            )
+        elif action == "sect_annual_support":
+            cls._process_members(
+                sect=sect, world=world, support_amount=int(option.parameters["support_amount"]), result=result,
+                expel_ids=set(), reward_ids=set(), support_ids={avatar_id},
+                decision=decision, decision_event=decision_event, may_spend=True,
+                may_administer=False,
+            )
+        else:
+            raise StaleAffordanceError("unknown annual sect affordance")
+        decision_event.causal_payload["decision"] = decision.to_dict()
 
     @classmethod
     def _serialize_context(cls, ctx: "SectDecisionContext") -> dict[str, Any]:
@@ -314,75 +271,21 @@ class SectDecider:
         }
 
     @classmethod
-    def _parse_plan(
-        cls,
-        payload: dict[str, Any] | Any,
-        decision_context: "SectDecisionContext",
-    ) -> SectDecisionPlan | None:
-        if not isinstance(payload, dict):
-            return None
-
-        recruit_valid = {
-            str(item["avatar_id"]) for item in decision_context.recruitment_candidates
-        }
-        member_valid = {
-            str(item["avatar_id"]) for item in decision_context.member_candidates
-        }
-
-        def _pick_ids(key: str, valid_ids: set[str]) -> list[str]:
-            raw = payload.get(key, [])
-            if not isinstance(raw, list):
-                return []
-            deduped: list[str] = []
-            seen: set[str] = set()
-            for item in raw:
-                value = str(item)
-                if value in valid_ids and value not in seen:
-                    seen.add(value)
-                    deduped.append(value)
-            return deduped
-
-        return SectDecisionPlan(
-            recruit_avatar_ids=_pick_ids("recruit_avatar_ids", recruit_valid),
-            expel_avatar_ids=_pick_ids("expel_avatar_ids", member_valid),
-            reward_avatar_ids=_pick_ids("reward_avatar_ids", member_valid),
-            support_avatar_ids=_pick_ids("support_avatar_ids", member_valid),
-            thinking=str(payload.get("thinking", "") or ""),
-        )
-
-    @classmethod
-    def _record_institutional_step(
-        cls, decision: AgentDecision, action_name: str, avatar_id: str
-    ) -> None:
-        """把一次已经执行的宗门行政动作记入审计链。
-
-        `appraisal_ids` 恒为空：个人解读从不参与人事决策，宣战也不再是
-        本执行器的输出——它是 ``src.systems.institutional_war`` 拥有的
-        独立制度决策。
-        """
-        decision.chosen_chain.append(
-            {
-                "action_name": action_name,
-                "params": {"avatar_id": str(avatar_id)},
-                "appraisal_ids": [],
-            }
-        )
-
-    @classmethod
     async def _process_recruitment(
         cls,
         *,
         sect: "Sect",
-        decision_context: "SectDecisionContext",
+        candidates: Any,
         world: "World",
         recruit_cost: int,
         result: SectDecisionResult,
         selected_ids: set[str],
         decision: AgentDecision,
         decision_event: Event,
+        revalidate=None,
     ) -> None:
         avatars = getattr(getattr(world, "avatar_manager", None), "avatars", {}) or {}
-        for candidate in decision_context.recruitment_candidates:
+        for candidate in candidates:
             if candidate["avatar_id"] not in selected_ids:
                 continue
             if int(getattr(sect, "magic_stone", 0)) < recruit_cost:
@@ -411,18 +314,36 @@ class SectDecider:
                     cost=recruit_cost,
                 )
             )
-            result.events.append(
-                Event(
-                    month_stamp=world.month_stamp,
-                    content=outcome.result_text,
-                    related_avatars=[avatar.id],
-                    related_sects=[int(sect.id)],
-                    is_major=False,
-                )
+            if str(outcome.sect_id) != str(sect.id) or str(outcome.avatar_id) != str(avatar.id):
+                raise StaleAffordanceError("recruitment outcome names another actor")
+            choice = outcome.decision
+            selected_key = str(choice.selected_key)
+            accepted = selected_key == "ACCEPT" if selected_key in {"ACCEPT", "REJECT"} else False
+            if bool(outcome.accepted) != accepted:
+                raise StaleAffordanceError("recruitment outcome disagrees with its choice")
+            response_event = Event(
+                month_stamp=world.month_stamp,
+                content=outcome.result_text,
+                related_avatars=[avatar.id], related_sects=[int(sect.id)],
+                fact_kind=FactKind.DECISION,
+                causal_origin=CausalOrigin.ACTOR_DECISION,
+                causal_payload={"deltas": [], "decision": AgentDecision(
+                    month_stamp=int(world.month_stamp), subject_kind="avatar",
+                    subject_id=str(avatar.id), source=str(getattr(choice.source, "value", choice.source)),
+                    considered_count=2, chosen_chain=[{"selected_key": str(choice.selected_key)}],
+                    thinking=str(choice.thinking),
+                ).to_dict()},
             )
+            response_event.causal_links.append(CausalLink(
+                event_id=response_event.id, cause_event_id=decision_event.id,
+                relation=CausalRelation.RESPONSE_TO,
+            ))
+            result.events.append(response_event)
 
-            if not outcome.accepted:
+            if not accepted:
                 continue
+            if revalidate is not None:
+                revalidate()
             # Re-read everything the acceptance rested on: the resolver was
             # awaited, and authority, life, membership and funds can all have
             # moved meanwhile. Without this the await would be the way past
@@ -452,7 +373,6 @@ class SectDecider:
                 continue
             sect.magic_stone -= recruit_cost
             result.recruitment_count += 1
-            cls._record_institutional_step(decision, "recruit", avatar.id)
             # A real transition of two owners, not prose: the treasury really
             # fell and the avatar really joined, cited to the decision that
             # chose it.
@@ -498,6 +418,13 @@ class SectDecider:
                     relation=CausalRelation.MOTIVATED_BY,
                 )
             )
+            recruit_event.causal_links.append(
+                CausalLink(
+                    event_id=recruit_event.id,
+                    cause_event_id=response_event.id,
+                    relation=CausalRelation.MOTIVATED_BY,
+                )
+            )
             result.events.append(recruit_event)
 
     @classmethod
@@ -537,7 +464,6 @@ class SectDecider:
                     # that did not happen.
                     continue
                 result.expulsion_count += 1
-                cls._record_institutional_step(decision, "expel", avatar_id)
                 expel_event = Event(
                     month_stamp=world.month_stamp,
                     content=t(
@@ -588,7 +514,6 @@ class SectDecider:
             ):
                 avatar.technique = reward_technique
                 result.technique_reward_count += 1
-                cls._record_institutional_step(decision, "reward_technique", avatar_id)
                 reward_event = Event(
                     month_stamp=world.month_stamp,
                     content=t(
@@ -643,7 +568,6 @@ class SectDecider:
             if not transfer_sect_member_support(sect, avatar, amount=support_amount):
                 continue
             result.support_count += 1
-            cls._record_institutional_step(decision, "support", avatar_id)
             support_event = Event(
                 month_stamp=world.month_stamp,
                 content=t(
@@ -783,3 +707,107 @@ class SectDecider:
             + "、".join(parts)
             + "。"
         )
+
+
+def sect_annual_affordances(context: AffordanceContext):
+    """Offer exactly the annual actions grounded in current sect state."""
+    if context.actor_ref.kind != "sect":
+        return ()
+    sect = next(
+        (item for item in getattr(context.world, "existed_sects", ()) if str(item.id) == context.actor_ref.id),
+        None,
+    )
+    if sect is None or not getattr(sect, "is_active", False):
+        return ()
+    options: list[DomainAffordance] = []
+    recruit_cost = int(getattr(CONFIG.sect, "recruit_cost", 500))
+    support_amount = int(getattr(CONFIG.sect, "support_amount", 300))
+    evidence = (context.trigger_event.id,)
+    if SectDecider._may_dispose_treasury(sect, context.world):
+        avatars = getattr(context.world.avatar_manager, "avatars", {})
+        for avatar_id, avatar in sorted(avatars.items(), key=lambda item: str(item[0])):
+            avatar_id = str(avatar_id)
+            if (
+                avatar is None or getattr(avatar, "is_dead", False)
+                or getattr(avatar, "sect", None) is not None
+                or not sect.is_alignment_recruitable(avatar.alignment)
+                or not sect.accepts_avatar_race(avatar)
+                or int(getattr(sect, "magic_stone", 0)) < recruit_cost
+            ):
+                continue
+            options.append(DomainAffordance(
+                context.domain, context.actor_ref, "sect_annual_recruit",
+                (EntityRef("avatar", avatar_id),),
+                    {"avatar_id": avatar_id, "recruit_cost": recruit_cost}, 0.4, evidence,
+            ))
+        for avatar in sect.get_living_members_sorted_by_status():
+            avatar_id = str(avatar.id)
+            if is_eligible_support_member(sect, avatar, amount=support_amount):
+                options.append(DomainAffordance(
+                    context.domain, context.actor_ref, "sect_annual_support",
+                    (EntityRef("avatar", avatar_id),),
+                    {"avatar_id": avatar_id, "support_amount": support_amount},
+                    max(0.0, min(1.0, 1.0 - int(avatar.magic_stone.value) / support_amount)), evidence,
+                ))
+    if SectDecider._may_administer_sect(sect, context.world):
+        for avatar in sect.get_living_members_sorted_by_status():
+            avatar_id = str(avatar.id)
+            if sect.is_member_rule_breaker(avatar):
+                options.append(DomainAffordance(
+                    context.domain, context.actor_ref, "sect_annual_expel",
+                    (EntityRef("avatar", avatar_id),), {"avatar_id": avatar_id}, 0.65, evidence,
+                ))
+            elif (technique := SectDecider._pick_reward_technique(sect, avatar)) is not None:
+                options.append(DomainAffordance(
+                    context.domain, context.actor_ref, "sect_annual_reward",
+                    (EntityRef("avatar", avatar_id),),
+                    {"avatar_id": avatar_id, "technique_id": int(technique.id),
+                     "before_technique_id": str(getattr(getattr(avatar, "technique", None), "id", "none"))},
+                    0.55, evidence,
+                ))
+    return tuple(options)
+
+
+async def execute_sect_annual_affordance(
+    context: AffordanceContext,
+    option: DomainAffordance,
+    *,
+    decision_event: Event | None = None,
+    result: SectDecisionResult | None = None,
+    **_: Any,
+) -> Event:
+    """Registered annual executor; all owner mutations remain below this gate."""
+    validate_actor_decision(decision_event, context, option, label="annual sect")
+    sect = next(
+        (item for item in getattr(context.world, "existed_sects", ()) if str(item.id) == context.actor_ref.id),
+        None,
+    )
+    if sect is None or result is None or decision_event is None:
+        raise StaleAffordanceError("annual sect actor or decision disappeared")
+    before = len(result.events)
+    await SectDecider._execute_option(sect, context, context.world, option, result, decision_event)
+    if len(result.events) <= before:
+        event = Event(
+            context.world.month_stamp,
+            t("The selected annual sect action made no canonical change."),
+            event_type="sect_annual_action_noop",
+            fact_kind=FactKind.OCCURRENCE,
+            causal_payload={"deltas": []},
+        )
+        event.causal_links.append(CausalLink(
+            event_id=event.id,
+            cause_event_id=decision_event.id,
+            relation=CausalRelation.MOTIVATED_BY,
+        ))
+        return event
+    return result.events[-1]
+
+
+DOMAIN_AFFORDANCES.register_provider("sect_annual", sect_annual_affordances)
+for _annual_action in (
+    "sect_annual_recruit",
+    "sect_annual_expel",
+    "sect_annual_reward",
+    "sect_annual_support",
+):
+    DOMAIN_AFFORDANCES.register_executor(_annual_action, execute_sect_annual_affordance)

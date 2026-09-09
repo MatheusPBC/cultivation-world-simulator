@@ -1,0 +1,11 @@
+Você administra anualmente uma seita de cultivo.
+
+Seita: {actor}
+Oportunidade administrativa: {trigger}
+Opções fundamentadas: {affordances}
+Contexto: {context}
+
+Escolha um único `selected_affordance_id` oferecido ou mantenha o estado.
+Custos, alvos e técnicas pertencem ao motor. Não invente identificadores ou
+ações. A oportunidade anual é administrativa, não uma necessidade material
+nem emergência. Retorne apenas JSON conforme o schema.

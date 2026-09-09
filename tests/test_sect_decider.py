@@ -1,866 +1,108 @@
-import pytest
+"""Public annual sect decisions select one current, composed affordance."""
+
+from __future__ import annotations
+
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.classes.age import Age
-from src.classes.items.magic_stone import MagicStone
 from src.classes.alignment import Alignment
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
-from src.classes.institution import Institution, InstitutionKind
-from src.classes.mechanical_language import EntityRef
-from src.classes.event import FactKind
-from src.classes.sect_decider import SectDecider, SectDecisionPlan
-from src.classes.sect_ranks import get_rank_from_realm
-from src.classes.technique import (
-    Technique,
-    TechniqueAttribute,
-    TechniqueGrade,
-    techniques_by_name,
-)
+from src.classes.domain_affordance import DomainDecision, DomainDecisionKind
+from src.classes.items.magic_stone import MagicStone
 from src.classes.root import Root
+from src.classes.sect_decider import SectDecider
+from src.classes.sect_ranks import SectRank, get_rank_from_realm
+from src.classes.technique import Technique, TechniqueAttribute, TechniqueGrade, techniques_by_name
 from src.systems.cultivation import Realm
-from src.systems.institutional_diplomacy import are_sects_at_war
+from src.systems.institution_bootstrap import bootstrap_institutional_authority
 from src.systems.sect_decision_context import SectDecisionContext
+from src.systems.single_choice.models import ChoiceSource, SingleChoiceDecision
+from src.systems.single_choice.sect_recruitment import SectRecruitmentOutcome
 from src.systems.time import Month, Year, create_month_stamp
-from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
-def test_sect_decider_serializes_celestial_context_as_non_command_evidence():
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        celestial_dao=[
-            {"kind": "omen", "tradition": "balance", "source_event_id": "omen-1"},
-        ],
-    )
-
-    serialized = SectDecider._serialize_context(ctx)
-
-    assert serialized["celestial_dao"] == ctx.celestial_dao
-
-
-def test_sect_decider_serializes_imperial_crisis_as_non_command_context():
-    crisis = {
-        "emperor": {"id": "e", "name": "Emperor"},
-        "claimant": {"id": "c", "name": "Claimant"},
-    }
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        imperial_crisis=crisis,
-    )
-
-    assert SectDecider._serialize_context(ctx)["imperial_crisis"] == crisis
-
-
-def test_sect_decider_serializes_regional_semantics_as_read_only_context():
-    semantics = [{"region_id": 7, "conditions": [{"id": "overcrowded"}]}]
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        regional_semantics=semantics,
-    )
-
-    assert SectDecider._serialize_context(ctx)["regional_semantics"] == semantics
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_world_test_mode_never_calls_provider(base_world):
-    sect = Sect(
-        id=1,
-        name="Test Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-    )
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-    base_world.run_config_snapshot = {"test_mode": True}
-
-    with (
-        patch.object(SectDecider, "_llm_available", return_value=True),
-        patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(side_effect=AssertionError("provider called")),
-        ) as provider,
-    ):
-        plan = await SectDecider._plan(
-            sect, ctx, base_world, recruit_cost=500, support_amount=300
-        )
-
-    assert plan is not None
-    provider.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_world_test_mode_marks_decision_as_deterministic(base_world):
-    sect = Sect(
-        id=1,
-        name="Test Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-    )
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-    base_world.run_config_snapshot = {"test_mode": True}
-    # A sect that can actually decide about spending: without a treasury
-    # office the round is refused before planning, which is a different
-    # outcome from the deterministic plan this test is about.
-    _authorized_sect_with_patriarch(base_world, sect)
-
-    result = await SectDecider.decide(sect, ctx, base_world)
-
-    assert result.decision_event.causal_origin.value == "deterministic"
-    assert result.decision_event.causal_payload["decision"]["source"] == "rule"
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_scoped_test_mode_never_calls_provider(base_world):
-    sect = Sect(
-        id=1,
-        name="Test Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-    )
-    ctx = SectDecisionContext(
-        basic_structured={},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-
-    with (
-        patch.object(SectDecider, "_llm_available", return_value=True),
-        patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(side_effect=AssertionError("provider called")),
-        ) as provider,
-        llm_test_mode_scope(True),
-    ):
-        plan = await SectDecider._plan(
-            sect, ctx, base_world, recruit_cost=500, support_amount=300
-        )
-
-    assert plan is not None
-    provider.assert_not_awaited()
-
-
-def _create_avatar(world, *, avatar_id: str, name: str, alignment: Alignment) -> Avatar:
-    avatar = Avatar(
-        world=world,
-        name=name,
-        id=avatar_id,
-        birth_month_stamp=create_month_stamp(Year(2000), Month.JANUARY),
-        age=Age(20, Realm.Qi_Refinement),
-        gender=Gender.MALE,
-        pos_x=0,
-        pos_y=0,
-        root=Root.GOLD,
-        personas=[],
-        alignment=alignment,
-    )
+def _avatar(world, avatar_id, alignment):
+    avatar = Avatar(world=world, name=avatar_id.title(), id=avatar_id,
+        birth_month_stamp=create_month_stamp(Year(2000), Month.JANUARY), age=Age(20, Realm.Qi_Refinement),
+        gender=Gender.MALE, pos_x=0, pos_y=0, root=Root.GOLD, personas=[], alignment=alignment)
     avatar.personas = []
-    avatar.weapon = None
-    avatar.technique = None
+    avatar.weapon = avatar.technique = None
+    avatar.magic_stone = MagicStone(0)
     avatar.recalc_effects()
+    world.avatar_manager.register_avatar(avatar)
     return avatar
 
 
-def _dummy_ctx(rogue: Avatar, member: Avatar, breaker: Avatar) -> SectDecisionContext:
-    return SectDecisionContext(
-        basic_structured={"name": "Test Sect"},
-        basic_text="Test sect detailed info",
-        power={"total_battle_strength": 100.0, "influence_radius": 2},
-        territory={
-            "tile_count": 5,
-            "conflict_tile_count": 1,
-            "headquarter_center": (1, 1),
-        },
-        self_assessment={
-            "member_count": 2,
-            "alive_member_count": 2,
-            "peak_member_realm": str(member.cultivation_progress.realm),
-            "patriarch_realm": "",
-            "war_readiness": "stable",
-            "resource_pressure": "normal",
-            "can_afford_recruit_count": 2,
-            "can_afford_support_count": 3,
-        },
-        economy={
-            "current_magic_stone": 1000,
-            "effective_income_per_tile": 10.0,
-            "controlled_tile_income": 50.0,
-        },
-        relations=[],
-        relations_summary="total=0",
-        history={"recent_events": [], "summary_text": ""},
-        diplomacy_targets=[
-            {
-                "other_sect_id": 2,
-                "other_sect_name": "Enemy Sect",
-                "status": "peace",
-                "war_months": 0,
-                "peace_months": 24,
-                "relation_value": -10,
-            }
-        ],
-        active_wars=[],
-        rule={"rule_id": "righteous_orthodoxy", "rule_desc": "不得勾结邪魔。"},
-        recruitment_candidates=[
-            {
-                "avatar_id": rogue.id,
-                "name": rogue.name,
-                "alignment": str(rogue.alignment),
-                "realm": str(rogue.cultivation_progress.realm),
-                "magic_stone": int(rogue.magic_stone.value),
-                "technique_name": "",
-                "technique_grade": "",
-                "technique_grade_rank": 0,
-                "alignment_recruitable": True,
-            }
-        ],
-        member_candidates=[
-            {
-                "avatar_id": member.id,
-                "name": member.name,
-                "alignment": str(member.alignment),
-                "realm": str(member.cultivation_progress.realm),
-                "rank": "",
-                "magic_stone": int(member.magic_stone.value),
-                "technique_name": "",
-                "technique_grade": "",
-                "technique_grade_rank": 1,
-                "is_rule_breaker": False,
-            },
-            {
-                "avatar_id": breaker.id,
-                "name": breaker.name,
-                "alignment": str(breaker.alignment),
-                "realm": str(breaker.cultivation_progress.realm),
-                "rank": "",
-                "magic_stone": int(breaker.magic_stone.value),
-                "technique_name": "",
-                "technique_grade": "",
-                "technique_grade_rank": 1,
-                "is_rule_breaker": True,
-            },
-        ],
-    )
+def _ctx(*members, recruit=None):
+    return SectDecisionContext(basic_structured={}, basic_text="", power={}, territory={}, self_assessment={}, economy={},
+        relations=[], relations_summary="", history={}, member_candidates=[{"avatar_id": item.id} for item in members],
+        recruitment_candidates=[] if recruit is None else [{"avatar_id": recruit.id, "alignment_recruitable": True, "race_recruitable": True}])
 
 
-def _authorize_sect(world, sect) -> None:
-    """Give the sect a real treasury office, as the runtime requires."""
-    from src.systems.institution_bootstrap import bootstrap_institutional_authority
-
-    world.existed_sects = [sect]
-    world.sect_context.from_existed_sects(world.existed_sects)
-    bootstrap_institutional_authority(world)
+def _select(action, avatar_id):
+    async def llm_call(_task, _template, context, **_kwargs):
+        option = next(item for item in context["affordances"] if item["action_kind"] == action and item["parameters"].get("avatar_id") == avatar_id)
+        return {"decision": "act", "reason": "select a real current option", "selected_affordance_id": option["id"]}
+    return llm_call
 
 
-def _authorized_sect_with_patriarch(world, sect) -> Avatar:
-    """The same, for a sect that has no member yet to hold the office."""
-    from src.classes.sect_ranks import SectRank
-
-    patriarch = _create_avatar(
-        world,
-        avatar_id=f"patriarch-{sect.id}",
-        name="Patriarch",
-        alignment=Alignment.RIGHTEOUS,
-    )
-    world.avatar_manager.register_avatar(patriarch)
+def _setup(world):
+    sect = Sect(1, "Test Sect", "", "", Alignment.RIGHTEOUS, SectHeadQuarter("HQ", "", Path()), ["Upper"],
+        rule_id="righteous_orthodoxy", magic_stone=1000)
+    patriarch = _avatar(world, "patriarch", Alignment.RIGHTEOUS)
+    breaker = _avatar(world, "breaker", Alignment.EVIL)
+    rogue = _avatar(world, "rogue", Alignment.RIGHTEOUS)
     patriarch.join_sect(sect, SectRank.Patriarch)
-    _authorize_sect(world, sect)
-    return patriarch
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world):
-    sect = Sect(
-        id=1,
-        name="Test Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=["测试上品金诀"],
-        rule_id="righteous_orthodoxy",
-        rule_desc="不得勾结邪魔。",
-        magic_stone=1000,
-    )
-
-    reward_technique = Technique(
-        id=99901,
-        name="测试上品金诀",
-        attribute=TechniqueAttribute.GOLD,
-        grade=TechniqueGrade.UPPER,
-        desc="",
-        weight=1.0,
-        condition="",
-        sect_id=1,
-    )
-    low_technique = Technique(
-        id=99902,
-        name="测试下品金诀",
-        attribute=TechniqueAttribute.GOLD,
-        grade=TechniqueGrade.LOWER,
-        desc="",
-        weight=1.0,
-        condition="",
-        sect_id=None,
-    )
-
-    rogue = _create_avatar(
-        base_world, avatar_id="rogue", name="Rogue", alignment=Alignment.RIGHTEOUS
-    )
-    member = _create_avatar(
-        base_world, avatar_id="member", name="Member", alignment=Alignment.RIGHTEOUS
-    )
-    breaker = _create_avatar(
-        base_world, avatar_id="breaker", name="Breaker", alignment=Alignment.EVIL
-    )
-
-    member.technique = low_technique
-    member.magic_stone = MagicStone(0)
-    breaker.magic_stone = MagicStone(100)
-    # Spending the treasury needs an office with a living holder, so the
-    # fixture declares a real patriarch instead of a sect nobody speaks for.
-    from src.classes.sect_ranks import SectRank
-
-    member.join_sect(sect, SectRank.Patriarch)
     breaker.join_sect(sect, get_rank_from_realm(breaker.cultivation_progress.realm))
+    world.existed_sects = [sect]
+    world.sect_context.from_existed_sects([sect])
+    bootstrap_institutional_authority(world)
+    return sect, patriarch, breaker, rogue
 
-    base_world.avatar_manager.avatars = {
-        rogue.id: rogue,
-        member.id: member,
-        breaker.id: breaker,
-    }
-    _authorize_sect(base_world, sect)
 
-    ctx = _dummy_ctx(rogue, member, breaker)
-    old_tech = techniques_by_name.get(reward_technique.name)
-    techniques_by_name[reward_technique.name] = reward_technique
+def test_serializes_read_only_context_evidence():
+    ctx = SectDecisionContext(basic_structured={}, basic_text="", power={}, territory={}, self_assessment={}, economy={},
+        relations=[], relations_summary="", history={}, celestial_dao=[{"kind": "omen"}], regional_semantics=[{"region_id": 7}],
+        imperial_crisis={"emperor": {"id": "e"}})
+    serialized = SectDecider._serialize_context(ctx)
+    assert serialized["celestial_dao"] == ctx.celestial_dao
+    assert serialized["regional_semantics"] == ctx.regional_semantics
+    assert serialized["imperial_crisis"] == ctx.imperial_crisis
 
+
+@pytest.mark.asyncio
+async def test_each_annual_action_is_a_separate_composed_public_selection(base_world):
+    sect, patriarch, breaker, rogue = _setup(base_world)
+    reward = Technique(100, "Upper", TechniqueAttribute.GOLD, TechniqueGrade.UPPER, "", 1.0, "", sect_id=sect.id)
+    old = techniques_by_name.get(reward.name)
+    techniques_by_name[reward.name] = reward
     try:
-        with (
-            patch(
-                "src.classes.sect_decider.resolve_sect_recruitment",
-                new=AsyncMock(
-                    return_value=type(
-                        "Outcome",
-                        (),
-                        {
-                            "accepted": True,
-                            "result_text": "Rogue 答应了 Test Sect 的招徕。",
-                        },
-                    )()
-                ),
-            ),
-            patch.object(
-                SectDecider,
-                "_plan",
-                new=AsyncMock(
-                    return_value=SectDecisionPlan(
-                        recruit_avatar_ids=[rogue.id],
-                        expel_avatar_ids=[breaker.id],
-                        reward_avatar_ids=[member.id],
-                        support_avatar_ids=[member.id],
-                    )
-                ),
-            ),
-        ):
-            result = await SectDecider.decide(sect, ctx, base_world)
+        with patch("src.classes.sect_decider.resolve_sect_recruitment", new=AsyncMock(return_value=SectRecruitmentOutcome(
+            decision=SingleChoiceDecision("ACCEPT", "accept", ChoiceSource.LLM, None, False),
+            result_text="accepted", accepted=True, sect_id=int(sect.id), avatar_id=rogue.id))):
+            recruited = await SectDecider.decide(sect, _ctx(patriarch, breaker, recruit=rogue), base_world, llm_call=_select("sect_annual_recruit", rogue.id))
+        expelled = await SectDecider.decide(sect, _ctx(patriarch, breaker), base_world, llm_call=_select("sect_annual_expel", breaker.id))
+        rewarded = await SectDecider.decide(sect, _ctx(patriarch), base_world, llm_call=_select("sect_annual_reward", patriarch.id))
+        supported = await SectDecider.decide(sect, _ctx(patriarch), base_world, llm_call=_select("sect_annual_support", patriarch.id))
+        assert (recruited.recruitment_count, expelled.expulsion_count, rewarded.technique_reward_count, supported.support_count) == (1, 1, 1, 1)
+        assert rogue.sect is sect and breaker.sect is None and patriarch.technique is reward and patriarch.magic_stone.value == 300
+        for result in (recruited, expelled, rewarded, supported):
+            assert result.decision_event.causal_payload["decision"]["chosen_chain"]
     finally:
-        if old_tech is None:
-            techniques_by_name.pop(reward_technique.name, None)
+        if old is None:
+            techniques_by_name.pop(reward.name, None)
         else:
-            techniques_by_name[reward_technique.name] = old_tech
-
-    assert rogue.sect == sect
-    assert rogue.sect_rank is not None
-    assert rogue.technique is None
-    assert breaker.sect is None
-    assert member.technique == reward_technique
-    assert member.magic_stone.value == 300
-    assert sect.magic_stone == 200
-    assert result.recruitment_count == 1
-    assert result.expulsion_count == 1
-    assert result.technique_reward_count == 1
-    assert result.support_count == 1
-    assert "招徕散修 1 人" in result.summary_text
-    assert any(
-        delta.get("aspect") == "sect_membership" and delta.get("after") == "none"
-        for event in result.events
-        for delta in (event.causal_payload or {}).get("deltas", [])
-    )
-    # Recruitment now carries deltas too, so the support fact is selected by
-    # what actually distinguishes it: the *member's* stones rose.
-    support_event = next(
-        event
-        for event in result.events
-        if any(
-            delta.get("aspect") == "magic_stone"
-            and delta.get("owner_kind") == "avatar"
-            and delta.get("owner_id") == str(member.id)
-            and float(delta.get("magnitude", 0)) > 0
-            for delta in (event.causal_payload or {}).get("deltas", [])
-        )
-    )
-    assert support_event.fact_kind.value == "state_transition"
-    assert {link.cause_event_id for link in support_event.causal_links} == {
-        result.decision_event.id
-    }
-    # And the recruitment is its own fact: treasury down, membership gained.
-    recruit_event = next(
-        event
-        for event in result.events
-        if any(
-            delta.get("aspect") == "sect_membership" and delta.get("before") == "none"
-            for delta in (event.causal_payload or {}).get("deltas", [])
-        )
-    )
-    assert recruit_event.fact_kind.value == "state_transition"
-    assert {
-        (delta["owner_kind"], delta["aspect"])
-        for delta in recruit_event.causal_payload["deltas"]
-    } == {("sect", "magic_stone"), ("avatar", "sect_membership")}
-    assert {link.cause_event_id for link in recruit_event.causal_links} == {
-        result.decision_event.id
-    }
+            techniques_by_name[reward.name] = old
 
 
 @pytest.mark.asyncio
-async def test_sect_decider_skips_recruitment_when_funds_insufficient(base_world):
-    sect = Sect(
-        id=1,
-        name="Poor Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-        rule_id="righteous_orthodoxy",
-        rule_desc="不得勾结邪魔。",
-        magic_stone=400,
-    )
-    rogue = _create_avatar(
-        base_world, avatar_id="rogue", name="Rogue", alignment=Alignment.RIGHTEOUS
-    )
-    base_world.avatar_manager.avatars = {rogue.id: rogue}
-    ctx = SectDecisionContext(
-        basic_structured={"name": "Poor Sect"},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        rule={"rule_id": "righteous_orthodoxy", "rule_desc": "不得勾结邪魔。"},
-        recruitment_candidates=[
-            {
-                "avatar_id": rogue.id,
-                "name": rogue.name,
-                "alignment": str(rogue.alignment),
-                "realm": str(rogue.cultivation_progress.realm),
-                "magic_stone": int(rogue.magic_stone.value),
-                "technique_name": "",
-                "technique_grade": "",
-                "technique_grade_rank": 0,
-                "alignment_recruitable": True,
-            }
-        ],
-        member_candidates=[],
-        relations=[],
-        relations_summary="",
-        history={"recent_events": [], "summary_text": ""},
-    )
-
-    with patch(
-        "src.classes.sect_decider.resolve_sect_recruitment", new=AsyncMock()
-    ) as mock_resolve:
-        result = await SectDecider.decide(sect, ctx, base_world)
-
-    mock_resolve.assert_not_awaited()
-    assert rogue.sect is None
-    assert sect.magic_stone == 400
-    assert result.recruitment_count == 0
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_llm_plan_receives_detailed_info(base_world):
-    sect = Sect(
-        id=1,
-        name="Wise Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-        rule_id="righteous_orthodoxy",
-        rule_desc="不得勾结邪魔。",
-        magic_stone=1000,
-    )
-    rogue = _create_avatar(
-        base_world, avatar_id="rogue", name="Rogue", alignment=Alignment.RIGHTEOUS
-    )
-    ctx = SectDecisionContext(
-        basic_structured={"name": "Wise Sect"},
-        basic_text="",
-        identity={
-            "purpose": "守正积势",
-            "style": "行事果决",
-            "orthodoxy_name": "仙道",
-            "rule_desc": "不得勾结邪魔。",
-        },
-        power={},
-        territory={},
-        self_assessment={},
-        economy={
-            "treasury_pressure": "tight",
-            "action_cost_notes": [
-                "每成功招募一名新人会立即消耗 500 灵石，并增加后续年度成员供养支出。",
-                "赐予功法会消耗宗门传承资源。",
-            ],
-        },
-        relations=[],
-        relations_summary="",
-        history={"recent_events": [], "summary_text": ""},
-        diplomacy_targets=[],
-        active_wars=[],
-        rule={"rule_id": "righteous_orthodoxy", "rule_desc": "不得勾结邪魔。"},
-        recruitment_candidates=[
-            {
-                "avatar_id": rogue.id,
-                "name": rogue.name,
-                "alignment": str(rogue.alignment),
-                "realm": str(rogue.cultivation_progress.realm),
-                "magic_stone": int(rogue.magic_stone.value),
-                "technique_name": "",
-                "technique_grade": "",
-                "technique_grade_rank": 0,
-                "alignment_recruitable": True,
-                "detailed_info": {"name": rogue.name, "bio": "detailed"},
-            }
-        ],
-        member_candidates=[],
-    )
-
-    payload = {
-        "thinking": "先观其人。",
-        "recruit_avatar_ids": [rogue.id],
-        "expel_avatar_ids": [],
-        "reward_avatar_ids": [],
-        "support_avatar_ids": [],
-    }
-    with (
-        patch.object(SectDecider, "_llm_available", return_value=True),
-        patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(return_value=payload),
-        ) as mock_llm,
-    ):
-        plan = await SectDecider._plan(
-            sect, ctx, base_world, recruit_cost=500, support_amount=300
-        )
-
-    assert plan is not None
-    infos = mock_llm.call_args.kwargs["infos"]
-    assert "detailed_info" in infos["decision_context_info"]
-    assert "bio" in infos["decision_context_info"]
-    assert "守正积势" in infos["decision_context_info"]
-    assert "传承资源" in infos["decision_context_info"]
-    assert infos["world_lore"] == ""
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_output_can_no_longer_declare_war(base_world):
-    """The periodic sect plan has no war channel left, in any shape."""
-    sect = Sect(
-        id=1,
-        name="War Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-        magic_stone=1000,
-    )
-    for sect_id in (1, 2):
-        base_world.institutional_authority.add_institution(
-            Institution(
-                kind=InstitutionKind.SECT,
-                owner_ref=EntityRef("sect", str(sect_id)),
-                founded_month=int(base_world.month_stamp),
-            )
-        )
-    ctx = SectDecisionContext(
-        basic_structured={"name": "War Sect"},
-        basic_text="",
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={"recent_events": [], "summary_text": ""},
-        diplomacy_targets=[
-            {
-                "other_sect_id": 2,
-                "other_sect_name": "Enemy Sect",
-                "status": "peace",
-                "war_months": 0,
-                "peace_months": 12,
-                "relation_value": -40,
-            }
-        ],
-        active_wars=[],
-        rule={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-    payload = {
-        "thinking": "先压边界。",
-        "diplomacy_actions": [
-            {"action": "declare_war", "other_sect_id": 2, "appraisal_ids": []},
-        ],
-        "recruit_avatar_ids": [],
-        "expel_avatar_ids": [],
-        "reward_avatar_ids": [],
-        "support_avatar_ids": [],
-    }
-    with (
-        patch.object(SectDecider, "_llm_available", return_value=True),
-        patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(return_value=payload),
-        ),
-    ):
-        result = await SectDecider.decide(sect, ctx, base_world)
-
-    assert not are_sects_at_war(base_world, 1, 2)
-    assert not hasattr(result, "war_declared_count")
-    plan_fields = set(SectDecisionPlan().__slots__)
-    assert "diplomacy_actions" not in plan_fields
-    assert [
-        event for event in result.events if event.fact_kind is FactKind.STATE_TRANSITION
-    ] == []
-
-
-def test_sect_decider_llm_available_uses_runtime_config():
-    mock_service = MagicMock()
-    mock_service.get_llm_runtime_config.return_value = (
-        type(
-            "Profile",
-            (),
-            {
-                "base_url": "http://test",
-                "model_name": "test-model",
-                "fast_model_name": "test-fast",
-                "api_format": "openai",
-            },
-        )(),
-        "secret",
-    )
-
-    with patch(
-        "src.classes.sect_decider.get_settings_service", return_value=mock_service
-    ):
-        assert SectDecider._llm_available() is True
-
-
-def test_sect_decider_accepts_codex_oauth_without_api_key():
-    mock_service = MagicMock()
-    mock_service.get_llm_runtime_config.return_value = (
-        type(
-            "Profile",
-            (),
-            {
-                "base_url": "codex://local",
-                "model_name": "gpt-5.6-terra",
-                "fast_model_name": "gpt-5.6-luna",
-                "api_format": "codex_cli",
-            },
-        )(),
-        "",
-    )
-
-    with patch(
-        "src.classes.sect_decider.get_settings_service", return_value=mock_service
-    ):
-        assert SectDecider._llm_available() is True
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_warns_when_llm_runtime_config_unavailable(base_world):
-    sect = Sect(
-        id=1,
-        name="Warn Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-        magic_stone=1000,
-    )
-    ctx = SectDecisionContext(
-        basic_structured={"name": "Warn Sect"},
-        basic_text="",
-        identity={},
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={"recent_events": [], "summary_text": ""},
-        diplomacy_targets=[],
-        active_wars=[],
-        rule={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-    mock_service = MagicMock()
-    mock_service.get_llm_runtime_config.return_value = (
-        type(
-            "Profile", (), {"base_url": "", "model_name": "", "fast_model_name": ""}
-        )(),
-        "",
-    )
-
-    with (
-        patch(
-            "src.classes.sect_decider.get_settings_service", return_value=mock_service
-        ),
-        patch("src.classes.sect_decider.get_logger") as mock_logger,
-    ):
-        plan = await SectDecider._plan(
-            sect, ctx, base_world, recruit_cost=500, support_amount=300
-        )
-
-    assert plan is None
-    assert (
-        "LLM runtime config unavailable"
-        in mock_logger.return_value.logger.warning.call_args.args[-1]
-    )
-
-
-@pytest.mark.asyncio
-async def test_sect_decider_warns_when_llm_plan_call_fails(base_world):
-    sect = Sect(
-        id=1,
-        name="Warn Sect",
-        desc="",
-        member_act_style="",
-        alignment=Alignment.RIGHTEOUS,
-        headquarter=SectHeadQuarter(name="HQ", desc="", image=Path("")),
-        technique_names=[],
-        magic_stone=1000,
-    )
-    ctx = SectDecisionContext(
-        basic_structured={"name": "Warn Sect"},
-        basic_text="",
-        identity={},
-        power={},
-        territory={},
-        self_assessment={},
-        economy={},
-        relations=[],
-        relations_summary="",
-        history={"recent_events": [], "summary_text": ""},
-        diplomacy_targets=[],
-        active_wars=[],
-        rule={},
-        recruitment_candidates=[],
-        member_candidates=[],
-    )
-    mock_service = MagicMock()
-    mock_service.get_llm_runtime_config.return_value = (
-        type(
-            "Profile",
-            (),
-            {
-                "base_url": "http://test",
-                "model_name": "test-model",
-                "fast_model_name": "test-fast",
-                "api_format": "openai",
-            },
-        )(),
-        "secret",
-    )
-
-    with (
-        patch(
-            "src.classes.sect_decider.get_settings_service", return_value=mock_service
-        ),
-        patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(side_effect=RuntimeError("boom")),
-        ),
-        patch("src.classes.sect_decider.get_logger") as mock_logger,
-    ):
-        plan = await SectDecider._plan(
-            sect, ctx, base_world, recruit_cost=500, support_amount=300
-        )
-
-    assert plan is None
-    assert (
-        "LLM plan failed: boom"
-        in mock_logger.return_value.logger.warning.call_args.args[-1]
-    )
+async def test_explicit_maintain_is_a_real_audited_noop(base_world):
+    sect, patriarch, breaker, rogue = _setup(base_world)
+    result = await SectDecider.decide(sect, _ctx(patriarch, breaker, recruit=rogue), base_world,
+        injected_decision=DomainDecision(DomainDecisionKind.MAINTAIN, "No action selected."))
+    assert result.decision_event.causal_payload["decision"]["chosen_chain"] == []
+    assert (result.recruitment_count, result.expulsion_count, result.technique_reward_count, result.support_count) == (0, 0, 0, 0)

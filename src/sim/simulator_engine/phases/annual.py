@@ -139,6 +139,9 @@ async def phase_sect_periodic_decision(simulator) -> list[Event]:
                 exc,
                 exc_info=True,
             )
+            # A sect executor may already have changed canonical owners.  The
+            # phase runner, not this loop, owns atomic rollback of that state.
+            raise
     return events
 
 

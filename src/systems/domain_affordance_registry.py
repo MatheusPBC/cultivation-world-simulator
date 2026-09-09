@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
+import inspect
 from typing import Any
 
 from src.classes.agent_decision import AgentDecision
@@ -27,7 +28,7 @@ class AffordanceContext:
 
 
 AffordanceProvider = Callable[[AffordanceContext], Iterable[DomainAffordance]]
-AffordanceExecutor = Callable[..., Event]
+AffordanceExecutor = Callable[..., Event | Awaitable[Event]]
 
 
 class StaleAffordanceError(ValueError):
@@ -190,6 +191,17 @@ class DomainAffordanceRegistry:
     ) -> Event:
         option = self.revalidate(context, selected_affordance_id)
         return self._executors[option.action_kind](context, option, **kwargs)
+
+    async def execute_async(
+        self,
+        context: AffordanceContext,
+        selected_affordance_id: str,
+        **kwargs: Any,
+    ) -> Event:
+        """Revalidate, then await an executor only when it genuinely needs I/O."""
+        option = self.revalidate(context, selected_affordance_id)
+        result = self._executors[option.action_kind](context, option, **kwargs)
+        return await result if inspect.isawaitable(result) else result
 
     def clear(self) -> None:
         self._providers.clear()

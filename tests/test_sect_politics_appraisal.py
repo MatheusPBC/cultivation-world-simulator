@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -21,6 +21,7 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.core.avatar import Avatar, Gender
 from src.classes.core.sect import Sect, SectHeadQuarter
 from src.classes.core.world import World
+from src.classes.domain_affordance import DomainDecision, DomainDecisionKind
 from src.classes.emotions import EmotionType
 from src.classes.event import Event, FactKind
 from src.classes.event_appraisal import AppraisalSource, EventAppraisal
@@ -190,11 +191,9 @@ def _appraisal_entry(appraisal_id: str = "ap-1", source_event_id: str = "ev-1") 
 
 
 async def _decide(sect, ctx, world, payload):
-    """Run one decision round with a fixed LLM payload."""
-    with patch.object(SectDecider, "_llm_available", return_value=True), patch(
-        "src.classes.sect_decider.call_llm_with_task_name", new=AsyncMock(return_value=payload)
-    ):
-        return await SectDecider.decide(sect, ctx, world)
+    """The removed diplomacy channel maps to an explicit public no-op."""
+    return await SectDecider.decide(sect, ctx, world, injected_decision=DomainDecision(
+        DomainDecisionKind.MAINTAIN, str(payload.get("thinking", "No annual action."))))
 
 
 # --- 1. Context ---
@@ -313,45 +312,27 @@ class TestSectDecisionAudit:
     async def test_every_round_emits_one_sect_decision_event(self, base_world):
         _, sect_a, _ = _make_world_with_two_sects(base_world, with_patriarch=True)
         ctx = _minimal_ctx([_target(2)])
-        payload = {"thinking": "Hold."}
-
-        with (
-            patch.object(SectDecider, "_llm_available", return_value=True),
-            patch(
-                "src.classes.sect_decider.call_llm_with_task_name",
-                new=AsyncMock(return_value=payload),
-            ) as provider,
-        ):
-            result = await SectDecider.decide(sect_a, ctx, base_world)
-
-        provider.assert_awaited_once()
+        result = await SectDecider.decide(sect_a, ctx, base_world, injected_decision=DomainDecision(
+            DomainDecisionKind.MAINTAIN, "Hold."))
         decision_events = [e for e in result.events if e.fact_kind is FactKind.DECISION]
         assert len(decision_events) == 1
         decision = decision_events[0].causal_payload["decision"]
         assert decision["subject_kind"] == "sect"
         assert decision["subject_id"] == "1"
-        assert decision["source"] == "llm"
-        assert decision_events[0].causal_origin is CausalOrigin.LLM_INTERPRETATION
+        assert decision["source"] == "injected"
+        assert decision_events[0].causal_origin is CausalOrigin.DETERMINISTIC
 
     @pytest.mark.asyncio
     async def test_rule_fallback_round_is_still_audited_and_never_raises(self, base_world):
         _, sect_a, _ = _make_world_with_two_sects(base_world, with_patriarch=True)
         ctx = _minimal_ctx([_target(2)])
 
-        with (
-            patch.object(SectDecider, "_llm_available", return_value=True),
-            patch(
-                "src.classes.sect_decider.call_llm_with_task_name",
-                new=AsyncMock(side_effect=RuntimeError("provider down")),
-            ) as provider,
-        ):
-            result = await SectDecider.decide(sect_a, ctx, base_world)
-
-        provider.assert_awaited_once()
+        result = await SectDecider.decide(sect_a, ctx, base_world, injected_decision=DomainDecision(
+            DomainDecisionKind.MAINTAIN, "Provider unavailable."))
         decision_events = [e for e in result.events if e.fact_kind is FactKind.DECISION]
         assert len(decision_events) == 1
-        assert decision_events[0].causal_payload["decision"]["source"] == "rule"
-        assert decision_events[0].causal_origin is CausalOrigin.ACTOR_DECISION
+        assert decision_events[0].causal_payload["decision"]["source"] == "injected"
+        assert decision_events[0].causal_origin is CausalOrigin.DETERMINISTIC
 
     @pytest.mark.asyncio
     @pytest.mark.asyncio
@@ -367,8 +348,7 @@ class TestSectDecisionAudit:
         try:
             world.event_manager = MagicMock()
             world.event_manager._storage = storage
-            with patch.object(SectDecider, "_llm_available", return_value=False):
-                events = await phase_sect_periodic_decision(simulator)
+            events = await phase_sect_periodic_decision(simulator)
         finally:
             _close(storage)
 

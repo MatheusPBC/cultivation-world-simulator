@@ -74,3 +74,8 @@ msgstr "Essa petição não se dirige a nenhuma instituição vigente"
 
 msgid "You have already endorsed that petition"
 msgstr "Você já apoiou essa petição"
+msgid "{sect_name} opened its annual administration round."
+msgstr "{sect_name} abriu sua rodada anual de administração."
+
+msgid "The selected annual sect action made no canonical change."
+msgstr "A ação anual selecionada da seita não produziu mudança canônica."

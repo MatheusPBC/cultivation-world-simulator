@@ -19,7 +19,7 @@ llm:
     backstory: "fast"
     custom_content_generation: "normal"
     fate_revelation: "normal"
-    sect_decider: "normal"
+    sect_annual_interpreter: "normal"
     sect_thinker: "fast"
     event_appraisal: "fast"
     chronicle_chapter: "fast"

@@ -226,7 +226,7 @@ def test_backend_compose_contract_exposes_port_and_healthcheck():
     backend_block = get_service_block(compose_text, "backend")
 
     assert backend_block, "Expected backend service in docker-compose.yml"
-    assert '"8002:8002"' in backend_block
+    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:8002:8002"', backend_block)
     assert "healthcheck:" in backend_block
     assert "test:" in backend_block
     assert "http://127.0.0.1:8002/api/v1/query/runtime/status" in backend_block
@@ -244,7 +244,7 @@ def test_frontend_compose_contract_depends_on_backend_and_exposes_port():
     assert 'depends_on:' in frontend_block
     assert 'backend:' in frontend_block
     assert 'condition: service_healthy' in frontend_block
-    assert '"8123:80"' in frontend_block
+    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:8123:80"', frontend_block)
     assert "healthcheck:" in frontend_block
     assert "test:" in frontend_block
     assert "http://127.0.0.1:80/api/v1/query/runtime/status" in frontend_block
