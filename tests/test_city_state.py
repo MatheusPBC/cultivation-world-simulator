@@ -7,6 +7,7 @@ from src.classes.environment.city_state import (
     CityDistrict,
     CityGovernance,
     CityState,
+    UrbanCrowdDamageProfile,
     UrbanAsset,
     UrbanPopulationGroup,
     UrbanServiceDemand,
@@ -299,6 +300,36 @@ def test_city_state_rejects_invalid_asset_ranges():
         UrbanAsset("asset", "core", ("housing",), 1.0, 0.5, -0.1)
     with pytest.raises(ValueError, match="capacity"):
         UrbanAsset("asset", "core", ("housing",), float("nan"), 0.5, 0.5)
+
+
+def test_urban_asset_crowd_damage_profile_is_strict_and_round_trips():
+    asset = UrbanAsset(
+        "water-core",
+        "core",
+        ("clean_water",),
+        100.0,
+        0.9,
+        1.0,
+        UrbanCrowdDamageProfile(0.6, 40.0),
+    )
+    payload = asset.to_dict()
+    assert payload["crowd_damage_profile"] == {
+        "crowd_exposure": 0.6,
+        "breach_effort_wan": 40.0,
+    }
+    assert UrbanAsset.from_dict(payload) == asset
+
+    missing = dict(payload)
+    missing.pop("crowd_damage_profile")
+    with pytest.raises(ValueError, match="missing"):
+        UrbanAsset.from_dict(missing)
+
+    null_payload = dict(payload, crowd_damage_profile=None)
+    assert UrbanAsset.from_dict(null_payload).crowd_damage_profile is None
+
+    invalid_profile = dict(payload, crowd_damage_profile={"crowd_exposure": 0.6})
+    with pytest.raises(ValueError, match="missing"):
+        UrbanAsset.from_dict(invalid_profile)
 
 
 @pytest.mark.parametrize("map_id", ["classic", "island_seas", "mountain_frontier"])

@@ -1,3 +1,6 @@
-Você interpreta uma condição regional para uma seita existente.
+Você decide, por uma seita existente, como responder a uma condição regional comprovada. Use somente as affordances transitórias enumeradas pela engine: você pode manter o estado atual ou selecionar exatamente um ID de affordance da lista. Nunca invente membro, região, valor, custo, duração nem qualquer mudança de estado: o membro e a quantia já estão fixados dentro da affordance escolhida, e nenhum membro fora dessa lista está elegível. Manter é uma resposta legítima quando o apoio não se justifica. O contexto institucional contém somente fatos canônicos atualmente conhecidos por esta seita e a projeção do titular autorizado agora; ele é perspectiva, não permissão nem comando, e um titular ausente significa que ninguém está autorizado, nunca que você deva imaginar um. Retorne apenas JSON compatível com o schema fornecido: decision igual a maintain ou act, reason não vazio, e selected_affordance_id presente somente quando act.
 
-Retorne JSON com decision igual a maintain ou support_member. Para support_member, action_intent deve conter apenas action_kind=support_member e um member_id de eligible_member_ids. Nunca escolha valor, custo, duração nem altere estado. Retorne maintain quando o apoio não for justificado.
+Ator: {actor}
+Gatilho: {trigger}
+Affordances disponíveis: {affordances}
+Contexto institucional: {context}

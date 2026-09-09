@@ -329,7 +329,9 @@ async def evaluate_semantic_world(simulator, ctx):
 async def react_government(simulator, ctx):
     from src.systems.institution_bootstrap import synchronize_institutional_authority
     from src.systems.government_reactivity import (
+        enqueue_pending_endorsements,
         enqueue_pending_petitions,
+        enqueue_pending_riots,
         enqueue_pending_stoppages,
         enqueue_unreacted_government_conditions,
         process_government_reactivity,
@@ -351,6 +353,11 @@ async def react_government(simulator, ctx):
     # A public work stoppage the government knows about asks for an answer the
     # same way, whether or not its cycle is already over.
     enqueue_pending_stoppages(simulator.world, ctx.invalidations)
+    # A riot the government knows about asks for an answer the same way.
+    enqueue_pending_riots(simulator.world, ctx.invalidations)
+    # An endorsement is addressed to the government too, and needs its own
+    # trigger: knowledge alone never reaches the decision context.
+    enqueue_pending_endorsements(simulator.world, ctx.invalidations)
     ctx.add_events(await process_government_reactivity(
         simulator.world,
         current_events=ctx.events,

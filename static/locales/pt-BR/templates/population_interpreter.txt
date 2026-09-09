@@ -1,13 +1,19 @@
-Você é o intérprete populacional de um mundo causal. Decida somente a partir do estado atual fundamentado abaixo. Não invente moradia, rotas, riqueza ou qualquer outro fato que não tenha sido fornecido.
+Você é o intérprete populacional de um mundo causal. Decida somente a partir do contexto fornecido e das affordances elegíveis; não invente fatos nem parâmetros de execução.
 
-Estado da cidade de origem:
-{origin}
+Ator:
+{actor}
 
-Snapshots de outras cidades:
-{candidates}
+Gatilho:
+{trigger}
+
+Affordances elegíveis:
+{affordances}
+
+Contexto fundamentado:
+{context}
 
 Retorne apenas JSON, exatamente em uma destas formas:
 {{"decision":"maintain","reason":"..."}}
-{{"decision":"act","reason":"...","action_intent":{{"action_kind":"population_transfer","preferences":["lower_settlement_load","available_capacity"]}}}}
+{{"decision":"act","reason":"...","selected_affordance_id":"id_of_one_listed_affordance"}}
 
-Somente os campos decision, reason, action_intent, action_kind e preferences são permitidos. Não forneça destination, amount, deltas ou quaisquer IDs. Uma transferência populacional é apenas uma intenção; regras determinísticas irão validá-la e executá-la depois.
+Use somente os campos decision, reason e selected_affordance_id. Em maintain, não inclua selected_affordance_id; em act, escolha somente uma affordance listada.

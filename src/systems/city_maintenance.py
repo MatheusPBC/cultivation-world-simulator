@@ -191,6 +191,17 @@ def execute_urban_maintenance(
         },
         fact_kind=FactKind.STATE_TRANSITION,
     )
+    # The same numbers the delta and the payload already state, promoted to
+    # `render_params` because that is the only part of an event institutional
+    # memory projects: `decision_context` never reads `causal_payload`, so a
+    # remembered repair would otherwise reach a later prompt without saying
+    # which asset improved or by how much.
+    event.render_params.update({
+        "asset_id": asset.id,
+        "improvement": improvement,
+        "integrity_before": asset.integrity,
+        "integrity_after": replacement.integrity,
+    })
     delta.event_id = event.id
     event.causal_payload["deltas"] = [delta.to_dict()]
 

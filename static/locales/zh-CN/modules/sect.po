@@ -101,6 +101,9 @@ msgstr "{sect_name} 花费 {cost} 灵石招徕 {avatar_name} 入门，{avatar_na
 msgid "{sect_name} judged that {avatar_name} had gravely violated the sect rules and expelled them from the sect."
 msgstr "{sect_name} 认定 {avatar_name} 严重违背门规，将其逐出宗门。"
 
+msgid "{sect_name} found {avatar_name} incompatible with its rules and ended their membership."
+msgstr "{sect_name} 认为 {avatar_name} 与本门规矩不合，终止了其门人身份。"
+
 msgid "{sect_name} bestowed the technique \"{technique_name}\" upon {avatar_name}."
 msgstr "{sect_name} 赐予 {avatar_name} 功法《{technique_name}》。"
 

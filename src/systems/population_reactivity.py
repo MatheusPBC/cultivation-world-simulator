@@ -31,6 +31,7 @@ from src.sim.simulator_engine.causal_budget import CausalBudget
 CIVIL_SUCCESS_EVENT_TYPES = frozenset({
     "civil_public_petition",
     "civil_work_stoppage_started",
+    "civil_riot_occurred",
 })
 
 

@@ -104,4 +104,42 @@ def setup_government_condition(world, *, controller_id="1", integrity=0.5):
         ),
     )
     world.mechanical_language.add_condition_instance(condition)
+    # A governed city needs an office that can actually act: the runtime now
+    # refuses urban work when the sovereign's office has no living holder, so
+    # a fixture that only names a `current_emperor_id` would describe a
+    # government nobody can speak for. Registered for real, then bootstrapped.
+    _register_sovereign(world)
     return city, trigger, condition
+
+
+def _register_sovereign(world) -> None:
+    """Give the dynasty a living, registered holder and bootstrap authority."""
+    from src.classes.age import Age
+    from src.classes.alignment import Alignment
+    from src.classes.core.avatar import Avatar, Gender
+    from src.classes.root import Root
+    from src.systems.cultivation import Realm
+    from src.systems.institution_bootstrap import bootstrap_institutional_authority
+    from src.systems.time import Month, Year, create_month_stamp
+
+    existing = world.avatar_manager.get_avatar(
+        str(world.dynasty.current_emperor_id)
+    )
+    if existing is None:
+        avatar = Avatar(
+            world=world,
+            name="Test Sovereign",
+            id=str(world.dynasty.current_emperor_id),
+            birth_month_stamp=create_month_stamp(Year(2000), Month.JANUARY),
+            age=Age(30, Realm.Qi_Refinement, innate_max_lifespan=80),
+            gender=Gender.MALE,
+            pos_x=0,
+            pos_y=0,
+            root=Root.GOLD,
+            personas=[],
+            alignment=Alignment.RIGHTEOUS,
+        )
+        avatar.personas = []
+        avatar.technique = None
+        world.avatar_manager.register_avatar(avatar)
+    bootstrap_institutional_authority(world)

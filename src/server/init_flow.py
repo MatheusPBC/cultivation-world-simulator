@@ -7,7 +7,10 @@ from datetime import datetime
 from typing import Any, Callable
 
 from src.systems.city_governance import ground_unclaimed_city_governance
-from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.systems.institution_bootstrap import (
+    bootstrap_institutional_authority,
+    establish_genesis_identity_anchors,
+)
 from src.sim.simulator_engine.prehistory import (
     genesis_month_stamp,
     run_institutional_prehistory,
@@ -324,6 +327,12 @@ async def perform_game_initialization(
             world.existed_sects = existed_sects
             world.sect_context.from_existed_sects(existed_sects)
             bootstrap_institutional_authority(world)
+            # New-world only, and only here: the sect context and the
+            # authority registry both exist now, and the prehistory window has
+            # not opened yet, so the declared anchors are established at the
+            # exact genesis month. Neither an ordinary load nor the monthly
+            # reconciliation may add one.
+            establish_genesis_identity_anchors(world)
             from src.systems.world_secret import initialize_world_secret
             initialize_world_secret(world, getattr(run_config, "world_secret_id", "none"))
 

@@ -41,6 +41,16 @@ msgstr "Ajude as pessoas na cidade, consumindo uma pequena quantia de Pedras Esp
 msgid "help_people_requirements"
 msgstr "Apenas em áreas urbanas e com Pedras Espirituais suficientes"
 
+# Action: EndorsePublicPetition
+msgid "endorse_public_petition_action_name"
+msgstr "Apoiar petição pública"
+
+msgid "endorse_public_petition_description"
+msgstr "Apoie publicamente, em seu próprio nome, uma petição que o povo desta cidade já apresentou ao governo"
+
+msgid "endorse_public_petition_requirements"
+msgstr "Requer estar vivo e presente nesta cidade, uma petição pública recente cuja queixa ainda esteja ativa, e não tê-la apoiado antes"
+
 # Action: SponsorDaoRite
 msgid "sponsor_dao_rite_action_name"
 msgstr "Patrocinar rito do Dao"

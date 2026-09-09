@@ -127,6 +127,9 @@ msgstr "{sect_name} gastou {cost} pedras espirituais para recrutar {avatar_name}
 msgid "{sect_name} judged that {avatar_name} had gravely violated the sect rules and expelled them from the sect."
 msgstr "{sect_name} julgou que {avatar_name} havia violado gravemente as regras e o expulsou da seita."
 
+msgid "{sect_name} found {avatar_name} incompatible with its rules and ended their membership."
+msgstr "{sect_name} considerou {avatar_name} incompatível com suas regras e encerrou seu vínculo com a seita."
+
 msgid "{sect_name} bestowed the technique \"{technique_name}\" upon {avatar_name}."
 msgstr "{sect_name} concedeu a técnica \"{technique_name}\" a {avatar_name}."
 

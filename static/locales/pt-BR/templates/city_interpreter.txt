@@ -1,5 +1,19 @@
-You interpret one grounded regional urban-risk transition.
+Você interpreta uma transição urbana fundamentada. Decida somente a partir do contexto fornecido e das affordances elegíveis; não invente fatos nem parâmetros de execução.
 
-Use only the supplied condition, existing urban assets, administrative capacity, eligible_capability_ids, and eligible_project_kinds. Return maintain when no intervention is warranted or possible. Return urban_maintenance only with one listed capability_id. Return urban_capacity_project only with one listed project_kind. Never invent resources, costs, duration, quantities, population changes, capacity gains, or deltas.
+Ator:
+{actor}
 
-Return JSON matching the supplied schema.
+Gatilho:
+{trigger}
+
+Affordances elegíveis:
+{affordances}
+
+Contexto fundamentado:
+{context}
+
+Retorne apenas JSON, exatamente em uma destas formas:
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","selected_affordance_id":"id_of_one_listed_affordance"}}
+
+Use somente os campos decision, reason e selected_affordance_id. Em maintain, não inclua selected_affordance_id; em act, escolha somente uma affordance listada.

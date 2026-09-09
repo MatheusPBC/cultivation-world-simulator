@@ -122,6 +122,54 @@ class CityDistrict:
 
 
 @dataclass(frozen=True)
+class UrbanCrowdDamageProfile:
+    """Declared physical aptitude of one asset to be damaged by a crowd.
+
+    Both readings are declared in config or by the map, never inferred from an
+    asset's name, kind, capability or position.  ``crowd_exposure`` states how
+    reachable and strikeable the fabric is; ``breach_effort_wan`` states the
+    physical effort, in the same 万 unit the world uses for population, needed
+    to inflict a full point of integrity loss.
+
+    Serving people is not the same as withstanding them: neither reading is
+    derived from service capacity, service quality, or administrative
+    capacity.
+    """
+
+    crowd_exposure: float
+    breach_effort_wan: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "crowd_exposure", _bounded(self.crowd_exposure, "crowd exposure")
+        )
+        object.__setattr__(
+            self,
+            "breach_effort_wan",
+            _positive(self.breach_effort_wan, "crowd breach effort"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "crowd_exposure": self.crowd_exposure,
+            "breach_effort_wan": self.breach_effort_wan,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "UrbanCrowdDamageProfile":
+        payload = _require_mapping(data, "crowd damage profile")
+        _strict_keys(
+            payload,
+            {"crowd_exposure", "breach_effort_wan"},
+            "crowd damage profile",
+        )
+        return cls(
+            crowd_exposure=payload["crowd_exposure"],
+            breach_effort_wan=payload["breach_effort_wan"],
+        )
+
+
+@dataclass(frozen=True)
 class UrbanAsset:
     """A generic urban capability-bearing asset."""
 
@@ -131,10 +179,20 @@ class UrbanAsset:
     capacity: float
     quality: float
     integrity: float
+    # Absent means this asset's physical aptitude is simply not modelled. It is
+    # a gap in what the world declares, not a statement that the fabric is
+    # immune, and it blocks crowd damage for lack of a basis to compute it.
+    crowd_damage_profile: UrbanCrowdDamageProfile | None = None
 
     def __post_init__(self) -> None:
         _require_string(self.id, "asset id")
         _require_string(self.district_id, "asset district_id")
+        if self.crowd_damage_profile is not None and not isinstance(
+            self.crowd_damage_profile, UrbanCrowdDamageProfile
+        ):
+            raise TypeError(
+                "asset crowd_damage_profile must be an UrbanCrowdDamageProfile"
+            )
         if not isinstance(self.capability_ids, (list, tuple)) or not self.capability_ids:
             raise ValueError("asset capability_ids must be a non-empty list")
         capabilities = tuple(_require_string(item, "asset capability id") for item in self.capability_ids)
@@ -153,6 +211,13 @@ class UrbanAsset:
             "capacity": self.capacity,
             "quality": self.quality,
             "integrity": self.integrity,
+            # Always emitted, `null` included: an absent key would leave the
+            # reader unable to tell "not modelled" from "lost in transit".
+            "crowd_damage_profile": (
+                self.crowd_damage_profile.to_dict()
+                if self.crowd_damage_profile is not None
+                else None
+            ),
         }
 
     @classmethod
@@ -160,11 +225,20 @@ class UrbanAsset:
         payload = _require_mapping(data, "asset")
         _strict_keys(
             payload,
-            {"id", "district_id", "capability_ids", "capacity", "quality", "integrity"},
+            {
+                "id",
+                "district_id",
+                "capability_ids",
+                "capacity",
+                "quality",
+                "integrity",
+                "crowd_damage_profile",
+            },
             "asset",
         )
         if not isinstance(payload["capability_ids"], list):
             raise ValueError("asset capability_ids must be a list")
+        profile = payload["crowd_damage_profile"]
         return cls(
             id=payload["id"],
             district_id=payload["district_id"],
@@ -172,6 +246,9 @@ class UrbanAsset:
             capacity=payload["capacity"],
             quality=payload["quality"],
             integrity=payload["integrity"],
+            crowd_damage_profile=(
+                None if profile is None else UrbanCrowdDamageProfile.from_dict(profile)
+            ),
         )
 
 

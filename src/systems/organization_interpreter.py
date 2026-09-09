@@ -41,6 +41,37 @@ def organization_affordance_context(
     )
 
 
+def _institution_context(
+    world: Any, sect: Any, trigger_event: Event
+) -> dict[str, Any] | None:
+    """This sect's own known history and current authorized holder.
+
+    A projection through the shared `decision_context` helper, so there is no
+    second reading of the same state and no fabricated memory. An unregistered
+    sect institution fails closed to nothing rather than naming a patriarch
+    the authority state does not actually hold.
+    """
+    from src.classes.institution import AuthorityScope
+    from src.systems.institutional_diplomacy import sect_institution_id
+    from src.systems.institutional_memory import decision_context
+
+    authority = getattr(world, "institutional_authority", None)
+    if authority is None:
+        return None
+    institution_id = sect_institution_id(str(sect.id))
+    if authority.get_institution(institution_id) is None:
+        return None
+    return decision_context(
+        world,
+        institution_id,
+        event_overlays=(trigger_event,),
+        # Supporting a member spends the sect's own treasury
+        # (`execute_sect_member_support` moves `sect.magic_stone`), so the
+        # office projected is the one that could actually authorize it.
+        authority_scope=AuthorityScope.TREASURY_DISPOSITION,
+    )
+
+
 async def interpret_organization_transition(
     world: Any,
     sect: Any,
@@ -75,7 +106,11 @@ async def interpret_organization_transition(
         affordances=options,
         task_name=ORGANIZATION_INTERPRETER_TASK,
         template_name=ORGANIZATION_INTERPRETER_TEMPLATE,
-        extra_context={"condition": condition.to_dict(), "region_id": str(region.id)},
+        extra_context={
+            "condition": condition.to_dict(),
+            "region_id": str(region.id),
+            "institution": _institution_context(world, sect, trigger_event),
+        },
         llm_call=llm_call,
         force_rule=force_rule,
         injected_decision=injected_decision,

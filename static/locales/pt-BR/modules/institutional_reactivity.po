@@ -33,6 +33,15 @@ msgstr "{region} interpretou um risco urbano como {decision}: {reason}"
 msgid "The people of {region} publicly petition their government over {label}."
 msgstr "O povo de {region} peticiona publicamente ao seu governo sobre {label}."
 
+msgid "A crowd in {region} broke into {asset}."
+msgstr "Uma multidão em {region} arrombou {asset}."
+
+msgid "{avatar} publicly endorses the petition of {region}."
+msgstr "{avatar} apoia publicamente a petição de {region}."
+
+msgid "The declared headquarters of {institution} is {region}."
+msgstr "A sede declarada de {institution} é {region}."
+
 msgid "The people of {region} stop working for one cycle."
 msgstr "O povo de {region} para de trabalhar por um ciclo."
 
@@ -41,3 +50,27 @@ msgstr "O trabalho recomeça em {region} com o fim da paralisação."
 
 msgid "{region} produced less {resource} during the work stoppage."
 msgstr "{region} produziu menos {resource} durante a paralisação."
+
+msgid "A departed voice cannot speak for anyone"
+msgstr "Uma voz que partiu não pode falar por ninguém"
+
+msgid "That public petition does not exist"
+msgstr "Essa petição pública não existe"
+
+msgid "That petition is no longer public notice"
+msgstr "Essa petição já não é aviso público"
+
+msgid "That petition names no city"
+msgstr "Essa petição não nomeia nenhuma cidade"
+
+msgid "Only someone in that city can endorse its petition"
+msgstr "Só quem está nessa cidade pode apoiar a petição dela"
+
+msgid "That grievance is no longer active"
+msgstr "Essa queixa já não está ativa"
+
+msgid "That petition addresses no standing institution"
+msgstr "Essa petição não se dirige a nenhuma instituição vigente"
+
+msgid "You have already endorsed that petition"
+msgstr "Você já apoiou essa petição"

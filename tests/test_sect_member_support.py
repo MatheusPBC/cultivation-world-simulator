@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from src.classes.age import Age
 from src.classes.items.magic_stone import MagicStone
 from src.classes.alignment import Alignment
@@ -72,18 +74,28 @@ def test_support_owner_requires_current_presence_and_need(base_world):
     assert eligible_member_ids(sect, region_id=str(region.id)) == ()
 
 
-def test_execute_support_mutates_both_canonical_owners_and_records_deltas(base_world):
-    sect = _sect()
-    avatar = _avatar(base_world, "member")
-    region = _ground(base_world, sect, avatar)
+@pytest.mark.asyncio
+async def test_execute_support_mutates_both_canonical_owners_and_records_deltas(
+    base_world,
+):
+    """Through the owner's real boundary: a live offer and a real decision.
+
+    Hand-made ids no longer reach the treasury, so the fixture goes through
+    the same door the dispatcher does.
+    """
+    from tests.test_organization_reactivity_integration import _setup
+    from tests.test_sect_support_authority import authorized_support
+
+    sect, avatar, region, trigger, condition = _setup(base_world)
+    context, option, decision_event = await authorized_support(
+        base_world, sect, region, condition, trigger
+    )
 
     event = execute_sect_member_support(
-        base_world,
-        sect,
-        member_id=avatar.id,
-        region_id=str(region.id),
-        decision_event_id="decision-1",
-        condition_event_id="condition-1",
+        context,
+        option,
+        decision_event_id=decision_event.id,
+        decision_event=decision_event,
     )
 
     assert event.event_type == "sect_member_support_completed"
@@ -93,12 +105,15 @@ def test_execute_support_mutates_both_canonical_owners_and_records_deltas(base_w
     assert {
         (item.owner_kind, item.owner_id, item.before, item.after) for item in deltas
     } == {
-        ("sect", "1", "1000", "700"),
-        ("avatar", "member", "0", "300"),
+        ("sect", str(sect.id), "1000", "700"),
+        ("avatar", str(avatar.id), "0", "300"),
     }
+    # Both owners really moved, and each delta names this event.
+    assert all(item.event_id == event.id for item in deltas)
+    # The real decision and the real condition are the cited causes.
     assert {link.cause_event_id for link in event.causal_links} == {
-        "decision-1",
-        "condition-1",
+        decision_event.id,
+        trigger.id,
     }
 
 

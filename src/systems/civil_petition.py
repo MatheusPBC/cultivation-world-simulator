@@ -367,6 +367,22 @@ def prior_local_petition(
     def _authoring_decision(world_: Any, event: Event, overlays: Any):
         from src.classes.agent_decision import AgentDecision
 
+        manager_ = getattr(world_, "event_manager", None)
+        resolve = getattr(manager_, "get_event_by_id", None)
+        # A windowed scan builds its events without causal links:
+        # `EventStorage._row_to_event` never fills them, and only
+        # `get_event_by_id` hydrates them from the edge table. Reading links
+        # off a scanned row would therefore find none after a real load, and
+        # every petition would silently fail its own provenance check. So the
+        # candidate is re-resolved by id before provenance is judged -- and
+        # only the candidate, so this stays one lookup per petition rather
+        # than a hydration of every windowed query.
+        provenance = event
+        if not getattr(event, "causal_links", None) and callable(resolve):
+            resolved = resolve(str(event.id))
+            if isinstance(resolved, Event):
+                provenance = resolved
+        event = provenance
         cited = [
             str(link.cause_event_id) for link in getattr(event, "causal_links", ())
             if link.relation is CausalRelation.TRIGGERED_BY
@@ -796,6 +812,9 @@ def civil_response_is_open(
     composing, so a direct registry call cannot buy a response to a fact the
     institution never learned. It reads canonical state only and owns none.
     """
+    from src.systems.civic_endorsement import endorsement_already_answered
+    from src.systems.civil_riot import riot_already_answered
+
     # One dynasty may govern several cities. Authority over this region says
     # nothing about a fact that happened in another one.
     if str(payload.get("region_id", "")) != str(getattr(region, "id", "")):
@@ -805,7 +824,14 @@ def civil_response_is_open(
         if already_responded(world, source_event.id):
             return False
     else:
-        if not institution_id or stoppage_already_answered(
+        # A stoppage, a riot and an endorsement are all public facts addressed
+        # to the institution that administers the region, and each carries its
+        # own response receipt. Answering one never closes another.
+        answered = {
+            "riot": riot_already_answered,
+            "endorsement": endorsement_already_answered,
+        }.get(kind, stoppage_already_answered)
+        if not institution_id or answered(
             world, source_event.id, institution_id
         ):
             return False

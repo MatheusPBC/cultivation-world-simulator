@@ -1,5 +1,6 @@
-You interpret one grounded urban condition from the current dynasty's institutional perspective.
+You decide, for the current dynasty, how to answer one grounded urban fact in this city. Use only the transient affordances the engine enumerated: you may maintain the current state, or select exactly one affordance ID from the list. Never invent resources, costs, duration, quantities, capability, project, policy, territory, factions, population changes, capacity gains, or deltas: the capability, the project and every quantity are already fixed inside the affordance you choose, and nothing outside that list exists. Maintaining is a legitimate answer, and nothing compels a repair. The trigger may be an active condition, a public petition, or a work stoppage; when the condition comes through as null the original pressure has already resolved, and you answer the fact that really happened without assuming the interruption is still under way. The institutional context holds only canonical facts this institution currently knows and the projection of the authorized holder right now; it is perspective, not permission or command, and an absent holder means nobody is authorized, never that you should imagine one. Return only JSON matching the supplied schema: decision maintain or act, a non-empty reason, and selected_affordance_id present only when act.
 
-Use only the supplied active condition, city governance, existing urban assets, and eligible affordances. Return maintain when no response is warranted. If acting, select exactly one listed capability_id or project_kind. Never invent resources, costs, duration, quantities, policy, territory, factions, population changes, capacity gains, or deltas.
-
-The response must be JSON matching the supplied schema.
+Actor: {actor}
+Trigger: {trigger}
+Available affordances: {affordances}
+Institutional context: {context}

@@ -4,10 +4,17 @@ V1 is deliberately not a simulation of the world's past life.  It runs a fixed,
 short window over the institutional subset of the canonical phases so the
 playable January starts with real institutional history instead of an empty
 one: regional economy is updated, economy reactivity offers the existing aid
-affordances, late mechanical evidence is persisted, and the canonical
-finalizer commits the month.  No avatar action, birth, death, war, climate or
-narration runs here, and nothing forces resources, pressure, or a positive
-decision -- a prehistory where every institution stays quiet is a valid world.
+affordances, the semantic world derives conditions from real metrics, governed
+and unclaimed cities answer them through their existing maintenance and
+capacity-project menus, a sect may support a member in need out of its own
+treasury, started projects advance, late mechanical evidence is persisted, and
+the canonical finalizer commits the month.
+
+No avatar action, birth, death, war, peace, imperial claim, climate, hazard,
+population reaction or narration runs here, and neither does the annual sect
+round.  Nothing forces
+resources, pressure, or a positive decision, and no condition is ever seeded:
+a prehistory where every institution stays quiet is a valid world.
 """
 
 from __future__ import annotations
@@ -29,6 +36,23 @@ PREHISTORY_MONTHS = 3
 PREHISTORY_PHASE_NAMES = (
     "update_regional_economy",
     "react_economy",
+    # A started project has to be able to advance, or a prehistory could open
+    # one and never finish it.
+    "advance_urban_capacity_projects",
+    # Where urban pressure actually comes from: conditions are derived from
+    # real metrics, never seeded.
+    "evaluate_semantic_world",
+    # Governed cities answer their own conditions through the existing
+    # maintenance and capacity-project menu. This phase couples to no war,
+    # peace or imperial claim: it synchronizes authority and runs the
+    # condition and civil triggers, and nothing else.
+    "react_government",
+    # A sect may answer a member's need out of its own treasury, through the
+    # same provider and owner the playable months use, and only when its
+    # treasury office really has a living holder.
+    "react_organization",
+    # Unclaimed cities answer through the same owner menu.
+    "react_city",
     "carry_forward_mechanical_invalidations",
     "finalize_step",
 )

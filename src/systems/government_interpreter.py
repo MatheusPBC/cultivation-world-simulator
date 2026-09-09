@@ -30,6 +30,8 @@ def government_affordance_context(
     world: Any, trigger_event: Event, condition: Any
 ) -> tuple[AffordanceContext, CityRegion, Any]:
     from src.systems.civil_petition import PETITION_EVENT_TYPE, STOPPAGE_EVENT_TYPE
+    from src.systems.civic_endorsement import ENDORSEMENT_EVENT_TYPE
+    from src.systems.civil_riot import RIOT_EVENT_TYPE
 
     # A government answers either a condition it noticed itself or a civil fact
     # its people produced. All of them name the region they concern, and the
@@ -37,7 +39,8 @@ def government_affordance_context(
     if (
         trigger_event.event_type
         not in ("semantic_condition_activated", PETITION_EVENT_TYPE,
-                STOPPAGE_EVENT_TYPE)
+                STOPPAGE_EVENT_TYPE, RIOT_EVENT_TYPE,
+                ENDORSEMENT_EVENT_TYPE)
         or not isinstance(trigger_event.render_params, Mapping)
     ):
         raise ValueError(
@@ -76,6 +79,66 @@ def government_affordance_context(
     )
 
 
+def _riot_fact_context(
+    world: Any, trigger_event: Event, region: CityRegion
+) -> dict[str, Any]:
+    """State the riot as a past event plus what it left behind.
+
+    The damage, the target and the crowd estimate come from the fact itself;
+    the asset's integrity and the service reading come from the owners as they
+    stand now. A riot is a single moment, so nothing here says one is ongoing.
+    """
+    from src.systems.civil_riot import riot_payload
+
+    payload = riot_payload(trigger_event)
+    if payload is None:
+        return {}
+    asset_id = str(payload["asset_id"])
+    capability_id = str(payload["capability_id"])
+    state = getattr(region, "city_state", None)
+    asset = next(
+        (
+            item
+            for item in getattr(state, "assets", ()) or ()
+            if str(item.id) == asset_id
+        ),
+        None,
+    )
+    access_now = None
+    if state is not None:
+        try:
+            access_now = state.service_access(
+                capability_id, float(region.population)
+            )
+        except (AttributeError, TypeError, ValueError):
+            access_now = None
+    return {
+        "riot": {
+            "riot_event_id": str(trigger_event.id),
+            "occurred_month": int(trigger_event.month_stamp),
+            "current_month": int(world.month_stamp),
+            "region_id": str(payload["region_id"]),
+            "asset_id": asset_id,
+            "capability_id": capability_id,
+            # What the fact recorded when it happened.
+            "damage": float(payload["damage"]),
+            "estimated_crowd_wan": payload.get("crowd_wan"),
+            "service_shortfall_then": payload.get("service_shortfall"),
+            "crowd_exposure": float(payload["crowd_exposure"]),
+            "breach_effort_wan": float(payload["breach_effort_wan"]),
+            # What the owners say right now, so the damage that remains is
+            # visible without the riot being described as still under way.
+            "asset_integrity_now": (
+                None if asset is None else float(asset.integrity)
+            ),
+            "service_access_now": (
+                None if access_now is None else float(access_now)
+            ),
+            "asset_still_present": asset is not None,
+        }
+    }
+
+
 def _civil_fact_context(
     world: Any, trigger_event: Event, region: CityRegion
 ) -> dict[str, Any]:
@@ -90,7 +153,11 @@ def _civil_fact_context(
 
     payload = stoppage_payload(trigger_event)
     if payload is None:
-        return {}
+        from src.systems.civic_endorsement import endorsement_fact_context
+
+        return _riot_fact_context(world, trigger_event, region) or (
+            endorsement_fact_context(world, trigger_event, region)
+        )
     month = int(world.month_stamp)
     record = getattr(getattr(region, "economy", None), "work_stoppage", None)
     is_this_one = (
@@ -112,6 +179,38 @@ def _civil_fact_context(
             "recorded_on_region": bool(is_this_one),
         }
     }
+
+
+def _institution_context(
+    world: Any, dynasty: Any, trigger_event: Event
+) -> dict[str, Any] | None:
+    """This dynasty's own known history and current authorized holder.
+
+    A projection of the existing institutional owners through the shared
+    `decision_context` helper -- no second reading of the same state, and no
+    memory invented for the facts this vertical produced. An unregistered
+    institution fails closed to nothing rather than describing a leader who
+    does not exist.
+    """
+    from src.classes.institution import AuthorityScope
+    from src.systems.institutional_memory import decision_context
+
+    authority = getattr(world, "institutional_authority", None)
+    if authority is None:
+        return None
+    institution = authority.get_institution_for_owner(
+        EntityRef("dynasty", str(dynasty.id))
+    )
+    if institution is None:
+        return None
+    return decision_context(
+        world,
+        institution.id,
+        event_overlays=(trigger_event,),
+        # Answering a city's condition is urban administration, so the office
+        # projected is the one that could actually take this choice.
+        authority_scope=AuthorityScope.URBAN_ADMINISTRATION,
+    )
 
 
 async def interpret_government_transition(
@@ -145,6 +244,7 @@ async def interpret_government_transition(
             "condition": condition.to_dict() if condition is not None else None,
             "region_id": str(region.id),
             **_civil_fact_context(world, trigger_event, region),
+            "institution": _institution_context(world, dynasty, trigger_event),
         },
         llm_call=llm_call,
         force_rule=force_rule,

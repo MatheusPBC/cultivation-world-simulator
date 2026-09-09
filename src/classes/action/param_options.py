@@ -26,6 +26,7 @@ class ParamOptionSource(str, Enum):
     KNOWN_GRAVE_POI_ID = "known_grave_poi_id"
     KNOWN_TREASURE_POI_ID = "known_treasure_poi_id"
     SPONSORABLE_DAO_RITE_EVENT_ID = "sponsorable_dao_rite_event_id"
+    ENDORSABLE_PUBLIC_PETITION_EVENT_ID = "endorsable_public_petition_event_id"
     ACTIVE_IMPERIAL_CLAIM_CANDIDATE_ID = "active_imperial_claim_candidate_id"
 
 
@@ -105,6 +106,8 @@ def _options_for_source(action_cls: type, avatar: "Avatar", source: ParamOptionS
         return _known_poi_options(avatar, kind="treasure")
     if source == ParamOptionSource.SPONSORABLE_DAO_RITE_EVENT_ID:
         return _sponsorable_dao_rite_options(avatar)
+    if source == ParamOptionSource.ENDORSABLE_PUBLIC_PETITION_EVENT_ID:
+        return _endorsable_public_petition_options(avatar)
     if source == ParamOptionSource.ACTIVE_IMPERIAL_CLAIM_CANDIDATE_ID:
         return _active_imperial_claim_options(action_cls, avatar)
     return []
@@ -145,6 +148,36 @@ def _active_imperial_claim_options(
                 "type": "imperial_claim",
             }
         )
+    return _limit_options(options)
+
+
+def _endorsable_public_petition_options(avatar: "Avatar") -> list[dict[str, Any]]:
+    """Return the public petitions whose event IDs the executor accepts.
+
+    The rule is not restated here: the civic owner answers whether this exact
+    avatar could endorse this exact petition right now, so a stale, foreign,
+    settled or already-endorsed one is never offered. Every option is a value
+    the boundary will accept, and the LLM only ever picks an enumerated ID.
+    """
+    from src.systems.civic_endorsement import endorsable_petitions
+
+    world = getattr(avatar, "world", None)
+    if world is None:
+        return []
+    options: list[dict[str, Any]] = []
+    for event in endorsable_petitions(world, avatar):
+        payload = dict(
+            (getattr(event, "causal_payload", {}) or {}).get("civil_petition", {})
+            or {}
+        )
+        options.append({
+            "value": str(event.id),
+            "id": str(event.id),
+            "name": str(getattr(event, "content", "") or "public petition"),
+            "type": "public_petition",
+            "region_id": str(payload.get("region_id", "")),
+            "month_stamp": int(getattr(event, "month_stamp", 0)),
+        })
     return _limit_options(options)
 
 

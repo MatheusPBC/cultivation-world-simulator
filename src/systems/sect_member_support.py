@@ -142,15 +142,57 @@ def _event(
 
 
 def execute_sect_member_support(
-    world: Any,
-    sect: Any,
+    context: Any,
+    option: Any,
     *,
-    member_id: str,
-    region_id: str,
     decision_event_id: str,
-    condition_event_id: str,
+    decision_event: Any = None,
 ) -> Event:
-    """Validate and execute a reactive support intent with causal evidence."""
+    """Validate authorship and the live offer, then spend the treasury.
+
+    The whole operation lives here, not in a registry wrapper: a direct call
+    is exactly as guarded as the dispatched one. The actor's own canonical
+    decision must select this option, the cited id must be that decision, and
+    the option must still be one the provider composes from current state --
+    matched by canonical id, which also covers a treasury office that lost its
+    holder, because the provider asks `can_actor_act_for` for it. Nothing is
+    spent before all of that holds.
+    """
+    from src.systems.collective_affordances import _active_sect
+    from src.systems.domain_affordance_registry import (
+        DOMAIN_AFFORDANCES,
+        StaleAffordanceError,
+        validate_actor_decision,
+    )
+
+    if (
+        str(getattr(option, "action_kind", "")) != "support_member"
+        or str(getattr(option, "domain", "")) != str(context.domain)
+        or getattr(option, "actor_ref", None) != context.actor_ref
+    ):
+        raise StaleAffordanceError("member support option is not this actor's")
+    validate_actor_decision(decision_event, context, option, label="member support")
+    if str(getattr(decision_event, "id", "")) != str(decision_event_id):
+        raise StaleAffordanceError("member support decision id does not match")
+    live = next(
+        (
+            item
+            for item in DOMAIN_AFFORDANCES.compose(context)
+            if str(item.action_kind) == "support_member"
+            and str(item.id) == str(option.id)
+        ),
+        None,
+    )
+    if live is None or dict(live.parameters) != dict(option.parameters):
+        raise StaleAffordanceError("member support is not currently offered")
+
+    world = context.world
+    sect = _active_sect(world, context.actor_ref.id)
+    if sect is None:
+        raise StaleAffordanceError("member support actor disappeared")
+    member_id = str(option.parameters["member_id"])
+    region_id = str(option.parameters["region_id"])
+    condition_event_id = str(context.trigger_event.id)
     avatar = (getattr(sect, "members", {}) or {}).get(str(member_id))
     if avatar is None:
         return _event(

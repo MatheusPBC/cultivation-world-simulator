@@ -37,7 +37,10 @@ from src.systems.domain_affordance_registry import (
     DOMAIN_AFFORDANCES,
     StaleAffordanceError,
 )
-from src.systems.institution_bootstrap import bootstrap_institutional_authority
+from src.systems.institution_bootstrap import (
+    bootstrap_institutional_authority,
+    synchronize_institutional_authority,
+)
 from tests.domain_reactivity_fixtures import setup_government_condition
 
 
@@ -53,6 +56,12 @@ def aggrieved(base_world):
     emperor = _emperor(base_world)
     base_world.dynasty.current_emperor_id = emperor.id
     bootstrap_institutional_authority(base_world)
+    # Bootstrap is idempotent and never moves an existing office's holder, so
+    # the sovereign office would still name whoever the shared fixture
+    # registered. Reconciliation is the runtime path that actually installs a
+    # new holder, and this fixture must leave the office pointing at the
+    # emperor it just declared.
+    synchronize_institutional_authority(base_world)
     return city, trigger, condition
 
 

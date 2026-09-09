@@ -2,6 +2,31 @@
 
 ## Current implementation ledger (2026-09-04)
 
+Sect annual administration now has its own `SECT_ADMINISTRATION` authority:
+only sect offices receive it, never dynasty offices. Explicit annual plans
+select every recruitment, expulsion, technique reward, and support action;
+an absent, failed, or malformed plan selects nobody. An explicit plan may end
+an actually incompatible living member's membership or replace a member's
+technique with the deterministic best permitted ID. Each owner transition cites
+the annual decision and carries canonical ID-based deltas. Treasury actions
+remain independently gated. Focused rollback tests
+cover failed commits; this is implementation evidence, not a deployment claim.
+The latest no-plan slice passed 77 focused tests across 12 files in 9.85
+seconds; ruff and diff checks were clean. Its coverage exercises unavailable,
+failed, and malformed planning with a real authority, eligible recruit, and
+needy member, verifying an auditable no-op rather than implicit selection.
+The final 120-month institutional smoke artifacts also completed with audit
+clean: natural recorded 3,225 events at causal depth 18, and pressured 3,676
+at depth 10 with 20 transfers plus the seven-fact witness/memory chain. Both
+reported zero broken or out-of-window links, Story mutations, untyped material
+ancestors, provider calls/awaits, and failed affordances. They exercise broad
+simulation health, not a substitute for the focused administration assertions.
+Those 120-month artifacts are evidence from the earlier administrative slice;
+they were not rerun for the no-plan change.
+Both activated 27 conditions and resolved none; this is a pending observation,
+without a causal attribution. Root's consolidated institutional check passed
+66 tests across 11 files in 8.07 seconds; ruff and diff checks were clean.
+
 The current working tree contains the institutional backbone pieces through the
 urban aid vertical: authority, relations, knowledge and memory remain separate
 World-owned state; aid uses independent request/response decisions, multi-term
@@ -518,22 +543,852 @@ baseline: no clean-checkout run was performed to confirm the failures predate
 this work, and they are deliberately left unfixed here rather than repaired as
 an unrelated feature.
 
+### Institutional actors now decide with their own history
+
+The government and organization interpreters were deciding blind. Both now
+project the **existing** `institutional_memory.decision_context` helper into
+`extra_context` as `"institution"`: only facts the institution genuinely knows
+(the helper already filters by `known.contains`), its current relations, and
+the projection of the office that could actually authorize the choice at hand.
+The institution id is resolved canonically -- `get_institution_for_owner` for
+the dynasty, `sect_institution_id` validated against `get_institution` for the
+sect -- and fails closed to `None` when the record is absent, rather than
+naming a leader the authority state does not hold. No new state, no planner,
+and no memory invented for the facts this wave produced.
+
+Scopes are the ones that could really authorize each choice, not a default.
+Government: `URBAN_ADMINISTRATION`. Sect: `TREASURY_DISPOSITION`, because
+`execute_sect_member_support` spends `sect.magic_stone`
+(`sect_member_support.py:167-180`) and `institution_bootstrap.py:22-27`
+bootstraps sect offices with exactly that scope.
+
+**The bigger find, in the same path.** `build_prompt` is
+`template.format(**processed)` (`src/utils/llm/prompt.py:19`), so any info
+without a matching placeholder is silently discarded -- and the government and
+organization templates, in both locales, had **no placeholders at all**: no
+`{actor}`, `{trigger}`, `{affordances}` or `{context}`. Their prose also asked
+for fields the runtime rejects (`capability_id`/`project_kind` for government;
+`decision=support_member`/`action_intent`/`member_id` for organization) while
+`_parse` accepts only `maintain|act` plus `selected_affordance_id` from the
+offered set (`domain_decision_interpreter.py:53-71`, schema at `:29-50`).
+
+Two defects were reproduced directly from HEAD `6bedde74`, and they are not the
+same shape. The **government** template omitted all four sentinels, so `format`
+dropped every info silently, with no error. The **population** template raises
+`KeyError` when formatted with the infos the runtime actually passes, because
+it carries placeholders whose keys the assembly does not supply.
+
+State the consequence precisely, and no further. A valid `act` remained
+expressible: `output_schema` enumerates the offered ids independently of the
+prompt (`:29-50`), so the ids were never unknowable and no claim is made that a
+valid selection was impossible. What the government prompt lacked was the
+material for an informed choice -- what each option is, its parameters and
+urgency, the trigger, and the institution's own known history were absent from
+the rendered text. For the population template, `KeyError` at the origin is a
+hard failure of that call.
+
+No real provider behaviour was measured. The tests in this step drive a fake
+boundary or run in test mode, which is why they prove the rendered text and
+nothing about a live model; qualitative actor autonomy is not demonstrated
+here. Note the inverse hazard now that the slots exist: a placeholder without a
+matching info key raises `KeyError` -- exactly the population template's
+failure -- so all four keys must stay present, and `_context()` always builds
+them (`:108-123`).
+
+The government and organization templates were rewritten in both locales to the
+real schema with the four slots, following
+`institutional_commitment_interpreter.txt`. The same input contract in the
+population, city and economy templates, plus the ten-template sweep in
+`tests/test_collective_prompt_templates.py`, was fixed in parallel; the
+consolidated run below covers all of it together.
+
+Evidence: `tests/test_interpreter_institution_context.py` passes 10 tests. They
+render the real template through `build_prompt` rather than only inspecting
+captured kwargs, and assert that every offered affordance ID, the current
+holder's name and a known fact's content appear in the finished text while an
+unknown fact's content and id do not. Also covered: a holder succession through
+`synchronize_institutional_authority` that changes the persona while the
+institution keeps the same remembered fact; the correct scope per domain read
+off the projected office; an unregistered institution projecting `None`; an
+empty menu never reaching the boundary at all (a deterministic `rule` maintain,
+zero fake calls); and the engine keeping sole ownership of the member and the
+amount, with interpretation moving no money. The boundary is a fake `llm_call`
+that returns a valid offered id -- never a provider.
+
+Two fixture facts surfaced and are owner behaviour working correctly, not bugs:
+`_ensure_office` is idempotent, so re-bootstrapping never moves a holder (the
+runtime path is `synchronize_institutional_authority`), and an office whose
+holder the avatar manager cannot find is refused as `HOLDER_DEAD`.
+
+Root's consolidated run for this step passed **110 tests in 40.97 s**: the ten
+template-sweep tests, the ten institution-context tests, five domain suites,
+three civil suites, aid, relationship and the twelve-month `Simulator.step`
+run. `ruff check` and `git diff --check` clean. The 120-month smokes were
+deliberately **not** re-run: this change touches prompt assembly and template
+text, where the real evidence is the `build_prompt` render, and the twelve-month
+run is already inside the selection.
+
+What this closes, stated narrowly: the wave 6 context gap -- institutional
+actors in the government and organization domains now decide with their own
+known history and current authorized office in front of them -- and the input
+contracts of the collective interpreter templates. It does **not** deliver a
+riot and does not complete wave 10, which stays partial exactly as described
+above: petition, single-cycle work stoppage and an independent government
+answer exist; riot, organized movement and rebellion do not.
+
 Limitation: the answer reuses the existing urban menu only. There is no force,
 no repression, no new resource, no concession, no negotiation and no bargaining
 state; a maintain remains a legitimate answer and nothing compels a repair.
+
+### A riot, and the first owner that can damage a city
+
+Wave 10's third civil rung. Before this, `UrbanAsset.integrity` had only an
+upward writer (`city_maintenance.py:158`); the sole downward one was the causal
+probe harness (`causal_probe.py:748`), and `material_hazard_impacts` degrades
+infrastructure sites, not urban assets. No actor in the world could damage a
+city -- only repair it. `src/systems/city_damage.py` is that mirror, and it is
+the one genuinely new owner in this slice.
+
+**The material basis is declared, never inferred.** `UrbanAsset` gained
+`crowd_damage_profile: UrbanCrowdDamageProfile | None`, holding
+`crowd_exposure` (bounded 0..1) and `breach_effort_wan` (finite > 0, in the
+same 万 unit the world uses for population). Serialization always emits the
+key -- `null` or a strict object -- so a reader can tell "not modelled" from
+"lost in transit". `None` **blocks** the action for lack of a basis: that is
+ignorance about the fabric, not a claim that it is immune. Save schema rose to
+6, with no migration and no real data rewritten.
+
+**The law**, an explicit calibratable mechanical approximation and not proven
+physics:
+
+```
+crowd_wan = district_population(asset.district_id, population)
+            * (1 - service_access(capability_id, population))
+            * MAX_RIOT_PARTICIPATION            # 0.20, the stoppage's ceiling
+damage    = min(MAX_RIOT_DAMAGE,                # 0.10, maintenance's scale
+                crowd_wan * crowd_exposure / breach_effort_wan,
+                asset.integrity)
+```
+
+`condition.intensity` is absent: severity does not become violence.
+`administrative_capacity` is absent in every role -- it repairs cities, it does
+not guard them, and using it as resistance would make a well-administered city
+magically immune. Service capacity and quality are absent as resistance too;
+they measure service rendered, not durability. The unmet share of declared
+demand enters only as an **engine-owned aggregate estimate of who is
+aggrieved**, and is never presented as a count of deprived people.
+
+**The cost is real and self-inflicted.** `effective_service_capacity`
+multiplies by integrity, so breaking the clinic deepens the very deficit the
+crowd was protesting. The menu says so before the choice: each option carries
+`crowd_wan`, `breach_effort_wan`, `service_access_now` and
+`service_access_after_damage`, so the self-harm can be weighed rather than
+guessed. No shared schema changed -- these live in the option's own parameters.
+
+**The owner is as safe as the registry.** `execute_crowd_damage` takes the
+context, the option and the actor's real decision fact; there is no generic
+"damage by N" entry point. It validates authorship through the shared
+`validate_actor_decision`, then requires the option to still appear in the
+provider's current read-only recomposition, matched by canonical id -- which
+rejects a tampered `damage`, since `DomainAffordance.id` derives from the whole
+content, and rejects a replay, since `riotable_targets` refuses a grievance
+whose riot receipt is spent. The magnitude is then re-derived from current
+state; the option's own figure is never applied. Nothing is written until the
+fact, its links and its delta are fully built, so a refusal leaves no partial
+mutation. It is also the *complete* operation -- it records the institutional
+knowledge and spends the riot receipt itself, and the registry executor merely
+delegates to it -- so there is exactly one public door and no way to write
+damage without spending the grievance. Note for future readers: `DomainAffordance.parameters` is a
+`MappingProxyType`, so a gate testing for `dict` would reject every real option
+and make every refusal test pass for the wrong reason -- the check is
+`collections.abc.Mapping`.
+
+**Government integration is explicit, with no new phase.** `enqueue_pending_riots`
+runs inside the existing `react_government` hook; `_civil_trigger`,
+`_close_civil_response`, the shared `civil_response_is_open` gate and
+`government_affordances` all recognise `riot` alongside `petition` and
+`stoppage`. So a direct registry call is gated on knowledge, authority and the
+spent response receipt exactly as the dispatcher is, and an unrecognised riot
+offers nothing even with a valid live condition beside it. The interpreter's
+context projects the riot factually -- damage, target, crowd estimate and the
+shortfall as recorded, plus the asset's integrity and the service reading as
+they stand now -- so the answer is informed without the riot being described as
+ongoing. A riot is one moment, not a state.
+
+Evidence: `tests/test_civil_riot.py` passes 20 tests, including a twelve-month
+`Simulator.step` run with no provider call that reaches the whole chain --
+population decision, damage with a real delta, and a dynasty answer linked
+`RESPONSE_TO` the persisted riot on a later month. Twelve months is that
+test's own window, chosen like the stoppage fixture's because the canonical
+definitions need about seven months to activate a grievance -- not a figure the
+engine imposes. The general smoke neither requires nor demonstrates a riot; the
+dedicated fixture guarantees the pressure and the targets and injects only a
+valid selection. Also covered: the law reading only declared terms; administrative
+capacity never immunising; a missing profile, an empty district and a satisfied
+demand each offering nothing; a Story grievance authorising nothing; the menu
+stating its own self-harm; the direct owner accepting a genuine riot and
+refusing a forged option, a mismatched citation and a replay; an unrecognised
+riot and a resolved grievance through the registry; knowledge gating the
+answer; strict profile serialization; and a month rollback releasing damage,
+knowledge and receipt together.
+
+Root's consolidated run for this slice passed **159 tests in 60.28 s**,
+including the twelve-month `Simulator.step` riot integration, the collective
+and civil regressions, rollback and save/map coverage. Read it as a focused
+selection, not a whole-suite result.
+
+The 120-month smokes were then re-run on this runtime and exited 0: natural
+recorded 3,202 events at max causal depth 18, and pressured 3,663 events at max
+depth 10 with 20 economic transfers. Both report zero broken causes,
+out-of-window causes, Story mutations, untyped events and failed affordances,
+with `provider_call_count` and `provider_await_count` at 0, an empty
+`story_as_material_cause_ids` and `audit.assertions_passed` true; the pressured
+run also carries its complete aid-chain witness. Audits are at
+`/tmp/cws-riot-natural120.json` and `/tmp/cws-riot-pressured120.json`. These
+are general world-health runs: they say the riot owner did not damage the
+world, and they are **not** the proof that a riot works -- that proof is the
+twelve-month `Simulator.step` test above. `ruff check` and `git diff --check`
+are clean.
+
+Backend strings: the riot event label was added to the **source** modules,
+`static/locales/{pt-BR,zh-CN}/modules/institutional_reactivity.po`, where the
+other civil strings already live, and compiled with `tools/i18n/build_mo.py`.
+`LC_MESSAGES/messages.po` is generated from those modules, so an edit made
+directly there is silently lost on the next build -- which is exactly what
+happened on the first attempt here. No other locale was touched.
+
+Split of work, all of it now landed: the preset entries in
+`static/game_configs/city_region.csv` (water at `crowd_exposure` 0.6 and
+`breach_effort_wan` 40 万 in the five cities, every other asset `null`), the
+save schema bump to 6, the old serialization tests,
+`tests/test_civil_riot_owner_boundary.py`,
+`src/server/assemblers/institutional_chain.py` and
+`web/src/locales/pt-BR/game.json` were done in parallel, not here. The map
+snapshot needed no version change; only the save schema moved. The
+pre-existing `test_city_state.py::test_urban_capability_quality_...`
+failure persists, unrelated and unchanged.
+
+### The damage becomes institutional memory
+
+Wave 6 asked for "memory decay/reinforcement, and their effect on future
+decisions" (`docs/specs/actor-driven-emergent-world.md:136`). That was
+delivered for commitments and transfers and never for civil facts: all four of
+them called `record_known_fact` **without** `factors` -- `civil_petition.py`
+for the petition and the stoppage, `civil_riot.py`, `civic_endorsement.py` --
+and `record_known_fact` only creates an `InstitutionalMemory` when factors are
+supplied (`institutional_memory.py:123-125`). Since `decision_context`
+projects *memories* rather than raw known facts (`:249-257`), every civil fact
+disappeared from institutional context the moment its response receipt closed.
+
+This slice closes that for **actual material damage only**: the riot, at the
+one call site `civil_riot.record_riot_aftermath`.
+
+`relative_scale` is the **observed integrity loss itself**, read from the
+canonical `urban_asset_integrity` delta on the city's own 0..1 scale. It is
+deliberately *not* divided by `MAX_RIOT_DAMAGE`: an execution cap limits what
+one riot may do, it is not a scale for how large the loss was, and dividing by
+it would amplify a small loss into a large memory. The other three factors are
+frozen at zero because nothing supports them -- no office, institution or
+control changed; there is no commitment to breach; and a generic urban asset is
+not an identity anchor. The knowledge channel stays `PUBLIC_FACT`: a broken
+building is a public fact, not a notice anyone served.
+
+`_damage_memory_factors` only **reads** the transition the damage owner
+already applied; the loss happened in `city_damage.execute_crowd_damage`, and a
+refusal here writes no memory rather than rolling anything back. It filters the
+deltas to the single one that names this event, this region and this aspect,
+checks the endpoints are finite and in 0..1, and requires the delta's
+endpoints, its recorded magnitude and the payload's damage figure to agree --
+with the finiteness check first, since `abs(NaN) > tol` is False and would
+otherwise pass silently. A foreign entry alongside the real delta is filtered,
+not fatal: this is a light coherence read, not a second validator of the damage
+owner.
+
+Deliberately excluded: **no memory for speech or interruption.** A petition, a
+stoppage and an endorsement stay known and unremembered -- speech has no
+material magnitude, and a stoppage has no integrity delta (its delta is the
+`work_stoppage` record, and forgone output is recorded with `deltas == []`), so
+stretching `relative_scale` to cover them would be inventing scale. Also
+excluded: no new helper module for a single caller, no reinforcement inferred
+from mere same-type-same-city recurrence (that is not causal evidence), no
+hostility or relationship change, and no change to options, urgency, triggers
+or fallback. The four `enqueue_*` civil triggers stay exactly as they are:
+memory is perspective, not a work queue, and `decision_context` truncates by
+salience at `MAX_KNOWN_FACTS_IN_DECISION_CONTEXT = 4`, so a fact that depended
+on memory alone could go unanswered. No claim is made about what happens with
+fewer than four facts.
+
+The effect, stated narrowly: known damage remains available in the
+government's institutional context on later decisions, after the original
+response receipt has closed and across a change of office holder.
+
+Evidence: `tests/test_civil_riot_memory.py` passes 18 tests -- one memory per
+riot with `relative_scale` equal to the real loss and explicitly not the capped
+ratio; the delta and the memory stating the same loss; eight parametrized
+incoherent-evidence cases writing no memory; a foreign delta entry filtered
+rather than fatal; petition, stoppage and endorsement leaving no memory while
+staying known; no memory or knowledge reaching another institution; the damage
+present in a later government decision **on a different trigger**, captured at
+the real `interpret_government_transition` boundary and rendered through the
+real template with `build_prompt`, with the riot's id, asset and damage all in
+the text; existing decay lowering salience over months; a month rollback
+releasing the memory; a real save/load roundtrip through the project's own
+helpers on the real SQLite store, with the whole chain persisted, keeping the
+factors and still projecting into a decision context; and the memory outliving
+a change of holder, asserted by the authorized holder's id actually changing.
+With the existing riot suite that is 38 tests in 15.48 s; root's consolidated
+run passed **74 tests in 19.75 s**. The 120-month smokes were **not** re-run
+for this slice, and the historical smoke numbers recorded above are not a
+claim about this change.
+
+Boundaries, exactly: memory weight comes only from the observed integrity loss
+on the 0..1 scale, never from an execution cap, a severity reading or a
+context limit; `identity_anchor_impact` is anchored at **0.0** and no urban
+asset is treated as an identity anchor; `institutional_change` and
+`commitment_breach` are likewise 0.0; no hostility, no relationship change and
+no population institution; petition, stoppage and endorsement gain no memory;
+no reinforcement is inferred from recurrence; triggers, options, urgency,
+fallback and schema are untouched. This completes no wave: it closes wave 6's
+memory item **for material civil damage only**, and wave 10 stays partial as
+described above -- civic movement, rebellion and revolution remain absent.
+
+### Sect support gets the authority and authorship gate it never had
+
+Preflight for putting `react_organization` in the prehistory found three holes,
+so the gate was fixed first and the phase was **not** enabled.
+
+`can_actor_act_for` appeared nowhere in the organization path.
+`TREASURY_DISPOSITION` occurred once, in `organization_interpreter`, and only
+as `decision_context(authority_scope=...)` -- a projection of which office to
+show the prompt, never a gate. `_execute_support` took a `decision_event_id`
+and swallowed the decision fact in `**_`, so authorship was a string: this
+support path did not validate the decision fact, and
+`organization_reactivity` never passed it. And nothing caught a treasury
+office that lost its holder between the offer and the spend, which matters
+because `execute_sect_member_support` moves `sect.magic_stone`.
+
+`organization_affordances` now requires `can_actor_act_for` under
+`TREASURY_DISPOSITION`, and re-reads the grievance from
+`get_active_conditions` by id and cause so a context built earlier cannot
+carry a condition that has since resolved. **No material control is required**:
+a treasury is not territorial, and the region only says where the member is --
+a member supported in a city the sect neither governs nor controls is still
+valid, and is asserted as such.
+
+The boundary moved into the owner. `execute_sect_member_support(context,
+option, *, decision_event_id, decision_event)` replaces the old
+`(world, sect, member_id=..., region_id=...)` signature -- no compatibility
+layer -- and validates authorship, the cited id, the option's own kind, domain
+and actor, and that the provider still composes exactly this option, before a
+single coin moves. A direct call is now as guarded as the dispatched one;
+`_execute_support` only delegates and adds the affordance id.
+
+Fixtures were updated to declare real authority rather than bypass it:
+`test_organization_reactivity_integration` now registers its member as a living
+patriarch and bootstraps, and `test_sect_member_support` and
+`test_month_transaction` drive the owner through a live offer and a real
+decision instead of hand-made ids.
+
+### And the sect joins the prehistory window
+
+With that gate in place, `react_organization` is now in
+`PREHISTORY_PHASE_NAMES`, after `react_government` and still in registry order.
+It reuses the existing phase, provider and owner -- the same authority check,
+the same `support_member` affordance, the same `execute_sect_member_support`.
+Nothing annual runs there, no planner, and no scripted event. The window is
+still three fixed months.
+
+Evidence: `tests/test_sect_prehistory.py` passes 5 tests, all through
+`run_institutional_prehistory`. A sect with a living patriarch supports a
+member in need in a city whose condition the semantic pass **derived** from
+declared material state and the engine-owned rule, with two real owner deltas,
+the sect's own decision and that city's own `clinic-risk` cause both cited, and
+this sect's own acting receipt -- `organization:<id>`, naming the condition,
+the affordance and the decision event, not merely some receipt in the world.
+A sect with nobody in need supports nobody. A real need left alone is an
+explicit MAINTAIN with the support genuinely on the menu, asserted through a
+maintain receipt, so it proves a decision rather than an absence. The window
+calls no provider. And the support survives a real save and load -- the loader
+rebuilds from the save itself, with no map handed back to it, and the stored
+support, decision, activation, deltas and the complete receipts all compare
+equal.
+
+Root's final consolidated run over eight files passed **79 tests in 13.06 s**,
+with `ruff check` and `git diff --check` clean. It includes the sect
+prehistory rollback proof: a failed month restores the transfer, the receipts,
+the conditions, the events, the calendar and the RNG cursor. Read it as a
+focused selection -- no new 120-month smoke was run for this slice, and nothing
+here is a whole-suite claim.
+
+Limits: support is the only organization affordance that exists, so this adds
+one kind of act and no more. There is **no institutional memory of support** --
+that owner does not exist for this path -- so nothing here claims a memory
+chain.
+
+### The annual sect round is gated too
+
+The annual `SectDecider` spent the same treasury with no authority check at
+all. It now asks `can_actor_act_for` under `TREASURY_DISPOSITION` -- again with
+**no** material control, since a treasury is not territorial -- before
+planning, so an unauthorized sect never has a provider consulted about a spend
+nobody could make; the round still emits its audit event, and **no spending
+step is recorded** in it rather than a fabricated choice. Expulsion and a
+technique reward are outside this gate and can still act, so an empty
+`chosen_chain` is what a particular fixture produced, not a general law.
+
+The question is asked again at every mutation point: per candidate before the
+invitation, and after the `resolve_sect_recruitment` await, where life,
+membership, race eligibility and funds are re-read as well. `join_sect` refuses
+an unaccepted race silently, so membership is confirmed to have actually
+happened before a single coin is debited -- otherwise the treasury would fall
+and a membership delta would be written for a join that never occurred.
+Support in `_process_members` is gated at its own mutation point; expulsion and
+a technique reward move no treasury and are untouched.
+
+Recruitment also stopped being prose: it is now a `STATE_TRANSITION` carrying a
+treasury delta and a `sect_membership` delta, linked `MOTIVATED_BY` to the
+round's own decision event.
+
+Limits: this covers the **recruitment and support** spends only. Expulsion and
+technique reward are deliberately outside it, and would need their own contract
+before being gated the same way. Fixtures were updated to declare real
+authority -- a living registered patriarch plus bootstrap -- rather than
+bypass it.
+
+Evidence: `tests/test_sect_annual_authority.py` passes 8 tests -- an authorized
+baseline recruiting with both real deltas and an audited step, driven by an
+enumerated plan so the treasury delta's `after` really is the balance; no
+office at all; an office that exists without the `TREASURY_DISPOSITION` scope;
+authority lost while planning, where no candidate is even invited; authority
+lost during the await; a candidate who joined elsewhere during the await; a
+race the sect stopped accepting mid-await; and support refused with an empty
+office.
+
+Root's final consolidated run over nine files passed **63 tests in 7.54 s**,
+with `ruff check` and `git diff --check` clean. It includes the annual rollback
+proof, which drives a real `EventManager` whose `commit_step` returns false and
+checks that treasury, membership, rank, events, calendar, institutional states
+and the RNG cursor are all restored.
+
+Evidence: `tests/test_sect_support_authority.py` passes 9 tests -- an
+authorized baseline that really spends; support valid outside any territory the
+sect controls; a missing and a mismatched decision, and authority lost after
+the offer, each **parametrized over both doors**, the registry and the owner
+called directly, asserting the sect's and the member's balances both unchanged;
+a forged option called on the owner with a real decision re-pointed at it; a
+resolved condition offering nothing; and a sect with no registered holder
+offered nothing.
+
+Root's runs, which are the evidence of record: a nine-file selection passed 74
+tests in 9.74 s on a temporary host, and the authority suite passed 9 in 1.25 s
+after the owner parametrization. The two overlap and are not additive. The same
+selection timed out at 124 s in the sandbox after 71 dots -- a known
+environment hang, not a result. None of this is a green whole suite.
+`ruff check` and `git diff --check` are clean.
+
+### The prehistory window now includes urban pressure and its answer
+
+Wave 8's prehistory ran only economy, aid and the relations those produce.
+`PREHISTORY_PHASE_NAMES` now also selects `advance_urban_capacity_projects`,
+`evaluate_semantic_world`, `react_government` and `react_city`, still as a
+**filter over the canonical registry in registry order** -- no phase is
+hand-written and `prehistory_phases()` still refuses a reordered subset. Three
+fixed months, unchanged.
+
+Checked before widening: `react_government` couples to **no** war, peace or
+imperial claim. It synchronizes authority and runs the condition and civil
+triggers, and its menu is the existing `_city_options` maintenance and
+capacity-project pair. `react_city` is the same menu for unclaimed cities.
+`evaluate_semantic_world` is what derives conditions from real metrics, so
+without it there is no urban pressure at all, and
+`advance_urban_capacity_projects` is there so a project opened in the window
+can advance. Still excluded: avatar actions, birth, death, war, peace, imperial
+claim, climate, hazards, organization, population reaction and narration.
+
+No condition is ever seeded. The tests declare material state and the
+engine-owned rule -- a damaged asset, a declared service demand, a
+`DerivedMetricDefinition` and a `ConditionDefinition` -- and the real semantic
+pass has to derive the instance itself; only the *selection* among options the
+engine composed is injected, and only in tests.
+
+Evidence: `tests/test_institutional_prehistory.py` passes 20 tests. The new
+ones show a governed city whose pressure is derived and then answered through
+the canonical menu, with a real `urban_asset_integrity` delta, the government's
+own decision as a fact, the institution's memory of the repair scaled to the
+real improvement, everything pre-playable, and the material state, memory
+factors, decision and activation all surviving the project's own save/load; an
+unclaimed city answered through `react_city`; and a quiet prehistory that
+answers nothing urban, which stays a valid world.
+`tests/test_urban_prehistory_lifecycle.py` proves the other two separately: a
+capacity project started and advanced before play, with real consumption,
+stock, progress deltas and decisions on pre-playable timestamps; and a failed
+month rolled back after the urban owner had acted, compared on the full
+`institutional_relations.to_dict()`, receipts, event ids, calendar and RNG
+cursor, with earlier committed months surviving. Root's consolidated run passed
+**88 tests in 11.71 s** across prehistory, game init, those two, government and
+city reactivity, month transaction and maintenance memory.
+
+Limits: the rollback comparison is on in-memory state -- the event store owns
+its own transaction -- and save/load is proven separately in the positive test.
+No new 120-month smokes were run for this wave. This does not complete wave 8,
+and completes no plan.
+
+### The long smokes now create and audit the genesis anchors
+
+The anchors existed but the smokes never produced any, so 120 months of
+integrated evidence said nothing about them. `_world_factory` already called
+`bootstrap_institutional_authority`; what was missing was the producer. It is
+now called in `capture_factory`, after that bootstrap and **before the first
+step** -- new world only, nothing in runtime or load. No sect is selected or
+invented: `SectContext.get_active_sects()` already answers with the active
+configs, and the classic map declares 14 seats (`SectRegion` 401-414 with
+`sect_id` 1-14). This is the institutional harness on `Simulator.step`, not
+`init_game_async`; the real initialization path has its own test.
+
+The premise facts happen before any step, so the step capture would never see
+them; they are added to `captured` exactly once, in `capture_factory`.
+
+`audit_identity_anchors(world, *, stage, expected_anchor_ids)` is a pure,
+testable helper. It checks each anchor against the fact it cites: evidence
+resolvable and not Story, `institution_identity_anchored` with
+`DETERMINISTIC`/`STATE_TRANSITION`, `anchor_id`/`institution_id`/`region_id`/
+`anchor_kind`/`premise` all matching, the month equal to `established_month`, a
+`region` subject, and exactly one `institutional_authority` delta whose
+`event_id` is the event's own with `absent` -> `established`. Violations are
+objects carrying their `stage`. Zero anchors is a valid *starting* result, so a
+config declaring no seat is not a failure -- but `expected_anchor_ids` makes an
+anchor that disappears after genesis a violation, closing the case where a
+naive audit would read a loss as clean.
+
+It runs at the factory and after **every** step, on the live world:
+`CausalTortureRunner` restores its checkpoint before returning, so a check made
+afterwards would only re-inspect restored genesis state. The runner itself was
+not touched.
+
+Two gaps in the existing audit were also closed: `assertions_passed` now
+requires `totals["out_of_window_causes"] == 0`, which the acceptance criteria
+demand and it was not asserting, plus no anchor violations.
+
+Results, one run each, both exit 0 taken from the process status rather than a
+piped `$?`. `/tmp/cws-anchor-natural120.json`: 120 months, 3,220 events, max
+causal depth 18. `/tmp/cws-anchor-pressured120.json`: 120 months, 3,684 events,
+max depth 9, 20 economic transfers, with the aid witness `fulfilled`
+`b2b7aaeb-75ae-4987-848e-3c21ad4edcd8` over seven steps and its memory events;
+a `null` witness in the natural run is a valid quiet world, not a gap. Both
+report `assertions_passed` true with `provider_call_count` 0 and zero broken
+causes, out-of-window causes, Story mutations and untyped events, and both held
+**14 anchors across all 121 audited stages with zero violations**.
+`tests/test_institutional_smoke_anchor_audit.py` passes 14 tests -- clean
+genesis, clean zero when nothing is declared, an anchor lost after genesis,
+evidence the store never held, a non-region subject, and nine parametrized
+corruptions of the cited fact; root's focused run was 28 in 3.57 s.
+
+Limits: this is the **institutional harness** on `Simulator.step` with an
+in-memory world -- not `init_game_async`, not a save/load stress run, and not a
+statement about overall world quality. It is two runs of two scenarios on the
+classic map, added no mechanic and changed no world logic. It completes nothing
+in the plan beyond giving the genesis anchors integrated evidence.
+
+### Declared sect headquarters finally become identity anchors
+
+`InstitutionalIdentityAnchor` was fully modelled, validated and serialized,
+and **no engine ever created one**: `add_identity_anchor` appeared exactly once
+in `src/` -- its own definition at `authority_state.py:170` -- with the only
+callers in tests. So `identity_anchor_impact` was structurally dead:
+`celestial_dao_service._identity_anchor_impact` scans `identity_anchors` and
+returned `0.0` in every real world because the dictionary was always empty.
+That is wave 2/6 backbone, not a civil extension.
+
+`establish_genesis_identity_anchors` closes it from the one source the world
+actually declares: a `SectRegion` names its owner through `sect_id`
+(`sect_region.py:16`, loaded at `load_map.py:203`), and being that region *is*
+being that sect's seat. `Sect.headquarter` is name/desc/image only and holds no
+spatial truth, so it is not used for this. `Dynasty` declares **no** capital
+and **no** founder anywhere, so no dynasty or city anchor is produced, nothing
+is inferred from `current_emperor_id` or from city control, and no city is ever
+created for a `SectRegion`.
+
+Invariants: new-world initialization only, wired in `init_flow.py` between
+`bootstrap_institutional_authority(world)` and `run_institutional_prehistory`
+-- the sect context and the authority registry both exist by then and the
+prehistory window has not opened. Neither `bootstrap_institutional_authority`
+nor `synchronize_institutional_authority` calls it, so a load or a monthly
+reconciliation can never add an anchor and invent a past. `established_month`
+is the world clock as it stands, which `prehistory.py:67,82` guarantees is
+exactly the genesis month, so nothing is backdated. Ids are deterministic, so
+a re-run is idempotent rather than a second founding.
+
+The premise fact is `institution_identity_anchored`, a `STATE_TRANSITION` of
+`CausalOrigin.DETERMINISTIC` -- no new enum -- carrying `institution_id`,
+`anchor_id`, `anchor_kind`, `region_id`, `institution_name`, `region_name` and
+`premise: world_genesis` in `render_params`, plus a real
+`institutional_authority` delta. Its content is a neutral declaration of a
+pre-existing seat, not a founding act, translated in the source modules for
+pt-BR and zh-CN. It is persisted **before** the anchor cites it, because
+`save_game._validate_institutional_evidence` (`:104-125`) refuses to save an
+authority state whose evidence is absent from the event store. That is a
+save-time check, and it does not by itself prevent pruning: it makes a save
+fail loudly afterwards rather than silently keeping an anchor whose premise is
+gone.
+
+No new owner, no new schema (`identity_anchors` already round-trips at
+`authority_state.py:74,96,108,329-331`), and no change to
+`celestial_dao_service`: the consumer was already written and was only missing
+data.
+
+Evidence: `tests/test_institution_identity_anchor.py` passes 12 tests -- the
+anchor and its persisted premise with every field checked and a region id
+deliberately different from the sect id; idempotency by deterministic id;
+nothing anchored for `sect_id = -1`, a missing sect or an inactive one; no
+dynasty or city anchor and no city created for a sect region; two sects getting
+distinct anchors and distinct facts; bootstrap and monthly sync never creating
+one; a real save/load roundtrip with the active sect that keeps the anchor and
+its evidence, plus the save refusing outright when evidence is missing; the
+previously dead factor reading the generated anchor and staying zero elsewhere;
+the real sponsorship lifecycle recording `identity_anchor_impact == 1.0`; and
+the premise being reachable from the state. `tests/test_institutional_prehistory.py`
+now also proves it in the **real** initialization: one declared seat becomes an
+anchor at the exact genesis month, before the playable month, with its premise
+still published. No month-rollback test exists for this producer on purpose --
+it runs outside any month, a failed initialization discards the candidate
+world, and the shared rollback behaviour is already covered elsewhere.
+
+Root's runs: 12 for the producer in 1.62 s, 55 integration in 7.64 s and 35
+shared, consolidated at 102. Focused selections, not a whole-suite result.
+
+Precise on what was and was not verified: the save-time guarantee was tested by
+adding an anchor whose evidence is absent and asserting
+`_validate_institutional_evidence` refuses -- **no** event-cleanup run was
+executed, and the interaction between pruning and anchor evidence was
+inspected in the code, not exercised.
+
+Limits of this slice: **new worlds only**; `HEADQUARTERS` anchors from
+`SectRegion` only; **no** dynasty, capital or founder anchor of any kind; **no**
+runtime or load backfill, so worlds created before this change gain no anchors;
+and **no** new 120-month smokes were run here.
+
+### The repair is remembered too, and authority is checked before it happens
+
+The damage became memory; the repair did not, so a government could answer a
+riot and then hold no record of having answered. `_execute_maintenance` now
+writes knowledge and memory for a **completed** repair only, for the
+institution the acting actor speaks for, through
+`KnowledgeChannel.OWN_ACTION` -- it did the work itself. `relative_scale` is
+the **observed improvement** read from the canonical `urban_asset_integrity`
+delta on the asset's own 0..1 scale, not divided by
+`MAX_MAINTENANCE_IMPROVEMENT`, with the other three factors frozen at 0.0 for
+the same reasons as the riot. `city_maintenance` promotes `asset_id`,
+`improvement`, `integrity_before` and `integrity_after` into `render_params`,
+because `decision_context` projects `render_params` and never
+`causal_payload`, so a remembered repair would otherwise reach a later prompt
+without saying which asset improved or by how much.
+
+Cause-independent by construction: a riot, a condition and a petition all
+leave the same record, since what is remembered is the improvement and not
+what prompted it. Nothing is dispatched by disaster name.
+
+**A real authority hole was found and closed while doing this.**
+`government_affordances` matched only the controller id, and
+`_require_urban_authorship` validates the *decision*, not the office -- so a
+dynasty whose sovereign office had no living holder could still mutate a city
+through the registry's own maintenance path. A post-mutation memory gate would
+not have fixed that, and is not presented as if it did. `_can_administer_now`
+now asks `can_actor_act_for` under `URBAN_ADMINISTRATION` with material
+control over that region, in the provider, so the menu is empty and
+`revalidate` refuses **before** any owner runs. It covers the capacity-project
+path too. Unclaimed cities keep their existing semantics through
+`city_affordances`, untouched.
+
+Fixture impact, reported rather than worked around:
+`tests/domain_reactivity_fixtures.py::setup_government_condition` named a
+`current_emperor_id` without registering an avatar, so it described a
+government nobody could speak for; it now registers a real holder and
+bootstraps. And `tests/test_civil_petition.py::aggrieved` declares its own
+emperor after that, which `bootstrap_institutional_authority` will not install
+because `_ensure_office` is idempotent -- it now calls
+`synchronize_institutional_authority`, the runtime path that actually moves a
+holder. `test_interpreter_institution_context.py`'s unregistered-institution
+test was updated to assert the stronger truth: such an institution can neither
+act nor name a leader, and the boundary is never reached.
+
+Deliberately excluded: no gratitude, hostility, reputation or relationship
+change; no grievance marked resolved and no full recovery inferred -- a
+partial improvement stays partial and the memory says exactly how much; no
+reinforcement of an older riot memory from the same city alone, which is not
+causal evidence; no memory erased; no resource, cost, option, urgency, trigger
+or schema change; no new module or abstraction; no query or UI.
+
+Evidence: `tests/test_urban_maintenance_memory.py` passes 12 tests -- the
+completed repair remembered at its real size and explicitly not the capped
+ratio, with `OWN_ACTION` and `relations == {}`; a partial improvement staying
+partial with the condition untouched; the repair naming the asset it really
+improved while a sibling of the same capability stays untouched; a blocked
+attempt remembering nothing; a holder lost **before** execution blocking the
+repair itself, with an injected decision that really chose that option and
+nothing moving afterwards; an unauthorized aftermath writing no memory;
+incoherent evidence writing no memory; damage and repair both reaching a later
+prompt at the real `interpret_government_transition` boundary rendered through
+the real template; a repair reinforcing no older riot memory and erasing none;
+a month rollback releasing it; a real save/load roundtrip keeping both
+memories and still projecting both; and no other institution learning it.
+
+Root's consolidated run passed **167 tests in 65.87 s** across the government,
+city, civil, endorsement, memory, registry, rollback, maintenance and
+projection suites, with `ruff check` and `git diff --check` clean. Read it as a
+focused selection, not a whole-suite result. The 120-month smokes were run
+separately as general world-health regression and are not proof that a repair
+is remembered; that proof is the boundary test above.
+
+This completes no wave: it extends wave 6's memory item to material civil
+repair, and wave 10 stays partial as described above.
+
+Not in this slice, by design: no repression or suppression --
+`AuthorityScope.FORCE_EMPLOYMENT` exists as a scope with no material force
+owner anywhere in the repository, so the government's answer remains its
+existing repair menu; no writes to `administrative_capacity`; no use of
+`UrbanPopulationGroup.service_priority_weights`; and no rebellion, which the
+spec gates on organization, leadership and material capacity that do not exist
+(the only organization owner with members is `src/classes/core/sect.py`, and no
+Avatar has any link to population).
+
+### A named person endorsing their city's petition
+
+The first bridge between an Avatar and the civil vertical. Petition, stoppage
+and riot all have an **aggregate** subject (`population:region:<id>`); no named
+person took part in any of them. `EndorsePublicPetition(cause_event_id)` lets
+one living resident publicly support the petition their own city already
+filed. It is individual **support**, not leadership, and not a completed civic
+movement.
+
+**What it is grounded on**, all re-read from canonical stores at every ask, by
+the single `get_endorse_petition_blocker` that serves the prompt filter,
+`can_start` and the execution boundary alike: a living avatar the world's own
+`avatar_manager` actually holds; standing in the petitioned city *now*; a
+stored `civil_public_petition` inside the notice window; a grievance still
+active; and an addressed institution that still stands and still administers
+this region. Authorship of the petition is not re-derived -- `prior_local_petition`
+already resolves the population's own audited decision, and there is at most
+one petition per condition instance, so requiring the selected id to be
+exactly that petition is the whole check.
+
+**Presence now is not evidence of past witness**, and the code does not
+pretend otherwise. A recent local petition is treated as *public notice
+available now* -- the kind of matter a resident could act on -- rather than as
+a claim that this avatar saw the filing. No avatar-level knowledge owner was
+invented to stand in for that.
+
+**No resource cost was invented.** Nothing is bought and no owner moves when
+someone speaks, so the action takes the ordinary action slot and nothing else.
+
+**Why there is no avatar-side reaction receipt.** An acting
+`DomainReactionReceipt` requires a real `DomainAffordance` id
+(`models.py:439`), and an avatar acts through the action registry, so there is
+none; inventing an id, or writing a `maintain` receipt for something that
+really acted, would both be lies in canonical state. Dedup therefore reads the
+canonical facts themselves -- persisted, plus a **current-month** transient
+buffer following the `_dao_sponsorship_events_this_step` precedent, which
+covers only the gap before the finalizer stores the event. `world.__dict__` is
+captured whole by `SimulationMonthCheckpoint`, so a rolled-back month drops the
+buffer, and it is never written to a save. Read failures in that path are
+**not** swallowed: "I could not read the store" is not "nobody ever endorsed",
+and answering the second would let a replay through. The only new receipt is
+the government's response, which selects a real affordance from the existing
+menu.
+
+**Authorship is strict, with no permissive default.** A missing, reactive or
+restored `action_origin` produces no fact, no notice and no buffer entry --
+`ActionOrigin.ACTOR_CHOICE` is required exactly. The engine writes it only
+after `start` returns, so the proof happens at the execution boundary, where
+`attach_validated_actor_decision` must find this exact action with this exact
+parameter in the avatar's own audited decision.
+
+**Government integration is explicit, not assumed.** Recording institutional
+knowledge does **not** by itself put a fact in front of the government:
+`decision_context` projects only *memories* whose facts are known, and a fact
+recorded without memory factors has none. So `enqueue_pending_endorsements`
+runs inside the existing `react_government` hook -- no new phase -- and
+`_civil_trigger`, `_close_civil_response`, the shared `civil_response_is_open`
+gate and `government_affordances` all recognise `endorsement` alongside
+petition, stoppage and riot. The endorsement carries its own response receipt,
+so answering it never resets the petition's, and answering the petition never
+closes it. The interpreter's context states who endorsed, when, the petition's
+own month, whether that person is still alive, and the grievance's reading now
+-- one named voice, never a count.
+
+**Performance**, because `endorsable_petitions` is reached from
+`get_action_infos` for every avatar every month: the avatar is rejected before
+any store is touched (dead, unregistered, or not in a city), the bounded window
+scan is filtered by event type and then by this avatar's own city on the rows
+already in hand, and only the survivors reach the rule. The menu passes the
+scanned row through to a private reader so the rule does not re-fetch it; the
+public and execution paths always resolve fresh by id, so no caller can
+substitute a forged object. No new cache and no persistent state.
+
+**Explicitly not built, and why.** No followers or counts of any kind; no
+organization; no faction; no `AuthorityClaim`, office or scope -- the
+city institution has no office holder by construction
+(`institution_bootstrap.py:140`), and nothing here changes that; no force or
+repression; no resources; **no new durable state at all** -- `CityRegion`,
+`CityState` and `UrbanPopulationGroup` are untouched, and no save schema moved.
+A durable "movement with a leader and a membership" record on `CityRegion`
+would be a faction layer by definition, and is the line this slice does not
+cross. Commitments were ruled out as a vehicle because `party_ids` are
+institution ids (`models.py:731`), so using them would turn a person into an
+institution.
+
+Evidence: `tests/test_civic_endorsement.py` passes 21 tests -- the executable
+baseline; every enumerated option being a value the boundary accepts, with the
+action really appearing in `get_action_infos`; dead, absent, unregistered,
+out-of-window and re-controlled all refusing; a forged petition and a foreign
+city refusing; a missing or reactive origin and an unchosen action producing no
+fact; the whole authored act with formal notice and no repeat; the real action
+driver (`commit_next_plan` + `tick_action`) producing it; a second resident
+endorsing the same petition with no aggregate anywhere; the transient buffer
+released by a month rollback; the government answering on its own decision
+without resetting the petition; knowledge gating the answer; an unrecognised
+endorsement offering the registry nothing even beside a valid condition;
+`react_government` itself answering a persisted endorsement; and a twelve-month
+`Simulator.step` run with no provider call reaching a state where a living
+resident is genuinely offered the action. That last test guarantees the
+resident in its fixture, because the institutional smoke scenario carries a
+single living avatar and none in a city -- it cannot by itself show a resident
+being offered anything. The focused selection across the civil, civic,
+government, sponsorship, domain-affordance, prompt-template and save-schema
+suites passes 142 tests in 48.64 s, with `ruff check` and `git diff --check`
+clean.
+
+Backend strings went to the **source** modules --
+`static/locales/{pt-BR,zh-CN}/modules/action_world.po` for the action labels
+and `.../institutional_reactivity.po` for the event line and every blocker
+message -- and were compiled with `tools/i18n/build_mo.py`, then verified to
+resolve in both locales. The assembler chain, the web PT-BR game strings and
+`tests/test_civic_endorsement_projection.py` were handled in parallel, not
+here.
+
+Status: this closes the individual-support step and nothing more. A civic
+**movement** -- organization, leadership, membership -- remains absent, as does
+rebellion, on the same evidence as before: no Avatar has any link to
+population, the only organization owner with members is
+`src/classes/core/sect.py`, and `FORCE_EMPLOYMENT` is a scope with no material
+force owner anywhere in the repository.
 
 Limitation: this is a work stoppage, not a general strike. It reduces declared
 labour output for one cycle in one region and touches nothing else -- no
 demand, no transfers, no routes, no projects, no leadership, no organization,
 no police, and no escalation ladder.
 
-Status, honestly: this is a **partial** wave 10 -- the civil slice's protest
-path, now with a bounded work stoppage. A *general* strike, riot, mob violence,
-civic movement, rebellion and revolution are all still absent by design: what
-exists is one petition and one single-cycle stoppage per pressure instance,
-with no organization, no leadership and no escalation between them. Rebellion
-in particular remains gated on the spec's own requirement of organization,
-leadership and material capacity.
+Status at the time of the stoppage slice (historical -- the riot section above
+supersedes the riot line): this was a **partial** wave 10, the civil slice's
+protest path with a bounded work stoppage, and a riot was then still absent.
+
+Status now: wave 10 remains **partial**. What exists is one petition, one
+single-cycle work stoppage and one riot per pressure instance, plus one
+endorsement per resident per petition, each unrepeatable and each drawing an
+independent government answer. A *general*
+strike, mob violence, a civic movement, rebellion and revolution are all still
+absent by design, with no organization, no leadership and no escalation
+scripted between the three rungs. Rebellion in particular remains gated on the
+spec's own requirement of organization, leadership and material capacity.
 Wave 11 (intrigue, conspiracy, mythical threats) stays conditional on
 long-run evidence and is not started. No whole-plan claim is valid.
 
@@ -804,9 +1659,11 @@ duplicate `DomainAffordance`. `build_avatar_prompt_context` gains
 `institutional_memory.decision_context` under the same scope, visible only to
 the avatar who may currently speak for the institution; an ordinary member
 sees nothing. History survives a leadership change: current office holding is
-not rechecked over past facts. Note that nothing in the engine ever creates an
-`InstitutionalIdentityAnchor` today, so that factor reads 0.0 in a real world
-and is exercised only by seeding an anchor in a test.
+not rechecked over past facts. On the identity factor, superseded by the
+genesis anchor section below: the engine now produces `HEADQUARTERS` anchors
+from declared `SectRegion` seats, at new-world initialization only. There is no
+backfill for existing saves, so in a world created before that change -- and in
+any world with no declared seat -- the factor still reads 0.0.
 
 Other institutions may now interpret a sponsorship they actually witnessed,
 reusing the existing relationship-impact engine with no new planner, church,

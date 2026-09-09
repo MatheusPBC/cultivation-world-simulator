@@ -19,6 +19,103 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+ANCHOR_EVENT_TYPE = "institution_identity_anchored"
+
+
+def audit_identity_anchors(
+    world, *, stage: str = "unknown", expected_anchor_ids=None
+) -> dict:
+    """Check every identity anchor against the fact it cites.
+
+    Pure and testable: it reads the world and returns findings. Zero anchors is
+    a valid *starting* result -- a world whose config declares no seat reports
+    none rather than being pushed into declaring one. Losing an anchor that
+    genesis established is not: pass `expected_anchor_ids` and each missing one
+    is a violation, so a later disappearance cannot read as a clean audit.
+    """
+    from src.classes.causal_origin import CausalOrigin
+    from src.classes.event import FactKind
+
+    state = getattr(world, "institutional_authority", None)
+    anchors = dict(getattr(state, "identity_anchors", {}) or {})
+    manager = getattr(world, "event_manager", None)
+    getter = getattr(manager, "get_event_by_id", None)
+    violations: list[dict] = []
+
+    def fail(anchor_id: str, reason: str, **extra) -> None:
+        violations.append(
+            {"stage": str(stage), "anchor_id": anchor_id, "reason": reason, **extra}
+        )
+
+    for missing in sorted(set(expected_anchor_ids or ()) - set(anchors)):
+        fail(missing, "anchor_lost")
+
+    for anchor in anchors.values():
+        if str(anchor.subject.kind) != "region":
+            fail(anchor.id, "subject_is_not_a_region", subject=str(anchor.subject.kind))
+        if not anchor.evidence_event_ids:
+            fail(anchor.id, "no_evidence")
+            continue
+        if anchor.institution_id not in (
+            getattr(state, "institutions", {}) or {}
+        ):
+            fail(anchor.id, "unknown_institution")
+        for event_id in anchor.evidence_event_ids:
+            event = getter(str(event_id)) if callable(getter) else None
+            if event is None:
+                fail(anchor.id, "missing_evidence", event_id=str(event_id))
+                continue
+            if bool(getattr(event, "is_story", False)):
+                fail(anchor.id, "story_evidence", event_id=str(event_id))
+            if str(getattr(event, "event_type", "")) != ANCHOR_EVENT_TYPE:
+                fail(anchor.id, "wrong_event_type", event_id=str(event_id))
+                continue
+            if getattr(event, "fact_kind", None) is not FactKind.STATE_TRANSITION:
+                fail(anchor.id, "wrong_fact_kind", event_id=str(event_id))
+            if getattr(event, "causal_origin", None) is not CausalOrigin.DETERMINISTIC:
+                fail(anchor.id, "wrong_origin", event_id=str(event_id))
+            params = getattr(event, "render_params", None) or {}
+            if str(params.get("anchor_id")) != anchor.id:
+                fail(anchor.id, "anchor_id_mismatch", event_id=str(event_id))
+            if str(params.get("institution_id")) != anchor.institution_id:
+                fail(anchor.id, "institution_mismatch", event_id=str(event_id))
+            if str(params.get("region_id")) != str(anchor.subject.id):
+                fail(anchor.id, "region_mismatch", event_id=str(event_id))
+            if str(params.get("anchor_kind")) != str(anchor.kind.value):
+                fail(anchor.id, "anchor_kind_mismatch", event_id=str(event_id))
+            if str(params.get("premise")) != "world_genesis":
+                fail(anchor.id, "premise_mismatch", event_id=str(event_id))
+            if int(getattr(event, "month_stamp", -1)) != int(
+                anchor.established_month
+            ):
+                fail(anchor.id, "month_mismatch", event_id=str(event_id))
+            deltas = [
+                item
+                for item in ((getattr(event, "causal_payload", None) or {}).get(
+                    "deltas"
+                ) or [])
+                if isinstance(item, dict)
+                and str(item.get("owner_kind")) == "institutional_authority"
+                and str(item.get("owner_id")) == anchor.institution_id
+                and str(item.get("aspect")) == f"identity_anchor:{anchor.id}"
+            ]
+            if len(deltas) != 1:
+                fail(anchor.id, "delta_missing_or_ambiguous", event_id=str(event_id))
+                continue
+            delta = deltas[0]
+            if str(delta.get("event_id")) != str(event.id):
+                fail(anchor.id, "delta_cites_another_event", event_id=str(event_id))
+            if str(delta.get("before")) != "absent":
+                fail(anchor.id, "delta_before_not_absent", event_id=str(event_id))
+            if str(delta.get("after")) != "established":
+                fail(anchor.id, "delta_after_not_established", event_id=str(event_id))
+    return {
+        "anchor_count": len(anchors),
+        "anchor_ids": sorted(anchors),
+        "violations": violations,
+    }
+
+
 def _world_factory(*, pressured: bool, commerce: bool, seed: int):
     from src.classes.age import Age
     from src.classes.core.avatar import Avatar, Gender
@@ -99,8 +196,30 @@ async def run_scenario(*, pressured: bool, seed: int, months: int, commerce: boo
     simulators: dict[int, object] = {}
     factory = _world_factory(pressured=pressured, commerce=commerce, seed=seed)
 
+    anchor_audits: list[dict] = []
+    genesis_anchor_ids: set[str] = set()
+
     def capture_factory(index: int, world_seed: int):
-        return factory(index, world_seed)
+        from src.systems.institution_bootstrap import (
+            establish_genesis_identity_anchors,
+        )
+
+        world = factory(index, world_seed)
+        # New world only, after the factory's own bootstrap and before the
+        # first step. This is the institutional harness, not
+        # `init_game_async`; the real initialization path is covered by its
+        # own test. `SectContext.get_active_sects()` already answers with the
+        # active configs, so no sect is selected or invented here.
+        premises = establish_genesis_identity_anchors(world)
+        # The premise facts happen before any step, so the step capture would
+        # never see them. Added exactly once, here.
+        captured.extend(premises)
+        baseline = audit_identity_anchors(world, stage="genesis")
+        anchor_audits.append(baseline)
+        # Whatever genesis established must still be there at every later
+        # stage; an anchor that disappears is a violation, not a clean zero.
+        genesis_anchor_ids.update(baseline["anchor_ids"])
+        return world
 
     async def normal_step(world):
         from src.sim.simulator import Simulator
@@ -110,6 +229,14 @@ async def run_scenario(*, pressured: bool, seed: int, months: int, commerce: boo
         simulator = simulators[id(world)]
         events = await simulator.step()
         captured.extend(events)
+        # Audited on the live world while the run is still in progress: the
+        # torture runner restores its checkpoint before returning, so a check
+        # made afterwards would only re-inspect restored genesis state.
+        anchor_audits.append(audit_identity_anchors(
+            world,
+            stage=f"month:{int(world.month_stamp)}",
+            expected_anchor_ids=genesis_anchor_ids,
+        ))
         memory_event_ids.update(
             str(memory.event_id)
             for memory in (getattr(world.institutional_relations, "memories", {}) or {}).values()
@@ -271,18 +398,37 @@ async def run_scenario(*, pressured: bool, seed: int, months: int, commerce: boo
         witness["edges"] = chain_edges
         witness["memory_event_ids"] = sorted(memory_event_ids.intersection(chain))
     complete = all(witness.values()) if (pressured or commerce) else True
+    anchor_violations = sorted(
+        (
+            violation
+            for entry in anchor_audits
+            for violation in entry["violations"]
+        ),
+        key=lambda item: json.dumps(item, sort_keys=True),
+    )
+    anchor_counts = sorted({entry["anchor_count"] for entry in anchor_audits})
     audit = {
         "provider_call_count": provider.call_count,
         "provider_await_count": provider.await_count,
         "story_as_material_cause_ids": sorted(set(story_as_material_cause_ids)),
         "memory_event_ids_observed": sorted(memory_event_ids),
         "witness": witness,
+        "identity_anchors": {
+            "genesis_count": anchor_audits[0]["anchor_count"] if anchor_audits else 0,
+            "counts_observed": anchor_counts,
+            "stages_audited": len(anchor_audits),
+            "violations": anchor_violations,
+        },
         "assertions_passed": (
             provider.call_count == 0
             and provider.await_count == 0
             and not story_as_material_cause_ids
             and data["totals"]["broken_causes"] == 0
             and data["totals"]["story_mutations"] == 0
+            # The acceptance criteria require this to be zero, and the audit
+            # was not asserting it.
+            and data["totals"]["out_of_window_causes"] == 0
+            and not anchor_violations
             and complete
             and (not (pressured or commerce) or bool(witness.get("memory_event_ids")))
         ),

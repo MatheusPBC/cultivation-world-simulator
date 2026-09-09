@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from typing import Any
 
 from src.classes.causal_link import CausalLink, CausalRelation
@@ -129,6 +130,59 @@ def _stoppage_option(context: AffordanceContext, origin) -> tuple[DomainAffordan
     ),)
 
 
+def _riot_option(context: AffordanceContext, origin) -> tuple[DomainAffordance, ...]:
+    """One option per asset a crowd could really damage, or none at all.
+
+    An asset with no declared `UrbanCrowdDamageProfile` is absent from this
+    menu because its physical aptitude is unknown, not because it is immune.
+    The engine fixes the target's damage; the choice is only which listed
+    target, or none.
+    """
+    from src.systems.civil_riot import (
+        RIOT_ACTION,
+        aggrieved_crowd_wan,
+        projected_service_access,
+        riotable_targets,
+    )
+
+    condition = context.condition
+    if condition is None:
+        return ()
+    options: list[DomainAffordance] = []
+    for asset, capability_id, damage in riotable_targets(
+        context.world, origin, condition, overlays=(context.trigger_event,)
+    ):
+        access_now, access_after = projected_service_access(
+            origin, asset, capability_id, damage
+        )
+        options.append(DomainAffordance(
+            domain=context.domain,
+            actor_ref=context.actor_ref,
+            action_kind=RIOT_ACTION,
+            target_refs=(EntityRef("region", str(origin.id)),),
+            parameters={
+                "region_id": str(origin.id),
+                "condition_instance_id": str(condition.id),
+                "asset_id": str(asset.id),
+                "capability_id": str(capability_id),
+                "damage": damage,
+                # Stated so the choice can be weighed rather than guessed: the
+                # crowd this grievance could gather, the declared effort the
+                # fabric costs, and what breaking it does to the very service
+                # being demanded. Estimates, not measurements.
+                "crowd_wan": aggrieved_crowd_wan(origin, asset, capability_id),
+                "breach_effort_wan": float(
+                    asset.crowd_damage_profile.breach_effort_wan
+                ),
+                "service_access_now": access_now,
+                "service_access_after_damage": access_after,
+            },
+            urgency=_condition_urgency(context),
+            motivation_event_ids=(context.trigger_event.id,),
+        ))
+    return tuple(options)
+
+
 def population_affordances(context: AffordanceContext):
     origin = _region(context.world, _actor_region_id(context.actor_ref))
     condition = context.condition
@@ -144,11 +198,12 @@ def population_affordances(context: AffordanceContext):
     # to its government, leaving, or doing neither.
     petition = _petition_option(context, origin)
     stoppage = _stoppage_option(context, origin)
+    riot = _riot_option(context, origin)
     population = float(origin.population)
     capacity = float(origin.population_capacity)
     if population <= 0 or capacity <= 0 or population / capacity <= 0.85:
         # Not crowded enough to migrate, but the grievance can still be voiced.
-        return (*petition, *stoppage)
+        return (*petition, *stoppage, *riot)
     urgency = _condition_urgency(context)
     desired_fraction = min(
         MAX_POPULATION_TRANSFER_FRACTION,
@@ -202,7 +257,7 @@ def population_affordances(context: AffordanceContext):
                 motivation_event_ids=(context.trigger_event.id,),
             )
         )
-    return (*options, *petition, *stoppage)
+    return (*options, *petition, *stoppage, *riot)
 
 
 def economy_affordances(context: AffordanceContext):
@@ -397,23 +452,36 @@ def government_affordances(context: AffordanceContext):
     )
 
     from src.systems.civil_petition import STOPPAGE_EVENT_TYPE
+    from src.systems.civic_endorsement import (
+        ENDORSEMENT_EVENT_TYPE,
+        canonical_endorsement_payload,
+    )
+    from src.systems.civil_riot import RIOT_EVENT_TYPE, canonical_riot_payload
 
     condition = context.condition
     civil_kind = "petition"
     civil = petition_payload(context.trigger_event)
     if civil is None:
-        civil_kind = "stoppage"
         # Read from the stored fact, so composing against a loose object that
-        # merely looks like a stoppage offers nothing. The government answers
-        # on a later cycle than the stoppage, so the fact is genuinely stored.
+        # merely looks like a civil fact offers nothing. The government answers
+        # on a later cycle than the fact, so it is genuinely stored by then.
+        civil_kind = "stoppage"
         civil = canonical_stoppage_payload(context.world, context.trigger_event)
-        if civil is None and (
-            context.trigger_event.event_type == STOPPAGE_EVENT_TYPE
-        ):
-            # A trigger claiming to be a stoppage that canonical state does not
-            # recognise offers nothing, even alongside a perfectly valid
-            # condition: the condition must not launder the unknown fact.
-            return ()
+    if civil is None:
+        civil_kind = "riot"
+        civil = canonical_riot_payload(context.world, context.trigger_event)
+    if civil is None:
+        civil_kind = "endorsement"
+        civil = canonical_endorsement_payload(
+            context.world, context.trigger_event
+        )
+    if civil is None and context.trigger_event.event_type in (
+        STOPPAGE_EVENT_TYPE, RIOT_EVENT_TYPE, ENDORSEMENT_EVENT_TYPE
+    ):
+        # A trigger claiming to be a civil fact that canonical state does not
+        # recognise offers nothing, even alongside a perfectly valid condition:
+        # the condition must not launder the unknown fact.
+        return ()
     if condition is not None:
         region = _region(context.world, str(condition.target_id))
     elif civil is not None:
@@ -428,6 +496,13 @@ def government_affordances(context: AffordanceContext):
     governance = region.city_state.governance
     if governance.controller_kind != "dynasty" or governance.controller_id != context.actor_ref.id:
         return ()
+    # Matching the controller id says who governs on paper; it does not say
+    # anyone can currently act. An office whose holder is dead or missing
+    # authorizes nothing, so the menu is empty and `revalidate` refuses --
+    # before any owner mutates the city, not after. The civil branch below
+    # asks the same question through its own gate.
+    if not _can_administer_now(context, region):
+        return ()
     # When the trigger is a civil fact, the institution that was actually
     # addressed must still govern here and still hold the authority to answer.
     # Recomposition runs after the interpreter's await, so losing authority
@@ -438,6 +513,28 @@ def government_affordances(context: AffordanceContext):
     ):
         return ()
     return _city_options(context, region)
+
+
+def _can_administer_now(context: AffordanceContext, region: CityRegion) -> bool:
+    """Whether this actor can really administer this region right now.
+
+    Asked of the institution, under the scope urban work actually needs, with
+    material control over this very region. Unclaimed cities go through
+    `city_affordances` and keep their existing semantics; this is the
+    government path only.
+    """
+    from src.classes.institution import AuthorityScope
+    from src.systems.institution_authority import can_actor_act_for
+
+    return can_actor_act_for(
+        context.world,
+        context.actor_ref,
+        context.actor_ref,
+        AuthorityScope.URBAN_ADMINISTRATION,
+        current_month=int(context.world.month_stamp),
+        require_material_control=True,
+        material_target_ref=EntityRef("region", str(region.id)),
+    ).allowed
 
 
 def _active_sect(world: Any, sect_id: str):
@@ -459,7 +556,33 @@ def _is_risk_condition(world: Any, condition: Any) -> bool:
 def organization_affordances(context: AffordanceContext):
     condition = context.condition
     sect = _active_sect(context.world, context.actor_ref.id)
-    if condition is None or sect is None or not _is_risk_condition(context.world, condition):
+    if (
+        condition is None
+        or sect is None
+        or context.domain != "organization"
+        or context.actor_ref.kind != "sect"
+        or not _is_risk_condition(context.world, condition)
+    ):
+        return ()
+    # The grievance must still be live in canonical state, and be the very
+    # same instance: a context built earlier can carry a condition that has
+    # since resolved, and recomposition is where that has to be caught.
+    if not any(
+        str(item.id) == str(condition.id)
+        and str(item.cause_event_id) == str(condition.cause_event_id)
+        for item in context.world.mechanical_language.get_active_conditions(
+            EntityRef("region", str(condition.target_id)),
+            int(context.world.month_stamp),
+        )
+    ):
+        return ()
+    # Supporting a member spends the sect's own treasury, so the office that
+    # could authorize that has to have a living holder right now. Asked here,
+    # in the provider, so an unauthorized sect has an empty menu and
+    # `revalidate` refuses before any owner moves money. No material control
+    # is required: a treasury is not territorial, and the region only says
+    # where the member is.
+    if not _can_dispose_treasury(context):
         return ()
     region_id = str(condition.target_id)
     urgency = _condition_urgency(context)
@@ -620,7 +743,111 @@ def _execute_maintenance(
         invalidations=invalidations,
     )
     event.causal_payload["affordance_id"] = option.id
+    _remember_completed_maintenance(context, region, event)
     return event
+
+
+def _maintenance_memory_factors(event, region) -> dict[str, float]:
+    """The factors a completed repair really supports, and nothing more.
+
+    `relative_scale` is the **observed improvement**, read from the canonical
+    `urban_asset_integrity` delta on the asset's own 0..1 scale. It is not
+    divided by `MAX_MAINTENANCE_IMPROVEMENT`: an execution cap limits what one
+    repair may do, it is not a scale for how large the improvement was.
+
+    The other three are frozen at zero because nothing supports them. No
+    office, institution or control changed; no commitment exists; and a
+    generic urban asset is not an identity anchor.
+
+    This only reads the transition the maintenance owner already applied. A
+    refusal writes no memory rather than rolling anything back.
+    """
+    import math
+
+    payload = event.causal_payload if isinstance(event.causal_payload, dict) else {}
+    deltas = [
+        item
+        for item in (payload.get("deltas") or [])
+        if isinstance(item, Mapping)
+        and str(item.get("aspect")) == "urban_asset_integrity"
+        and str(item.get("event_id")) == str(event.id)
+        and str(item.get("owner_kind")) == "region"
+        and str(item.get("owner_id")) == str(region.id)
+    ]
+    if len(deltas) != 1:
+        raise ValueError("maintenance memory requires exactly one integrity delta")
+    delta = deltas[0]
+    before = float(delta["before"])
+    after = float(delta["after"])
+    if not all(
+        math.isfinite(value) and 0.0 <= value <= 1.0 for value in (before, after)
+    ):
+        raise ValueError("maintenance memory requires integrity endpoints in 0..1")
+    observed = after - before
+    if not 0.0 < observed <= 1.0:
+        raise ValueError("maintenance memory requires a real, bounded improvement")
+    # Endpoints, recorded magnitude and the payload figure must agree, with the
+    # finiteness test first: `abs(NaN) > tol` is False and would pass silently.
+    for claimed in (float(delta["magnitude"]), float(payload["improvement"])):
+        if not math.isfinite(claimed) or abs(claimed - observed) > 1e-9:
+            raise ValueError("maintenance memory found an incoherent delta")
+    return {
+        "relative_scale": observed,
+        "institutional_change": 0.0,
+        "commitment_breach": 0.0,
+        "identity_anchor_impact": 0.0,
+    }
+
+
+def _remember_completed_maintenance(context, region, event) -> None:
+    """Let the institution that really repaired the city remember doing it.
+
+    This is a **knowledge and memory** gate only, and runs after the owner has
+    already acted. It authorizes nothing: whether the material work was
+    permitted is decided before execution, by `_can_administer_now` emptying
+    the government menu so `revalidate` refuses. What is asked here is the
+    narrower question of who may be said to know this happened.
+
+    Only a completed repair, and only the institution this actor speaks for. A
+    blocked attempt improved nothing and is remembered as nothing. Nothing
+    here reads what prompted the repair: a riot, a condition and a petition
+    all leave the same record, because the memory is of the improvement, not
+    of its cause.
+
+    Fail-closed: no institution, or no current authority, and the fact still
+    stands with nobody remembering it.
+    """
+    from src.classes.institution import AuthorityScope, KnowledgeChannel
+    from src.systems.institution_authority import can_actor_act_for
+    from src.systems.institutional_memory import record_known_fact
+
+    if str(getattr(event, "event_type", "")) != "city_maintenance_completed":
+        return
+    authority = getattr(context.world, "institutional_authority", None)
+    if authority is None:
+        return
+    institution = authority.get_institution_for_owner(context.actor_ref)
+    if institution is None:
+        return
+    verdict = can_actor_act_for(
+        context.world,
+        context.actor_ref,
+        context.actor_ref,
+        AuthorityScope.URBAN_ADMINISTRATION,
+        current_month=int(context.world.month_stamp),
+        require_material_control=True,
+        material_target_ref=EntityRef("region", str(region.id)),
+    )
+    if not verdict.allowed:
+        return
+    record_known_fact(
+        context.world,
+        event,
+        (institution.id,),
+        factors=_maintenance_memory_factors(event, region),
+        # The institution did the work; it was not told and did not witness.
+        channel=KnowledgeChannel.OWN_ACTION,
+    )
 
 
 def _execute_project(
@@ -646,17 +873,34 @@ def _execute_project(
     return event
 
 
-def _execute_support(context, option, *, decision_event_id: str, **_):
-    sect = _active_sect(context.world, context.actor_ref.id)
-    if sect is None:
-        raise ValueError("organization affordance actor disappeared")
-    event = execute_sect_member_support(
+def _can_dispose_treasury(context: AffordanceContext) -> bool:
+    """Whether this sect can really spend its treasury right now."""
+    from src.classes.institution import AuthorityScope
+    from src.systems.institution_authority import can_actor_act_for
+
+    return can_actor_act_for(
         context.world,
-        sect,
-        member_id=str(option.parameters["member_id"]),
-        region_id=str(option.parameters["region_id"]),
+        context.actor_ref,
+        context.actor_ref,
+        AuthorityScope.TREASURY_DISPOSITION,
+        current_month=int(context.world.month_stamp),
+    ).allowed
+
+
+def _execute_support(
+    context, option, *, decision_event_id: str, decision_event=None, **_
+):
+    """Delegate wholly to the support owner.
+
+    The owner revalidates authorship, the option and current treasury
+    authority itself, so this registry path and a direct call are the same
+    single operation. No validation is duplicated here.
+    """
+    event = execute_sect_member_support(
+        context,
+        option,
         decision_event_id=decision_event_id,
-        condition_event_id=context.trigger_event.id,
+        decision_event=decision_event,
     )
     event.causal_payload["affordance_id"] = option.id
     return event
@@ -746,6 +990,27 @@ def _execute_stoppage(
     return event
 
 
+def _execute_riot(
+    context, option, *, decision_event_id: str, decision_event=None,
+    invalidations=None, **_,
+):
+    """Delegate wholly to the damage owner.
+
+    The owner revalidates authorship, re-derives the magnitude from current
+    state and the asset's declared profile, and records the aftermath itself,
+    so this registry path and a direct call are the same single operation.
+    """
+    from src.systems.city_damage import execute_crowd_damage
+
+    return execute_crowd_damage(
+        context,
+        option,
+        decision_event_id=decision_event_id,
+        decision_event=decision_event,
+        invalidations=invalidations,
+    )
+
+
 for _domain, _provider in (
     ("population", population_affordances),
     ("economy", economy_affordances),
@@ -763,6 +1028,7 @@ for _action, _executor in (
     ("support_member", _execute_support),
     ("file_public_petition", _execute_petition),
     ("declare_work_stoppage", _execute_stoppage),
+    ("join_public_riot", _execute_riot),
 ):
     DOMAIN_AFFORDANCES.register_executor(_action, _executor)
 

@@ -152,6 +152,10 @@ async def test_sect_decider_world_test_mode_marks_decision_as_deterministic(base
         member_candidates=[],
     )
     base_world.run_config_snapshot = {"test_mode": True}
+    # A sect that can actually decide about spending: without a treasury
+    # office the round is refused before planning, which is a different
+    # outcome from the deterministic plan this test is about.
+    _authorized_sect_with_patriarch(base_world, sect)
 
     result = await SectDecider.decide(sect, ctx, base_world)
 
@@ -303,6 +307,31 @@ def _dummy_ctx(rogue: Avatar, member: Avatar, breaker: Avatar) -> SectDecisionCo
     )
 
 
+def _authorize_sect(world, sect) -> None:
+    """Give the sect a real treasury office, as the runtime requires."""
+    from src.systems.institution_bootstrap import bootstrap_institutional_authority
+
+    world.existed_sects = [sect]
+    world.sect_context.from_existed_sects(world.existed_sects)
+    bootstrap_institutional_authority(world)
+
+
+def _authorized_sect_with_patriarch(world, sect) -> Avatar:
+    """The same, for a sect that has no member yet to hold the office."""
+    from src.classes.sect_ranks import SectRank
+
+    patriarch = _create_avatar(
+        world,
+        avatar_id=f"patriarch-{sect.id}",
+        name="Patriarch",
+        alignment=Alignment.RIGHTEOUS,
+    )
+    world.avatar_manager.register_avatar(patriarch)
+    patriarch.join_sect(sect, SectRank.Patriarch)
+    _authorize_sect(world, sect)
+    return patriarch
+
+
 @pytest.mark.asyncio
 async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world):
     sect = Sect(
@@ -352,7 +381,11 @@ async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world
     member.technique = low_technique
     member.magic_stone = MagicStone(0)
     breaker.magic_stone = MagicStone(100)
-    member.join_sect(sect, get_rank_from_realm(member.cultivation_progress.realm))
+    # Spending the treasury needs an office with a living holder, so the
+    # fixture declares a real patriarch instead of a sect nobody speaks for.
+    from src.classes.sect_ranks import SectRank
+
+    member.join_sect(sect, SectRank.Patriarch)
     breaker.join_sect(sect, get_rank_from_realm(breaker.cultivation_progress.realm))
 
     base_world.avatar_manager.avatars = {
@@ -360,6 +393,7 @@ async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world
         member.id: member,
         breaker.id: breaker,
     }
+    _authorize_sect(base_world, sect)
 
     ctx = _dummy_ctx(rogue, member, breaker)
     old_tech = techniques_by_name.get(reward_technique.name)
@@ -380,8 +414,17 @@ async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world
                     )()
                 ),
             ),
-            patch(
-                "src.classes.sect_decider.random.choice", return_value=reward_technique
+            patch.object(
+                SectDecider,
+                "_plan",
+                new=AsyncMock(
+                    return_value=SectDecisionPlan(
+                        recruit_avatar_ids=[rogue.id],
+                        expel_avatar_ids=[breaker.id],
+                        reward_avatar_ids=[member.id],
+                        support_avatar_ids=[member.id],
+                    )
+                ),
             ),
         ):
             result = await SectDecider.decide(sect, ctx, base_world)
@@ -393,27 +436,53 @@ async def test_sect_decider_executes_recruit_expel_reward_and_support(base_world
 
     assert rogue.sect == sect
     assert rogue.sect_rank is not None
-    assert rogue.technique == reward_technique
+    assert rogue.technique is None
     assert breaker.sect is None
     assert member.technique == reward_technique
     assert member.magic_stone.value == 300
     assert sect.magic_stone == 200
     assert result.recruitment_count == 1
     assert result.expulsion_count == 1
-    assert result.technique_reward_count == 2
+    assert result.technique_reward_count == 1
     assert result.support_count == 1
     assert "招徕散修 1 人" in result.summary_text
-    assert any("逐出宗门" in event.content for event in result.events)
+    assert any(
+        delta.get("aspect") == "sect_membership" and delta.get("after") == "none"
+        for event in result.events
+        for delta in (event.causal_payload or {}).get("deltas", [])
+    )
+    # Recruitment now carries deltas too, so the support fact is selected by
+    # what actually distinguishes it: the *member's* stones rose.
     support_event = next(
         event
         for event in result.events
         if any(
             delta.get("aspect") == "magic_stone"
+            and delta.get("owner_kind") == "avatar"
+            and delta.get("owner_id") == str(member.id)
+            and float(delta.get("magnitude", 0)) > 0
             for delta in (event.causal_payload or {}).get("deltas", [])
         )
     )
     assert support_event.fact_kind.value == "state_transition"
     assert {link.cause_event_id for link in support_event.causal_links} == {
+        result.decision_event.id
+    }
+    # And the recruitment is its own fact: treasury down, membership gained.
+    recruit_event = next(
+        event
+        for event in result.events
+        if any(
+            delta.get("aspect") == "sect_membership" and delta.get("before") == "none"
+            for delta in (event.causal_payload or {}).get("deltas", [])
+        )
+    )
+    assert recruit_event.fact_kind.value == "state_transition"
+    assert {
+        (delta["owner_kind"], delta["aspect"])
+        for delta in recruit_event.causal_payload["deltas"]
+    } == {("sect", "magic_stone"), ("avatar", "sect_membership")}
+    assert {link.cause_event_id for link in recruit_event.causal_links} == {
         result.decision_event.id
     }
 

@@ -41,6 +41,16 @@ msgstr "在城镇救济百姓，消耗少量灵石"
 msgid "help_people_requirements"
 msgstr "仅限城市区域，并且灵石足够"
 
+# Action: EndorsePublicPetition
+msgid "endorse_public_petition_action_name"
+msgstr "声援公开请命"
+
+msgid "endorse_public_petition_description"
+msgstr "以个人名义公开声援本城百姓已向官府提出的请命"
+
+msgid "endorse_public_petition_requirements"
+msgstr "需要在世且身处该城、存在近期公开请命且其怨情仍然持续，并且此前未曾声援过该请命"
+
 # Action: SponsorDaoRite
 msgid "sponsor_dao_rite_action_name"
 msgstr "赞助大道仪式"

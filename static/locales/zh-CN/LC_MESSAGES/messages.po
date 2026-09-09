@@ -988,6 +988,16 @@ msgstr "在城镇救济百姓，消耗少量灵石"
 msgid "help_people_requirements"
 msgstr "仅限城市区域，并且灵石足够"
 
+# Action: EndorsePublicPetition
+msgid "endorse_public_petition_action_name"
+msgstr "声援公开请命"
+
+msgid "endorse_public_petition_description"
+msgstr "以个人名义公开声援本城百姓已向官府提出的请命"
+
+msgid "endorse_public_petition_requirements"
+msgstr "需要在世且身处该城、存在近期公开请命且其怨情仍然持续，并且此前未曾声援过该请命"
+
 # Action: SponsorDaoRite
 msgid "sponsor_dao_rite_action_name"
 msgstr "赞助大道仪式"
@@ -3076,6 +3086,15 @@ msgid ""
 "The people of {region} publicly petition their government over {label}."
 msgstr "{region}的百姓就{label}公开向官府请命。"
 
+msgid "A crowd in {region} broke into {asset}."
+msgstr "{region}的民众冲入并破坏了{asset}。"
+
+msgid "{avatar} publicly endorses the petition of {region}."
+msgstr "{avatar}公开声援{region}的请命。"
+
+msgid "The declared headquarters of {institution} is {region}."
+msgstr "{institution}的既定山门位于{region}。"
+
 msgid "The people of {region} stop working for one cycle."
 msgstr "{region}的百姓停工一个周期。"
 
@@ -3084,6 +3103,30 @@ msgstr "停工结束，{region}复工。"
 
 msgid "{region} produced less {resource} during the work stoppage."
 msgstr "停工期间，{region}的{resource}产量减少。"
+
+msgid "A departed voice cannot speak for anyone"
+msgstr "逝者之声无法为任何人发言"
+
+msgid "That public petition does not exist"
+msgstr "该公开请命并不存在"
+
+msgid "That petition is no longer public notice"
+msgstr "该请命已不再是公开告示"
+
+msgid "That petition names no city"
+msgstr "该请命未指明任何城池"
+
+msgid "Only someone in that city can endorse its petition"
+msgstr "只有身处该城者才能声援其请命"
+
+msgid "That grievance is no longer active"
+msgstr "该怨情已不再持续"
+
+msgid "That petition addresses no standing institution"
+msgstr "该请命并未指向现存的机构"
+
+msgid "You have already endorsed that petition"
+msgstr "你已声援过该请命"
 
 # Item exchange - general
 msgid "decided to equip it"
@@ -4889,6 +4932,11 @@ msgid ""
 "{sect_name} judged that {avatar_name} had gravely violated the sect rules "
 "and expelled them from the sect."
 msgstr "{sect_name} 认定 {avatar_name} 严重违背门规，将其逐出宗门。"
+
+msgid ""
+"{sect_name} found {avatar_name} incompatible with its rules and ended their "
+"membership."
+msgstr "{sect_name} 认为 {avatar_name} 与本门规矩不合，终止了其门人身份。"
 
 msgid ""
 "{sect_name} bestowed the technique \"{technique_name}\" upon {avatar_name}."

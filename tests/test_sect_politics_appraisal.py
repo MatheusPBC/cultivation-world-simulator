@@ -66,7 +66,9 @@ def _make_avatar(world, *, avatar_id: str, name: str) -> Avatar:
     return avatar
 
 
-def _make_world_with_two_sects(base_world: World) -> tuple[World, Sect, Sect]:
+def _make_world_with_two_sects(
+    base_world: World, *, with_patriarch: bool = False
+) -> tuple[World, Sect, Sect]:
     from src.classes.environment.sect_region import SectRegion
 
     world = base_world
@@ -86,6 +88,11 @@ def _make_world_with_two_sects(base_world: World) -> tuple[World, Sect, Sect]:
                   alignment=Alignment.NEUTRAL, headquarter=hq, technique_names=[], magic_stone=1000)
     world.existed_sects = [sect_a, sect_b]
     world.sect_context.from_existed_sects(world.existed_sects)
+    if with_patriarch:
+        patriarch = _make_avatar(
+            world, avatar_id="patriarch-a", name="PatriarchA"
+        )
+        patriarch.join_sect(sect_a, SectRank.Patriarch)
     bootstrap_institutional_authority(world)
     return world, sect_a, sect_b
 
@@ -304,12 +311,20 @@ class TestSectDecisionAudit:
 
     @pytest.mark.asyncio
     async def test_every_round_emits_one_sect_decision_event(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
+        _, sect_a, _ = _make_world_with_two_sects(base_world, with_patriarch=True)
         ctx = _minimal_ctx([_target(2)])
-        payload = {"thinking": "Hold.", "diplomacy_actions": []}
+        payload = {"thinking": "Hold."}
 
-        result = await _decide(sect_a, ctx, base_world, payload)
+        with (
+            patch.object(SectDecider, "_llm_available", return_value=True),
+            patch(
+                "src.classes.sect_decider.call_llm_with_task_name",
+                new=AsyncMock(return_value=payload),
+            ) as provider,
+        ):
+            result = await SectDecider.decide(sect_a, ctx, base_world)
 
+        provider.assert_awaited_once()
         decision_events = [e for e in result.events if e.fact_kind is FactKind.DECISION]
         assert len(decision_events) == 1
         decision = decision_events[0].causal_payload["decision"]
@@ -320,15 +335,19 @@ class TestSectDecisionAudit:
 
     @pytest.mark.asyncio
     async def test_rule_fallback_round_is_still_audited_and_never_raises(self, base_world):
-        _, sect_a, _ = _make_world_with_two_sects(base_world)
+        _, sect_a, _ = _make_world_with_two_sects(base_world, with_patriarch=True)
         ctx = _minimal_ctx([_target(2)])
 
-        with patch.object(SectDecider, "_llm_available", return_value=True), patch(
-            "src.classes.sect_decider.call_llm_with_task_name",
-            new=AsyncMock(side_effect=RuntimeError("provider down")),
+        with (
+            patch.object(SectDecider, "_llm_available", return_value=True),
+            patch(
+                "src.classes.sect_decider.call_llm_with_task_name",
+                new=AsyncMock(side_effect=RuntimeError("provider down")),
+            ) as provider,
         ):
             result = await SectDecider.decide(sect_a, ctx, base_world)
 
+        provider.assert_awaited_once()
         decision_events = [e for e in result.events if e.fact_kind is FactKind.DECISION]
         assert len(decision_events) == 1
         assert decision_events[0].causal_payload["decision"]["source"] == "rule"

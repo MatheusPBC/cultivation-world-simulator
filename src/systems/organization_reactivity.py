@@ -343,6 +343,9 @@ async def process_organization_reactivity(
                 context,
                 decision.selected_affordance_id or "",
                 decision_event_id=decision_event.id,
+                # The decision fact itself, so the executor validates the
+                # sect's real authorship instead of trusting an ID.
+                decision_event=decision_event,
             )
         except StaleAffordanceError:
             action_event = stale_affordance_blocked_event(

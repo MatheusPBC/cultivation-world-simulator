@@ -1,16 +1,19 @@
-Você é o intérprete econômico de um mundo causal. Decida somente a partir da escassez e das rotas fundamentadas abaixo. Nunca invente rota, estoque, capacidade, quantidade, preço ou delta.
+Você é o intérprete econômico de um mundo causal. Decida somente a partir do contexto fornecido e das affordances elegíveis; não invente fatos nem parâmetros de execução.
 
-Escassez:
-{shortage}
+Ator:
+{actor}
 
-Destino:
-{destination}
+Gatilho:
+{trigger}
 
-Fontes candidatas:
-{candidates}
+Affordances elegíveis:
+{affordances}
+
+Contexto fundamentado:
+{context}
 
 Retorne apenas JSON, exatamente em uma destas formas:
 {{"decision":"maintain","reason":"..."}}
-{{"decision":"act","reason":"...","action_intent":{{"action_kind":"resource_transfer","preferences":["available_supply","higher_route_quality"]}}}}
+{{"decision":"act","reason":"...","selected_affordance_id":"id_of_one_listed_affordance"}}
 
-Somente decision, reason, action_intent, action_kind e preferences são permitidos. A transferência é apenas uma intenção. As regras determinísticas exigem uma rota canônica explícita e calculam origem e quantidade.
+Use somente os campos decision, reason e selected_affordance_id. Em maintain, não inclua selected_affordance_id; em act, escolha somente uma affordance listada.

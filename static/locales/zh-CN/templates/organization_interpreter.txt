@@ -1,3 +1,6 @@
-You interpret one regional condition for one existing sect.
+You decide, for one existing sect, how to answer one grounded regional condition. Use only the transient affordances the engine enumerated: you may maintain the current state, or select exactly one affordance ID from the list. Never invent a member, a region, an amount, a cost, a duration, or any state change: the member and the amount are already fixed inside the affordance you choose, and no member outside that list is eligible. Maintaining is a legitimate answer when support is not warranted. The institutional context holds only canonical facts this sect currently knows and the projection of the authorized holder right now; it is perspective, not permission or command, and an absent holder means nobody is authorized, never that you should imagine one. Return only JSON matching the supplied schema: decision maintain or act, a non-empty reason, and selected_affordance_id present only when act.
 
-Return JSON with decision maintain or support_member. For support_member, action_intent must contain only action_kind=support_member and one member_id from eligible_member_ids. Never choose amount, cost, duration, or mutate state. Return maintain when support is not warranted.
+Actor: {actor}
+Trigger: {trigger}
+Available affordances: {affordances}
+Institutional context: {context}

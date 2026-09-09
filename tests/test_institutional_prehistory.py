@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -15,7 +16,10 @@ from src.classes.core.world import World
 from src.classes.environment.city_state import CityGovernance
 from src.classes.environment.region import CityRegion
 from src.classes.environment.route import Route
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
+from src.classes.institution import IdentityAnchorKind
+from src.classes.mechanical_language import EntityRef
 from src.classes.regional_economy import RegionalEconomyState
 from src.server.init_flow import _create_save_slot, _generate_initial_events
 from src.sim.load.load_game import load_game
@@ -93,6 +97,298 @@ def _world(base_map, *, pressured: bool) -> World:
 async def _run(world: World):
     return await run_institutional_prehistory(
         Simulator(world), playable_start_month=PLAYABLE_START
+    )
+
+
+def _inject_government_choice(action_kind: str):
+    """Make the real government interpreter select an offered option.
+
+    Test-only, and it never invents an option: when the engine offers nothing
+    of this kind the decision stays whatever the engine's own rule decided.
+    """
+    from contextlib import contextmanager
+    from unittest.mock import patch
+
+    from src.classes.domain_affordance import DomainDecision, DomainDecisionKind
+    import src.systems.government_interpreter as interpreter
+
+    original = interpreter.interpret_domain_affordances
+
+    async def choose(*args, **kwargs):
+        options = tuple(kwargs.get("affordances") or ())
+        chosen = next(
+            (item for item in options if item.action_kind == action_kind), None
+        )
+        if chosen is None:
+            return await original(*args, **kwargs)
+        return await original(*args, **{
+            **kwargs,
+            "injected_decision": DomainDecision(
+                DomainDecisionKind.ACT, "The city is repaired.", chosen.id
+            ),
+        })
+
+    @contextmanager
+    def _scope():
+        with patch.object(interpreter, "interpret_domain_affordances", choose):
+            yield
+
+    return _scope()
+
+
+def _declare_urban_pressure(world, *, integrity: float = 0.2) -> CityRegion:
+    """A really damaged city and the engine-owned rules that read it.
+
+    No `ConditionInstance` and no activation event are seeded: the rule and
+    the material state are declared, and the real `evaluate_semantic_world`
+    has to derive the condition itself. Otherwise the test would prove only
+    that a hand-made instance can be answered.
+    """
+    from src.classes.environment.city_state import (
+        CityDistrict,
+        CityState,
+        UrbanAsset,
+        UrbanServiceDemand,
+    )
+    from src.classes.mechanical_language import (
+        ConditionDefinition,
+        DerivedMetricDefinition,
+        PrimitiveDimension,
+    )
+
+    month = int(world.month_stamp)
+    city = CityRegion(
+        id=301,
+        name="Strained City",
+        desc="",
+        cors=[(1, 1)],
+        city_state=CityState(
+            districts=(CityDistrict("core", "urban", ((1, 1),), 1.0),),
+            assets=(UrbanAsset("clinic", "core", ("healing",), 10, 0.4, integrity),),
+            service_demands=(UrbanServiceDemand("healing", 1.0),),
+            governance=CityGovernance("dynasty", "1", 1.0),
+        ),
+    )
+    city.population = 40
+    city.population_capacity = 400
+    world.map.regions[city.id] = city
+    world.map.region_cors[city.id] = [(1, 1)]
+    world.map.tiles[(1, 1)].region = city
+    world.mechanical_language.derived_definitions["clinic-risk-metric"] = (
+        DerivedMetricDefinition(
+            id="clinic-risk-metric",
+            concept_id="clinic-risk-metric",
+            dimension=PrimitiveDimension.RISK,
+            target_kind="region",
+            expression={
+                "op": "subtract",
+                "left": {"op": "constant", "value": 1.0, "unit": "ratio"},
+                "right": {
+                    "op": "metric",
+                    "dimension": "quality",
+                    "concept_id": "healing",
+                },
+            },
+            unit="ratio",
+            created_month=month,
+        )
+    )
+    world.mechanical_language.condition_definitions["clinic-risk"] = (
+        ConditionDefinition(
+            id="clinic-risk",
+            concept_id="clinic-risk",
+            target_kind="region",
+            metric_definition_id="clinic-risk-metric",
+            activate_above=0.7,
+            resolve_below=0.5,
+            activate_after_months=1,
+            resolve_after_months=1,
+            created_month=month,
+        )
+    )
+    return city
+
+
+@pytest.mark.asyncio
+async def test_a_pressured_city_is_answered_inside_the_prehistory(
+    base_map, tmp_path
+) -> None:
+    """Urban pressure is derived, then answered, before play.
+
+    Only material state and the engine-owned rule are declared; the condition
+    itself is produced by the real semantic pass. The option is one the engine
+    composed, and only the selection is injected.
+    """
+    world = _world(base_map, pressured=False)
+    city = _declare_urban_pressure(world)
+    assert world.mechanical_language.condition_instances == {}
+    integrity_before = city.city_state.assets[0].integrity
+
+    with _inject_government_choice("urban_maintenance"):
+        events = await _run(world)
+
+    # The semantic pass really derived the condition; nothing seeded it.
+    activations = [
+        event for event in events
+        if event.event_type == "semantic_condition_activated"
+        and str((event.render_params or {}).get("region_id")) == str(city.id)
+    ]
+    assert activations, "the semantic pass derived no condition from the damage"
+    assert world.mechanical_language.condition_instances
+
+    repairs = [
+        event for event in events
+        if event.event_type == "city_maintenance_completed"
+    ]
+    assert repairs, "the prehistory never answered the urban pressure"
+    repair = repairs[0]
+
+    # A real owner transition, and the asset really moved.
+    delta = repair.causal_payload["deltas"][0]
+    assert delta["aspect"] == "urban_asset_integrity"
+    assert float(delta["after"]) > float(delta["before"])
+    assert city.city_state.assets[0].integrity > integrity_before
+
+    # Authored by the government's own decision, which is also a fact here.
+    decisions = [
+        event for event in events
+        if event.fact_kind is FactKind.DECISION
+        and any(
+            link.cause_event_id == event_id
+            for link in repair.causal_links
+            for event_id in (event.id,)
+        )
+    ]
+    assert decisions, "the repair cites no decision produced in the prehistory"
+
+    # And the institution remembers having done it.
+    institution_id = _dynasty_institution_id(world)
+    remembered = [
+        memory
+        for memory in world.institutional_relations.memories_for(institution_id)
+        if memory.event_id == repair.id
+    ]
+    assert remembered
+    assert dict(remembered[0].factors)["relative_scale"] == pytest.approx(
+        float(delta["after"]) - float(delta["before"])
+    )
+
+    # Everything stayed before the playable month.
+    assert int(world.month_stamp) == int(PLAYABLE_START)
+    for event in (repair, *decisions):
+        assert int(event.month_stamp) < int(PLAYABLE_START)
+
+    # And it survives the project's own save/load, memory included.
+    save_path = tmp_path / "urban_prehistory.json"
+    original_map = world.map
+    success, _message = save_game(world, Simulator(world), [], save_path)
+    assert success
+    world.event_manager.close()
+    with patch(
+        "src.run.load_map.load_cultivation_world_map", return_value=original_map
+    ):
+        loaded, _simulator, _sects = load_game(save_path)
+    # The material state, the memory and the causal chain all came back.
+    restored_city = loaded.map.regions[city.id]
+    assert restored_city.city_state.assets[0].integrity == pytest.approx(
+        city.city_state.assets[0].integrity
+    )
+    restored_repair = loaded.event_manager.get_event_by_id(repair.id)
+    assert restored_repair is not None
+    assert restored_repair.causal_payload["deltas"][0]["after"] == delta["after"]
+    remembered_after_load = [
+        memory
+        for memory in loaded.institutional_relations.memories_for(institution_id)
+        if memory.event_id == repair.id
+    ]
+    assert remembered_after_load
+    assert dict(remembered_after_load[0].factors) == dict(remembered[0].factors)
+    # The decision that authored it, and the activation that motivated it, are
+    # both still real facts in the store.
+    assert loaded.event_manager.get_event_by_id(decisions[0].id) is not None
+    assert loaded.event_manager.get_event_by_id(activations[0].id) is not None
+
+
+@pytest.mark.asyncio
+async def test_an_unclaimed_city_answers_through_react_city(base_map) -> None:
+    """`react_city` really belongs to the window, not just `react_government`.
+
+    Maintenance only, and deliberately small: the capacity-project lifecycle
+    and the urban rollback are proven separately.
+    """
+    world = _world(base_map, pressured=False)
+    city = _declare_urban_pressure(world)
+    # Nobody governs it, so the city answers for itself.
+    city.city_state = replace(
+        city.city_state, governance=CityGovernance("", "", 0.8)
+    )
+    integrity_before = city.city_state.assets[0].integrity
+
+    with _inject_city_choice("urban_maintenance"):
+        events = await _run(world)
+
+    repairs = [
+        event for event in events
+        if event.event_type == "city_maintenance_completed"
+    ]
+    assert repairs, "the unclaimed city answered nothing"
+    assert city.city_state.assets[0].integrity > integrity_before
+    assert int(world.month_stamp) == int(PLAYABLE_START)
+    assert int(repairs[0].month_stamp) < int(PLAYABLE_START)
+
+
+def _inject_city_choice(action_kind: str):
+    """The same test-only selection, for the unclaimed-city interpreter."""
+    from contextlib import contextmanager
+    from unittest.mock import patch
+
+    from src.classes.domain_affordance import DomainDecision, DomainDecisionKind
+    import src.systems.city_interpreter as interpreter
+
+    original = interpreter.interpret_domain_affordances
+
+    async def choose(*args, **kwargs):
+        options = tuple(kwargs.get("affordances") or ())
+        chosen = next(
+            (item for item in options if item.action_kind == action_kind), None
+        )
+        if chosen is None:
+            return await original(*args, **kwargs)
+        return await original(*args, **{
+            **kwargs,
+            "injected_decision": DomainDecision(
+                DomainDecisionKind.ACT, "The city builds.", chosen.id
+            ),
+        })
+
+    @contextmanager
+    def _scope():
+        with patch.object(interpreter, "interpret_domain_affordances", choose):
+            yield
+
+    return _scope()
+
+
+@pytest.mark.asyncio
+async def test_a_quiet_prehistory_answers_nothing_urban(base_map) -> None:
+    """No pressure, no repair: the new phases force no drama."""
+    world = _world(base_map, pressured=False)
+
+    events = await _run(world)
+
+    assert not [
+        event for event in events
+        if event.event_type
+        in ("city_maintenance_completed", "urban_capacity_project_started")
+    ]
+
+
+def _dynasty_institution_id(world) -> str:
+    from src.classes.institution import Institution, InstitutionKind
+    from src.classes.mechanical_language import EntityRef as _Ref
+
+    return Institution.id_for(
+        InstitutionKind.DYNASTY, _Ref("dynasty", str(world.dynasty.id))
     )
 
 
@@ -360,11 +656,39 @@ async def test_real_initialization_wires_genesis_prehistory_and_publication(
     from src.config import RunConfig
     from src.server import main
 
+    from pathlib import Path
+
+    from src.classes.alignment import Alignment
+    from src.classes.core.sect import Sect, SectHeadQuarter
+    from src.classes.environment.sect_region import SectRegion
+
+    anchored_sect = Sect(
+        401,
+        "Azure Peak Sect",
+        "",
+        "",
+        Alignment.RIGHTEOUS,
+        SectHeadQuarter("Azure Peak", "", Path("")),
+        [],
+        magic_stone=100,
+    )
+
     def small_map(*_args, **_kwargs) -> Map:
         game_map = Map(width=3, height=2)
         for x in range(3):
             for y in range(2):
                 game_map.create_tile(x, y, TileType.PLAIN)
+        # A real declared headquarters region: the map, not the sect object,
+        # is what names the seat, through `sect_id`. The region id is
+        # deliberately different from the sect id, so confusing the two fails.
+        seat = SectRegion(
+            id=901, name="Azure Peak", desc="", cors=[(0, 0)],
+            sect_id=anchored_sect.id, sect_name=anchored_sect.name,
+        )
+        game_map.regions[seat.id] = seat
+        # A second sect region with no declared owner: nothing is inferred.
+        unowned = SectRegion(id=902, name="Nameless Hall", desc="", cors=[(1, 0)])
+        game_map.regions[unowned.id] = unowned
         return game_map
 
     previous_state = dict(main.game_instance)
@@ -379,7 +703,7 @@ async def test_real_initialization_wires_genesis_prehistory_and_publication(
             "run_config": RunConfig(
                 content_locale="pt-BR",
                 init_npc_num=0,
-                sect_num=0,
+                sect_num=1,
                 npc_awakening_rate_per_month=0.0,
                 test_mode=True,
             ).model_dump(),
@@ -396,7 +720,7 @@ async def test_real_initialization_wires_genesis_prehistory_and_publication(
         ), patch(
             "src.server.main.CONFIG"
         ) as mock_config, patch(
-            "src.server.main.sects_by_id", {}
+            "src.server.main.sects_by_id", {401: anchored_sect}
         ), patch(
             "src.server.init_flow._prepare_initial_character_profiles",
             new=AsyncMock(),
@@ -429,6 +753,47 @@ async def test_real_initialization_wires_genesis_prehistory_and_publication(
             int(event.month_stamp) <= int(PLAYABLE_START) for event in stored
         )
         assert provider.call_count == 0
+
+        # The declared headquarters really became an anchor during this very
+        # initialization: one for the region that names its owner, none for
+        # the one that declares no `sect_id`, and none for the dynasty, which
+        # declares neither capital nor founder anywhere.
+        anchors = world.institutional_authority.identity_anchors
+        assert len(anchors) == 1
+        anchor = next(iter(anchors.values()))
+        assert anchor.kind is IdentityAnchorKind.HEADQUARTERS
+        assert anchor.subject == EntityRef("region", "901")
+        assert not [
+            item for item in anchors.values() if item.subject.id == "902"
+        ]
+        assert all(
+            not item.institution_id.startswith("inst:dynasty")
+            for item in anchors.values()
+        )
+
+        # Established at the exact genesis month, before the playable one.
+        genesis = int(PLAYABLE_START) - prehistory_month_count(PLAYABLE_START)
+        assert anchor.established_month == genesis
+
+        # Its evidence is a real, still-published premise fact -- which is
+        # what `_validate_institutional_evidence` demands at every save.
+        assert len(anchor.evidence_event_ids) == 1
+        premise = world.event_manager.get_event_by_id(anchor.evidence_event_ids[0])
+        assert premise is not None
+        assert premise.event_type == "institution_identity_anchored"
+        assert premise.fact_kind is FactKind.STATE_TRANSITION
+        assert premise.causal_origin is CausalOrigin.DETERMINISTIC
+        assert int(premise.month_stamp) == genesis
+        assert premise.render_params["premise"] == "world_genesis"
+        assert premise.render_params["anchor_id"] == anchor.id
+        assert premise.render_params["region_id"] == "901"
+        assert premise.render_params["institution_id"] == anchor.institution_id
+        delta = premise.causal_payload["deltas"][0]
+        assert delta["owner_kind"] == "institutional_authority"
+        assert delta["owner_id"] == anchor.institution_id
+        assert delta["after"] == "established"
+        # Nothing claims a founding happened now.
+        assert "founded" not in premise.content.lower()
     finally:
         world = main.game_instance.get("world")
         manager = getattr(world, "event_manager", None) if world is not None else None

@@ -32,6 +32,11 @@ class AuthorityScope(StrEnum):
     COMMITMENT_NEGOTIATION = "commitment_negotiation"
     RECOGNITION = "recognition"
     FORCE_EMPLOYMENT = "force_employment"
+    # Internal administration of an organization's own membership and the
+    # standing it grants its members. Deliberately not `RECOGNITION`:
+    # endorsing a public rite says nothing about who may end a membership or
+    # replace what a member was taught.
+    SECT_ADMINISTRATION = "sect_administration"
 
 
 class AuthorityClaimStatus(StrEnum):

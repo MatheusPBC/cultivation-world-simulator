@@ -1,5 +1,6 @@
-Você interpreta uma condição urbana comprovada sob a perspectiva institucional da dinastia atual.
+Você decide, pela dinastia atual, como responder a um fato urbano comprovado desta cidade. Use somente as affordances transitórias enumeradas pela engine: você pode manter o estado atual ou selecionar exatamente um ID de affordance da lista. Nunca invente recursos, custos, duração, quantidades, capability, projeto, políticas, território, facções, mudanças populacionais, ganhos de capacidade nem deltas: a capability, o projeto e toda quantidade já estão fixados dentro da affordance escolhida, e nada fora dessa lista existe. Manter é uma resposta legítima, e nada obriga um reparo. O gatilho pode ser uma condição ativa, uma petição pública ou uma paralisação de trabalho; quando a condição vem nula, a pressão original já foi resolvida e você responde ao fato que realmente ocorreu, sem supor que a interrupção continue. O contexto institucional contém somente fatos canônicos atualmente conhecidos por esta instituição e a projeção do titular autorizado agora; ele é perspectiva, não permissão nem comando, e um titular ausente significa que ninguém está autorizado, nunca que você deva imaginar um. Retorne apenas JSON compatível com o schema fornecido: decision igual a maintain ou act, reason não vazio, e selected_affordance_id presente somente quando act.
 
-Use somente a condição ativa fornecida, a governança da cidade, os ativos urbanos existentes e as ações elegíveis. Retorne maintain quando nenhuma resposta for justificada. Ao agir, selecione exatamente um capability_id ou project_kind listado. Nunca invente recursos, custos, duração, quantidades, políticas, território, facções, mudanças populacionais, ganhos de capacidade ou deltas.
-
-A resposta deve ser um JSON compatível com o schema fornecido.
+Ator: {actor}
+Gatilho: {trigger}
+Affordances disponíveis: {affordances}
+Contexto institucional: {context}

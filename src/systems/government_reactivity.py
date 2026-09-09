@@ -155,6 +155,30 @@ def _close_civil_response(
             affordance_id=decision.selected_affordance_id,
         )
         return
+    if kind == "endorsement":
+        from src.systems.civic_endorsement import mark_endorsement_answered
+
+        mark_endorsement_answered(
+            world,
+            source_event.id,
+            str(payload.get("addressed_institution_id", "")),
+            decision_event_id=decision_event.id,
+            decision=outcome,
+            affordance_id=decision.selected_affordance_id,
+        )
+        return
+    if kind == "riot":
+        from src.systems.civil_riot import mark_riot_answered
+
+        mark_riot_answered(
+            world,
+            source_event.id,
+            str(payload.get("addressed_institution_id", "")),
+            decision_event_id=decision_event.id,
+            decision=outcome,
+            affordance_id=decision.selected_affordance_id,
+        )
+        return
     mark_stoppage_answered(
         world,
         source_event.id,
@@ -172,11 +196,20 @@ def _civil_trigger(world: Any, event: Event) -> tuple[str, dict] | None:
         petition_payload,
     )
 
+    from src.systems.civic_endorsement import canonical_endorsement_payload
+    from src.systems.civil_riot import canonical_riot_payload
+
     payload = petition_payload(event)
     if payload is not None:
         return "petition", payload
     payload = canonical_stoppage_payload(world, event)
-    return ("stoppage", payload) if payload is not None else None
+    if payload is not None:
+        return "stoppage", payload
+    payload = canonical_riot_payload(world, event)
+    if payload is not None:
+        return "riot", payload
+    payload = canonical_endorsement_payload(world, event)
+    return ("endorsement", payload) if payload is not None else None
 
 
 def _condition_for_petition(
@@ -214,6 +247,7 @@ def _region_and_optional_condition(
     region = _region_from_id(world, str(payload.get("region_id", "")))
     if region is None:
         return None, None
+    # Both civil facts name their grievance the same way, so one reader serves.
     return region, active_condition_for(world, region, payload)
 
 
@@ -301,6 +335,72 @@ def enqueue_pending_stoppages(
     if dynasty_id is None:
         return
     for event, payload in pending_stoppages(world):
+        region = _region_from_id(world, str(payload.get("region_id", "")))
+        if region is None or not is_dynasty_governed(world, region):
+            continue
+        invalidations.mark(
+            DomainInvalidation(
+                layer=DomainInvalidationLayer.SEMANTIC,
+                domain="government",
+                target_kind="dynasty",
+                target_id=dynasty_id,
+                reason=DomainInvalidationReason.CONDITION_ACTIVATED,
+                source_event_ids=(event.id,),
+                condition_instance_id=str(payload.get("condition_instance_id", "")),
+                revision=event.id,
+            )
+        )
+
+
+def enqueue_pending_riots(
+    world: Any,
+    invalidations: DomainInvalidationQueue,
+) -> None:
+    """Let a riot the government knows about ask for an answer.
+
+    Same shape as the stoppage: the fact itself is the trigger, so a grievance
+    that has since been resolved still gets an answer to the damage that
+    really happened.
+    """
+    from src.systems.civil_riot import pending_riots
+
+    dynasty_id = _dynasty_id(world)
+    if dynasty_id is None:
+        return
+    for event, payload in pending_riots(world):
+        region = _region_from_id(world, str(payload.get("region_id", "")))
+        if region is None or not is_dynasty_governed(world, region):
+            continue
+        invalidations.mark(
+            DomainInvalidation(
+                layer=DomainInvalidationLayer.SEMANTIC,
+                domain="government",
+                target_kind="dynasty",
+                target_id=dynasty_id,
+                reason=DomainInvalidationReason.CONDITION_ACTIVATED,
+                source_event_ids=(event.id,),
+                condition_instance_id=str(payload.get("condition_instance_id", "")),
+                revision=event.id,
+            )
+        )
+
+
+def enqueue_pending_endorsements(
+    world: Any,
+    invalidations: DomainInvalidationQueue,
+) -> None:
+    """Let an endorsement the government knows about ask for an answer.
+
+    Its own trigger, because institutional knowledge alone would not reach the
+    decision context: `decision_context` projects only memories, and a fact
+    recorded without memory factors has none.
+    """
+    from src.systems.civic_endorsement import pending_endorsements
+
+    dynasty_id = _dynasty_id(world)
+    if dynasty_id is None:
+        return
+    for event, payload in pending_endorsements(world):
         region = _region_from_id(world, str(payload.get("region_id", "")))
         if region is None or not is_dynasty_governed(world, region):
             continue
@@ -629,6 +729,8 @@ async def process_government_reactivity(
 __all__ = [
     "enqueue_government_transitions",
     "enqueue_pending_petitions",
+    "enqueue_pending_endorsements",
+    "enqueue_pending_riots",
     "enqueue_pending_stoppages",
     "enqueue_unreacted_government_conditions",
     "process_government_reactivity",

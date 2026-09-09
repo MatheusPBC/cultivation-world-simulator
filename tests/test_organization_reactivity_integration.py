@@ -15,7 +15,6 @@ from src.classes.mechanical_language import (
     DerivedMetricDefinition,
     PrimitiveDimension,
 )
-from src.classes.sect_ranks import get_rank_from_realm
 from src.classes.root import Root
 from src.sim.simulator_engine.causal_budget import CausalBudget
 from src.sim.simulator_engine.domain_invalidation import (
@@ -58,10 +57,18 @@ def _setup(world):
     )
     avatar.personas = []
     avatar.tile.region = city
-    avatar.join_sect(sect, get_rank_from_realm(avatar.cultivation_progress.realm))
+    # Spending the sect's treasury needs an office with a living holder, so
+    # the fixture declares a real patriarch the world actually holds rather
+    # than a member nobody could speak for.
+    from src.classes.sect_ranks import SectRank
+    from src.systems.institution_bootstrap import bootstrap_institutional_authority
+
+    avatar.join_sect(sect, SectRank.Patriarch)
     avatar.magic_stone = MagicStone(0)
+    world.avatar_manager.register_avatar(avatar)
     world.existed_sects = [sect]
     world.sect_context.from_existed_sects(world.existed_sects)
+    bootstrap_institutional_authority(world)
     trigger = Event(
         world.month_stamp,
         "pressure activated",

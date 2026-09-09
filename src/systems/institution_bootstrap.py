@@ -6,6 +6,7 @@ from typing import Any
 
 from src.classes.environment.region import CityRegion
 from src.classes.causal_link import CausalLink, CausalRelation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import Event, FactKind
 from src.classes.institution import (
     AuthorityScope,
@@ -18,12 +19,23 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.state_delta import StateDelta
 
 
-_DYNASTY_SCOPES = tuple(AuthorityScope)
+# Listed explicitly rather than `tuple(AuthorityScope)`, so a scope added for
+# one kind of institution cannot silently hand the same power to another: a
+# sovereign administers cities, not somebody else's sect.
+_DYNASTY_SCOPES = (
+    AuthorityScope.URBAN_ADMINISTRATION,
+    AuthorityScope.RESOURCE_DISPOSITION,
+    AuthorityScope.TREASURY_DISPOSITION,
+    AuthorityScope.COMMITMENT_NEGOTIATION,
+    AuthorityScope.RECOGNITION,
+    AuthorityScope.FORCE_EMPLOYMENT,
+)
 _SECT_SCOPES = (
     AuthorityScope.TREASURY_DISPOSITION,
     AuthorityScope.COMMITMENT_NEGOTIATION,
     AuthorityScope.RECOGNITION,
     AuthorityScope.FORCE_EMPLOYMENT,
+    AuthorityScope.SECT_ADMINISTRATION,
 )
 
 
@@ -230,6 +242,118 @@ def _relevant_sources(
     )
 
 
+def establish_genesis_identity_anchors(world: Any) -> list[Event]:
+    """Declare, once, where each active sect's identity is already anchored.
+
+    Invariants:
+
+    * New-world initialization only. Neither `bootstrap_institutional_authority`
+      nor `synchronize_institutional_authority` calls this, so a load or a
+      monthly reconciliation can never add an anchor after the fact.
+    * The only source is the map's own declaration: a `SectRegion` names its
+      owner through `sect_id`. No dynasty or city anchor, and no city is ever
+      created for a `SectRegion`.
+    * `established_month` is the world clock as it stands -- the genesis
+      month -- never backdated.
+    * The premise fact is persisted before the anchor cites it, because
+      `save_game._validate_institutional_evidence` refuses to save an
+      authority state whose evidence is absent from the event store.
+    * Deterministic ids make a re-run idempotent instead of duplicating.
+    """
+    from src.classes.environment.sect_region import SectRegion
+    from src.classes.institution import (
+        IdentityAnchorKind,
+        InstitutionalIdentityAnchor,
+    )
+    from src.i18n import t
+
+    state = getattr(world, "institutional_authority", None)
+    if not isinstance(state, InstitutionalAuthorityState):
+        raise TypeError(
+            "world institutional_authority must be an InstitutionalAuthorityState"
+        )
+    month = int(getattr(world, "month_stamp", 0))
+    sects = _active_sects(world)
+    regions = getattr(getattr(world, "map", None), "regions", {}) or {}
+    produced: list[Event] = []
+    for region in sorted(regions.values(), key=lambda item: str(getattr(item, "id", ""))):
+        if not isinstance(region, SectRegion):
+            continue
+        try:
+            sect_id = int(getattr(region, "sect_id", -1))
+        except (TypeError, ValueError):
+            continue
+        # `-1` is the field's own default for "no sect declared".
+        if sect_id < 0:
+            continue
+        sect = sects.get(str(sect_id))
+        if sect is None:
+            continue
+        institution = state.get_institution_for_owner(
+            EntityRef("sect", str(sect_id))
+        )
+        if institution is None:
+            continue
+        # Deterministic, so re-running this on the same world produces the
+        # same fact id and the same anchor id rather than a second founding.
+        event_id = (
+            f"institutional-identity-anchor:{institution.id}:"
+            f"{IdentityAnchorKind.HEADQUARTERS.value}:region:{region.id}"
+        )
+        anchor = InstitutionalIdentityAnchor(
+            institution_id=institution.id,
+            kind=IdentityAnchorKind.HEADQUARTERS,
+            subject=EntityRef("region", str(region.id)),
+            established_month=month,
+            evidence_event_ids=(event_id,),
+        )
+        if anchor.id in state.identity_anchors:
+            continue
+        institution_name = str(getattr(sect, "name", "") or institution.id)
+        region_name = str(getattr(region, "name", "") or region.id)
+        event = Event(
+            month_stamp=world.month_stamp,
+            # A declared pre-existing seat, not a founding: nothing here says
+            # the institution came into being now.
+            content=t(
+                "The declared headquarters of {institution} is {region}.",
+                institution=institution_name,
+                region=region_name,
+            ),
+            related_sects=[sect_id],
+            event_type="institution_identity_anchored",
+            id=event_id,
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.DETERMINISTIC,
+            render_params={
+                "institution_id": institution.id,
+                "anchor_id": anchor.id,
+                "anchor_kind": IdentityAnchorKind.HEADQUARTERS.value,
+                "region_id": str(region.id),
+                "institution_name": institution_name,
+                "region_name": region_name,
+                # Says plainly what this fact is: a declared premise of the
+                # world's genesis, not an act anyone decided.
+                "premise": "world_genesis",
+            },
+        )
+        delta = StateDelta(
+            event_id=event.id,
+            owner_kind="institutional_authority",
+            owner_id=institution.id,
+            aspect=f"identity_anchor:{anchor.id}",
+            before="absent",
+            after="established",
+        )
+        event.causal_payload = {"deltas": [delta.to_dict()]}
+        # Persisted before the anchor cites it, so the evidence a save
+        # validates always exists.
+        world.event_manager.add_event(event)
+        state.add_identity_anchor(anchor)
+        produced.append(event)
+    return produced
+
+
 def _transition_event(
     world: Any,
     institution: Institution,
@@ -425,5 +549,6 @@ def synchronize_institutional_authority(
 
 __all__ = [
     "bootstrap_institutional_authority",
+    "establish_genesis_identity_anchors",
     "synchronize_institutional_authority",
 ]

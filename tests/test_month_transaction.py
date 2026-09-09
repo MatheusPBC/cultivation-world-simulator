@@ -446,19 +446,22 @@ async def test_failed_commit_restores_relations_receipts_calendar_events_and_rng
 async def test_failed_month_restores_reactive_sect_support_in_place(base_world):
     from src.systems.sect_member_support import execute_sect_member_support
     from tests.test_organization_reactivity_integration import _setup
+    from tests.test_sect_support_authority import authorized_support
 
-    sect, avatar, city, trigger, _condition = _setup(base_world)
+    sect, avatar, city, trigger, condition = _setup(base_world)
     before_sect_stones = sect.magic_stone
     before_avatar_stones = avatar.magic_stone.value
+    # A real offer and a real decision: the owner refuses anything less.
+    context, option, decision_event = await authorized_support(
+        base_world, sect, city, condition, trigger
+    )
 
     def mutate_then_fail(simulator, _ctx):
         event = execute_sect_member_support(
-            simulator.world,
-            sect,
-            member_id=avatar.id,
-            region_id=str(city.id),
-            decision_event_id="organization-decision",
-            condition_event_id=trigger.id,
+            context,
+            option,
+            decision_event_id=decision_event.id,
+            decision_event=decision_event,
         )
         assert event.event_type == "sect_member_support_completed"
         raise RuntimeError("abort institutional reaction")

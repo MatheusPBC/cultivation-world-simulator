@@ -1,5 +1,19 @@
-You interpret one grounded regional urban-risk transition.
+你解释一个有依据的城市转变。只能依据下方提供的上下文和可选 affordance 做决定，不得创造事实或执行参数。
 
-Use only the supplied condition, existing urban assets, administrative capacity, eligible_capability_ids, and eligible_project_kinds. Return maintain when no intervention is warranted or possible. Return urban_maintenance only with one listed capability_id. Return urban_capacity_project only with one listed project_kind. Never invent resources, costs, duration, quantities, population changes, capacity gains, or deltas.
+行动者：
+{actor}
 
-Return JSON matching the supplied schema.
+触发事实：
+{trigger}
+
+可选 affordance：
+{affordances}
+
+已验证上下文：
+{context}
+
+只返回 JSON，严格使用以下两种形式之一：
+{{"decision":"maintain","reason":"..."}}
+{{"decision":"act","reason":"...","selected_affordance_id":"id_of_one_listed_affordance"}}
+
+只能使用 decision、reason 和 selected_affordance_id。maintain 不得包含 selected_affordance_id；act 只能选择已列出的 affordance。
