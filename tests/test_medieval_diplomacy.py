@@ -156,15 +156,23 @@ def test_accepted_payment_still_requires_current_money_and_authority(reason):
 async def test_deadlines_interrupt_months_and_breach_does_not_force_payment(tmp_path):
     from src.sim.medieval.engine import MedievalSimulator
     world = world_with_knowledge(); proposal = offer(world); respond(world, proposal)
+    # Prepared mandate expires after acceptance. The obligation survives, but
+    # neither the policy nor its owner may spend without current authority.
+    for identity, office in world.authority.offices.items():
+        if office.institution_ref == BUYER:
+            world.authority.offices[identity] = office.model_copy(update={'ends_day': 91})
     balances = dict(world.economy.accounts)
     sim = MedievalSimulator(world)
     await sim.step(); assert world.clock.absolute_day == 95
+    assert world.relations.obligations[f'{proposal.id}:term:0'].status == 'active'
+    assert world.economy.accounts == balances
     await sim.step(); assert world.clock.absolute_day == 101
     assert world.relations.obligations[f'{proposal.id}:term:0'].status == 'breached'
     assert world.economy.accounts == balances
     await sim.step(); assert world.clock.absolute_day == 106
     assert world.relations.obligations[f'{proposal.id}:term:1'].status == 'excused'
     assert not world.knowledge.knows(BUYER, 'metallurgy')
+    assert not any(e.event_type == 'payment_completed' for e in world.events)
     assert {n.recipient_ref for n in world.knowledge.notices.values()} == {SELLER, BUYER}
     save_world(world, tmp_path / 'breached.mws')
     assert world_snapshot(load_world(tmp_path / 'breached.mws')) == world_snapshot(world)

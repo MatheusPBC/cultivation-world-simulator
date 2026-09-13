@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from .models import Character, Occupation, Organization, Polity, PopulationGroup, Settlement
+from .migration import MigrationJourney
 from .serialization import REGISTRIES, SocietySerialization
 
 
@@ -13,6 +14,7 @@ class SocietyState(SocietySerialization):
     polities: dict[str, Polity] = field(default_factory=dict)
     organizations: dict[str, Organization] = field(default_factory=dict)
     population: dict[str, PopulationGroup] = field(default_factory=dict)
+    migrations: dict[str, MigrationJourney] = field(default_factory=dict)
 
     @property
     def total_population(self) -> int:
@@ -20,6 +22,14 @@ class SocietyState(SocietySerialization):
 
     def population_at(self, settlement_id: str) -> int:
         return sum(g.count for g in self.population.values() if g.settlement_id == settlement_id)
+
+    def present_population_at(self, settlement_id: str) -> int:
+        return sum(self.available_count(g.id) for g in self.population.values() if g.settlement_id == settlement_id)
+
+    def available_count(self, group_id: str) -> int:
+        group = self.population[group_id]
+        traveling = sum(j.count for j in self.migrations.values() if j.source_group_id == group_id)
+        return group.count - traveling
 
     def validate(self, region_ids: set[int] | None = None) -> None:
         for name, model in REGISTRIES.items():
@@ -66,6 +76,22 @@ class SocietyState(SocietySerialization):
             demographics.add(key)
             if named_counts.get(group.id, 0) > group.count:
                 raise ValueError("named population exceeds cohort count")
+        migrating_groups = set()
+        migrating_characters = set()
+        for key, journey in self.migrations.items():
+            if key != journey.id or journey.source_group_id not in self.population or journey.destination_id not in self.settlements:
+                raise ValueError("invalid migration journey")
+            if not journey.route_ids or not journey.initial_route_ids or journey.route_index >= len(journey.route_ids):
+                raise ValueError("invalid migration route")
+            if journey.source_group_id in migrating_groups:
+                raise ValueError("a cohort may have only one active migration")
+            if migrating_characters.intersection(journey.character_ids):
+                raise ValueError("a named resident cannot join two journeys")
+            migrating_groups.add(journey.source_group_id)
+            migrating_characters.update(journey.character_ids)
+            self._select_people(journey.source_group_id, journey.count, journey.character_ids)
+        if any(self.available_count(group_id) < 0 for group_id in self.population):
+            raise ValueError("migration exceeds its population cohort")
 
     def _select_people(self, group_id: str, count: int, character_ids: tuple[str, ...]):
         if type(count) is not int or count <= 0:

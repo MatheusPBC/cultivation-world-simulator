@@ -7,6 +7,7 @@ from src.classes.economy import EconomyState
 from src.classes.economy.models import Market, MoneyAccount, ProductionFacility, Recipe, Resource, SettlementNeeds, Stock
 from src.classes.mechanical_language import EntityRef
 from src.classes.economy.expansion import ExpansionBlueprint
+from src.classes.economy.maintenance import RepairBlueprint
 
 CATALOG_PATH = Path(__file__).resolve().parents[2] / "static/game_configs/medieval/economy.json"
 
@@ -17,7 +18,7 @@ def create_medieval_economy(society, *, catalog_path=CATALOG_PATH) -> EconomySta
         raise ValueError("unsupported economy catalog")
     state = EconomyState()
     for name, model in (("resources", Resource), ("recipes", Recipe), ("facilities", ProductionFacility),
-                        ("expansion_blueprints", ExpansionBlueprint)):
+                        ("expansion_blueprints", ExpansionBlueprint), ("repair_blueprints", RepairBlueprint)):
         for raw in data[name]:
             value = model.model_validate(raw)
             if value.id in getattr(state, name):

@@ -45,6 +45,7 @@ def _site_transition(
     before: dict[str, float | bool] = {
         "integrity": float(site.integrity),
         "enabled": bool(site.enabled),
+        "service_suspended": bool(site.service_suspended),
     }
     after = dict(before)
     found = False
@@ -70,16 +71,19 @@ def _site_transition(
     site.validate_runtime(
         integrity=float(before["integrity"]),
         enabled=bool(before["enabled"]),
+        service_suspended=bool(before["service_suspended"]),
     )
     site.validate_runtime(
         integrity=float(after["integrity"]),
         enabled=bool(after["enabled"]),
+        service_suspended=bool(after["service_suspended"]),
     )
     return site_id, before, after
 
 
-def _runtime_pair(values: dict[str, float | bool]) -> tuple[float, bool]:
-    return float(values["integrity"]), bool(values["enabled"])
+def _runtime_pair(values: dict[str, float | bool]) -> tuple[float, bool, bool]:
+    return (float(values["integrity"]), bool(values["enabled"]),
+            bool(values["service_suspended"]))
 
 
 def project_route_capacity_changes(
@@ -133,7 +137,8 @@ def project_route_capacity_changes(
             )
     for site_id in virtual_runtime:
         site = world.map.infrastructure_sites[site_id]
-        if virtual_runtime[site_id] != (float(site.integrity), bool(site.enabled)):
+        if virtual_runtime[site_id] != (float(site.integrity), bool(site.enabled),
+                                        bool(site.service_suspended)):
             raise ValueError("infrastructure condition events do not reach canonical state")
     return projected
 

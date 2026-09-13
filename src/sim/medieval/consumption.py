@@ -20,6 +20,19 @@ def ration_shares(groups, quantity):
     return shares
 
 
+def requirement_shares(requirements, quantity):
+    """Allocate remaining public food after each household used its own ration."""
+    total = sum(requirements.values())
+    if not total:
+        return {group_id: 0 for group_id in requirements}
+    shares = {group_id: quantity * required // total for group_id, required in requirements.items()}
+    remainder = quantity - sum(shares.values())
+    ranked = sorted(requirements, key=lambda group_id: (-(quantity * requirements[group_id] % total), group_id))
+    for group_id in ranked[:remainder]:
+        shares[group_id] += 1
+    return shares
+
+
 def buy_rations(world, *, group_id, stock_id, quantity, unit_price,
                 seller_account_id, buyer_decision_id, seller_decision_id):
     """Consume paid food and transfer cash together; caller owns the transaction."""
@@ -66,12 +79,12 @@ def buy_rations(world, *, group_id, stock_id, quantity, unit_price,
     return effect
 
 
-def purchase_monthly_rations(world, need, consumed):
+def purchase_monthly_rations(world, need, consumed, requirements=None):
     """Budget routine chooses purchases; supplier accepts only its own local sale."""
     economy = world.economy
     stock = economy.stocks[need.stock_id]
     groups = [g for g in world.society.population.values() if g.settlement_id == need.id and g.count]
-    shares = ration_shares(groups, consumed)
+    shares = requirement_shares(requirements, consumed) if requirements is not None else ration_shares(groups, consumed)
     accounts = sorted((a for a in economy.accounts.values() if a.owner_ref == stock.owner_ref), key=lambda a: a.id)
     if not accounts or not can_actor_act_for(world, stock.owner_ref, stock.owner_ref, "trade"):
         return 0, ()  # No authorized commercial supplier; existing public relief remains.
@@ -81,7 +94,7 @@ def purchase_monthly_rations(world, need, consumed):
     paid, receipts = 0, []
     for group in sorted(groups, key=lambda g: g.id):
         buyer = economy.accounts.get(f"household:{group.id}")
-        quantity = min(shares[group.id], buyer.balance // price) if buyer else 0
+        quantity = min(shares.get(group.id, 0), buyer.balance // price) if buyer else 0
         if not quantity:
             continue
         terms = {"group_id": group.id, "stock_id": stock.id, "quantity": quantity,

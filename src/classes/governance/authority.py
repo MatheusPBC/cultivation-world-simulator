@@ -23,12 +23,19 @@ class AuthorityState(RegistrySerialization):
                 raise ValueError("office institution must be a polity or organization")
             if office.holder_ref.kind != "character" and office.holder_ref != office.institution_ref:
                 raise ValueError("collective office holder must be its institution")
-        events = {e.id for e in world.events}
+        events = {e.id: e for e in world.events}
         for policy in self.tax_policies.values():
             account = world.economy.accounts.get(policy.account_id)
             if (policy.id not in world.society.polities or account is None
                     or account.owner_ref.kind != "polity" or account.owner_ref.id != policy.id
-                    or (policy.last_event_id is not None and policy.last_event_id not in events)):
+                    or (policy.last_event_id is not None and policy.last_event_id not in events)
+                    or (policy.export_policy_event_id is not None and (
+                        policy.export_policy_event_id not in events
+                        or not any(delta.owner_kind == "tax_policy" and delta.owner_id == policy.id
+                                   and delta.aspect == "export_rate_permille"
+                                   and delta.after == str(policy.export_rate_permille)
+                                   for delta in events[policy.export_policy_event_id].deltas)))
+                    or (policy.export_rate_permille != 0 and policy.export_policy_event_id is None)):
                 raise ValueError("invalid tax policy owner or provenance")
 
 

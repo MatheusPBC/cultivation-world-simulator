@@ -1,4 +1,6 @@
 """Decisions use isolated actor context; material execution remains independent."""
+from dataclasses import replace
+
 import pytest
 from tests.test_medieval_diplomacy import world_with_knowledge, SELLER, BUYER, clauses, respond
 from src.classes.mechanical_language import EntityRef
@@ -8,7 +10,8 @@ from src.sim.medieval.persistence import world_snapshot, save_world, load_world
 def useful_buyer(world):
     # Prepared institutional complex: the buyer owns a local productive capability.
     site = world.map.infrastructure_sites['campos-do-lume']
-    site.capability_ids = (*site.capability_ids, 'iron_production')
+    world.map.infrastructure_sites[site.id] = replace(
+        site, capability_ids=(*site.capability_ids, 'iron_production'))
 
 
 def test_actor_context_does_not_change_when_foreign_secrets_change():

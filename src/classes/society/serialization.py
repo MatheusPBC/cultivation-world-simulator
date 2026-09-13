@@ -1,6 +1,7 @@
 """Strict JSON boundary for society state; all cross-domain references are IDs."""
 
 from .models import Character, Organization, Polity, PopulationGroup, Settlement
+from .migration import MigrationJourney
 
 
 REGISTRIES = {
@@ -9,6 +10,7 @@ REGISTRIES = {
     "polities": Polity,
     "population": PopulationGroup,
     "settlements": Settlement,
+    "migrations": MigrationJourney,
 }
 
 
@@ -16,7 +18,7 @@ class SocietySerialization:
     def to_dict(self) -> dict:
         self.validate()
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             **{
                 name: {
                     key: value.model_dump(mode="json")
@@ -30,7 +32,7 @@ class SocietySerialization:
     def from_dict(cls, data: dict):
         if not isinstance(data, dict) or set(data) != {"schema_version", *REGISTRIES}:
             raise ValueError("invalid society fields")
-        if type(data["schema_version"]) is not int or data["schema_version"] != 1:
+        if type(data["schema_version"]) is not int or data["schema_version"] != 2:
             raise ValueError("unsupported society schema")
         parsed = {}
         for name, model in REGISTRIES.items():

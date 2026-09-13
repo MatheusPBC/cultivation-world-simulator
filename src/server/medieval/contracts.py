@@ -9,11 +9,16 @@ from src.classes.core.medieval_config import MedievalRunConfig
 from src.classes.economy.models import Market, MoneyAccount, Payroll, ProductionFacility, Recipe, Resource, SettlementNeeds, Stock
 from src.classes.economy.logistics import CargoParcel, FreightOrder, RouteFlow
 from src.classes.economy.expansion import ExpansionBlueprint, ExpansionProject
+from src.classes.economy.maintenance import RepairBlueprint, RepairProject
 from src.classes.research.models import ResearchProject, Technology, TechnicalKnowledge
+from src.classes.governance.diplomacy import DiplomaticProposal, Obligation
+from src.classes.governance.models import DiplomaticNotice, RouteReport, SettlementReport, SiteReport
 from src.classes.environment.geography import GeographyLayer
 from src.classes.environment.infrastructure import InfrastructureSite
 from src.classes.environment.route import Route
 from src.classes.society.models import Character, Organization, Polity, PopulationGroup, Settlement, SocietyValue
+from src.classes.society.migration import MigrationJourney
+from src.classes.economy.migration import MigrationProvision
 from src.sim.medieval.activities import Activity
 from src.sim.medieval.events import WorldEvent
 
@@ -73,6 +78,7 @@ class CharacterView(Character):
 
 class SettlementView(Settlement):
     population: int
+    present_population: int
     center: tuple[int, int]
     health: int
     unrest: int
@@ -86,11 +92,15 @@ class SocietyView(SocietyValue):
     organizations: list[Organization]
     population_groups: list[PopulationGroup]
     activities: list[Activity]
+    migrations: list[MigrationJourney]
 
 
 class EconomyView(SocietyValue):
     expansion_blueprints: list[ExpansionBlueprint]
     expansions: list[ExpansionProject]
+    repair_blueprints: list[RepairBlueprint]
+    repairs: list[RepairProject]
+    migration_provisions: list[MigrationProvision]
     resources: list[Resource]
     recipes: list[Recipe]
     stocks: list[Stock]
@@ -141,12 +151,21 @@ class GovernanceView(SocietyValue):
     reports: list[KnowledgeReport]
     objectives: list[ObjectiveView]
     plans: list[StrategicPlan]
+    route_reports: list[RouteReport]
+    site_reports: list[SiteReport]
+    settlement_reports: list[SettlementReport]
 
 
 class ResearchView(SocietyValue):
     technologies: list[Technology]
     projects: list[ResearchProject]
     knowledge: list[TechnicalKnowledge]
+
+
+class DiplomacyView(SocietyValue):
+    proposals: list[DiplomaticProposal]
+    obligations: list[Obligation]
+    notices: list[DiplomaticNotice]
 
 
 class ObservatoryView(SocietyValue):
@@ -157,6 +176,7 @@ class ObservatoryView(SocietyValue):
     map: MapView
     governance: GovernanceView
     research: ResearchView
+    diplomacy: DiplomacyView
 
 
 class CausalView(SocietyValue):

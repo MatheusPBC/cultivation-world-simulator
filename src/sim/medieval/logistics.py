@@ -62,6 +62,8 @@ def queue_freight(world, source_id, destination_id, resource_id, quantity, route
     if (source.owner_ref != destination.owner_ref or event is None or event.fact_kind != FactKind.DECISION
             or event.decision != expected):
         raise ValueError("internal freight requires the owner's matching decision")
+    if event.day != world.clock.absolute_day:
+        raise ValueError("internal freight decision is stale; consent must be given today")
     require_authority(world, source.owner_ref, "supply")
     return open_order(world, source_id, destination_id, resource_id, quantity, route_ids,
                       decision_ids=(decision_event_id,))

@@ -17,6 +17,7 @@ from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.markets import purchase
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from src.sim.medieval.tariffs import export_fee, export_quote
 
 ROAD = "road-campomanso-pedraclara"
 
@@ -56,9 +57,14 @@ async def run(seed: int, output: Path) -> dict:
     initial_food = food_total(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
     closure = set_passage(world, False)
+    unit_price = world.economy.markets["campomanso"].prices["food"]
+    quote = export_quote(world, "stock:campomanso", "stock:portovelho")
+    quantity = 2400
     values = {"source_id": "stock:campomanso", "destination_id": "stock:portovelho", "resource_id": "food",
-              "quantity": 2400, "unit_price": 4, "quote_day": 0, "route_ids": [ROAD, "river-pedraclara-portovelho"],
-              "seller_account_id": "treasury:auren", "buyer_account_id": "treasury:valedouro"}
+              "quantity": quantity, "unit_price": unit_price, "quote_day": world.economy.markets["campomanso"].updated_day,
+              "route_ids": [ROAD, "river-pedraclara-portovelho"], "seller_account_id": "treasury:auren",
+              "buyer_account_id": "treasury:valedouro", **quote,
+              "total_price": quantity * unit_price + export_fee(quantity, unit_price, quote["export_rate_permille"])}
     decisions = []
     for action, owner in (("buy", "valedouro"), ("sell", "auren")):
         decision = record_event(world, f"{action}_decided", "Oferta aceita pela política preparada do cenário.",

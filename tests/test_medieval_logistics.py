@@ -173,6 +173,22 @@ def test_invalid_path_does_not_remove_goods(routes):
     assert not world.economy.parcels
 
 
+def test_stale_freight_decision_is_rejected_and_leaves_no_new_state():
+    from src.systems.time import WorldClock
+    world = cargo_world()
+    intent = {"action": "freight", "source_id": SOURCE, "destination_id": DEST,
+              "resource_id": "food", "quantity": 100, "route_ids": list((ROAD,)),
+              "actor_ref": world.economy.stocks[SOURCE].owner_ref.to_dict()}
+    choice = record_event(world, "freight_decided", "Remessa autorizada.",
+                          fact_kind=FactKind.DECISION, decision=intent)
+    world.clock = WorldClock(1)
+    before = world_snapshot(world)
+    from src.sim.medieval.logistics import queue_freight
+    with pytest.raises(ValueError, match="stale"):
+        queue_freight(world, SOURCE, DEST, "food", 100, (ROAD,), decision_event_id=choice.id)
+    assert world_snapshot(world) == before
+
+
 def test_internal_transfer_requires_same_owner_and_cannot_replay():
     world = cargo_world()
     from src.sim.medieval.logistics import queue_freight

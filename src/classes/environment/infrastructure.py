@@ -93,6 +93,9 @@ class InfrastructureSite:
     maintainer_ref: EntityRef | None = None
     integrity: float = 1.0
     enabled: bool = True
+    # A proprietor may withhold the service of a still-physical passage.  This
+    # is deliberately not ``enabled``: damage and repair own physical state.
+    service_suspended: bool = False
     last_event_id: str | None = None
 
     _IDENTITY_FIELDS = frozenset(
@@ -131,6 +134,8 @@ class InfrastructureSite:
         self.integrity = _normalize_integrity(self.integrity)
         if not isinstance(self.enabled, bool):
             raise ValueError("enabled must be a boolean")
+        if not isinstance(self.service_suspended, bool):
+            raise ValueError("service_suspended must be a boolean")
         if self.last_event_id is not None:
             self.last_event_id = _require_id(self.last_event_id, "last_event_id")
         object.__setattr__(self, "_identity_locked", True)
@@ -139,6 +144,8 @@ class InfrastructureSite:
     def status(self) -> str:
         if self.integrity <= 0.0:
             return "destroyed"
+        if self.service_suspended:
+            return "service_suspended"
         if not self.enabled or self.integrity < 1.0:
             return "impaired"
         return "active"
@@ -148,12 +155,15 @@ class InfrastructureSite:
         *,
         integrity: float | None = None,
         enabled: bool | None = None,
+        service_suspended: bool | None = None,
         last_event_id: str | None = None,
     ) -> None:
         if integrity is not None:
             _normalize_integrity(integrity)
         if enabled is not None and not isinstance(enabled, bool):
             raise ValueError("enabled must be a boolean")
+        if service_suspended is not None and not isinstance(service_suspended, bool):
+            raise ValueError("service_suspended must be a boolean")
         if last_event_id is not None:
             _require_id(last_event_id, "last_event_id")
 
@@ -162,18 +172,21 @@ class InfrastructureSite:
         *,
         integrity: float | None = None,
         enabled: bool | None = None,
+        service_suspended: bool | None = None,
         last_event_id: str | None = None,
     ) -> bool:
         """Apply only validated runtime fields and return whether state changed."""
         self.validate_runtime(
             integrity=integrity,
             enabled=enabled,
+            service_suspended=service_suspended,
             last_event_id=last_event_id,
         )
         changed = any(
             (
                 integrity is not None and _normalize_integrity(integrity) != self.integrity,
                 enabled is not None and enabled != self.enabled,
+                service_suspended is not None and service_suspended != self.service_suspended,
                 last_event_id is not None and last_event_id != self.last_event_id,
             )
         )
@@ -181,6 +194,8 @@ class InfrastructureSite:
             self.integrity = _normalize_integrity(integrity)
         if enabled is not None:
             self.enabled = enabled
+        if service_suspended is not None:
+            self.service_suspended = service_suspended
         if last_event_id is not None:
             self.last_event_id = last_event_id
         return changed
@@ -201,6 +216,7 @@ class InfrastructureSite:
             ),
             "integrity": self.integrity,
             "enabled": self.enabled,
+            "service_suspended": self.service_suspended,
             "last_event_id": self.last_event_id,
         }
 
@@ -225,7 +241,7 @@ class InfrastructureSite:
             raise ValueError(
                 "Infrastructure site missing fields: " + ", ".join(missing)
             )
-        allowed = {*required, "owner_ref", "maintainer_ref", "last_event_id"}
+        allowed = {*required, "owner_ref", "maintainer_ref", "service_suspended", "last_event_id"}
         unknown = set(data) - allowed
         if unknown:
             raise ValueError(
@@ -257,6 +273,10 @@ class InfrastructureSite:
             maintainer_ref=maintainer_ref,
             integrity=data["integrity"],
             enabled=data["enabled"],
+            # Authored map catalogs predate runtime service state.  Saved worlds
+            # are rejected by their outer schema, while source maps bootstrap
+            # this new runtime field as open.
+            service_suspended=data.get("service_suspended", False),
             last_event_id=data.get("last_event_id"),
         )
 

@@ -10,7 +10,15 @@ def observatory_view(runtime):
     world = runtime.require_world()
     return ObservatoryView(status=runtime.status(), world=world_view(world),
                            society=society_view(world), economy=economy_view(world),
-                           map=map_view(world), governance=governance_view(world), research=research_view(world))
+                           map=map_view(world), governance=governance_view(world), research=research_view(world),
+                           diplomacy=diplomacy_view(world))
+
+
+def diplomacy_view(world):
+    from .contracts import DiplomacyView
+    return DiplomacyView(proposals=ordered(world.relations.proposals),
+                         obligations=ordered(world.relations.obligations),
+                         notices=ordered(world.knowledge.notices))
 
 
 def research_view(world):
@@ -24,7 +32,10 @@ def governance_view(world):
     from src.sim.medieval.demand import objective_target
     return GovernanceView(offices=ordered(world.authority.offices), tax_policies=ordered(world.authority.tax_policies), reports=ordered(world.knowledge.reports),
                           objectives=[ObjectiveView(**o.model_dump(), target_quantity=objective_target(world, o))
-                                      for o in ordered(world.strategy.objectives)], plans=ordered(world.strategy.plans))
+                                      for o in ordered(world.strategy.objectives)], plans=ordered(world.strategy.plans),
+                          route_reports=ordered(world.knowledge.route_reports),
+                          site_reports=ordered(world.knowledge.site_reports),
+                          settlement_reports=ordered(world.knowledge.settlement_reports))
 
 
 def ordered(registry):
@@ -46,6 +57,7 @@ def settlements(world):
     for item in ordered(world.society.settlements):
         needs = world.economy.needs[item.id]
         result.append(SettlementView(**item.model_dump(), population=world.society.population_at(item.id),
+                                      present_population=world.society.present_population_at(item.id),
                                       center=world.map.regions[item.region_id].center_loc,
                                       health=needs.health, unrest=needs.unrest, missing_food=needs.missing_food))
     return result
@@ -56,13 +68,14 @@ def society_view(world):
                                                            - c.birth_day) // 360) for c in ordered(world.society.characters)]
     return SocietyView(characters=characters, settlements=settlements(world), polities=ordered(world.society.polities),
                        organizations=ordered(world.society.organizations), population_groups=ordered(world.society.population),
-                       activities=ordered(world.activities))
+                       activities=ordered(world.activities), migrations=ordered(world.society.migrations))
 
 
 def economy_view(world):
     economy = world.economy
     registries = {name: ordered(getattr(economy, name)) for name in
-                  ("resources", "recipes", "stocks", "accounts", "facilities", "payrolls", "needs", "markets", "parcels", "route_flows", "expansion_blueprints", "expansions")}
+                  ("resources", "recipes", "stocks", "accounts", "facilities", "payrolls", "needs", "markets", "parcels", "route_flows",
+                  "expansion_blueprints", "expansions", "repair_blueprints", "repairs", "migration_provisions")}
     pending = [o for o in ordered(economy.freight_orders) if o.delivered_quantity < o.quantity]
     return EconomyView(**registries, pending_orders=pending, completed_order_count=len(economy.freight_orders) - len(pending))
 

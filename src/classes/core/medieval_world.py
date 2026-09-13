@@ -14,6 +14,7 @@ from src.classes.economy import EconomyState
 from src.classes.governance import AuthorityState, KnowledgeState, StrategyState
 from src.classes.research import ResearchState
 from src.classes.governance.diplomacy import RelationsState
+from .infrastructure import validate_infrastructure
 from .medieval_config import MedievalRunConfig
 from src.systems.calendar_agenda import WorldAgenda
 from src.systems.time import WorldClock
@@ -48,4 +49,5 @@ class MedievalWorld:
         self.knowledge.validate(self)
         self.research.validate(self)
         self.relations.validate(self)
+        validate_infrastructure(self)
         MedievalRunConfig.model_validate(self.config.model_dump())

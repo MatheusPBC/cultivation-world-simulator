@@ -41,6 +41,67 @@ async def test_observatory_is_one_consistent_published_snapshot(tmp_path):
         assert {p["technology_id"] for p in data["research"]["projects"]} == {"irrigation", "metallurgy"}
         assert all(p["completed_units"] == 0 for p in data["research"]["projects"])
         assert data["research"]["knowledge"] == []
+        diplomacy = await client.get("/api/v2/query/diplomacy")
+        assert diplomacy.status_code == 200
+        assert diplomacy.json()["data"] == data["diplomacy"] == {"proposals": [], "obligations": [], "notices": []}
+
+
+@pytest.mark.asyncio
+async def test_diplomacy_snapshot_exposes_real_terms_and_receipts_without_disclosing_to_actors(tmp_path):
+    from tests.test_medieval_diplomacy import world_with_knowledge, offer, respond, pay, teach, SELLER, BUYER
+    from src.sim.medieval.persistence import world_snapshot, save_world, load_world
+
+    world = world_with_knowledge()
+    original = offer(world)
+    proposal = offer(world, 80, original.id)
+    respond(world, proposal)
+    pay(world, f"{proposal.id}:term:0")
+    # Persist the mixed state: payment completed, teaching still an obligation.
+    path = tmp_path / 'negotiated.mws'
+    save_world(world, path)
+    world = load_world(path)
+    app = create_app(save_dir=lambda: tmp_path / 'runtime')
+    app.state.runtime._activate(world)
+    before = world_snapshot(world)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+        view = (await client.get('/api/v2/query/diplomacy')).json()
+        observed = (await client.get('/api/v2/query/observatory')).json()
+        assert view['revision'] == observed['revision']
+        assert view['data'] == observed['data']['diplomacy']
+        data = view['data']
+        terms = next(p for p in data['proposals'] if p['id'] == proposal.id)['clauses']
+        assert terms[0]['amount'] == 80 and terms[1]['depends_on'] == [0]
+        assert next(p for p in data['proposals'] if p['id'] == original.id)['status'] == 'superseded'
+        payment = next(o for o in data['obligations'] if o['clause_index'] == 0)
+        lesson = next(o for o in data['obligations'] if o['clause_index'] == 1)
+        assert payment['status'] == 'fulfilled' and lesson['status'] == 'active'
+        assert payment['material_event_id'] and lesson['material_event_id'] is None
+        assert {n['recipient_ref']['id'] for n in data['notices']} == {SELLER.id, BUYER.id}
+        detail = (await client.get(f"/api/v2/query/causal/{payment['last_event_id']}")).json()['data']
+        assert payment['material_event_id'] in {e['id'] for e in detail['causes']}
+        assert world_snapshot(world) == before  # omniscient reads teach nobody and move no assets
+        assert (await client.post('/api/v2/command/diplomacy', json={})).status_code == 404
+        teach(world, lesson['id'])
+        assert (await client.get('/api/v2/query/diplomacy')).json()['data']['obligations'][1]['status'] == 'fulfilled'
+
+
+@pytest.mark.asyncio
+async def test_route_reports_are_consistent_across_queries_and_reading_mutates_nothing(tmp_path):
+    from src.sim.medieval.persistence import world_snapshot
+
+    app = create_app(save_dir=lambda: tmp_path)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+        await client.post("/api/v2/command/create", json={"seed": 73})
+        await client.post("/api/v2/command/step", json={})
+        world = app.state.runtime.require_world()
+        before = world_snapshot(world)
+        observatory = (await client.get("/api/v2/query/observatory")).json()
+        governance = (await client.get("/api/v2/query/governance")).json()
+        assert governance["data"] == observatory["data"]["governance"]
+        reports = observatory["data"]["governance"]["route_reports"]
+        assert reports  # the monthly routine already published dated observations
+        assert all(r["observed_day"] == 30 for r in reports)
+        assert world_snapshot(world) == before  # omniscient reads publish nothing new
 
 
 @pytest.mark.asyncio

@@ -15,9 +15,16 @@ from .expansion import progress_expansions, review_expansions
 from .research import progress_research
 from .research_policy import review_research
 from .markets import update_markets
-from .intelligence import refresh_reports
+from .intelligence import refresh_reports, refresh_trade_reports
 from .procurement import review_supply, progress_supply
 from .diplomacy_policy import review_diplomacy
+from .infrastructure import progress_repairs, review_maintenance
+from .migration_policy import review_migration
+from .household_provisioning import review_household_provisions
+from .tariffs import review_export_tariffs
+from .site_services import review_site_services
+from .route_intelligence import refresh_route_reports, refresh_site_reports
+from src.classes.core.infrastructure import validate_infrastructure
 
 
 class MedievalSimulator:
@@ -46,6 +53,7 @@ class MedievalSimulator:
                 resolve_dated(candidate, candidate.agenda.pop_due(jump.to_day))
                 progress_supply(candidate)
                 review_diplomacy(candidate)
+                review_migration(candidate)
             # 3. Process monthly domains exactly once per month boundary.
             if jump.monthly_boundary:
                 advance_monthly_practice(candidate)
@@ -58,8 +66,26 @@ class MedievalSimulator:
                 review_expansions(candidate)
                 update_markets(candidate)
                 refresh_reports(candidate)
+                if review_export_tariffs(candidate):
+                    # A changed policy republishes only affected market quotes;
+                    # route/site/settlement observations remain single receipts.
+                    refresh_trade_reports(candidate, replace_today=True)
+                changed_service_sites = review_site_services(candidate)
+                if changed_service_sites:
+                    # Service changes are material state, so owners and connected
+                    # recipients receive a new dated route/site observation today.
+                    refresh_site_reports(candidate, site_ids=changed_service_sites)
+                    refresh_route_reports(
+                        candidate,
+                        route_ids=tuple(sorted({route_id for site_id in changed_service_sites
+                                                for route_id in candidate.map.infrastructure_sites[site_id].route_ids})),
+                    )
+                review_household_provisions(candidate)
+                progress_repairs(candidate, available)
+                review_maintenance(candidate)
                 review_supply(candidate)
                 review_diplomacy(candidate, allow_offers=True)
+                review_migration(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")
             # 4. Validate and durably commit the candidate before publishing any change.
             candidate.society.validate(set(candidate.map.regions))
@@ -69,6 +95,7 @@ class MedievalSimulator:
             candidate.knowledge.validate(candidate)
             candidate.research.validate(candidate)
             candidate.relations.validate(candidate)
+            validate_infrastructure(candidate)
             validate_activities(candidate)
             validate_history(candidate.events, candidate.clock.absolute_day)
             if self.save_path is not None:

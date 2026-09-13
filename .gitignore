@@ -186,6 +186,9 @@ docker-data/
 web/coverage/
 web/test-results/
 
+# Medieval build output.
+/web/dist-medieval/
+
 # Local deployment snapshots. Keep the active Compose file versioned.
 docker-compose.yml.backup-*
 docker-compose.yml.original

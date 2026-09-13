@@ -69,6 +69,7 @@ class PopulationGroup(SocietyValue):
     people: People
     occupation: Occupation
     count: Count
+    last_event_id: Identity | None = None
 
 
 class Settlement(SocietyValue):

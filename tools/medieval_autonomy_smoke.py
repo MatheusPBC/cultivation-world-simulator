@@ -19,13 +19,35 @@ from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 def food_total(world):
     return sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) + sum(
         p.quantity for p in world.economy.parcels.values()
-        if world.economy.freight_orders[p.order_id].resource_id == "food")
+        if world.economy.freight_orders[p.order_id].resource_id == "food") + sum(
+        provision.food for provision in world.economy.migration_provisions.values())
 
 
 def resource_totals(world):
     totals = {rid: sum(s.goods.get(rid, 0) for s in world.economy.stocks.values()) for rid in world.economy.resources}
     for parcel in world.economy.parcels.values():
         totals[world.economy.freight_orders[parcel.order_id].resource_id] += parcel.quantity
+    totals["food"] += sum(provision.food for provision in world.economy.migration_provisions.values())
+    return totals
+
+
+RESOURCE_EFFECTS = {"production_completed", "production_limited", "subsistence_resolved",
+                    "household_purchase_completed", "household_rations_consumed", "household_provisions_purchased",
+                    "migration_started", "migration_arrived", "migration_returned", "migration_rations_consumed",
+                    "expansion_progressed", "research_progressed", "repair_progressed"}
+
+
+def ledger_resource_effects(events, resources):
+    """Count true production/consumption effects, including carried provisions."""
+    totals = Counter()
+    for event in events:
+        if event.event_type not in RESOURCE_EFFECTS:
+            continue
+        for delta in event.deltas:
+            if delta.owner_kind == "stock" and delta.aspect in resources:
+                totals[delta.aspect] += int(delta.after) - int(delta.before)
+            elif delta.owner_kind == "migration_provision" and delta.aspect == "food":
+                totals["food"] += int(delta.after) - int(delta.before)
     return totals
 
 
@@ -38,11 +60,7 @@ async def run(seed, days, output, profile=False):
         start = len(world.events)
         await MedievalSimulator(world).step()
         jumps += 1
-        for event in world.events[start:]:
-            if event.event_type in {"production_completed", "production_limited", "subsistence_resolved", "household_purchase_completed", "expansion_progressed", "research_progressed"}:
-                for delta in event.deltas:
-                    if delta.owner_kind == "stock":
-                        net_resources[delta.aspect] += int(delta.after) - int(delta.before)
+        net_resources.update(ledger_resource_effects(world.events[start:], world.economy.resources))
         assert resource_totals(world) == {rid: amount + net_resources[rid] for rid, amount in initial_resources.items()}, "unaccounted resource creation/loss"
         assert sum(a.balance for a in world.economy.accounts.values()) == initial_money
         if world.clock.absolute_day // 30 > boundary:

@@ -312,6 +312,7 @@ class Map():
         *,
         integrity: float | None = None,
         enabled: bool | None = None,
+        service_suspended: bool | None = None,
         last_event_id: str | None = None,
         track_update: bool = True,
     ) -> bool:
@@ -322,6 +323,7 @@ class Map():
         changed = site.update_runtime(
             integrity=integrity,
             enabled=enabled,
+            service_suspended=service_suspended,
             last_event_id=last_event_id,
         )
         if changed and track_update:
@@ -374,7 +376,7 @@ class Map():
         self,
         route_id: str,
         *,
-        site_runtime_overrides: Mapping[str, tuple[float, bool]] | None = None,
+        site_runtime_overrides: Mapping[str, tuple[float, bool, bool]] | None = None,
     ) -> float:
         """Derive usable capacity from the route and its declared sites.
 
@@ -392,16 +394,17 @@ class Map():
 
         dependency_factor = 1.0
         for site in self.get_route_dependency_sites(route_id):
-            integrity, enabled = (
+            integrity, enabled, service_suspended = (
                 site_runtime_overrides[site.id]
                 if site_runtime_overrides is not None
                 and site.id in site_runtime_overrides
-                else (float(site.integrity), bool(site.enabled))
+                else (float(site.integrity), bool(site.enabled), bool(site.service_suspended))
             )
-            site.validate_runtime(integrity=integrity, enabled=enabled)
+            site.validate_runtime(integrity=integrity, enabled=enabled,
+                                  service_suspended=service_suspended)
             dependency_factor = min(
                 dependency_factor,
-                float(integrity) if enabled else 0.0,
+                float(integrity) if enabled and not service_suspended else 0.0,
             )
 
         return float(route.capacity) * float(route.quality) * dependency_factor

@@ -1,8 +1,11 @@
 # Roadmap do fork medieval
 
 Atualizado em 13/09/2026. Este é o plano de produto que substitui o roteiro
-herdado de xianxia para o fork medieval; o plano operacional detalhado permanece
-em `.agent/tasks/medieval-world-simulator/plan.md` fora do repositório.
+herdado de xianxia para o fork medieval. Este roadmap e
+`docs/handoff/medieval-current-state.md`, ambos versionados, são a fonte
+canônica do plano e do estado atual. `.agent/tasks/medieval-world-simulator/`
+é apenas registro local de orquestração/retomada, não versionado e não
+substitui nem complementa a autoridade destes dois documentos.
 
 ## Regras que permanecem inegociáveis
 

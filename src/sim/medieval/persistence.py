@@ -11,6 +11,7 @@ import random
 import sqlite3
 import tempfile
 
+from src.classes.core.infrastructure import validate_infrastructure
 from src.classes.core.medieval_world import MedievalWorld
 from src.classes.core.medieval_config import MedievalRunConfig
 from src.classes.society import SocietyState
@@ -28,7 +29,7 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-SCHEMA = 11
+SCHEMA = 16
 
 
 def world_snapshot(world: MedievalWorld) -> dict:
@@ -40,6 +41,7 @@ def world_snapshot(world: MedievalWorld) -> dict:
     world.strategy.validate(world)
     world.research.validate(world)
     world.relations.validate(world)
+    validate_infrastructure(world)
     snapshot = serialize_map_snapshot(world.map)
     source = {
         "schema_version": 6, "id": snapshot["preset_id"], "version": snapshot["preset_version"],
@@ -74,6 +76,10 @@ def restore_snapshot(data: dict, events: list[WorldEvent]) -> MedievalWorld:
         raise ValueError("invalid saved run configuration")
     if type(data["event_count"]) is not int or data["event_count"] != len(events):
         raise ValueError("saved history count does not match the world snapshot")
+    sites = data["map"].get("infrastructure_sites") if isinstance(data["map"], dict) else None
+    if (not isinstance(sites, list)
+            or any(not isinstance(site, dict) or "service_suspended" not in site for site in sites)):
+        raise ValueError("saved infrastructure service state is missing")
     validate_history(events, clock.absolute_day)
     society = SocietyState.from_dict(data["society"])
     game_map = build_medieval_map(parse_map_source(data["map"]), society)

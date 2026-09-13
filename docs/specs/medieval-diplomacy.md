@@ -51,9 +51,13 @@ obrigações aceitas, pagamento/ensino e prazos mantêm referências causais.
 Testes preparados em tests/test_medieval_diplomacy.py provam contraproposta100→80, oferta anterior não aceitável,
 aceitação sem transferência, pagamento80 pelo owner econômico, ensino dependente
 do pagamento, reexecução recusada, autoridade perdida, prazo em dia intermediário,
-dispensa de dependência, save/load e rollback. As políticas autônomas de barganha,
-contextos por ator, API/observatório e inspeção visual serão integrados antes de
-considerar esta frente completa. Sem IAreal ou cota de acordos obrigatórios.
+dispensa de dependência, save/load e rollback. A política determinística de
+barganha (contextos por ator, ofertas mensais, prazos e reoferta) já está
+integrada e coberta por tests/test_medieval_diplomacy_policy.py; API/observatório
+e o painel visual também estão conectados (ver seções abaixo). Sem IAreal ou
+cota de acordos obrigatórios; isto não fecha a etapa nem o plano geral. Evidência
+de execução (contagens, evidência manual e status da suíte ampla) está centralizada
+em docs/handoff/medieval-current-state.md; este documento descreve apenas o contrato.
 
 O núcleo está implementado e coberto por testes focados. Ele não foi exposto como comando
 material público. Recibos das duas partes são notícias privadas, mas reputação,
@@ -62,7 +66,7 @@ Ensino continua institucional e imediato quando executado, não curso com duraç
 Propostas superadas/aceitas deixam o lembrete de expiração na agenda: ele é
 consumido sem efeitos, podendo produzir um salto intermediário inócuo.
 
-## Integração autônoma planejada
+## Integração autônoma determinística (implementada)
 
 Decisor determinístico recebe contexto isolado por instituição: conta própria,
 técnicas próprias, capacidades de sites próprios, catálogo público e propostas
@@ -89,3 +93,24 @@ e comunicado impede reoferta. Essa memória usa apenas negociações conhecidas 
 ator. Identidades e contas de recebimento institucionais são endereços públicos;
 seus saldos não entram no contexto alheio. API/UI projetam condições, obrigações,
 partes informadas e causas sob snapshot único, sem novos comandos materiais.
+
+## API, observatório e painel conectados
+
+GET `/api/v2/query/diplomacy` retorna `DiplomacyView` como listas planas
+(`proposals`/`obligations`/`notices`); o mesmo payload aparece no campo
+`diplomacy` de `query/observatory`. O agrupamento por proposta/cláusula não
+acontece na API — é feito no composable `useDiplomacy.ts`, que indexa
+obrigações por `proposal_id:clause_index`, resolve nomes por `entityName` e
+abre a crônica causal a partir de `decision_event_id`, `last_event_id` e
+`material_event_id` de cada obrigação. Notices exibidos são apenas os do próprio
+evento (`event_id`), preservando a regra de que a visão onisciente do observador
+não transforma um registro privado em conhecimento de um ator não notificado.
+
+Consultas separadas (`query/diplomacy`, `query/economy` etc.) compartilham a
+mesma trava/contrato de serialização, mas cada requisição não garante a mesma
+revisão que outra requisição feita em outro instante — o mundo pode avançar
+entre elas. Apenas uma única chamada a `query/observatory` é atômica entre todos
+os seus campos (incluindo `diplomacy`).
+
+Evidência de execução (contagens de testes, prova manual e status da suíte
+ampla) está centralizada em docs/handoff/medieval-current-state.md.

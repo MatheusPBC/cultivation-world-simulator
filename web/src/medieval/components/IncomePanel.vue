@@ -30,6 +30,9 @@ const { savings, totalSavings, payrolls, policies, source } = useIncome()
     <h3>{{ t('taxPolicies') }}</h3><p class="muted">{{ t('taxPoliciesHelp') }}</p>
     <article v-for="p in policies" :key="p.id" class="stock-card">
       <h4>{{ p.name }}</h4><p>{{ t('incomeTax') }}: {{ n(p.income_rate / 10) }}%</p>
+      <p>{{ t('exportRate') }}: {{ n(p.export_rate_permille / 10) }}%</p>
+      <p class="muted">{{ t('exportRateSource') }}: {{ p.export_policy_event_id ?? '—' }}</p>
+      <button v-if="p.export_policy_event_id" data-testid="export-policy-source" @click="source(p.export_policy_event_id)">{{ t('source') }} · {{ t('exportRate') }}</button>
       <button v-if="p.last_event_id" @click="source(p.last_event_id)">{{ t('source') }}</button>
     </article>
   </section>

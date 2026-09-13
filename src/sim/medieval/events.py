@@ -48,6 +48,8 @@ class WorldEvent(SocietyValue):
             raise ValueError("only a decision may carry intent")
         if self.deltas and self.fact_kind != FactKind.STATE_TRANSITION:
             raise ValueError("only state transitions can carry material deltas")
+        if self.deltas and self.causal_origin == CausalOrigin.LLM_INTERPRETATION:
+            raise ValueError("an interpretation cannot carry a state change")
         for index, delta in enumerate(self.deltas):
             if (delta.event_id != self.id or delta.id != f"{self.id}:delta:{index}"
                     or not delta.owner_kind or not delta.owner_id or not delta.aspect):
@@ -58,8 +60,12 @@ class WorldEvent(SocietyValue):
         return self
 
 
+def _interprets(event) -> bool:
+    return event.causal_origin == CausalOrigin.LLM_INTERPRETATION
+
+
 def validate_history(events, day: int) -> None:
-    known = set()
+    known = {}
     previous_day = 0
     for index, event in enumerate(events, start=1):
         event = WorldEvent.model_validate(event.model_dump(mode="json"))
@@ -68,17 +74,32 @@ def validate_history(events, day: int) -> None:
         causes = [link.cause_event_id for link in event.causal_links]
         if len(set(causes)) != len(causes) or any(cause not in known for cause in causes):
             raise ValueError("unknown or repeated event cause")
-        known.add(event.id)
+        if event.deltas and any(_interprets(known[cause]) for cause in causes):
+            raise ValueError("a state change cannot be caused directly by an interpretation")
+        known[event.id] = event
         previous_day = event.day
+
+
+def _is_recorded(events, cause_id) -> bool:
+    # Canonical IDs name their own position, so a cause is checked against the
+    # single event it could be instead of rescanning the whole history.
+    if not isinstance(cause_id, str):
+        return False
+    prefix, separator, sequence = cause_id.partition(":")
+    if prefix != "event" or not separator or not sequence.isdecimal():
+        return False
+    position = int(sequence)
+    return 1 <= position <= len(events) and events[position - 1].id == cause_id
 
 
 def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCCURRENCE,
                  causal_origin=CausalOrigin.DETERMINISTIC, decision=None, deltas=(), cause_ids=()) -> WorldEvent:
     sequence = len(world.events) + 1
     event_id = f"event:{sequence}"
-    known = {event.id for event in world.events}
-    if len(set(cause_ids)) != len(cause_ids) or any(cause not in known for cause in cause_ids):
+    if len(set(cause_ids)) != len(cause_ids) or any(not _is_recorded(world.events, cause) for cause in cause_ids):
         raise ValueError("unknown or repeated event cause")
+    if deltas and any(_interprets(world.events[int(cause.partition(":")[2]) - 1]) for cause in cause_ids):
+        raise ValueError("a state change cannot be caused directly by an interpretation")
     event = WorldEvent(
         id=event_id, day=world.clock.absolute_day, sequence=sequence,
         event_type=event_type, content=content, fact_kind=fact_kind,

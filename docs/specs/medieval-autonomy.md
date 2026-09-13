@@ -34,12 +34,65 @@ privados sem instalação ativa e saldos alheios não são divulgados. Canal men
 abstraído, sem tempo de
 mensageiro nesta unidade. Isto não autoriza compartilhar todo o histórico.
 
-Ofertas têm quantidade anunciada, preço, data e evento. Publicar zero retrai a
+Ofertas têm quantidade anunciada, preço, data e evento. Para origem administrada,
+também carregam a taxa exportadora, o fato específico da política e o coletor da
+jurisdição de origem; são metadados históricos da cotação, não leitura de saldo ou
+política privada estrangeira. Publicar zero retrai a
 oferta conectada; observações com 30dias ou mais não orientam novas compras.
 Planejador não vê excedente estrangeiro surgido após o relatório. O executor
 usa a verdade atual para validar, nunca para atribuí-la retrospectivamente ao ator.
 Segredos, crenças, relatos falsos, espionagem e redes de comunicação com atraso
 permanecem pendentes; a observação pública do jogador continua onisciente.
+
+### Conhecimento datado de rotas
+
+`RouteReport` (`src/sim/medieval/route_intelligence.py`) é uma observação
+datada de uma rota, nunca uma cópia do `Map` canônico: identidade (topologia,
+modo, recursos permitidos) permanece pública e estática ali; só capacidade
+operacional e duração de viagem são conhecidas por relatório. Uma instituição
+com povoado em um dos extremos da rota e mandato `supply` vigente observa sua
+própria passagem; essa autoobservação não exige estrada aberta, pois o ator já
+administra o extremo. A publicação mensal é uma decisão `publish_route_report`
+que entrega um recibo (`route_bulletin`) por destinatário, propagado pela rede
+física alcançável apenas a partir dos extremos administrados pelo publicador
+na própria rota observada (via `supply_path`), nunca a partir de outros
+povoados desconectados que o publicador também administre; um destinatário
+colocalizado nesse extremo é alcançável mesmo sem estrada aberta. `routing.py`
+só considera
+um relatório utilizável com menos de 30 dias e `travel_days` conhecido
+(passagem relatada como transitável); relatório ausente ou vencido não é
+inferido do mapa. O painel de inspeção de rota compara o valor datado com a
+capacidade canônica atual lado a lado; o observador onisciente nunca ensina
+esse conhecimento a um ator que não o recebeu.
+
+`SiteReport` é diferente de um boletim: só o mantenedor com presença local na
+instalação conhece sua integridade/operabilidade. Esse conhecimento permanece
+privado em `KnowledgeState` e não é transmitido automaticamente a outros atores.
+
+### Manutenção de infraestrutura
+
+O Map é o dono da integridade e da flag `enabled`. Economy schema 8 é dona apenas
+de `repair_blueprints` e `repairs`, a obrigação de projeto. A decisão de autorizar
+o projeto e cada `repair_batch_decided` são eventos distintos; cada lote revalida
+materiais locais, salários e a força de trabalho mensal compartilhada. Cada lote
+restaura no máximo 0,10 de integridade e nunca altera `enabled`: uma instalação
+interditada não é reativada pelo reparo. Os únicos kinds com blueprint são `farm`,
+`mine`, `port`, `workshop`, `forest` e `mountainpass`; não existe fallback mágico.
+
+## Migração temporal
+
+`refresh_reports` produz as observações factuais que uma coorte pode usar;
+`review_migration` e `start_migration` criam jornadas canônicas. A coorte segue
+residente na origem enquanto `present_population` diminui. A provisão referencia
+um `MoneyAccount`; alimento doméstico pode ser adquirido por compra bilateral
+e separado proporcionalmente para a jornada, sem copiar dinheiro entre donos;
+não é consumo genérico nem quota definida pelo observador. `returning` e
+`consumed_day` e `consumed_event_id` registram retorno/consumo temporal com
+proveniência causal explícita. Recuperação passa por uma nova decisão: tentar a
+chegada novamente ou retornar por rotas físicas conhecidas; esperar continua válido.
+Os testes focados cobrem recuperação e rollback de chegada, não calibração secular.
+Não há genealogia profunda, difusão de conhecimento por migração, pedágio,
+trânsito, bloqueios ou contrabando, e não há IA real.
 
 ## Intenções, contraparte e execução
 
@@ -74,15 +127,18 @@ Falha técnica de execução/save aborta o salto inteiro, não vira recusa do ve
 
 ## Persistência e observação
 
-Schema8 inclui alvos/relatórios por recurso e projetos econômicos. Schemas1–7 experimentais são preservados e
+Schema8 inclui alvos/relatórios por recurso e projetos econômicos; o save atual é
+schema16 e a economia interna é schema8. Schemas1–15 experimentais são preservados e
 rejeitados, sem migração silenciosa. Load confere identidades, referências,
 proveniência e canais; retomada mantém observações/intenções/pedidos/RNG.
 
 `query/governance` e `query/observatory.governance` projetam cargos, objetivos,
-planos, políticas tributárias e relatórios. ObjectiveView deriva target_quantity.
-Painel Abastecimento identifica recurso/unidade/finalidade/estoque e distingue reserva desejada, estoque,
+planos, políticas tributárias, relatórios e `route_reports`. ObjectiveView deriva
+target_quantity. Painel Abastecimento identifica recurso/unidade/finalidade/estoque e distingue reserva desejada, estoque,
 carga pendente, etapa, impedimento, data da avaliação e boletins conhecidos.
-Ver causa navega para os eventos canônicos. Nenhum novo comando material público.
+O painel de inspeção de rota mostra o conhecimento datado por instituição ao
+lado da capacidade canônica atual da rota selecionada. Ver causa navega para
+os eventos canônicos. Nenhum novo comando material público.
 
 ## Evidência e limites
 
@@ -104,8 +160,12 @@ mas a oficina esgota caixa sem demanda por ferramentas. Não corrigir isso injet
 bens/moedas. Faltam produção distribuída, investimentos mais amplos, demanda multissetorial mais
 ampla, demografia e negociações condicionais.
 Salários produtivos e imposto sobre essa renda já executam com limites de caixa;
-o painel Finanças permite inspecionar folhas. Novas taxas ainda não são escolhidas
-pela política autônoma, embora o executor validado exista.
+o painel Finanças permite inspecionar folhas. A rotina tarifária conservadora só
+considera as alternativas legais 0 e 50 permille, usando apenas caixa, folha,
+excedente próprio e dependência de entrega estrangeira conhecida. Ela abre 50 para
+proteger a próxima folha com caixa insuficiente e excedente, e retorna a 0 diante de
+dependência ou caixa recomposta; manter a taxa corrente também é uma decisão legal.
+Isso não é política fiscal geral, nem usa informação privada.
 
 A rotina atual de investimento usa operações próprias: instalação produzindo no
 limite, saída abaixo da reserva de dois meses, trabalhadores para nova capacidade,

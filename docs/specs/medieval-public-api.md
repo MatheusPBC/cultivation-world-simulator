@@ -22,7 +22,9 @@ Velocidade significa saltos por segundo real, nunca mudança na duração simula
 
 Configuração persistente medieval contém seed, contagem inicial de personagens
 (padrão12, 1–60), locale pt-BR e política determinística; não finge IA integrada.
-Saves usam schema11. IDs de sessão/pausa/velocidade/locks continuam apenas no runtime.
+Saves usam schema16 (Society2/Economy8); schemas 15 e abaixo são rejeitados e preservados, sem
+sobrescrita ou migração. IDs de
+sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras
 ou instalações e projetos de pesquisa. Finanças identifica a origem de cada folha.
 ExpansionBlueprint expõe additional_recipe_id/new_capacity para linhas adicionais,
@@ -45,18 +47,40 @@ das receitas e capacidades das instalações no estoque. Relatórios nomeiam o
 recurso observado. DTOs não persistem nem possuem quantidades materiais.
 
 - GET query/status: mundo disponível, pausa, erro, dia, sessão e velocidade.
-- GET query/observatory: status, world, society, economy, map, governance e research do mesmo instante,
-  serializados sob uma única trava/revisão; evita misturar meses no observatório.
+- GET query/observatory: status, world, society, economy, map, governance, research e diplomacy do mesmo
+  instante, serializados sob uma única trava/revisão; evita misturar meses no observatório.
 - GET query/options: configuração inicial e mapa disponíveis nesta versão.
 - GET query/world: resumo do mundo e configuração persistente.
 - GET query/society: personagens, povos, governos, organizações e povoados.
+- `SocietyView.migrations` lista jornadas ativas; `SettlementView.population`
+  (residentes) e `present_population` são distintos.
 - GET query/economy: catálogo, estoques, contas, produção, últimas folhas salariais, necessidades, mercados,
   ordens pendentes e cargas; ordens concluídas permanecem rastreáveis por eventos.
+  O catálogo inclui `repair_blueprints` e `repairs` (economia schema 8); custos
+  são definidos pelo engine, não pelo cliente.
+- `EconomyView.migration_provisions` expõe provisões e seu `MoneyAccount`; o
+  observador apenas projeta a transferência bilateral e não controla famílias.
 - GET query/map: geografia, território, rotas e instalações canônicas.
-- GET query/governance: cargos, políticas tributárias, objetivos, planos e relatórios por ator; consulta
-  onisciente do observador, não contexto permitido de um ator do mundo.
+- GET query/governance: cargos, políticas tributárias, objetivos, planos, relatórios de
+  suprimento, `SiteReport` e relatórios datados de rotas por ator. Relatórios e
+  ofertas de estoque incluem a cotação histórica de exportação da origem (taxa,
+  fato de política e coletor), nunca saldo da conta coletora; `SiteReport`
+  registra a presença local do mantenedor e permanece privado, não sendo
+  broadcast automático; consulta
+  onisciente do observador, não contexto permitido de um ator do mundo. Um
+  relatório de rota ausente ou com 30 dias ou mais não é inferido do mapa
+  canônico; ver medieval-autonomy.md.
+- `GovernanceView.settlement_reports` expõe observações datadas com residentes e
+  presentes; isso não é canal de controle para o observador.
 - GET query/research: catálogo, projetos e conhecimento técnico por instituição;
   consulta onisciente, não transferência de conhecimento entre atores.
+- GET query/diplomacy: listas planas de propostas, obrigações e notices (o
+  agrupamento por proposta/cláusula é responsabilidade do cliente); o mesmo
+  payload também está no campo `diplomacy` de query/observatory. Consultas
+  separadas não garantem a mesma revisão entre si se o mundo avançar; apenas uma
+  chamada a query/observatory é atômica entre todos os seus campos. Consulta
+  onisciente; não concede conhecimento a parte não notificada e não expõe
+  comando material de barganha.
 - GET query/events?after=0&limit=50: fatos em sequência, página máxima100.
 - GET query/causal/{event_id}: fato, causas diretas e efeitos diretos paginados.
 - GET query/saves: IDs dos arquivos, data/tamanho e metadados de compatibilidade.
@@ -74,5 +98,10 @@ serialização real de concorrência, pausa drena salto, limites de paginação,
 confinamento de arquivos e ausência de comandos materiais na superfície pública.
 Build/inspeção e limites do observatório constam em medieval-observatory.md.
 Pesquisa/ensino/aplicação e seus limites estão em medieval-research.md.
-Abastecimento autônomo por regras está em medieval-autonomy.md; integração de IA,
-diplomacia e as demais cadeias do plano continuam pendentes.
+Abastecimento autônomo por regras, incluindo o conhecimento datado de rotas,
+está em medieval-autonomy.md; barganha diplomática determinística e sua
+exposição via API/observatório estão descritas em medieval-diplomacy.md. Etapa1
+do plano permanece PARCIAL: faltam hazards naturais/clima/desgaste, mobilidade e
+treinamento de força de trabalho, pedágio/trânsito/bloqueios/contrabando e IA real;
+ver medieval-runtime.md e
+docs/handoff/medieval-current-state.md para o estado e a evidência centralizada.

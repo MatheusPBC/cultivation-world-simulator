@@ -8,8 +8,9 @@ from .events import record_event
 from .intelligence import reserve_quantity
 from .logistics import queue_freight
 from .markets import purchase
-from .routing import supply_path
+from .routing import known_supply_path
 from .demand import objective_target
+from .tariffs import export_fee
 
 
 def _account(world, actor_ref):
@@ -62,9 +63,14 @@ def _pending_orders(world, stock_id, resource_id):
                  if o.destination_id == stock_id and o.resource_id == resource_id and o.quantity > o.delivered_quantity)
 
 
-def _offers(world, objective, inventory):
+def _route_evidence(world, actor_ref, path):
+    """The dated observations that made this path an affordance for this actor."""
+    return tuple(world.knowledge.route_report(actor_ref, route_id).event_id for route_id in path)
+
+
+def _offers(world, objective, inventory, reasons):
     """Candidate choices use only the actor's reports, never foreign inventory."""
-    result = []
+    result, evidence = [], []
     for report in world.knowledge.for_actor(objective.actor_ref):
         if (report.resource_id != objective.resource_id or report.stock_id == inventory.stock_id
                 or world.clock.absolute_day - report.observed_day >= 30):
@@ -77,11 +83,23 @@ def _offers(world, objective, inventory):
             amount -= reserve_quantity(world, source.id, objective.resource_id)
         if amount <= 0:
             continue
-        path = supply_path(world, source.location_id, objective.settlement_id, objective.resource_id)
-        if path is not None:
-            price = 0 if source.owner_ref == objective.actor_ref else report.unit_price
-            result.append((price, len(path), report.stock_id, amount, path, report))
-    return sorted(result, key=lambda value: value[:3])
+        consulted = []
+        path = known_supply_path(world, objective.actor_ref, source.location_id,
+                                 objective.settlement_id, objective.resource_id, consulted=consulted)
+        if path is None:
+            # No observation of an open passage is not an invitation to invent one:
+            # only the reports this search actually rejected explain the refusal.
+            reasons.append("sem rota conhecida até a origem")
+            evidence.extend(consulted)
+            continue
+        rate = (0 if report.export_collector_ref is not None
+                and report.export_collector_ref.id == world.society.settlements[objective.settlement_id].administrator_id
+                else report.export_rate_permille)
+        price = 0 if source.owner_ref == objective.actor_ref else report.unit_price
+        # Compare the buyer's known all-in marginal quote, retaining base price
+        # separately for the material executor's one-order ceiling calculation.
+        result.append((price * (1000 + rate), len(path), report.stock_id, amount, path, report))
+    return sorted(result, key=lambda value: value[:3]), tuple(dict.fromkeys(evidence))
 
 
 def _review_objective(world, objective):
@@ -106,11 +124,14 @@ def _review_objective(world, objective):
     missing = max(0, target - inventory.quantity - sum(o.quantity - o.delivered_quantity for o in pending))
     plan = _set_plan(world, objective, "acquire", order_ids=[o.id for o in pending], causes=(inventory.event_id,))
     order_ids, reasons, response_causes = list(plan.order_ids), [], []
-    for price, _, source_id, available, path, report in _offers(world, objective, inventory):
+    offers, closed_routes = _offers(world, objective, inventory, reasons)
+    for _, _, source_id, available, path, report in offers:
         if missing <= 0:
             break
         quantity = min(missing, available)
         source = world.economy.stocks[source_id]
+        price = report.unit_price
+        evidence = _route_evidence(world, actor, path)
         if source.owner_ref == actor:
             # Local administrative execution rechecks stock already known to its owner.
             quantity = min(quantity, max(0, source.goods.get(resource_id, 0) - reserve_quantity(world, source_id, resource_id)))
@@ -121,24 +142,35 @@ def _review_objective(world, objective):
                                     decision={"action": "freight", "actor_ref": actor.to_dict(), "source_id": source_id,
                                               "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
                                               "route_ids": list(path)},
-                                    cause_ids=(plan.last_event_id, report.event_id))
+                                    cause_ids=_causes(plan.last_event_id, report.event_id, *evidence))
             order = queue_freight(world, source_id, stock.id, resource_id, quantity, path, decision_event_id=decision.id)
         else:
             buyer, seller = _account(world, actor), _account(world, source.owner_ref)
             if buyer is None or seller is None or not can_actor_act_for(world, actor, actor, "trade"):
                 reasons.append("sem conta ou autoridade comercial")
                 continue
-            quantity = min(quantity, buyer.balance // price)
+            destination_admin = world.society.settlements[stock.location_id].administrator_id
+            quote = {"export_rate_permille": report.export_rate_permille,
+                     "export_policy_event_id": report.export_policy_event_id,
+                     "export_collector_ref": (report.export_collector_ref.to_dict()
+                                              if report.export_collector_ref is not None else None)}
+            # The buyer knows its own settlement's administration. A quote from
+            # that same administration is domestic and explicitly has no export fee.
+            if quote["export_collector_ref"] is not None and quote["export_collector_ref"]["id"] == destination_admin:
+                quote = {"export_rate_permille": 0, "export_policy_event_id": None, "export_collector_ref": None}
+            quantity = min(quantity, buyer.balance * 1000 // (price * (1000 + quote["export_rate_permille"])))
             if quantity <= 0:
                 reasons.append("saldo insuficiente")
                 continue
+            fee = export_fee(quantity, price, quote["export_rate_permille"])
             terms = {"source_id": source_id, "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
                      "unit_price": price, "quote_day": report.quote_day, "route_ids": list(path),
-                     "buyer_account_id": buyer.id, "seller_account_id": seller.id}
+                     "buyer_account_id": buyer.id, "seller_account_id": seller.id,
+                     **quote, "total_price": quantity * price + fee}
             decision = record_event(world, "buy_decided", f"Propor compra de {quantity} de {world.economy.resources[resource_id].name} para {world.society.settlements[objective.settlement_id].name}.",
                                     fact_kind=FactKind.DECISION,
                                     decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},
-                                    cause_ids=_causes(plan.last_event_id, report.event_id, buyer.last_event_id))
+                                    cause_ids=_causes(plan.last_event_id, report.event_id, buyer.last_event_id, *evidence))
             accepted = consider_sale(world, terms, decision.id)
             response_causes.append(world.events[-1].id)
             if accepted is None:
@@ -150,7 +182,8 @@ def _review_objective(world, objective):
     blocker = "; ".join(sorted(set(reasons))) if reasons else "sem oferta acessível suficiente"
     _set_plan(world, objective, "await_delivery" if order_ids else "blocked",
               blocker=blocker if missing else None, order_ids=order_ids,
-              causes=[*response_causes, *(world.economy.freight_orders[oid].last_event_id for oid in order_ids)])
+              causes=[*response_causes, *(closed_routes if missing else ()),
+                      *(world.economy.freight_orders[oid].last_event_id for oid in order_ids)])
 
 
 def review_supply(world):

@@ -31,6 +31,9 @@ saúde e eleva descontentamento proporcionalmente à fração não atendida; ate
 integral recupera gradualmente esses indicadores. Saúde e descontentamento usam
 inteiros de 0 a 1000. Nesta unidade não há mortes ou migração automáticas: esses
 efeitos serão executados pela demografia, preservando a contabilidade de pessoas.
+Em migrações temporais, `population` continua residente na coorte de origem e
+`present_population` desconta os viajantes; pantry e `MoneyAccount` da família
+viajam por transferência bilateral entre donos, não por consumo de subsistência.
 
 Produção, consumo, alterações de saúde e transferências monetárias geram deltas
 separados de decisões, com causas apontando para os fatos que alteraram os insumos
@@ -41,8 +44,8 @@ Operações inválidas validam antes de aplicar. O fechamento ocorre no candidat
 transacional do simulador: falha de save não publica economia parcial.
 
 O save incorporou catálogo, receitas, instalações, inventários, contas,
-abastecimento e proveniência no schema2; o formato atual é schema11, incluindo
-folhas de pagamento e políticas tributárias. Saves experimentais anteriores
+abastecimento e proveniência no schema2; o formato atual é save16/Economy8, incluindo
+folhas, políticas tributárias, reparos e provisões de jornadas. Saves experimentais anteriores
 não são migrados ou sobrescritos silenciosamente. O catálogo inicial é ajustável no JSON;
 seus números ainda não representam calibração das simulações de dez anos.
 
@@ -52,8 +55,9 @@ Testes com valores manuais cobrem: transformação com insumos limitados; trabal
 compartilhados/recrutados; instalação danificada; armazém cheio; consumo sem dupla
 contagem; escassez e recuperação; transferência monetária conservativa; erro sem
 mutação; equivalência entre execução contínua e retomada; rollback do fechamento.
-Entregas e mercados têm suas provas em medieval-logistics.md. Tarifas, contrabando,
-consumo de outros bens e financiamento além de obras próprias permanecem no plano.
+Entregas e mercados têm suas provas em medieval-logistics.md. Pedágios, trânsito,
+bloqueios, contrabando, consumo de outros bens e financiamento além de obras
+próprias permanecem no plano.
 
 Pagamentos avulsos exigem intenção explícita do proprietário da conta de origem:
 `action=pay`, `actor_ref`, `source_id`, `target_id` e `amount`, sem campos extras.
@@ -104,6 +108,27 @@ não transferência monetária; arrecadação futura aponta para essa política 
 o pagamento. O simulador autônomo ainda não escolhe novas taxas: o executor está
 disponível para os futuros planos fiscais, sem comando material do observador.
 
+## Tarifa de exportação de origem
+
+`TaxPolicy.export_rate_permille` é independente de `income_rate` e seu fato
+canônico é `export_policy_event_id`, separado de `last_event_id`. Assim, uma
+alteração de imposto de renda não invalida a cotação exportadora ainda publicada.
+Só a administração do povoado do estoque de origem pode definir a tarifa. A oferta
+e o relatório carregam metadados históricos da cotação - taxa, fato de política e
+`export_collector_ref` - sem expor saldo, reserva ou outra informação privada da
+jurisdição estrangeira.
+
+A cotação é zero quando origem e destino têm a mesma administração. Frete entre
+estoques do mesmo dono não é compra e não cobra esta tarifa, inclusive entre
+administrações distintas. Para vendas entre administrações distintas, a abertura da ordem
+bilateral cobra uma vez o preço-base mais a tarifa ad valorem arredondada: a base
+vai ao vendedor e a tarifa ao tesouro da origem. Quando vendedor e coletor usam a
+mesma conta, a soma dos deltas conserva o crédito líquido sem criar cobrança dupla.
+Revalidação, reserva e entrega continuam no executor de mercado; a tarifa não cria
+pedágio, regra de trânsito ou bloqueio.
+
+### Comprovantes de trabalho e limites históricos
+
 `EconomyState.payrolls` guarda a última liquidação por instalação: data, trabalhadores
 por grupo, salário unitário, bruto, imposto e evento de origem. É um comprovante,
 não outra conta. A mesma instalação não produz/paga duas vezes na mesma data,
@@ -146,7 +171,8 @@ de compra. O último fechamento impede repetir consumo na mesma data, inclusive
 após load. Todos os efeitos continuam no candidato transacional mensal.
 Consumo foi introduzido no schema6/economy3, usando contas, eventos, payments e
 proveniência existentes. O schema7 introduziu objetivos/relatórios por
-recurso; schema8/economy4 acrescenta obras e catálogo. Save exige os dois recibos de cada compra,
+recurso; schema8/economy4 acrescenta obras e catálogo, e Economy8 é o formato
+corrente. Save exige os dois recibos de cada compra,
 sem apagar arquivos antigos.
 
 Provas preparadas:10moedas compram2rações a4 e deixam2; fornecedor recebe8.
@@ -156,8 +182,8 @@ paga40de salários, recebe4de imposto e36de vendas; termina50 e financia o próx
 mês. Na rodada natural seed73/180dias houve34pedidos,3984eventos salvos e retomada
 181equivalente4006eventos; moeda76000 e alimentos conservados. Caixas dos governos:
 Auren53500, Valedouro3988 e Escárlia2798. Isso não elimina falta de abastecimento,
-nem prova calibração de dez anos. Investimento, produção distribuída, migração
-financeira, políticas de provisão e trocas dos demais bens continuam necessários.
+nem prova calibração de dez anos. Investimento, produção distribuída, recuperação
+de migração, políticas de provisão e trocas dos demais bens continuam necessários.
 
 ## Reposição produtiva por recurso
 

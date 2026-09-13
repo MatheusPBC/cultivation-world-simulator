@@ -11,8 +11,8 @@ Não edita recursos, decisões, personagens nem resultados materiais.
 Fluxo: tipos em types/medieval-api.ts (projeção do OpenAPI, defaults de resposta
 sempre serializados), transporte api.ts, mappers.ts, Pinia/composables e componentes.
 O índice types/api.ts reexporta o namespace, sem aliases entre contratos.
-query/observatory reúne status/world/society/economy/map/governance sob uma única revisão.
-Histórico e efeitos causais são paginados em consultas separadas.
+query/observatory reúne status/world/society/economy/map/governance/research/diplomacy
+sob uma única revisão. Histórico e efeitos causais são paginados em consultas separadas.
 
 O cliente não avança o relógio nem interpreta deltas como patches. Falha mantém a
 última leitura com mensagem explícita; número de requisição impede publicação
@@ -126,3 +126,14 @@ research-adaptation-narrow.png e research-complete-narrow.png no workspacepai,
 vistos;390pxdocumento375==scroll375/tabs341==341/cards295==295. Frontend23testes
 e build/vue-tsc741módulos aprovados. Apenasfavicon404 no console, warningPixi
 772.8KB permanece. Ver medieval-research.md para limites funcionais.
+
+DiplomacyPanel/useDiplomacy consultam o mesmo DiplomacyView do snapshot (listas
+planas de proposals/obligations/notices; a API não agrupa). O composable agrupa
+obrigações por proposta+índice de cláusula, resolve nomes por entityName e abre
+a crônica causal a partir de decision_event_id/last_event_id/material_event_id.
+Notices exibidos ficam restritos ao evento focado, sem promover registro privado
+a conhecimento público. Barganha determinística já está integrada ao motor; IA
+real de negociação não. Ver medieval-diplomacy.md para os limites completos da
+frente e docs/handoff/medieval-current-state.md para evidência de execução
+(contagens de testes, prova manual e status da suíte ampla). Isto não encerra o
+observatório de diplomacia, muito menos o roadmap ou a etapa0 do plano medieval.

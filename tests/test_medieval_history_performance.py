@@ -46,6 +46,47 @@ def test_clone_does_not_silently_turn_nonfinite_decision_data_into_null(bad):
         copy.deepcopy(event)
 
 
+def test_recording_a_cause_addresses_its_event_without_traversing_the_history():
+    class TraversedHistory(list):
+        traversals = 0
+
+        def __iter__(self):
+            self.traversals += 1
+            return super().__iter__()
+
+        def __reversed__(self):
+            self.traversals += 1
+            return super().__reversed__()
+
+    world = create_medieval_world(73)
+    cause = record_event(world, "observed", "Fato que será citado como causa.")
+    for _ in range(200):
+        record_event(world, "observed", "Fato sem relação com a causa.")
+    world.events = TraversedHistory(world.events)
+    world.events.traversals = 0
+    effect = record_event(world, "effect", "Efeito do fato citado.", fact_kind=FactKind.STATE_TRANSITION,
+                          deltas=(StateDelta(owner_kind="stock", owner_id="s", aspect="food", before="1", after="2"),),
+                          cause_ids=(cause.id,))
+    assert [link.cause_event_id for link in effect.causal_links] == [cause.id]
+    assert world.events[-1] is effect
+    assert world.events.traversals == 0
+
+
+@pytest.mark.parametrize("cause", ["event:0", "event:01", "event: 1", "event:1.0", "event:one", "event:",
+                                   "evento:1", "event:1:delta:0", "", None, "future"])
+def test_record_event_rejects_malformed_unknown_or_repeated_causes(cause):
+    world = create_medieval_world(73)
+    known = record_event(world, "observed", "Fato existente.")
+    if cause == "future":
+        cause = f"event:{len(world.events) + 1}"
+    before = len(world.events)
+    for causes in ((cause,), (known.id, cause), (known.id, known.id)):
+        with pytest.raises(ValueError, match="cause"):
+            record_event(world, "effect", "Efeito com causa inválida.", cause_ids=causes)
+    assert len(world.events) == before
+    assert record_event(world, "effect", "Efeito com causa válida.", cause_ids=(known.id,)).causal_links[0].cause_event_id == known.id
+
+
 def test_cargo_batch_reads_route_history_once_and_next_batch_observes_new_causes():
     from src.sim.medieval.logistics import resolve_parcels
     from src.systems.time import WorldClock

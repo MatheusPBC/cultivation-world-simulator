@@ -38,6 +38,13 @@ Veja [Pesquisa e aplicação](docs/specs/medieval-research.md) para os limites a
 Não há decisões por LLM nesta versão; diplomacia, pesquisa avançada, campanhas, magia,
 criaturas e demografia autônoma continuam em implementação. Não é o jogo completo.
 
+Exportações entre administrações diferentes podem carregar uma tarifa de origem
+datada na oferta pública. A cotação mostra ao comprador apenas a taxa, o fato de
+política e o coletor da jurisdição de origem; na abertura bilateral da ordem, o
+comprador paga base mais tarifa uma única vez, o vendedor recebe a base e o tesouro
+de origem recebe a tarifa. Não há tarifa em frete próprio/doméstico, pedágio,
+trânsito ou bloqueio nesta vertical.
+
 ## Executar localmente
 
 Na raiz deste fork, com Python e Node.js:
@@ -65,8 +72,20 @@ O servidor é local e não possui autenticação para exposição pública.
 A variável `SERVER_PORT` permite escolher a porta.
 
 Sem override, dados usam a pasta de aplicativo `MedievalWorldSimulator(-dev)`,
-separada da origem. Saves estão em `saves/medieval/*.mws`, schema 11.
-Saves xianxia e schemas experimentais anteriores são rejeitados, não migrados.
+separada da origem. Saves estão em `saves/medieval/*.mws`, schema 16. Saves
+xianxia e schemas experimentais anteriores (15 e abaixo) são rejeitados e
+preservados, sem sobrescrita nem migração.
+
+Migrações são jornadas temporais canônicas: residentes permanecem na coorte de
+origem enquanto `present_population` diminui. A provisão usa `MoneyAccount` e
+pantry próprio, com transferência bilateral entre donos, não consumo genérico.
+
+Instalações têm integridade e operabilidade no Map. Reparos são obrigações
+econômicas explícitas, com projetos e lotes decididos, materiais e salários
+pagos a partir da força de trabalho mensal compartilhada. O catálogo conhece
+somente farm, mine, port, workshop, forest e mountainpass; a recuperação é
+gradual (até 0,10 por lote) e não reativa automaticamente uma instalação com
+`enabled=false`.
 
 ## Desenvolvimento e documentação
 

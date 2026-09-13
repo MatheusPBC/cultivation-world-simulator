@@ -49,6 +49,12 @@ regiões, não geometria precisa da estrada. O personagem conserva a residência
 populacional enquanto viaja. Uma rota indisponível na resolução adia a chegada
 e reagenda a situação; a escolha estratégica de desvio ainda será integrada.
 
+Para portos e passagens de montanha, o Map separa dano físico de serviço. O
+proprietário atual, com mandato de abastecimento, presença local e `SiteReport`
+recente, pode suspender ou retomar o próprio serviço. Serviço suspenso zera a
+capacidade derivada da rota e preserva a carga em espera; não repara, não reativa
+`enabled=false`, não confisca bens e não modela bloqueio militar ou alfândega.
+
 O runner prepara uma cópia isolada do mundo, incluindo RNG, atividades e
 histórico. Só publica o candidato no objeto raiz depois de validar e, quando
 configurado um caminho, salvar. Falhas deixam o objeto publicado e o save
@@ -102,10 +108,13 @@ Um `.mws` é um arquivo SQLite com tabelas `metadata`, `world` e `events`, e
 índice por dia/sequência. O snapshot JSON interno carrega sociedade, mapa físico,
 rotas, instalações, relógio, agenda, atividades, economia, autoridade, conhecimento,
 estratégia, pesquisa, configuração e RNG.
-A identidade de produto é `medieval-world-simulator`, com schema 11 e versão de catálogo explícitos.
+A identidade de produto é `medieval-world-simulator`, com schema 16 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 8.
 Nenhum loader consulta o catálogo atual para reconstruir o mundo salvo.
-Saves experimentais schema 1–10 são rejeitados e preservados; use um novo arquivo
-para o smoke atualizado, sem sobrescrever a prova histórica anterior.
+Saves experimentais schema 1–15 são rejeitados e preservados; use um novo arquivo
+para o smoke atualizado, sem sobrescrever a prova histórica anterior. O snapshot
+atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 8 com `repair_blueprints` e
+`repairs`; nenhum loader migra schemas antigos. O catálogo de custos é propriedade
+do engine e os DTOs apenas o projetam.
 
 A escrita valida o candidato, prepara um arquivo temporário na mesma pasta,
 fecha conexões e substitui atomicamente o destino. Um arquivo existente de
@@ -115,9 +124,19 @@ credenciais, sessões, locks ou configurações secretas no arquivo.
 
 ## Pendências de integração
 
-Ainda faltam diplomacia/contratos de obrigações, tarifas/contrabando,
-crédito/investimentos mais amplos, demografia, sucessão/disputa de autoridade, planos multissetoriais,
-decisões de IA, pesquisa avançada/difusão, campanhas, magia, criaturas e observatório completo.
+Etapa 1 (fundação/informação/abastecimento) está **PARCIAL**: o núcleo de dano e
+reparo material de instalações existe, mas ainda faltam hazards naturais, clima e
+desgaste, mobilidade/treinamento de força de trabalho (as vilas são todas farmer,
+portanto o trabalho artesanal pode bloquear),
+pedágio/trânsito/bloqueios/contrabando e decisões de IA real. Diplomacia com barganha
+determinística já está integrada (ver medieval-diplomacy.md), mas sem IA real.
+Migração temporal já é projetada, inclusive recuperação/retorno validada na rodada
+E45, sem genealogia profunda ou difusão de conhecimento por migração.
+Também faltam crédito/investimentos mais amplos, demografia profunda,
+sucessão/disputa de autoridade, planos multissetoriais, pesquisa avançada/difusão,
+campanhas, magia, criaturas e observatório completo. Evidência de execução
+(contagens de teste, smokes e status da suíte) está centralizada em
+docs/handoff/medieval-current-state.md; não repetir aqui.
 O servidor principal e o observatório conectado já usam este runner.
 Produção remunera trabalho real e recolhe imposto de renda conforme mandato,
 com folhas e poupança visíveis no painel Finanças; ver medieval-economy.md.

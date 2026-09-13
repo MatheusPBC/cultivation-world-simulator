@@ -1,5 +1,27 @@
 # Ubiquitous Language
 
+## Medieval world — population and movement
+
+**Residence**:
+The settlement to which a population group belongs. Temporary absence does not
+by itself change residence.
+_Avoid_: Current position, arrival.
+
+**Physical presence**:
+Where people actually are, including absence while travelling. Residence alone
+does not make a traveller available for local work or meals.
+_Avoid_: Residence, registered population.
+
+**Migration journey**:
+A group's deliberate movement toward a new residence, which may be delayed or
+abandoned. Intending or starting the journey is not arrival.
+_Avoid_: Instant population transfer, government relocation.
+
+**Travelling household**:
+The people moving together and the portion of household property accompanying
+them. Named people are included in its population, not added to it.
+_Avoid_: Additional population, newly created wealth.
+
 ## Current implementation ledger (2026-09-04)
 
 Sect annual administration now has its own `SECT_ADMINISTRATION` authority:

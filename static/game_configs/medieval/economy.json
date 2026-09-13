@@ -112,6 +112,84 @@
       "to_recipe_id": "steam_ironworking"
     }
   ],
+  "repair_blueprints": [
+    {
+      "id": "repair:mountain_pass",
+      "name": "Recuperação da passagem",
+      "site_kind": "mountain_pass",
+      "inputs": {
+        "wood": 4,
+        "stone": 6,
+        "tools": 1
+      },
+      "workers": 6,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    },
+    {
+      "id": "repair:port",
+      "name": "Recuperação das docas",
+      "site_kind": "port",
+      "inputs": {
+        "wood": 6,
+        "stone": 3,
+        "tools": 1
+      },
+      "workers": 6,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    },
+    {
+      "id": "repair:mine",
+      "name": "Escoramento da mina",
+      "site_kind": "mine",
+      "inputs": {
+        "wood": 4,
+        "stone": 2,
+        "tools": 1
+      },
+      "workers": 5,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    },
+    {
+      "id": "repair:workshop",
+      "name": "Recuperação das oficinas",
+      "site_kind": "workshop",
+      "inputs": {
+        "wood": 3,
+        "stone": 2,
+        "tools": 1
+      },
+      "workers": 4,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    },
+    {
+      "id": "repair:farm",
+      "name": "Recuperação das lavouras",
+      "site_kind": "farm",
+      "inputs": {
+        "wood": 3,
+        "tools": 1
+      },
+      "workers": 4,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    },
+    {
+      "id": "repair:forestry",
+      "name": "Recuperação dos bosques",
+      "site_kind": "forestry",
+      "inputs": {
+        "wood": 3,
+        "tools": 1
+      },
+      "workers": 4,
+      "wage_per_worker": 2,
+      "restored_permille": 100
+    }
+  ],
   "resources": [
     {
       "id": "food",

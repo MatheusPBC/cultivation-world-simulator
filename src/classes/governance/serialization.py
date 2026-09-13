@@ -41,6 +41,6 @@ class RegistrySerialization:
 
 def validate_actor(world, ref):
     owners = {"polity": world.society.polities, "organization": world.society.organizations,
-              "character": world.society.characters}
+              "character": world.society.characters, "population_group": world.society.population}
     if ref.id not in owners.get(ref.kind, {}):
         raise ValueError("unknown governance actor")

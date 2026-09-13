@@ -13,8 +13,10 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 11 rejects incomplete configuration and older experimental saves.
-  Preserve old files. Session IDs, pause, speed, locks and secrets are not saved.
+  save schema 16 requires the current snapshot shape and rejects incomplete
+  configuration and older experimental saves (schema 15 and below), preserved
+  without overwrite or migration. Session IDs, pause, speed, locks and secrets
+  are not saved.
 - Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
   for isolated tests. Save IDs are confined basenames; manual overwrite is explicit.
 - Tests of inherited `main.py` routes/imports are historical contracts, not
@@ -29,12 +31,27 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Supply decisions use own dated reports/public bulletins. Seller consent,
   authorization and material executors revalidate independently. No private
   foreign inventory in actor context; an order is not delivered stock.
+- `RouteReport` (route_intelligence.py) is a dated observation, not a copy of the
+  Map's canonical route. Only an endpoint administration with a current supply
+  mandate observes its own passage; that self-observation needs no open road.
+  Monthly publication is a `publish_route_report` decision that delivers one
+  receipt per recipient (`route_bulletin`) over the physical network reachable
+  only from the publisher's administered endpoints of the observed route
+  itself, never from its other, disconnected settlements; a recipient
+  co-located at that endpoint is reachable even with no open road out. The
+  supply planner treats a report 30+ days old as too stale to
+  act on; Map identity (topology/mode/allowed resources) stays public and
+  static, but capacity/travel time are only known through a report. The route
+  inspector panel compares this dated figure against the current canonical
+  capacity side by side; the observer never teaches or backfills a missing
+  report from the map.
 - Objectives name the actual stock/resource. Food goals use public subsistence;
   productive-input goals use the owner's facility recipes, not city population.
   Reports and route searches are resource-specific. Sellers protect productive
   reserves as well as food; active public/workshop stores publish authorized offers,
   not all private holdings. ObjectiveView.target_quantity is a derived projection.
-- Economy owns expansion blueprints/projects (economy schema6). Construction and
+- Economy owns expansion blueprints/projects (economy schema 8; older schema 7
+  references are historical). Construction and
   production share monthly workforce and wage/tax settlement. Materials and paid
   work accumulate before capacity changes; completed projects cannot repeat.
   Resource targets add remaining construction materials once, not per reserve month.
@@ -43,6 +60,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   needs the line and its commissioning receipt; advanced recipes need owned
   knowledge during operation. Finances shows the new line's capacity, not its
   anchor's capacity, and identifies productive payrolls by their output products.
+- Economy schema 8 also owns `repair_blueprints`, `repairs` and migration travel
+  provisions. The Map owns site
+  integrity/operability; a repair is an explicit project obligation and current
+  `repair_batch_decided` decision. Materials, paid wages and the shared monthly
+  workforce are revalidated per batch. Restoration is gradual (at most 0.10
+  integrity per batch), and repair never re-enables a site whose `enabled` flag
+  is false. The catalog has explicit kinds only: farm, mine, port, workshop,
+  forest and mountainpass; there is no generic or magical fallback.
 - ResearchState owns the saved technology catalog and experiments; KnowledgeState
   owns institution-specific techniques. Discovery never changes a recipe directly.
   Monthly paid research reserves the named leader inside cohort labor, not an extra
@@ -59,12 +84,27 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   deadlines expire offers and record breach/excuse without forced transfers.
   KnowledgeState.notices disclose these facts only to the proposal participants.
   Saved pending diplomacy requires its agenda deadline. See medieval-diplomacy.md;
-  autonomous bargaining and its observer panel are not integrated yet.
+  deterministic autonomous bargaining, the `/api/v2/query/diplomacy` endpoint and
+  DiplomacyPanel are integrated; real AI-driven negotiation is not.
+- GET `/api/v2/query/diplomacy` returns flat lists (proposals/obligations/notices);
+  the same payload also appears in the `diplomacy` field of `query/observatory`.
+  Grouping obligations per proposal/clause is the client's job (useDiplomacy.ts),
+  not the API's. Separate queries share the same lock/contract but do not
+  guarantee the same revision across two requests if the world advances between
+  them; only a single `query/observatory` call is atomic across all its fields.
+  The omniscient view never grants knowledge to a party that has not been
+  notified. See medieval-diplomacy.md and medieval-public-api.md.
 - Event deepcopy must isolate nested mutable payloads, not share frozen outer
   models. Freight provenance is batch-local; never retain it across dated steps.
 - Economy owns cohort accounts and last payroll receipts; AuthorityState owns tax
   policies, not balances. Actual productive labor must be paid from employer funds.
   Income tax applies only to new wages and the current administrator's mandate.
+- TaxPolicy keeps income policy and export policy provenance separate.
+  `export_rate_permille` is the source settlement administrator's export quote and
+  `export_policy_event_id` proves that quote; it is not replaced by an income-tax
+  update or by the policy's general `last_event_id`. A foreign buyer receives only
+  the dated quoted metadata, never the collector's balance. Domestic/own freight
+  has rate zero; transit tolls and blockades are not part of this vertical.
 - Initial employment terms are authored standing agreements. Monthly household
   purchases consume actual rations and debit savings with bilateral decisions;
   public relief covers the unpaid share of the existing public distribution.
@@ -72,6 +112,12 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   again in relief. Both decision receipts and same-day closure survive save/load.
   Savings do not yet finance investment or follow a raw population cohort move.
   This initial provision rule is not a universal fiscal policy or proof of equilibrium.
+- Migration is a dated canonical journey owned by Society (`migrations`) with an
+  Economy travel provision (`migration_provisions`): residents remain in their
+  source cohort while `present_population` falls. Its `MoneyAccount` and pantry
+  are transferred bilaterally from the household, not consumed as a generic
+  population expense. Recovery/return (`returning`, `consumed_day`) was
+  validated in E45; conservative policy has no quota or omniscient family control.
 - IncomePanel/useIncome separates accumulated savings from dated payrolls and
   exposes causal evidence. Inspector tabs wrap; do not restore horizontal overflow.
 - Default monthly routine now opens real supply orders. Tests of elapsed years

@@ -451,6 +451,7 @@
         "claimant_ids": [],
         "housing_capacity": 1200,
         "population": 900,
+        "present_population": 888,
         "center": [
           20,
           11
@@ -469,6 +470,7 @@
         "claimant_ids": [],
         "housing_capacity": 1400,
         "population": 1100,
+        "present_population": 1100,
         "center": [
           2,
           3
@@ -487,6 +489,7 @@
         "claimant_ids": [],
         "housing_capacity": 1100,
         "population": 800,
+        "present_population": 800,
         "center": [
           14,
           11
@@ -505,6 +508,7 @@
         "claimant_ids": [],
         "housing_capacity": 2400,
         "population": 1800,
+        "present_population": 1800,
         "center": [
           20,
           3
@@ -523,6 +527,7 @@
         "claimant_ids": [],
         "housing_capacity": 3000,
         "population": 2400,
+        "present_population": 2400,
         "center": [
           8,
           3
@@ -544,6 +549,7 @@
         ],
         "housing_capacity": 1200,
         "population": 900,
+        "present_population": 900,
         "center": [
           14,
           3
@@ -562,6 +568,7 @@
         "claimant_ids": [],
         "housing_capacity": 2600,
         "population": 2000,
+        "present_population": 2000,
         "center": [
           8,
           11
@@ -580,6 +587,7 @@
         "claimant_ids": [],
         "housing_capacity": 1300,
         "population": 1000,
+        "present_population": 1000,
         "center": [
           2,
           11
@@ -964,7 +972,26 @@
         "count": 200
       }
     ],
-    "activities": []
+    "activities": [],
+    "migrations": [
+      {
+        "id": "migration:brumafria:pedraclara:1",
+        "source_group_id": "pop:brumafria:human:farmer",
+        "destination_id": "pedraclara",
+        "initial_destination_id": "pedraclara",
+        "count": 12,
+        "character_ids": ["character:001"],
+        "route_ids": ["road-brumafria-ferroalto"],
+        "initial_route_ids": ["road-brumafria-ferroalto"],
+        "route_index": 0,
+        "stage": "traveling",
+        "returning": false,
+        "due_day": 45,
+        "decision_event_id": "event:migration-decision",
+        "provision_id": "provision:migration:1",
+        "last_event_id": "event:migration-started"
+      }
+    ]
   },
   "economy": {
     "expansion_blueprints": [
@@ -1097,6 +1124,21 @@
       }
     ],
     "expansions": [],
+    "repair_blueprints": [],
+    "repairs": [],
+    "migration_provisions": [
+      {
+        "id": "provision:migration:1",
+        "journey_id": "migration:brumafria:pedraclara:1",
+        "account_id": "treasury:escarlia",
+        "food": 12,
+        "missing_food": 2,
+        "health": 980,
+        "consumed_day": null,
+        "consumed_event_id": null,
+        "last_event_id": "event:migration-provision"
+      }
+    ],
     "resources": [
       {
         "id": "coal",
@@ -3940,6 +3982,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -3970,6 +4013,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4005,6 +4049,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4035,6 +4080,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4065,6 +4111,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4095,6 +4142,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4128,6 +4176,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       },
       {
@@ -4158,6 +4207,7 @@
         },
         "integrity": 1,
         "enabled": true,
+        "service_suspended": false,
         "last_event_id": null
       }
     ]
@@ -4360,22 +4410,31 @@
         "id": "auren",
         "account_id": "treasury:auren",
         "income_rate": 100,
+        "export_rate_permille": 0,
+        "export_policy_event_id": null,
         "last_event_id": null
       },
       {
         "id": "escarlia",
         "account_id": "treasury:escarlia",
         "income_rate": 100,
+        "export_rate_permille": 0,
+        "export_policy_event_id": null,
         "last_event_id": null
       },
       {
         "id": "valedouro",
         "account_id": "treasury:valedouro",
         "income_rate": 100,
+        "export_rate_permille": 0,
+        "export_policy_event_id": null,
         "last_event_id": null
       }
     ],
     "reports": [],
+    "route_reports": [],
+    "site_reports": [],
+    "settlement_reports": [],
     "objectives": [
       {
         "id": "inputs:stock:ferroalto:wood",
@@ -4617,5 +4676,6 @@
     ],
     "projects": [],
     "knowledge": []
-  }
+  },
+  "diplomacy": { "proposals": [], "obligations": [], "notices": [] }
 }

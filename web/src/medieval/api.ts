@@ -1,7 +1,7 @@
 import type { CausalView, CreateRequest, EventsView, LoadRequest, ObservatoryView, OptionsView,
-  SaveRequest, SaveView, SpeedRequest, StatusView, ResearchView } from '../types/medieval-api'
+  SaveRequest, SaveView, SpeedRequest, StatusView, ResearchView, DiplomacyView } from '../types/medieval-api'
 
-type Queries = { status: StatusView; options: OptionsView; observatory: ObservatoryView; research: ResearchView; saves: SaveView[]; events: EventsView }
+type Queries = { status: StatusView; options: OptionsView; observatory: ObservatoryView; research: ResearchView; diplomacy: DiplomacyView; saves: SaveView[]; events: EventsView }
 type Commands = { create: CreateRequest; step: Record<string, never>; pause: Record<string, never>;
   resume: Record<string, never>; speed: SpeedRequest; save: SaveRequest; load: LoadRequest }
 export type Command = keyof Commands

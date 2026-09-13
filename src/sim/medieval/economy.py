@@ -36,7 +36,7 @@ def _apply_stock(world, stock, goods, event_type, content, *, extra_deltas=(), c
 
 
 def monthly_workforce(world):
-    available = {g.id: g.count for g in world.society.population.values()}
+    available = {g.id: world.society.available_count(g.id) for g in world.society.population.values()}
     for payroll in world.economy.payrolls.values():
         if payroll.day == world.clock.absolute_day:
             for group_id, count in payroll.workers_by_group.items():
@@ -92,6 +92,8 @@ def produce_monthly(world, available=None) -> None:
                              f"{site.name}: {batches} lotes de produção concluídos.",
                              cause_ids=_causes(site.last_event_id, facility.last_event_id,
                                                economy.accounts[facility.payroll_account_id].last_event_id,
+                                               *(group.last_event_id for group in world.society.population.values()
+                                                 if group.settlement_id == stock.location_id and group.occupation == recipe.occupation),
                                                *(stock.last_event_ids.get(r) for r in recipe.inputs)),
                              extra_deltas=changes)
         economy.facilities[facility.id] = updated.model_copy(update={"last_event_id": event.id})
@@ -101,37 +103,67 @@ def produce_monthly(world, available=None) -> None:
 
 def consume_monthly(world) -> None:
     from .consumption import purchase_monthly_rations
+    from .migration import consume_travel_provisions
     economy = world.economy
     economy.validate(world)
+    consume_travel_provisions(world)
     events = {e.id: e for e in world.events}
     for need in sorted(economy.needs.values(), key=lambda item: item.id):
         previous = events.get(need.last_event_id)
         if previous is not None and previous.day == world.clock.absolute_day and previous.event_type == "subsistence_resolved":
             continue
         stock = economy.stocks[need.stock_id]
-        required = world.society.population_at(need.id)
-        consumed = min(required, stock.goods.get("food", 0))
-        missing = required - consumed
+        groups = [group for group in world.society.population.values()
+                  if group.settlement_id == need.id and world.society.available_count(group.id)]
+        required_by_group = {group.id: world.society.available_count(group.id) for group in groups}
+        domestic, domestic_receipts = _consume_household_food(world, need.id, required_by_group)
+        required = sum(required_by_group.values()) + domestic
+        public_required = sum(required_by_group.values())
+        consumed = min(public_required, stock.goods.get("food", 0))
+        missing = public_required - consumed
         pressure = math.ceil(100 * missing / required) if required else 0
         health = max(0, need.health - pressure) if missing else min(1000, need.health + 20)
         unrest = min(1000, need.unrest + pressure) if missing else max(0, need.unrest - 20)
         updated = need.model_copy(update={"health": health, "unrest": unrest, "missing_food": missing})
         deltas = tuple(_delta("subsistence", need.id, field, getattr(need, field), getattr(updated, field))
                        for field in ("health", "unrest", "missing_food") if getattr(need, field) != getattr(updated, field))
-        paid, receipts = purchase_monthly_rations(world, need, consumed)
+        paid, receipts = purchase_monthly_rations(world, need, consumed, required_by_group)
         stock = economy.stocks[need.stock_id]
         relief = consumed - paid
         goods = {**stock.goods, "food": stock.goods.get("food", 0) - relief}
         settlement = world.society.settlements[need.id]
         event = _apply_stock(world, stock, goods, "subsistence_resolved",
-                             f"{settlement.name}: {consumed}/{required} rações atendidas; {paid} compradas, "
+                             f"{settlement.name}: {domestic + consumed}/{required} rações atendidas; {domestic} domésticas, {paid} compradas, "
                              f"{relief} de ajuda pública; déficit de {missing}.",
-                             extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"), *receipts,
+                             extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"), *domestic_receipts, *receipts,
+                                 *(group.last_event_id for group in groups),
                                  *(f.last_event_id for f in economy.facilities.values() if f.stock_id == stock.id
                                    and "food" in economy.recipes[f.recipe_id].outputs),
                                  *(o.last_event_id for o in economy.freight_orders.values() if o.destination_id == stock.id
                                    and o.resource_id == "food" and o.delivered_quantity < o.quantity)))
         economy.needs[need.id] = updated.model_copy(update={"last_event_id": event.id})
+
+
+def _consume_household_food(world, settlement_id, requirements):
+    """Private carried food is consumed once before any public allocation."""
+    economy = world.economy
+    total, receipts = 0, []
+    for group_id in sorted(requirements):
+        stock = economy.stocks.get(f"household-stock:{group_id}")
+        if stock is None:
+            continue
+        if stock.owner_ref.kind != "population_group" or stock.owner_ref.id != group_id or stock.location_id != settlement_id:
+            raise ValueError("invalid household food stock")
+        eaten = min(requirements[group_id], stock.goods.get("food", 0))
+        if not eaten:
+            continue
+        event = _apply_stock(world, stock, {**stock.goods, "food": stock.goods.get("food", 0) - eaten},
+                             "household_rations_consumed", f"A família consumiu {eaten} rações próprias.",
+                             cause_ids=_causes(stock.last_event_ids.get("food")))
+        requirements[group_id] -= eaten
+        total += eaten
+        receipts.append(event.id)
+    return total, tuple(receipts)
 
 
 def transfer_money(world, source_id: str, target_id: str, amount: int, *, decision_event_id: str) -> None:
@@ -153,6 +185,8 @@ def transfer_money(world, source_id: str, target_id: str, amount: int, *, decisi
                           "actor_ref": source.owner_ref.to_dict()}
             or decision_event_id in economy.payments):
         raise ValueError("payment needs a matching unexecuted decision")
+    if event.day != world.clock.absolute_day:
+        raise ValueError("payment decision is stale; consent must be given today")
     require_authority(world, source.owner_ref, "trade")
     effect = record_event(world, "payment_completed", f"Pagamento de {amount} unidades monetárias concluído.",
                           fact_kind=FactKind.STATE_TRANSITION,

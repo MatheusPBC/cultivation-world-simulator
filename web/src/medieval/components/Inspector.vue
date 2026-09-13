@@ -1,25 +1,31 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useInspection } from '../composables/useInspection'
-import { formatNumber as n } from '../mappers'
+import { formatNumber as n, calendar } from '../mappers'
 import SupplyPlans from './SupplyPlans.vue'
 import IncomePanel from './IncomePanel.vue'
 import ResearchPanel from './ResearchPanel.vue'
+import DiplomacyPanel from './DiplomacyPanel.vue'
+import MigrationPanel from './MigrationPanel.vue'
 const {t,te}=useI18n()
-const {tab,data,settlement,character,site,route,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
+const {tab,data,settlement,character,site,route,routeReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
+const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs).map(([id,amount])=>`${resourceName(id)}: ${n(amount)}`).join(', ')
 </script>
 <template>
   <aside class="inspector panel" data-testid="inspector">
-    <nav class="inspector-tabs" :aria-label="t('inspection')"><button v-for="key in (['inspection','people','governments','reserves','finances','research'] as const)" :key="key" :aria-pressed="tab===key" @click="tab=key">{{t(key)}}</button></nav>
+    <nav class="inspector-tabs" :aria-label="t('inspection')"><button v-for="key in (['inspection','people','governments','reserves','finances','research','diplomacy','migrations'] as const)" :key="key" :aria-pressed="tab===key" @click="tab=key">{{t(key)}}</button></nav>
     <div class="inspector-body">
       <SupplyPlans v-if="tab==='reserves'" />
       <IncomePanel v-if="tab==='finances'" />
       <ResearchPanel v-if="tab==='research'" />
+      <DiplomacyPanel v-if="tab==='diplomacy'" />
+      <MigrationPanel v-if="tab==='migrations'" />
       <template v-if="tab==='inspection'">
         <template v-if="settlement">
           <p class="eyebrow">{{label(settlement.kind)}} · {{polityName(settlement.administrator_id)}}</p><h2>{{settlement.name}}</h2>
-          <p class="population-number">{{n(settlement.population)}} <small>{{t('inhabitants')}}</small></p>
+          <p class="population-number">{{n(settlement.population)}} <small>{{t('inhabitants')}} ({{t('residents')}})</small></p>
+          <p class="muted">{{t('presentPopulation')}}: {{n(settlement.present_population)}}</p>
           <div class="stat-pair"><div><span>{{t('health')}}</span><strong>{{n(settlement.health/10)}}%</strong><meter :value="settlement.health" min="0" max="1000" :aria-label="t('health')"/></div><div><span>{{t('unrest')}}</span><strong>{{n(settlement.unrest/10)}}%</strong><meter :value="settlement.unrest" min="0" max="1000" :aria-label="t('unrest')"/></div></div>
           <p v-if="settlement.missing_food" class="notice warning">{{t('missing')}}: {{n(settlement.missing_food)}}</p>
           <dl><dt>{{t('administrator')}}</dt><dd>{{polityName(settlement.administrator_id)}}</dd><dt>{{t('occupier')}}</dt><dd>{{polityName(settlement.occupier_id)}}</dd><dt>{{t('claimants')}}</dt><dd>{{settlement.claimant_ids.map(polityName).join(', ')||t('none')}}</dd><dt>{{t('capacity')}}</dt><dd>{{n(settlement.housing_capacity)}} {{t('inhabitants')}}</dd></dl>
@@ -42,14 +48,58 @@ const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
           <p v-for="a in data.society.activities.filter(a=>a.character_id===character!.id)" :key="a.id">{{label(a.kind)}} <button @click="source(a.decision_event_id)">{{t('source')}}</button></p>
         </template>
         <template v-else-if="site">
-          <p class="eyebrow">{{t('sites')}}</p><h2>{{site.name}}</h2><dl><dt>{{t('owner')}}</dt><dd>{{entityName(data,site.owner_ref)}}</dd><dt>{{t('integrity')}}</dt><dd>{{n(site.integrity*100)}}%</dd><dt>{{t('activity')}}</dt><dd>{{site.enabled?t('enabled'):t('disabled')}}</dd></dl>
+          <p class="eyebrow">{{t('sites')}}</p><h2>{{site.name}}</h2><dl><dt>{{t('owner')}}</dt><dd>{{entityName(data,site.owner_ref)}}</dd><dt>{{t('maintainer')}}</dt><dd>{{entityName(data,site.maintainer_ref)}}</dd><dt>{{t('integrity')}}</dt><dd>{{n(site.integrity*100)}}%</dd><dt>{{t('activity')}}</dt><dd>{{site.enabled?t('enabled'):t('disabled')}}</dd><dt>{{t('serviceSuspended')}}</dt><dd>{{site.service_suspended?t('serviceSuspended'):t('serviceOperating')}}</dd></dl>
           <button v-if="site.last_event_id" @click="source(site.last_event_id)">{{t('source')}}</button>
           <h3>{{t('production')}}</h3><div v-for="f in data.economy.facilities.filter(f=>f.site_id===site!.id)" :key="f.id"><p>{{t('batches')}}: {{f.last_batches}} / {{f.max_batches}}</p><p>{{t('limitations')}}: {{f.last_limitations.join(', ')||t('none')}}</p><button v-if="f.last_event_id" @click="source(f.last_event_id)">{{t('source')}}</button></div>
+          <template v-if="data.economy.repairs.some(r=>r.site_id===site!.id)">
+            <h3>{{t('repairs')}}</h3>
+            <article v-for="r in data.economy.repairs.filter(r=>r.site_id===site!.id)" :key="r.id" :data-repair="r.id" class="stock-card">
+              <p>{{t('repairStages.' + r.stage)}}</p>
+              <p>{{t('accumulatedRepairWork')}}: {{r.restored_permille}}‰</p>
+              <p class="muted">{{t('repairRatePerBatch')}}: {{data.economy.repair_blueprints.find(b=>b.id===r.blueprint_id)?.restored_permille}}‰</p>
+              <p class="muted">{{t('repairInputsPerBatch')}}: {{repairInputs(data.economy.repair_blueprints.find(b=>b.id===r.blueprint_id)?.inputs)}}</p>
+              <p v-if="r.blocker" class="notice warning">{{r.blocker}}</p>
+              <p class="muted">{{t('lastReview')}}: {{r.last_work_day ?? r.started_day}}</p>
+              <button @click="source(r.last_event_id)">{{t('source')}}</button>
+            </article>
+          </template>
+          <details class="route-knowledge">
+            <summary>{{t('siteKnowledge')}} ({{siteReports.length}})</summary>
+            <p class="muted">{{t('siteKnowledgeHelp')}}</p>
+            <p v-if="!siteReports.length" class="muted">{{t('noSiteKnowledge')}}</p>
+            <article v-for="report in siteReports" :key="report.id" :data-site-report="report.id" class="stock-card">
+              <h4>{{t('observer')}}: {{report.observerName}}</h4>
+              <dl>
+                <dt>{{t('observedIntegrity')}}</dt><dd>{{n(report.integrity*100)}}%</dd>
+                <dt>{{t('observedActivity')}}</dt><dd>{{report.enabled?t('enabled'):t('disabled')}}</dd>
+                <dt>{{t('serviceSuspended')}}</dt><dd>{{report.service_suspended?t('serviceSuspended'):t('serviceOperating')}}</dd>
+              </dl>
+              <p class="muted">{{t('observedOn')}}: {{calendar(report.observed_day)}}</p>
+              <p v-if="report.stale" class="notice warning">{{t('staleRouteKnowledge')}}</p>
+              <button @click="source(report.event_id)">{{t('source')}}</button>
+            </article>
+          </details>
           <h3>{{t('routes')}}</h3><button v-for="id in site.route_ids" :key="id" class="link-row" @click="select('route',id)">{{id}} →</button>
         </template>
         <template v-else-if="route">
           <p class="eyebrow">{{t('routes')}} · {{label(route.route.mode)}}</p><h2>{{route.route.endpoint_region_ids.map(id=>data.society.settlements.find(s=>s.region_id===id)?.name).join(' — ')}}</h2>
           <dl><dt>{{t('nominal')}}</dt><dd>{{n(route.route.capacity)}} {{t('bulkDay')}}</dd><dt>{{t('operational')}}</dt><dd>{{n(route.operational_capacity)}} {{t('bulkDay')}}</dd></dl><p class="muted">{{t('routesHelp')}}</p>
+          <details class="route-knowledge">
+            <summary>{{t('routeKnowledge')}} ({{routeReports.length}})</summary>
+            <p class="muted">{{t('routeKnowledgeHelp')}}</p>
+            <p v-if="!routeReports.length" class="muted">{{t('noRouteKnowledge')}}</p>
+            <article v-for="report in routeReports" :key="report.id" :data-route-report="report.id" class="stock-card">
+              <h4>{{report.recipientName}}</h4>
+              <p class="muted">{{t('publisher')}}: {{report.publisherName}} · {{t('routeReportChannels.' + report.channel)}}</p>
+              <dl>
+                <dt>{{t('observedCapacity')}}</dt><dd>{{n(report.operational_capacity)}} {{t('bulkDay')}}</dd>
+                <dt>{{t('observedTravelDays')}}</dt><dd>{{report.travel_days!==null?`${report.travel_days} ${t('days')}`:t('impassable')}}</dd>
+              </dl>
+              <p class="muted">{{t('observedOn')}}: {{calendar(report.observed_day)}}</p>
+              <p v-if="report.stale" class="notice warning">{{t('staleRouteKnowledge')}}</p>
+              <button @click="source(report.event_id)">{{t('source')}}</button>
+            </article>
+          </details>
           <h3>{{t('sites')}}</h3><button v-for="s in data.map.sites.filter(s=>s.route_ids.includes(route!.route.id))" :key="s.id" class="link-row" @click="select('site',s.id)">{{s.name}} →</button>
         </template>
         <div v-else class="empty-inspector"><p class="eyebrow">{{t('inspection')}}</p><h2>{{t('select')}}</h2><p class="muted">{{t('selectionHelp')}}</p></div>
