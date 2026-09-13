@@ -8,8 +8,9 @@ can actually reach. Nobody learns of a closure without being told.
 
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for
-from src.classes.governance.knowledge import route_report_id, site_report_id
-from src.classes.governance.models import RouteReport, SiteReport, route_observation, site_observation
+from src.classes.governance.knowledge import fiscal_route_report_id, route_report_id, site_report_id
+from src.classes.governance.models import (FiscalRouteReport, RouteReport, SiteReport, fiscal_route_observation,
+                                           route_observation, site_observation)
 from src.classes.mechanical_language import EntityRef
 from .economy import _causes, _delta
 from .events import record_event
@@ -44,6 +45,23 @@ def _describe(world, route_id, travel_days):
             else f"Passagem {name}: interrompida para carga.")
 
 
+def fiscal_runtime(world, route_id):
+    """Today's public checkpoint terms, read only by the reporting channel.
+
+    This is intentionally not used while an actor plans. Actors only see the
+    immutable report emitted from this reading. The executor calls it later to
+    reject a selection made obsolete by a material checkpoint change.
+    """
+    from .customs import _checkpoint_for_route
+
+    return _checkpoint_for_route(world, route_id)
+
+
+def _fiscal_describe(world, route_id, checkpoint_id, fee_per_bulk):
+    name = world.map.routes[route_id].id
+    return f"Passagem {name}: posto civil {checkpoint_id} cobra {fee_per_bulk} por volume."
+
+
 def _observe(world, actor, route_id, day, causes):
     key = route_report_id(actor, route_id)
     previous = world.knowledge.route_reports.get(key)
@@ -61,6 +79,28 @@ def _observe(world, actor, route_id, day, causes):
                          operational_capacity=capacity, travel_days=travel_days,
                          channel="administrative_route_report", event_id=event.id)
     world.knowledge.route_reports[key] = report
+    return report
+
+
+def _observe_fiscal(world, checkpoint, route_id, day, causes):
+    """Only the current, active checkpoint operator can originate this reading."""
+    actor = checkpoint.operator_ref
+    key = fiscal_route_report_id(actor, route_id)
+    previous = world.knowledge.fiscal_route_reports.get(key)
+    checkpoint_id, fee_per_bulk = checkpoint.id, checkpoint.fee_per_bulk
+    if (previous is not None and previous.observed_day == day and previous.recipient_ref == previous.publisher_ref
+            and previous.checkpoint_id == checkpoint_id and previous.fee_per_bulk == fee_per_bulk):
+        return previous
+    observation = fiscal_route_observation(route_id, actor, day, checkpoint_id, fee_per_bulk)
+    event = record_event(world, "fiscal_route_observed", _fiscal_describe(world, route_id, checkpoint_id, fee_per_bulk),
+                         fact_kind=FactKind.STATE_TRANSITION,
+                         deltas=(_delta("fiscal_route_report", key, "observation",
+                                        previous.observation() if previous else None, observation),),
+                         cause_ids=_causes(*causes))
+    report = FiscalRouteReport(id=key, recipient_ref=actor, publisher_ref=actor, route_id=route_id,
+                               observed_day=day, checkpoint_id=checkpoint_id, fee_per_bulk=fee_per_bulk,
+                               channel="administrative_fiscal_route_report", event_id=event.id)
+    world.knowledge.fiscal_route_reports[key] = report
     return report
 
 
@@ -124,6 +164,42 @@ def _publish(world, report, recipients, day, channels):
             "id": keys[recipient], "recipient_ref": recipient, "channel": "route_bulletin", "event_id": delivery.id})
 
 
+def _publish_fiscal(world, report, recipients, day, channels):
+    """Send one dated fiscal reading through the same physically grounded channel."""
+    publisher = report.publisher_ref
+    if not can_actor_act_for(world, publisher, publisher, "trade"):
+        return
+
+    def same_reading(previous):
+        return (previous is not None and previous.observed_day == report.observed_day
+                and previous.checkpoint_id == report.checkpoint_id and previous.fee_per_bulk == report.fee_per_bulk)
+
+    targets = [r for r in recipients if r != publisher
+               and (world.knowledge.fiscal_route_report(r, report.route_id) is None
+                    or not same_reading(world.knowledge.fiscal_route_report(r, report.route_id)))
+               and _reachable(world, report, r, channels)]
+    if not targets:
+        return
+    observation = report.observation()
+    description = _fiscal_describe(world, report.route_id, report.checkpoint_id, report.fee_per_bulk)
+    decision = record_event(
+        world, "fiscal_route_report_published", description, fact_kind=FactKind.DECISION,
+        decision={"action": "publish_fiscal_route_report", "actor_ref": publisher.to_dict(),
+                  "route_id": report.route_id, "observation": observation,
+                  "recipients": [r.to_dict() for r in targets]}, cause_ids=(report.event_id,))
+    keys = {recipient: fiscal_route_report_id(recipient, report.route_id) for recipient in targets}
+    previous = {recipient: world.knowledge.fiscal_route_reports.get(key) for recipient, key in keys.items()}
+    delivery = record_event(
+        world, "fiscal_route_report_received", description, fact_kind=FactKind.STATE_TRANSITION,
+        deltas=tuple(_delta("fiscal_route_report", keys[recipient], "observation",
+                            previous[recipient].observation() if previous[recipient] else None, observation)
+                     for recipient in targets), cause_ids=_causes(decision.id, report.event_id))
+    for recipient in targets:
+        world.knowledge.fiscal_route_reports[keys[recipient]] = report.model_copy(update={
+            "id": keys[recipient], "recipient_ref": recipient, "channel": "fiscal_route_bulletin",
+            "event_id": delivery.id})
+
+
 def _present(world, actor, site):
     """Verifiable local presence: own stock at the place, or administering it."""
     for settlement in world.society.settlements.values():
@@ -178,3 +254,10 @@ def refresh_route_reports(world, *, route_ids=None):
         for actor in _administrations(world, world.map.routes[route_id]):
             report = _observe(world, actor, route_id, day, causes[route_id])
             _publish(world, report, recipients, day, channels)
+        checkpoint = fiscal_runtime(world, route_id)
+        if checkpoint is not None:
+            site = world.map.infrastructure_sites[checkpoint.site_id]
+            fiscal_report = _observe_fiscal(
+                world, checkpoint, route_id, day,
+                _causes(*causes[route_id], checkpoint.last_event_id, site.last_event_id))
+            _publish_fiscal(world, fiscal_report, recipients, day, channels)

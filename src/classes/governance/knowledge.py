@@ -1,7 +1,8 @@
 """Single owner of actor-specific observations; canonical truth stays elsewhere."""
 
 from dataclasses import dataclass, field
-from .models import KnowledgeReport, DiplomaticNotice, RouteReport, SettlementReport, SiteReport, CustomsNotice
+from .models import (KnowledgeReport, DiplomaticNotice, FiscalRouteReport, RouteReport, SettlementReport, SiteReport,
+                     CustomsNotice)
 from .serialization import RegistrySerialization, validate_actor
 from src.classes.event import FactKind
 from src.classes.research.models import TechnicalKnowledge
@@ -9,6 +10,10 @@ from src.classes.research.models import TechnicalKnowledge
 
 def route_report_id(recipient_ref, route_id):
     return f"route_report:{recipient_ref.kind}:{recipient_ref.id}:{route_id}"
+
+
+def fiscal_route_report_id(recipient_ref, route_id):
+    return f"fiscal_route_report:{recipient_ref.kind}:{recipient_ref.id}:{route_id}"
 
 
 def site_report_id(recipient_ref, site_id):
@@ -25,11 +30,13 @@ class KnowledgeState(RegistrySerialization):
     technologies: dict[str, TechnicalKnowledge] = field(default_factory=dict)
     notices: dict[str, DiplomaticNotice] = field(default_factory=dict)
     route_reports: dict[str, RouteReport] = field(default_factory=dict)
+    fiscal_route_reports: dict[str, FiscalRouteReport] = field(default_factory=dict)
     settlement_reports: dict[str, SettlementReport] = field(default_factory=dict)
     site_reports: dict[str, SiteReport] = field(default_factory=dict)
     customs_notices: dict[str, CustomsNotice] = field(default_factory=dict)
     registries = {"reports": KnowledgeReport, "technologies": TechnicalKnowledge, "notices": DiplomaticNotice,
-                  "route_reports": RouteReport, "settlement_reports": SettlementReport, "site_reports": SiteReport}
+                  "route_reports": RouteReport, "fiscal_route_reports": FiscalRouteReport,
+                  "settlement_reports": SettlementReport, "site_reports": SiteReport}
     registries["customs_notices"] = CustomsNotice
 
     def knows(self, actor_ref, technology_id):
@@ -44,6 +51,12 @@ class KnowledgeState(RegistrySerialization):
 
     def route_report(self, actor_ref, route_id):
         return self.route_reports.get(route_report_id(actor_ref, route_id))
+
+    def fiscal_routes_for_actor(self, actor_ref):
+        return tuple(r for _, r in sorted(self.fiscal_route_reports.items()) if r.recipient_ref == actor_ref)
+
+    def fiscal_route_report(self, actor_ref, route_id):
+        return self.fiscal_route_reports.get(fiscal_route_report_id(actor_ref, route_id))
 
     def site_report(self, actor_ref, site_id):
         return self.site_reports.get(site_report_id(actor_ref, site_id))
@@ -98,6 +111,8 @@ class KnowledgeState(RegistrySerialization):
             self._validate_export_quote(events, report)
         for report in self.route_reports.values():
             self._validate_route_report(world, events, report)
+        for report in self.fiscal_route_reports.values():
+            self._validate_fiscal_route_report(world, events, report)
         for report in self.settlement_reports.values():
             self._validate_settlement_report(world, events, report)
         for report in self.site_reports.values():
@@ -285,3 +300,54 @@ class KnowledgeState(RegistrySerialization):
             raise ValueError("route bulletin requires its publication decision")
         if not any(records(event, "route_observed", own) for decision in published for event in causes(decision)):
             raise ValueError("route bulletin requires the publisher's own observation receipt")
+
+    @staticmethod
+    def _validate_fiscal_route_report(world, events, report):
+        """Validate dated checkpoint knowledge without consulting today's post."""
+        validate_actor(world, report.recipient_ref)
+        validate_actor(world, report.publisher_ref)
+        receipt = events.get(report.event_id)
+        checkpoint = world.economy.customs_checkpoints.get(report.checkpoint_id)
+        observation = report.observation()
+        if (report.route_id not in world.map.routes or checkpoint is None or receipt is None
+                or report.id != fiscal_route_report_id(report.recipient_ref, report.route_id)
+                or report.publisher_ref != checkpoint.operator_ref or report.fee_per_bulk != checkpoint.fee_per_bulk
+                or report.observed_day > world.clock.absolute_day or receipt.day != report.observed_day):
+            raise ValueError("invalid fiscal route knowledge provenance")
+
+        def records(candidate, event_type, owner_id):
+            return (candidate.event_type == event_type and candidate.fact_kind == FactKind.STATE_TRANSITION
+                    and candidate.day == report.observed_day
+                    and any(d.owner_kind == "fiscal_route_report" and d.owner_id == owner_id
+                            and d.aspect == "observation" and d.after == observation for d in candidate.deltas))
+
+        def causes(event):
+            return (events[link.cause_event_id] for link in event.causal_links if link.cause_event_id in events)
+
+        def sourced_by_checkpoint(event):
+            return any(candidate.event_type in {"customs_opened", "customs_staff_paid"}
+                       and any(delta.owner_kind == "customs_checkpoint" and delta.owner_id == checkpoint.id
+                               for delta in candidate.deltas)
+                       for candidate in causes(event))
+
+        if report.channel == "administrative_fiscal_route_report":
+            if (report.recipient_ref != report.publisher_ref
+                    or not records(receipt, "fiscal_route_observed", report.id)
+                    or not sourced_by_checkpoint(receipt)):
+                raise ValueError("fiscal route observation requires its own typed receipt")
+            return
+        own = fiscal_route_report_id(report.publisher_ref, report.route_id)
+        if report.recipient_ref == report.publisher_ref or not records(receipt, "fiscal_route_report_received", report.id):
+            raise ValueError("fiscal route bulletin requires its typed delivery receipt")
+        published = [event for event in causes(receipt)
+                     if event.fact_kind == FactKind.DECISION and event.day == report.observed_day
+                     and (event.decision or {}).get("action") == "publish_fiscal_route_report"
+                     and event.decision.get("actor_ref") == report.publisher_ref.to_dict()
+                     and event.decision.get("route_id") == report.route_id
+                     and event.decision.get("observation") == observation
+                     and report.recipient_ref.to_dict() in event.decision.get("recipients", [])]
+        if not published:
+            raise ValueError("fiscal route bulletin requires its publication decision")
+        if not any(records(event, "fiscal_route_observed", own) and sourced_by_checkpoint(event)
+                   for decision in published for event in causes(decision)):
+            raise ValueError("fiscal route bulletin requires the publisher's own observation receipt")

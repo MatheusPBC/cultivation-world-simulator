@@ -12,7 +12,8 @@ from src.classes.economy.expansion import ExpansionBlueprint, ExpansionProject
 from src.classes.economy.maintenance import RepairBlueprint, RepairProject
 from src.classes.research.models import ResearchProject, Technology, TechnicalKnowledge
 from src.classes.governance.diplomacy import DiplomaticProposal, Obligation
-from src.classes.governance.models import CustomsNotice, DiplomaticNotice, RouteReport, SettlementReport, SiteReport
+from src.classes.governance.models import (CustomsNotice, DiplomaticNotice, FiscalRouteReport, RouteReport,
+                                            SettlementReport, SiteReport)
 from src.classes.environment.geography import GeographyLayer
 from src.classes.environment.infrastructure import InfrastructureSite
 from src.classes.environment.route import Route
@@ -155,6 +156,7 @@ class GovernanceView(SocietyValue):
     objectives: list[ObjectiveView]
     plans: list[StrategicPlan]
     route_reports: list[RouteReport]
+    fiscal_route_reports: list[FiscalRouteReport]
     site_reports: list[SiteReport]
     settlement_reports: list[SettlementReport]
     customs_notices: list[CustomsNotice]

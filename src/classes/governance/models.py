@@ -95,6 +95,36 @@ class RouteReport(SocietyValue):
                                  self.operational_capacity, self.travel_days)
 
 
+def fiscal_route_observation(route_id, publisher_ref, observed_day, checkpoint_id, fee_per_bulk) -> str:
+    """Public fiscal reading of one route, separate from physical operability.
+
+    A reading says that a staffed civil checkpoint was observed and names its
+    published per-bulk fee. It never carries its operator's
+    account, staffing ledger, inspection capacity, or any cargo state.
+    """
+    return json.dumps({"route_id": route_id, "publisher": publisher_ref.to_dict(),
+                       "observed_day": observed_day, "checkpoint_id": checkpoint_id,
+                       "fee_per_bulk": fee_per_bulk},
+                      sort_keys=True, ensure_ascii=False, allow_nan=False)
+
+
+class FiscalRouteReport(SocietyValue):
+    """Dated knowledge of a civil checkpoint along one canonical route."""
+    id: Identity
+    recipient_ref: EntityRef
+    publisher_ref: EntityRef
+    route_id: Identity
+    observed_day: Count
+    checkpoint_id: Identity
+    fee_per_bulk: int = Field(strict=True, gt=0)
+    channel: Literal["administrative_fiscal_route_report", "fiscal_route_bulletin"]
+    event_id: Identity
+
+    def observation(self) -> str:
+        return fiscal_route_observation(self.route_id, self.publisher_ref, self.observed_day,
+                                        self.checkpoint_id, self.fee_per_bulk)
+
+
 def settlement_observation(settlement_id, publisher_ref, observed_day, population, present_population, housing_capacity,
                            health, missing_food, unrest) -> str:
     """Stable historical shape for public, aggregate settlement conditions."""

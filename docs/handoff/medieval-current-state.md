@@ -18,8 +18,8 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
 
 ## O que já existe no WIP local
 
-- Runtime medieval separado, configuração persistente e save schema 18 (Society2,
-  Economy10); dados de execução usam namespace próprio e saves schema 17 e anteriores são rejeitados,
+- Runtime medieval separado, configuração persistente e save schema 19 (Society2,
+  Economy10); dados de execução usam namespace próprio e saves schema 18 e anteriores são rejeitados,
   preservados sem sobrescrita ou migração.
 - Calendário híbrido de 12 meses de 30 dias. Rotinas agregadas usam o salto mensal;
   agendas, prazos, viagem, carga e situações ativas podem exigir processamento por
@@ -63,6 +63,12 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
   aguardarem; não confisca carga nem representa bloqueio militar ou fiscalização.
 - A demanda de reparo já entra no preço local; `market_updated` cita o projeto
   e o `SiteReport` que fundamentam essa demanda.
+- Desgaste de infraestrutura já é uma consequência material engine-owned: o Map
+  reduz a integridade somente quando há recibo de produção ou de carga real que
+  ultrapasse o limiar de uso. A lei é determinística, limitada a 0,01 por ciclo
+  de 30 dias, sem clima, evento aleatório ou reparo automático. O relatório do
+  mesmo ciclo expõe o dano ao mantenedor, que continua precisando escolher e
+  financiar o reparo existente.
 - Tarifas de exportação são cotação pública e histórica da jurisdição que administra
   o estoque de origem. `TaxPolicy.export_rate_permille` usa
   `export_policy_event_id` próprio, separado de renda e de `last_event_id`.
@@ -77,6 +83,12 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
   pagamento libera a mesma parcela; evasão não detectada a reagenda para o dia seguinte.
   Não há força militar, confisco, alteração de rota/quantidade/propriedade ou escolha
   de rerroteamento nesta vertical.
+- Rotas fiscais são conhecimento datado: o operador ativo observa o checkpoint e
+  uma decisão de publicação emite recibos físicos para destinatários alcançáveis.
+  A abertura de carga usa opções enumeradas pelo engine, distinguindo rotas legais
+  sem posto (taxa zero); relatórios vencidos, IDs inventados e postos divergentes
+  são rejeitados. Ordens existentes não são redirecionadas, e a camada não cria
+  força, confisco, bloqueio ou rotas secretas.
 
 ## Evidência disponível e limites
 
@@ -208,7 +220,7 @@ acima. Ainda faltam, explicitamente: hazards naturais, clima e desgaste,
 mobilidade/treinamento de força de trabalho (as vilas são todas farmer, então
 o trabalho artesanal pode bloquear), genealogia profunda e difusão de conhecimento
 por migração,
-pedágios/trânsito/bloqueios/contrabando e qualquer integração de IA real.
+  pedágios/trânsito/bloqueios/contrabando e qualquer integração de IA real.
 Etapa1 não deve ser lida como encerrada.
 
 ## Lacunas explícitas
@@ -229,9 +241,9 @@ Etapa1 não deve ser lida como encerrada.
   calibração econômica de longo prazo continuam abertos. Preços locais já existem
   no fluxo mensal limitado de `markets.py`; isso não equivale a um
   mercado local completo.
-- O executor de reparo material existe apenas para os kinds catalogados; não há
-  dano natural, clima ou desgaste que o acione, nem reativação automática de
-  instalações interditadas.
+- O executor de reparo material existe apenas para os kinds catalogados; o desgaste
+  por uso já existe, mas não há dano natural/climático que o acione nem reativação
+  automática de instalações interditadas.
 - O observatório ainda não mostra campanha, criatura, estratégia geral ou todas as
   cadeias de informação. Testes de backend não substituem inspeção visual e mundos
   naturais de longa duração.

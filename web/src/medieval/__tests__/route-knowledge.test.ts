@@ -86,3 +86,24 @@ it('opens the canonical receipt event when a report source is clicked', async ()
   expect(store.focusEventId).toBe('event:77')
   wrapper.unmount()
 })
+
+it('shows dated fiscal route knowledge separately from the canonical route state', async () => {
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  data.world.day = 40
+  data.economy.customs_checkpoints = [{ id: 'customs:passagem-negra', site_id: 'passagem-negra',
+    operator_ref: { kind: 'polity', id: 'auren' }, account_id: 'account:auren', staff_group_id: 'staff:auren',
+    staff_count: 2, fee_per_bulk: 7, started_day: 1, last_staffed_day: 40, inspection_day: 40,
+    inspection_slots_used: 0, last_event_id: 'event:checkpoint' }]
+  data.governance.fiscal_route_reports = [{ id: 'fiscal_route_report:polity:auren:' + ROUTE,
+    recipient_ref: { kind: 'polity', id: 'auren' }, publisher_ref: { kind: 'polity', id: 'auren' }, route_id: ROUTE,
+    observed_day: 10, checkpoint_id: 'customs:passagem-negra', fee_per_bulk: 7,
+    channel: 'administrative_fiscal_route_report', event_id: 'event:fiscal-1' }]
+  const { wrapper, store } = inspectRoute(data)
+  const report = wrapper.get('[data-fiscal-route-report="fiscal_route_report:polity:auren:' + ROUTE + '"]')
+  expect(report.text()).toContain('Passagem Negra')
+  expect(report.text()).toContain('7')
+  expect(report.text()).toContain('desatualizada')
+  await report.get('button').trigger('click')
+  expect(store.focusEventId).toBe('event:fiscal-1')
+  wrapper.unmount()
+})

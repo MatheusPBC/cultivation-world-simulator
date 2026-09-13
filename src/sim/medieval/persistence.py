@@ -29,7 +29,7 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-SCHEMA = 18
+SCHEMA = 19
 
 
 def world_snapshot(world: MedievalWorld) -> dict:

@@ -69,6 +69,23 @@ esse conhecimento a um ator que não o recebeu.
 instalação conhece sua integridade/operabilidade. Esse conhecimento permanece
 privado em `KnowledgeState` e não é transmitido automaticamente a outros atores.
 
+### Conhecimento fiscal e escolha de rota
+
+`FiscalRouteReport` é um recibo datado, não uma leitura privada de caixa. O
+operador do posto civil ativo observa seu próprio checkpoint; a publicação exige
+a decisão `publish_fiscal_route_report` e entrega um recibo
+`fiscal_route_bulletin` por destinatário alcançável pela rede física. A cadeia é
+`checkpoint ativo → observação do operador → decisão de publicação → boletim`.
+
+Ao abrir uma nova remessa, `fiscal_route_options` enumera as rotas fisicamente
+conhecidas e seus relatórios fiscais atuais. Uma rota legal sem checkpoint é uma
+opção distinta, com taxa estimada zero. Quantidade, dono, carga e caminho são
+parâmetros canônicos, não texto da LLM. O executor recompõe e valida a opção
+contra relatórios, posto e mapa atuais; ID inventado, relatório vencido ou posto
+divergente é rejeitado antes de abrir a carga. A opção só vale para ordem nova:
+nenhuma carga já contratada é redirecionada. Esta V1 não implementa pedágio,
+bloqueio militar, confisco, força ou rota secreta.
+
 ### Manutenção de infraestrutura
 
 O Map é o dono da integridade e da flag `enabled`. Economy schema 8 é dona apenas
@@ -128,7 +145,7 @@ Falha técnica de execução/save aborta o salto inteiro, não vira recusa do ve
 ## Persistência e observação
 
 Schema8 inclui alvos/relatórios por recurso e projetos econômicos; o save atual é
-schema18 e a economia interna é schema10. Schemas1–17 experimentais são preservados e
+schema19 e a economia interna é schema10. Schemas1–18 experimentais são preservados e
 rejeitados, sem migração silenciosa. Load confere identidades, referências,
 proveniência e canais; retomada mantém observações/intenções/pedidos/RNG.
 

@@ -22,7 +22,7 @@ Velocidade significa saltos por segundo real, nunca mudança na duração simula
 
 Configuração persistente medieval contém seed, contagem inicial de personagens
 (padrão12, 1–60), locale pt-BR e política determinística; não finge IA integrada.
-Saves usam schema18 (Society2/Economy10); schemas 17 e abaixo são rejeitados e preservados, sem
+Saves usam schema19 (Society2/Economy10); schemas 18 e abaixo são rejeitados e preservados, sem
 sobrescrita ou migração. IDs de
 sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras
@@ -70,6 +70,11 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
   onisciente do observador, não contexto permitido de um ator do mundo. Um
   relatório de rota ausente ou com 30 dias ou mais não é inferido do mapa
   canônico; ver medieval-autonomy.md.
+- A mesma projeção expõe `fiscal_route_reports` recebidos pelo ator e seus recibos
+  de publicação/entrega. O observatório pode ver todos os relatórios, mas essa
+  visão não concede conhecimento a atores. Opções fiscais são recompostas pelo
+  engine na abertura de nova ordem; IDs inventados ou vencidos são rejeitados e
+  ordens já contratadas não podem ser redirecionadas.
 - `GovernanceView.settlement_reports` expõe observações datadas com residentes e
   presentes; isso não é canal de controle para o observador.
 - GET query/research: catálogo, projetos e conhecimento técnico por instituição;

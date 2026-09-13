@@ -72,6 +72,9 @@ def _purchase_terms(world, buy_id, sell_id):
     keys = {"source_id", "destination_id", "resource_id", "quantity", "unit_price", "quote_day", "route_ids",
             "seller_account_id", "buyer_account_id", "export_rate_permille", "export_policy_event_id",
             "export_collector_ref", "total_price"}
+    route_option_id = (buy.decision or {}).get("route_option_id")
+    if route_option_id is not None:
+        keys.add("route_option_id")
     if (set(buy.decision) != keys | {"action", "actor_ref"} or set(sell.decision) != keys | {"action", "actor_ref"}
             or buy.decision["action"] != "buy" or sell.decision["action"] != "sell"
             or any(buy.decision[k] != sell.decision[k] for k in keys)):
@@ -86,6 +89,15 @@ def _purchase_terms(world, buy_id, sell_id):
             raise ValueError("invalid trade reference")
     if not isinstance(terms["route_ids"], list) or any(not isinstance(r, str) for r in terms["route_ids"]):
         raise ValueError("invalid trade path")
+    if route_option_id is not None:
+        from src.classes.mechanical_language import EntityRef
+        from .routing import validate_fiscal_route_option
+        try:
+            buyer_ref = EntityRef.from_dict(buy.decision["actor_ref"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("invalid buyer route selection") from exc
+        validate_fiscal_route_option(world, route_option_id, buyer_ref, terms["source_id"], terms["destination_id"],
+                                     terms["resource_id"], terms["quantity"])
     check_freight(world, terms["source_id"], terms["destination_id"], terms["resource_id"], terms["quantity"], terms["route_ids"])
     economy = world.economy
     source, destination = economy.stocks[terms["source_id"]], economy.stocks[terms["destination_id"]]

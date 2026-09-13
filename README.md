@@ -72,8 +72,8 @@ O servidor é local e não possui autenticação para exposição pública.
 A variável `SERVER_PORT` permite escolher a porta.
 
 Sem override, dados usam a pasta de aplicativo `MedievalWorldSimulator(-dev)`,
-separada da origem. Saves estão em `saves/medieval/*.mws`, schema 18. Saves
-xianxia e schemas experimentais anteriores (17 e abaixo) são rejeitados e
+separada da origem. Saves estão em `saves/medieval/*.mws`, schema 19. Saves
+xianxia e schemas experimentais anteriores (18 e abaixo) são rejeitados e
 preservados, sem sobrescrita nem migração.
 
 Migrações são jornadas temporais canônicas: residentes permanecem na coorte de
@@ -86,6 +86,13 @@ pagos a partir da força de trabalho mensal compartilhada. O catálogo conhece
 somente farm, mine, port, workshop, forest e mountainpass; a recuperação é
 gradual (até 0,10 por lote) e não reativa automaticamente uma instalação com
 `enabled=false`.
+
+Rotas fiscais são conhecimento datado: o operador de um posto civil publica um
+recibo por decisão, distribuído pela rede física alcançável. Ao criar uma nova
+carga, o ator escolhe entre opções de rota enumeradas pelo engine, incluindo
+caminhos legais sem posto; a cotação e o relatório precisam continuar atuais na
+revalidação. Cargas já contratadas não mudam de rota. Esta camada não modela
+força, confisco, bloqueio ou rota secreta.
 
 ## Desenvolvimento e documentação
 

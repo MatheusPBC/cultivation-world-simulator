@@ -25,6 +25,7 @@ from .tariffs import review_export_tariffs
 from .site_services import review_site_services
 from .route_intelligence import refresh_route_reports, refresh_site_reports
 from .customs import staff_customs_checkpoints
+from .infrastructure_wear import apply_monthly_infrastructure_wear
 from src.classes.core.infrastructure import validate_infrastructure
 
 
@@ -64,6 +65,9 @@ class MedievalSimulator:
                 progress_expansions(candidate, available)
                 produce_monthly(candidate, available)
                 consume_monthly(candidate)
+                # Material use has completed.  Wear belongs to the Map and is
+                # applied before reports, so a maintainer sees this exact cycle.
+                apply_monthly_infrastructure_wear(candidate)
                 review_research(candidate)
                 review_expansions(candidate)
                 update_markets(candidate)

@@ -44,3 +44,37 @@ it('shows the workshop resource and its own stock without interpreting iron as f
   expect(plan.text()).not.toContain('Rações')
   wrapper.unmount()
 })
+
+it('reveals the chosen route and only dated reports known by the plan actor', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  const objective = data.governance.objectives.find(item => item.id === 'supply:portovelho')!
+  const orderId = 'order:portovelho:food'
+  const routeId = 'river-pedraclara-portovelho'
+  data.governance.plans = [{ id: 'plan:portovelho', objective_id: objective.id,
+    stage: 'await_delivery', blocker: null, order_ids: [orderId], last_review_day: 60, last_event_id: 'event:review' }]
+  data.economy.pending_orders = [{ id: orderId, source_id: 'stock:pedraclara', destination_id: objective.stock_id,
+    resource_id: objective.resource_id, quantity: 480, delivered_quantity: 0,
+    owner_ref: { kind: 'polity', id: 'auren' }, route_ids: [routeId], created_day: 61,
+    priority: 2, decision_ids: ['event:order-decision'], last_event_id: 'event:order' }]
+  data.governance.route_reports = [
+    { id: 'report:known', recipient_ref: objective.actor_ref, publisher_ref: { kind: 'polity', id: 'auren' },
+      route_id: routeId, observed_day: 62, operational_capacity: 324, travel_days: 3,
+      channel: 'route_bulletin', event_id: 'event:report' },
+    { id: 'report:hidden', recipient_ref: { kind: 'polity', id: 'auren' }, publisher_ref: { kind: 'polity', id: 'auren' },
+      route_id: 'road-brumafria-ferroalto', observed_day: 62, operational_capacity: 70, travel_days: 2,
+      channel: 'route_bulletin', event_id: 'event:hidden' },
+  ]
+  store.snapshot = data
+  const wrapper = mount(SupplyPlans, { global: { plugins: [pinia, medievalI18n] } })
+  const plan = wrapper.get('[data-plan="plan:portovelho"]')
+  expect(plan.get('[data-order="' + orderId + '"]').text()).toContain('Pedraclara → Portovelho')
+  expect(plan.get('[data-route-segment="' + routeId + '"]').text()).toContain('Pedraclara — Portovelho')
+  expect(plan.get('[data-route-segment="' + routeId + '"]').text()).toContain('Capacidade observada')
+  expect(plan.get('[data-route-segment="' + routeId + '"]').text()).toContain('Ano 1')
+  expect(plan.text()).not.toContain('road-brumafria-ferroalto')
+  await plan.get('[data-order="' + orderId + '"] .text-button').trigger('click')
+  expect(store.focusEventId).toBe('event:order-decision')
+  wrapper.unmount()
+})

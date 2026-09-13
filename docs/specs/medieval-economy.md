@@ -44,7 +44,7 @@ Operações inválidas validam antes de aplicar. O fechamento ocorre no candidat
 transacional do simulador: falha de save não publica economia parcial.
 
 O save incorporou catálogo, receitas, instalações, inventários, contas,
-abastecimento e proveniência no schema2; o formato atual é save17/Economy9, incluindo
+abastecimento e proveniência no schema2; o formato atual é save19/Economy10, incluindo
 folhas, políticas tributárias, reparos, provisões de jornadas e postos civis de alfândega. Saves experimentais anteriores
 não são migrados ou sobrescritos silenciosamente. O catálogo inicial é ajustável no JSON;
 seus números ainda não representam calibração das simulações de dez anos.
@@ -143,6 +143,29 @@ detectada, a mesma parcela volta à fila no dia seguinte. Se declarada, a taxa e
 fica devida e o pagamento material a libera. Não há confisco, força militar,
 alteração de rota, quantidade ou propriedade nesta vertical; rerroteamento fiscal ainda
 não existe.
+
+## Desgaste por uso
+
+Integridade continua sendo estado físico dono do Map. O ciclo medieval aplica
+uma lei determinística de uso apenas a instalações com recibos canônicos de
+produção ou de carga material acima do limiar definido pela engine; não existe
+desgaste causado por clima, narrativa ou sorte. A redução é limitada a 0,01 de
+integridade por janela de 30 dias e preserva a evidência dos recibos que a
+causaram. O `SiteReport` produzido no mesmo ciclo torna a condição observável ao
+mantenedor, mas não executa reparo nem reativa `enabled=false`: a recuperação
+continua sendo um lote explícito de `repair_batch_decided`, com seus materiais,
+salários e capacidade revalidados.
+
+## Relatório fiscal de rota
+
+`FiscalRouteReport` registra a observação datada de um posto civil pelo seu
+operador e a posterior publicação física (`fiscal_route_bulletin`). Ele contém
+apenas a identidade do checkpoint e a cotação válida naquele dia; não duplica
+saldo, estoque ou capacidade do mapa. Ao iniciar uma carga, o comprador recebe
+opções enumeradas para rotas conhecidas, incluindo uma rota legal sem posto com
+taxa zero. O owner recompõe a opção e revalida o posto, o relatório e a rota
+antes de criar a ordem. A escolha não altera ordens existentes, quantidade,
+propriedade ou rota já contratada.
 
 ### Comprovantes de trabalho e limites históricos
 

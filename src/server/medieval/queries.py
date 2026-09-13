@@ -34,6 +34,7 @@ def governance_view(world):
                           objectives=[ObjectiveView(**o.model_dump(), target_quantity=objective_target(world, o))
                                       for o in ordered(world.strategy.objectives)], plans=ordered(world.strategy.plans),
                           route_reports=ordered(world.knowledge.route_reports),
+                          fiscal_route_reports=ordered(world.knowledge.fiscal_route_reports),
                           site_reports=ordered(world.knowledge.site_reports),
                           settlement_reports=ordered(world.knowledge.settlement_reports),
                           customs_notices=ordered(world.knowledge.customs_notices))

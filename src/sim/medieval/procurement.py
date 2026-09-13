@@ -8,7 +8,7 @@ from .events import record_event
 from .intelligence import reserve_quantity
 from .logistics import queue_freight
 from .markets import purchase
-from .routing import known_supply_path
+from .routing import fiscal_route_options, known_supply_path
 from .demand import objective_target
 from .tariffs import export_fee
 
@@ -63,9 +63,9 @@ def _pending_orders(world, stock_id, resource_id):
                  if o.destination_id == stock_id and o.resource_id == resource_id and o.quantity > o.delivered_quantity)
 
 
-def _route_evidence(world, actor_ref, path):
-    """The dated observations that made this path an affordance for this actor."""
-    return tuple(world.knowledge.route_report(actor_ref, route_id).event_id for route_id in path)
+def _route_evidence(option):
+    """The exact dated receipts that made this selected path available."""
+    return (*option.route_report_ids, *option.fiscal_route_report_ids)
 
 
 def _offers(world, objective, inventory, reasons):
@@ -83,22 +83,26 @@ def _offers(world, objective, inventory, reasons):
             amount -= reserve_quantity(world, source.id, objective.resource_id)
         if amount <= 0:
             continue
-        consulted = []
-        path = known_supply_path(world, objective.actor_ref, source.location_id,
-                                 objective.settlement_id, objective.resource_id, consulted=consulted)
-        if path is None:
-            # No observation of an open passage is not an invitation to invent one:
-            # only the reports this search actually rejected explain the refusal.
+        route_options = fiscal_route_options(world, objective.actor_ref, source.id, inventory.stock_id,
+                                             objective.resource_id, 1)
+        if not route_options:
+            # Preserve the pre-existing physical-report explanation: if no
+            # route report supports a path, fiscal policy cannot invent one.
+            consulted = []
+            known_supply_path(world, objective.actor_ref, source.location_id,
+                              objective.settlement_id, objective.resource_id, consulted=consulted)
             reasons.append("sem rota conhecida até a origem")
             evidence.extend(consulted)
             continue
+        route_option = route_options[0]
         rate = (0 if report.export_collector_ref is not None
                 and report.export_collector_ref.id == world.society.settlements[objective.settlement_id].administrator_id
                 else report.export_rate_permille)
         price = 0 if source.owner_ref == objective.actor_ref else report.unit_price
         # Compare the buyer's known all-in marginal quote, retaining base price
         # separately for the material executor's one-order ceiling calculation.
-        result.append((price * (1000 + rate), len(path), report.stock_id, amount, path, report))
+        result.append((price * (1000 + rate) + route_option.estimated_customs_fee * 1000,
+                       len(route_option.route_ids), report.stock_id, amount, route_option, report))
     return sorted(result, key=lambda value: value[:3]), tuple(dict.fromkeys(evidence))
 
 
@@ -125,23 +129,31 @@ def _review_objective(world, objective):
     plan = _set_plan(world, objective, "acquire", order_ids=[o.id for o in pending], causes=(inventory.event_id,))
     order_ids, reasons, response_causes = list(plan.order_ids), [], []
     offers, closed_routes = _offers(world, objective, inventory, reasons)
-    for _, _, source_id, available, path, report in offers:
+    for _, _, source_id, available, _, report in offers:
         if missing <= 0:
             break
         quantity = min(missing, available)
         source = world.economy.stocks[source_id]
         price = report.unit_price
-        evidence = _route_evidence(world, actor, path)
         if source.owner_ref == actor:
             # Local administrative execution rechecks stock already known to its owner.
             quantity = min(quantity, max(0, source.goods.get(resource_id, 0) - reserve_quantity(world, source_id, resource_id)))
             if quantity <= 0:
                 continue
+            route_option = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
+            if not route_option:
+                reasons.append("sem rota conhecida até a origem")
+                continue
+            route_option = route_option[0]
+            path, evidence = route_option.route_ids, _route_evidence(route_option)
+            decision_terms = {"action": "freight", "actor_ref": actor.to_dict(), "source_id": source_id,
+                              "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
+                              "route_ids": list(path)}
+            if route_option.fiscal_route_report_ids:
+                decision_terms["route_option_id"] = route_option.id
             decision = record_event(world, "freight_decided", f"Remeter {quantity} de {world.economy.resources[resource_id].name} para {world.society.settlements[objective.settlement_id].name}.",
                                     fact_kind=FactKind.DECISION,
-                                    decision={"action": "freight", "actor_ref": actor.to_dict(), "source_id": source_id,
-                                              "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
-                                              "route_ids": list(path)},
+                                    decision=decision_terms,
                                     cause_ids=_causes(plan.last_event_id, report.event_id, *evidence))
             order = queue_freight(world, source_id, stock.id, resource_id, quantity, path, decision_event_id=decision.id)
         else:
@@ -162,11 +174,19 @@ def _review_objective(world, objective):
             if quantity <= 0:
                 reasons.append("saldo insuficiente")
                 continue
+            route_option = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
+            if not route_option:
+                reasons.append("sem rota conhecida até a origem")
+                continue
+            route_option = route_option[0]
+            path, evidence = route_option.route_ids, _route_evidence(route_option)
             fee = export_fee(quantity, price, quote["export_rate_permille"])
             terms = {"source_id": source_id, "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
                      "unit_price": price, "quote_day": report.quote_day, "route_ids": list(path),
                      "buyer_account_id": buyer.id, "seller_account_id": seller.id,
                      **quote, "total_price": quantity * price + fee}
+            if route_option.fiscal_route_report_ids:
+                terms["route_option_id"] = route_option.id
             decision = record_event(world, "buy_decided", f"Propor compra de {quantity} de {world.economy.resources[resource_id].name} para {world.society.settlements[objective.settlement_id].name}.",
                                     fact_kind=FactKind.DECISION,
                                     decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},

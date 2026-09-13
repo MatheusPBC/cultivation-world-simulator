@@ -55,6 +55,13 @@ recente, pode suspender ou retomar o próprio serviço. Serviço suspenso zera a
 capacidade derivada da rota e preserva a carga em espera; não repara, não reativa
 `enabled=false`, não confisca bens e não modela bloqueio militar ou alfândega.
 
+O desgaste segue a mesma fronteira de ownership: é uma mutação física do Map
+derivada somente de uso material comprovado por recibos de produção ou carga.
+Sua lei é determinística e limitada a 1% por janela de 30 dias; não usa clima,
+RNG ou eventos narrativos. O relatório do ciclo registra a integridade resultante
+antes de o mantenedor decidir um reparo, e nenhum sistema repara ou reativa o
+site automaticamente.
+
 O runner prepara uma cópia isolada do mundo, incluindo RNG, atividades e
 histórico. Só publica o candidato no objeto raiz depois de validar e, quando
 configurado um caminho, salvar. Falhas deixam o objeto publicado e o save
@@ -108,13 +115,19 @@ Um `.mws` é um arquivo SQLite com tabelas `metadata`, `world` e `events`, e
 índice por dia/sequência. O snapshot JSON interno carrega sociedade, mapa físico,
 rotas, instalações, relógio, agenda, atividades, economia, autoridade, conhecimento,
 estratégia, pesquisa, configuração e RNG.
-A identidade de produto é `medieval-world-simulator`, com schema 18 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 10.
+A identidade de produto é `medieval-world-simulator`, com schema 19 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 10.
 Nenhum loader consulta o catálogo atual para reconstruir o mundo salvo.
-Saves experimentais schema 1–17 são rejeitados e preservados; use um novo arquivo
+Saves experimentais schema 1–18 são rejeitados e preservados; use um novo arquivo
 para o smoke atualizado, sem sobrescrever a prova histórica anterior. O snapshot
 atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 10 com `repair_blueprints`,
 `repairs`, postos civis de alfândega e manifestos; nenhum loader migra schemas antigos. O catálogo de custos é propriedade
 do engine e os DTOs apenas o projetam.
+
+Relatórios fiscais de rota são conhecimento datado e persistem como recibos:
+observação do operador do checkpoint e boletins físicos publicados por decisão.
+Rotas legais sem posto permanecem opções distintas. A abertura de uma nova carga
+revalida a opção enumerada pelo engine; ordens existentes não são redirecionadas,
+e esta vertical não cria força, confisco, bloqueio ou rota secreta.
 
 A escrita valida o candidato, prepara um arquivo temporário na mesma pasta,
 fecha conexões e substitui atomicamente o destino. Um arquivo existente de

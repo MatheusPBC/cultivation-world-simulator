@@ -8,7 +8,7 @@ import ResearchPanel from './ResearchPanel.vue'
 import DiplomacyPanel from './DiplomacyPanel.vue'
 import MigrationPanel from './MigrationPanel.vue'
 const {t,te}=useI18n()
-const {tab,data,settlement,character,site,route,routeReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
+const {tab,data,settlement,character,site,route,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
 const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs).map(([id,amount])=>`${resourceName(id)}: ${n(amount)}`).join(', ')
 const checkpointsForSite=(siteId:string)=>data.value.economy.customs_checkpoints.filter(checkpoint=>checkpoint.site_id===siteId)
@@ -16,6 +16,11 @@ const checkpointName=(checkpointId:string)=>data.value.economy.customs_checkpoin
 const noticeForParcel=(parcelId:string)=>data.value.governance.customs_notices.find(notice=>notice.parcel_id===parcelId)
 const manifestForParcel=(parcelId:string)=>data.value.economy.cargo_manifests.find(manifest=>manifest.parcel_id===parcelId)
 const feeLabel=(fee:number|null)=>fee===null?'—':n(fee)
+const checkpointLabel=(checkpointId:string)=>{
+  const checkpoint=data.value.economy.customs_checkpoints.find(item=>item.id===checkpointId)
+  const site=checkpoint&&data.value.map.sites.find(item=>item.id===checkpoint.site_id)
+  return site ? site.name + ' (' + checkpointId + ')' : checkpointId
+}
 </script>
 <template>
   <aside class="inspector panel" data-testid="inspector">
@@ -116,6 +121,18 @@ const feeLabel=(fee:number|null)=>fee===null?'—':n(fee)
                 <dt>{{t('observedCapacity')}}</dt><dd>{{n(report.operational_capacity)}} {{t('bulkDay')}}</dd>
                 <dt>{{t('observedTravelDays')}}</dt><dd>{{report.travel_days!==null?`${report.travel_days} ${t('days')}`:t('impassable')}}</dd>
               </dl>
+              <p class="muted">{{t('observedOn')}}: {{calendar(report.observed_day)}}</p>
+              <p v-if="report.stale" class="notice warning">{{t('staleRouteKnowledge')}}</p>
+              <button @click="source(report.event_id)">{{t('source')}}</button>
+            </article>
+          </details>
+          <details class="route-knowledge" v-if="fiscalRouteReports.length">
+            <summary>{{t('fiscalRouteKnowledge')}} ({{fiscalRouteReports.length}})</summary>
+            <p class="muted">{{t('fiscalRouteKnowledgeHelp')}}</p>
+            <article v-for="report in fiscalRouteReports" :key="report.id" :data-fiscal-route-report="report.id" class="stock-card">
+              <h4>{{checkpointLabel(report.checkpoint_id)}}</h4>
+              <p class="muted">{{t('observer')}}: {{report.recipientName}} · {{t('publisher')}}: {{report.publisherName}} · {{t('routeReportChannels.' + report.channel)}}</p>
+              <dl><dt>{{t('checkpointFee')}}</dt><dd>{{n(report.fee_per_bulk)}} / {{t('bulkDay')}}</dd></dl>
               <p class="muted">{{t('observedOn')}}: {{calendar(report.observed_day)}}</p>
               <p v-if="report.stale" class="notice warning">{{t('staleRouteKnowledge')}}</p>
               <button @click="source(report.event_id)">{{t('source')}}</button>

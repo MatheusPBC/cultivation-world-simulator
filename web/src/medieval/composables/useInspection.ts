@@ -17,6 +17,15 @@ export function useInspection() {
         stale:day-r.observed_day>=30}))
       .sort((a,b)=>b.observed_day-a.observed_day || a.id.localeCompare(b.id))
   })
+  const fiscalRouteReports=computed(()=>{
+    const current=route.value
+    if(!current)return []
+    const day=data.value.world.day
+    return data.value.governance.fiscal_route_reports.filter(r=>r.route_id===current.route.id)
+      .map(r=>({...r,recipientName:entityName(data.value,r.recipient_ref),publisherName:entityName(data.value,r.publisher_ref),
+        stale:day-r.observed_day>=30}))
+      .sort((a,b)=>b.observed_day-a.observed_day || a.id.localeCompare(b.id))
+  })
   const siteReports=computed(()=>{
     const current=site.value
     if(!current)return []
@@ -35,5 +44,5 @@ export function useInspection() {
   const placeName=(id:string)=>data.value.society.settlements.find(s=>s.id===id)?.name??id
   const select=(kind:'settlement'|'character'|'site'|'route',id:string)=>{store.selection={kind,id};tab.value='inspection'}
   const source=(id:string|null|undefined)=>{if(id)store.focusEventId=id}
-  return {store,tab,data,settlement,character,site,route,routeReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}
+  return {store,tab,data,settlement,character,site,route,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}
 }

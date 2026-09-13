@@ -13,8 +13,8 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 18 requires the current snapshot shape and rejects incomplete
-  configuration and older experimental saves (schema 17 and below), preserved
+  save schema 19 requires the current snapshot shape and rejects incomplete
+  configuration and older experimental saves (schema 18 and below), preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
 - Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
@@ -50,12 +50,25 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   Reports and route searches are resource-specific. Sellers protect productive
   reserves as well as food; active public/workshop stores publish authorized offers,
   not all private holdings. ObjectiveView.target_quantity is a derived projection.
+- Fiscal route knowledge is a separate dated receipt: the active civil-checkpoint
+  operator observes its own checkpoint, then a real `publish_fiscal_route_report`
+  decision may deliver a physical bulletin to reachable recipients. New freight
+  selects only engine-enumerated current fiscal route options; a legal path without
+  a post remains a distinct zero-fee option. Owners revalidate reports, checkpoint
+  identity and route facts before opening freight. Existing orders are immutable
+  and never rerouted. There is no force, confiscation, blockade, secret route or
+  actor-invented fiscal selection in this vertical.
 - Economy owns expansion blueprints/projects, repairs, migration provisions and
   civil customs checkpoints/manifests (economy schema 10; older schema 9 references are
   historical). Construction and
   production share monthly workforce and wage/tax settlement. Materials and paid
   work accumulate before capacity changes; completed projects cannot repeat.
   Resource targets add remaining construction materials once, not per reserve month.
+- Infrastructure wear is a Map-owned, deterministic use consequence: only material
+  production or cargo receipts can trigger it, at most 0.01 integrity per 30-day
+  cycle under the engine law. It uses no climate/random event and never repairs or
+  re-enables a site automatically; the same-cycle report exposes the damage so the
+  existing maintainer repair decision can respond.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
   needs the line and its commissioning receipt; advanced recipes need owned

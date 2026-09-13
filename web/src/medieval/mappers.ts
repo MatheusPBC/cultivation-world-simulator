@@ -13,7 +13,8 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !Array.isArray(data.diplomacy?.proposals) || !Array.isArray(data.diplomacy?.obligations)
       || !Array.isArray(data.diplomacy?.notices)
       || !Array.isArray(data.governance?.objectives) || !Array.isArray(data.governance?.plans)
-      || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.site_reports)
+      || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.fiscal_route_reports)
+      || !Array.isArray(data.governance?.site_reports)
       || !Array.isArray(data.economy?.customs_checkpoints) || !Array.isArray(data.economy?.cargo_manifests)
       || !Array.isArray(data.governance?.customs_notices)) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato do mundo está incompleto.')
@@ -32,6 +33,20 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
   if (data.map.sites.some(s => typeof s.service_suspended !== 'boolean')
       || data.governance.site_reports.some(r => typeof r.service_suspended !== 'boolean')) {
     throw new ApiError('INVALID_RESPONSE', 'O estado de serviço da instalação está incompleto.')
+  }
+  if (data.governance.fiscal_route_reports.some(report =>
+      typeof report.id !== 'string' || !report.id
+      || typeof report.recipient_ref !== 'object' || report.recipient_ref === null
+      || typeof report.recipient_ref.kind !== 'string' || typeof report.recipient_ref.id !== 'string' || !report.recipient_ref.id
+      || typeof report.publisher_ref !== 'object' || report.publisher_ref === null
+      || typeof report.publisher_ref.kind !== 'string' || typeof report.publisher_ref.id !== 'string' || !report.publisher_ref.id
+      || typeof report.route_id !== 'string' || !report.route_id
+      || !Number.isInteger(report.observed_day) || report.observed_day < 0
+      || typeof report.checkpoint_id !== 'string' || !report.checkpoint_id
+      || typeof report.fee_per_bulk !== 'number' || !Number.isFinite(report.fee_per_bulk) || report.fee_per_bulk <= 0
+      || (report.channel !== 'administrative_fiscal_route_report' && report.channel !== 'fiscal_route_bulletin')
+      || typeof report.event_id !== 'string' || !report.event_id)) {
+    throw new ApiError('INVALID_RESPONSE', 'O relatório fiscal da rota está incompleto.')
   }
   if (data.economy.customs_checkpoints.some(checkpoint =>
       typeof checkpoint.id !== 'string' || !checkpoint.id

@@ -128,6 +128,6 @@ Consultar o contrato atual antes de usar rotas ou parâmetros. Inspeção não a
 
 ## Como colaborar na retomada
 
-Preservar WIP, aplicar diffs pequenos e separar fato, hipótese e decisão. Delegação não é automática: quando autorizada, tarefas delimitadas e arquivos sem sobreposição; responsável principal integra e verifica. Preferências históricas do usuário: Luna para tarefas leves, Terra para complexas e Claude via herdr quando disponível/autorizado. Nenhuma dessas ferramentas é requisito para rodar o projeto ou continuar o trabalho.
+Preservar WIP, aplicar diffs pequenos e separar fato, hipótese e decisão. Delegação não é automática: quando autorizada, tarefas delimitadas e arquivos sem sobreposição; responsável principal integra e verifica. Preferências históricas do usuário: Luna para tarefas leves e Terra para complexas. O uso de Claude via HerdR está pausado por decisão explícita do usuário em 13/09/2026; não iniciar nem rearmar sessões Claude até nova autorização. Nenhuma dessas ferramentas é requisito para rodar o projeto ou continuar o trabalho.
 
 O próximo responsável deve ler [pendências](estado-e-pendencias.md), confirmar evidências atuais e entregar um caminho completo por vez. Não declarar a visão de “mundo vivo” concluída só porque suas classes e contratos existem.
