@@ -11,6 +11,11 @@ const {t,te}=useI18n()
 const {tab,data,settlement,character,site,route,routeReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
 const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs).map(([id,amount])=>`${resourceName(id)}: ${n(amount)}`).join(', ')
+const checkpointsForSite=(siteId:string)=>data.value.economy.customs_checkpoints.filter(checkpoint=>checkpoint.site_id===siteId)
+const checkpointName=(checkpointId:string)=>data.value.economy.customs_checkpoints.find(checkpoint=>checkpoint.id===checkpointId)?.id??checkpointId
+const noticeForParcel=(parcelId:string)=>data.value.governance.customs_notices.find(notice=>notice.parcel_id===parcelId)
+const manifestForParcel=(parcelId:string)=>data.value.economy.cargo_manifests.find(manifest=>manifest.parcel_id===parcelId)
+const feeLabel=(fee:number|null)=>fee===null?'—':n(fee)
 </script>
 <template>
   <aside class="inspector panel" data-testid="inspector">
@@ -63,6 +68,22 @@ const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs)
               <button @click="source(r.last_event_id)">{{t('source')}}</button>
             </article>
           </template>
+          <template v-if="checkpointsForSite(site!.id).length">
+            <h3>{{t('customsCheckpoints')}}</h3>
+            <article v-for="checkpoint in checkpointsForSite(site!.id)" :key="checkpoint.id" class="stock-card" :data-checkpoint="checkpoint.id">
+              <h4>{{t('civilCheckpoint')}} · {{checkpointName(checkpoint.id)}}</h4>
+              <dl>
+                <dt>{{t('checkpointState')}}</dt><dd>{{checkpoint.staff_count > 0 ? t('checkpointStaffed') : t('checkpointUnstaffed')}}</dd>
+                <dt>{{t('operator')}}</dt><dd>{{entityName(data,checkpoint.operator_ref)}}</dd>
+                <dt>{{t('checkpointStaff')}}</dt><dd>{{n(checkpoint.staff_count)}}</dd>
+                <dt>{{t('checkpointFee')}}</dt><dd>{{n(checkpoint.fee_per_bulk)}} / {{t('bulkDay')}}</dd>
+                <dt>{{t('lastStaffed')}}</dt><dd>{{calendar(checkpoint.last_staffed_day)}}</dd>
+                <dt>{{t('inspectionDay')}}</dt><dd>{{calendar(checkpoint.inspection_day)}}</dd>
+                <dt>{{t('inspectionSlots')}}</dt><dd>{{n(checkpoint.inspection_slots_used)}}</dd>
+              </dl>
+              <button v-if="checkpoint.last_event_id" @click="source(checkpoint.last_event_id)">{{t('source')}}</button>
+            </article>
+          </template>
           <details class="route-knowledge">
             <summary>{{t('siteKnowledge')}} ({{siteReports.length}})</summary>
             <p class="muted">{{t('siteKnowledgeHelp')}}</p>
@@ -106,7 +127,7 @@ const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs)
       </template>
       <template v-if="tab==='people'"><h2>{{t('people')}}</h2><button v-for="c in data.society.characters" :key="c.id" class="person-row" @click="select('character',c.id)"><span class="initial">{{c.name.charAt(0)}}</span><span><strong>{{c.name}}</strong><small>{{label(c.people)}} · {{placeName(c.location_id)}}</small></span><span>→</span></button></template>
       <template v-if="tab==='governments'"><h2>{{t('governments')}}</h2><article v-for="p in data.society.polities" :key="p.id" class="stock-card"><h3>{{p.name}}</h3><p>{{label(p.government)}}</p><button class="link-row" @click="select('settlement',p.capital_id)">{{t('capital')}}: {{placeName(p.capital_id)}} →</button><p v-for="i in p.interests" :key="i" class="muted">{{i}}</p></article><h2>{{t('organizations')}}</h2><article v-for="o in data.society.organizations" :key="o.id" class="stock-card"><h3>{{o.name}}</h3><p>{{label(o.kind)}}</p><p v-for="i in o.interests" :key="i" class="muted">{{i}}</p><button @click="select('settlement',o.seat_id)">{{placeName(o.seat_id)}} →</button></article></template>
-      <template v-if="tab==='reserves'"><h2>{{t('reserves')}}</h2><button v-for="s in data.society.settlements" :key="s.id" class="link-row" @click="select('settlement',s.id)"><span>{{s.name}}<small>{{t('missing')}}: {{n(s.missing_food)}}</small></span><strong>{{n(s.health/10)}}%</strong></button><h3>{{t('treasury')}}</h3><div v-for="a in data.economy.accounts.filter(a=>a.owner_ref.kind!=='population_group')" :key="a.id" class="list-row"><span>{{entityName(data,a.owner_ref)}}</span><strong>{{n(a.balance)}}</strong></div><h3>{{t('cargos')}}</h3><p v-if="!data.economy.parcels.length" class="muted">{{t('noCargo')}}</p><article v-for="p in data.economy.parcels" :key="p.id" class="stock-card"><h4>{{resourceName(data.economy.pending_orders.find(o=>o.id===p.order_id)?.resource_id??'')}} · {{n(p.quantity)}}</h4><p>{{label(p.stage)}} · {{t('due')}}: {{p.due_day}}</p><button @click="source(p.last_event_id)">{{t('source')}}</button></article></template>
+      <template v-if="tab==='reserves'"><h2>{{t('reserves')}}</h2><button v-for="s in data.society.settlements" :key="s.id" class="link-row" @click="select('settlement',s.id)"><span>{{s.name}}<small>{{t('missing')}}: {{n(s.missing_food)}}</small></span><strong>{{n(s.health/10)}}%</strong></button><h3>{{t('treasury')}}</h3><div v-for="a in data.economy.accounts.filter(a=>a.owner_ref.kind!=='population_group')" :key="a.id" class="list-row"><span>{{entityName(data,a.owner_ref)}}</span><strong>{{n(a.balance)}}</strong></div><h3>{{t('cargos')}}</h3><p v-if="!data.economy.parcels.length" class="muted">{{t('noCargo')}}</p><article v-for="p in data.economy.parcels" :key="p.id" class="stock-card"><h4>{{resourceName(data.economy.pending_orders.find(o=>o.id===p.order_id)?.resource_id??'')}} · {{n(p.quantity)}}</h4><p>{{label(p.stage)}} · {{t('due')}}: {{p.due_day}}</p><p v-if="p.stage==='held'" class="notice warning">{{t('cargoHeldAtCheckpoint')}}: {{checkpointName(p.held_checkpoint_id ?? '')}}</p><template v-if="manifestForParcel(p.id)"><p>{{t('manifestStatus')}}: <strong>{{t('manifestDeclared')}}</strong></p><p class="muted">{{resourceName(manifestForParcel(p.id)!.resource_id)}} · {{n(manifestForParcel(p.id)!.quantity)}} · {{t('declaredOn')}}: {{calendar(manifestForParcel(p.id)!.declared_day)}}</p><button @click="source(manifestForParcel(p.id)!.event_id)">{{t('source')}}</button></template><template v-if="noticeForParcel(p.id)"><p>{{t('noticeState')}}: <strong>{{t('customsNoticeStates.' + noticeForParcel(p.id)!.state)}}</strong></p><p class="muted">{{resourceName(noticeForParcel(p.id)!.resource_id)}} · {{n(noticeForParcel(p.id)!.quantity)}} · {{t('checkpointFee')}}: {{feeLabel(noticeForParcel(p.id)!.fee)}} · {{t('learnedOn')}}: {{calendar(noticeForParcel(p.id)!.learned_day)}}</p><button :data-notice-source="noticeForParcel(p.id)!.id" @click="source(noticeForParcel(p.id)!.event_id)">{{t('source')}}</button><button v-if="noticeForParcel(p.id)!.state_event_id !== noticeForParcel(p.id)!.event_id" @click="source(noticeForParcel(p.id)!.state_event_id)">{{t('source')}}</button></template><button v-if="p.last_event_id" @click="source(p.last_event_id)">{{t('source')}}</button></article></template>
     </div>
   </aside>
 </template>

@@ -3,6 +3,8 @@
 from collections import defaultdict
 from typing import Literal
 
+from pydantic import model_validator
+
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Count, Identity, SocietyValue
@@ -29,9 +31,18 @@ class CargoParcel(SocietyValue):
     order_id: Identity
     quantity: Positive
     route_index: Count = 0
-    stage: Literal["waiting", "traveling", "unloading"] = "waiting"
+    stage: Literal["waiting", "held", "traveling", "unloading"] = "waiting"
     due_day: Count
+    held_checkpoint_id: Identity | None = None
+    held_notice_id: Identity | None = None
     last_event_id: Identity | None = None
+
+    @model_validator(mode="after")
+    def held_linkage_matches_stage(self):
+        linked = self.held_checkpoint_id is not None and self.held_notice_id is not None
+        if (self.stage == "held") != linked:
+            raise ValueError("held cargo requires exactly its checkpoint and notice links")
+        return self
 
 
 class RouteFlow(SocietyValue):
@@ -99,9 +110,20 @@ def validate_logistics(economy, world=None):
             raise ValueError("missing cargo provenance")
     for parcel in economy.parcels.values():
         scheduled = world.agenda.get(parcel.id)
-        if (scheduled is None or scheduled.kind != "cargo" or scheduled.due_day != parcel.due_day
-                or parcel.due_day <= world.clock.absolute_day):
+        if parcel.stage == "held":
+            if scheduled is not None:
+                raise ValueError("held cargo cannot remain on the dated agenda")
+        elif (scheduled is None or scheduled.kind != "cargo" or scheduled.due_day != parcel.due_day
+              or parcel.due_day <= world.clock.absolute_day):
             raise ValueError("cargo agenda mismatch")
+        if parcel.stage == "held":
+            notice = world.knowledge.customs_notices.get(parcel.held_notice_id)
+            checkpoint = world.economy.customs_checkpoints.get(parcel.held_checkpoint_id)
+            if (notice is None or checkpoint is None or notice.state not in {"presented", "fee_due", "detected"}
+                    or notice.parcel_id != parcel.id or notice.checkpoint_id != checkpoint.id):
+                raise ValueError("held cargo lacks its canonical customs notice")
+        elif parcel.held_checkpoint_id is not None or parcel.held_notice_id is not None:
+            raise ValueError("unheld cargo cannot retain customs links")
     for scheduled in world.agenda.to_dict():
         if scheduled["kind"] == "cargo" and scheduled["id"] not in economy.parcels:
             raise ValueError("cargo agenda references missing parcel")

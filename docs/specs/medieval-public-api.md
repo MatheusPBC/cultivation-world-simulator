@@ -22,7 +22,7 @@ Velocidade significa saltos por segundo real, nunca mudança na duração simula
 
 Configuração persistente medieval contém seed, contagem inicial de personagens
 (padrão12, 1–60), locale pt-BR e política determinística; não finge IA integrada.
-Saves usam schema16 (Society2/Economy8); schemas 15 e abaixo são rejeitados e preservados, sem
+Saves usam schema18 (Society2/Economy10); schemas 17 e abaixo são rejeitados e preservados, sem
 sobrescrita ou migração. IDs de
 sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras
@@ -55,14 +55,14 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
 - `SocietyView.migrations` lista jornadas ativas; `SettlementView.population`
   (residentes) e `present_population` são distintos.
 - GET query/economy: catálogo, estoques, contas, produção, últimas folhas salariais, necessidades, mercados,
-  ordens pendentes e cargas; ordens concluídas permanecem rastreáveis por eventos.
-  O catálogo inclui `repair_blueprints` e `repairs` (economia schema 8); custos
+  ordens pendentes, cargas, `customs_checkpoints` e `cargo_manifests`; ordens concluídas permanecem rastreáveis por eventos.
+  O catálogo inclui `repair_blueprints`, `repairs`, postos civis de alfândega e manifestos (economia schema 10); custos
   são definidos pelo engine, não pelo cliente.
 - `EconomyView.migration_provisions` expõe provisões e seu `MoneyAccount`; o
   observador apenas projeta a transferência bilateral e não controla famílias.
 - GET query/map: geografia, território, rotas e instalações canônicas.
 - GET query/governance: cargos, políticas tributárias, objetivos, planos, relatórios de
-  suprimento, `SiteReport` e relatórios datados de rotas por ator. Relatórios e
+  suprimento, `SiteReport`, `customs_notices` privados e relatórios datados de rotas por ator. Relatórios e
   ofertas de estoque incluem a cotação histórica de exportação da origem (taxa,
   fato de política e coletor), nunca saldo da conta coletora; `SiteReport`
   registra a presença local do mantenedor e permanece privado, não sendo

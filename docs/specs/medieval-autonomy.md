@@ -128,7 +128,7 @@ Falha técnica de execução/save aborta o salto inteiro, não vira recusa do ve
 ## Persistência e observação
 
 Schema8 inclui alvos/relatórios por recurso e projetos econômicos; o save atual é
-schema16 e a economia interna é schema8. Schemas1–15 experimentais são preservados e
+schema18 e a economia interna é schema10. Schemas1–17 experimentais são preservados e
 rejeitados, sem migração silenciosa. Load confere identidades, referências,
 proveniência e canais; retomada mantém observações/intenções/pedidos/RNG.
 

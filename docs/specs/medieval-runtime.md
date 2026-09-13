@@ -108,12 +108,12 @@ Um `.mws` é um arquivo SQLite com tabelas `metadata`, `world` e `events`, e
 índice por dia/sequência. O snapshot JSON interno carrega sociedade, mapa físico,
 rotas, instalações, relógio, agenda, atividades, economia, autoridade, conhecimento,
 estratégia, pesquisa, configuração e RNG.
-A identidade de produto é `medieval-world-simulator`, com schema 16 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 8.
+A identidade de produto é `medieval-world-simulator`, com schema 18 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 10.
 Nenhum loader consulta o catálogo atual para reconstruir o mundo salvo.
-Saves experimentais schema 1–15 são rejeitados e preservados; use um novo arquivo
+Saves experimentais schema 1–17 são rejeitados e preservados; use um novo arquivo
 para o smoke atualizado, sem sobrescrever a prova histórica anterior. O snapshot
-atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 8 com `repair_blueprints` e
-`repairs`; nenhum loader migra schemas antigos. O catálogo de custos é propriedade
+atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 10 com `repair_blueprints`,
+`repairs`, postos civis de alfândega e manifestos; nenhum loader migra schemas antigos. O catálogo de custos é propriedade
 do engine e os DTOs apenas o projetam.
 
 A escrita valida o candidato, prepara um arquivo temporário na mesma pasta,

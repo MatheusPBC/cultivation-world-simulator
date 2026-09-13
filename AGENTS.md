@@ -13,8 +13,8 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 16 requires the current snapshot shape and rejects incomplete
-  configuration and older experimental saves (schema 15 and below), preserved
+  save schema 18 requires the current snapshot shape and rejects incomplete
+  configuration and older experimental saves (schema 17 and below), preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
 - Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
@@ -50,8 +50,9 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   Reports and route searches are resource-specific. Sellers protect productive
   reserves as well as food; active public/workshop stores publish authorized offers,
   not all private holdings. ObjectiveView.target_quantity is a derived projection.
-- Economy owns expansion blueprints/projects (economy schema 8; older schema 7
-  references are historical). Construction and
+- Economy owns expansion blueprints/projects, repairs, migration provisions and
+  civil customs checkpoints/manifests (economy schema 10; older schema 9 references are
+  historical). Construction and
   production share monthly workforce and wage/tax settlement. Materials and paid
   work accumulate before capacity changes; completed projects cannot repeat.
   Resource targets add remaining construction materials once, not per reserve month.

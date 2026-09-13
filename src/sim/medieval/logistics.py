@@ -151,6 +151,12 @@ def _resolve_parcel(world, parcel, route_causes):
         _record_parcel(world, parcel, parcel.model_copy(update={"due_day": day + 1}),
                        "cargo_delayed", "Passagem indisponível; carga preservada.", cause_ids=causes)
         return
+    if parcel.stage == "waiting":
+        # A civil checkpoint retains this exact parcel before it can depart.
+        # Inspection never edits the route, quantity, owner, or destination.
+        from .customs import inspect_waiting_parcel
+        if inspect_waiting_parcel(world, parcel, route_id) is not None:
+            return
     if parcel.stage == "traveling":
         if parcel.route_index == len(order.route_ids) - 1:
             _unload(world, parcel)

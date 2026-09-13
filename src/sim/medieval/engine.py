@@ -24,6 +24,7 @@ from .household_provisioning import review_household_provisions
 from .tariffs import review_export_tariffs
 from .site_services import review_site_services
 from .route_intelligence import refresh_route_reports, refresh_site_reports
+from .customs import staff_customs_checkpoints
 from src.classes.core.infrastructure import validate_infrastructure
 
 
@@ -58,6 +59,7 @@ class MedievalSimulator:
             if jump.monthly_boundary:
                 advance_monthly_practice(candidate)
                 available = monthly_workforce(candidate)
+                staff_customs_checkpoints(candidate, available)
                 progress_research(candidate, available)
                 progress_expansions(candidate, available)
                 produce_monthly(candidate, available)

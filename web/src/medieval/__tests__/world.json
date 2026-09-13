@@ -2324,7 +2324,9 @@
     "pending_orders": [],
     "completed_order_count": 0,
     "parcels": [],
-    "route_flows": []
+    "route_flows": [],
+    "customs_checkpoints": [],
+    "cargo_manifests": []
   },
   "map": {
     "map_id": "vale-das-tres-coroas",
@@ -4435,6 +4437,7 @@
     "route_reports": [],
     "site_reports": [],
     "settlement_reports": [],
+    "customs_notices": [],
     "objectives": [
       {
         "id": "inputs:stock:ferroalto:wood",

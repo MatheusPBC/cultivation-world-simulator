@@ -18,8 +18,8 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
 
 ## O que já existe no WIP local
 
-- Runtime medieval separado, configuração persistente e save schema 16 (Society2,
-  Economy8); dados de execução usam namespace próprio e saves schema 15 e anteriores são rejeitados,
+- Runtime medieval separado, configuração persistente e save schema 18 (Society2,
+  Economy10); dados de execução usam namespace próprio e saves schema 17 e anteriores são rejeitados,
   preservados sem sobrescrita ou migração.
 - Calendário híbrido de 12 meses de 30 dias. Rotinas agregadas usam o salto mensal;
   agendas, prazos, viagem, carga e situações ativas podem exigir processamento por
@@ -40,7 +40,7 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
   privados. Cumprimento material ainda exige uma decisão nova e autorização atual.
   Barganha determinística por contexto de ator, `GET /api/v2/query/diplomacy` e o
   DiplomacyPanel do observatório já estão integrados; IA real de negociação não.
-- Conhecimento datado de rotas (schema16, `route_reports`): observação
+- Conhecimento datado de rotas (schema17, `route_reports`): observação
   administrativa por instituição-extremo com mandato de abastecimento (não
   exige estrada aberta), boletim mensal por decisão que entrega um recibo por
   destinatário pela rede física alcançável a partir do publicador, e planejador
@@ -69,6 +69,14 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
   O comprador vê taxa/fato/coletor, nunca saldo estrangeiro; na abertura bilateral
   paga base mais tarifa uma vez, com base ao vendedor e tarifa ao tesouro da origem.
   Não há tarifa doméstica/frete próprio, pedágio, trânsito ou bloqueio.
+- Alfândega civil é um posto Economy-owned em porto/passagem: equipe local paga
+  no ciclo, autoridade atual de supply/trade/taxation e serviço físico ativo são
+  pré-requisitos. Ao ser apresentada, a parcela canônica fica retida e o dono recebe
+  aviso privado. Ele só escolhe declarar o manifesto exato ou tentar evadir a taxa;
+  o engine resolve detecção com capacidade paga e RNG salvo. Declaração seguida de
+  pagamento libera a mesma parcela; evasão não detectada a reagenda para o dia seguinte.
+  Não há força militar, confisco, alteração de rota/quantidade/propriedade ou escolha
+  de rerroteamento nesta vertical.
 
 ## Evidência disponível e limites
 

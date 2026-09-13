@@ -1,7 +1,7 @@
 """Single owner of actor-specific observations; canonical truth stays elsewhere."""
 
 from dataclasses import dataclass, field
-from .models import KnowledgeReport, DiplomaticNotice, RouteReport, SettlementReport, SiteReport
+from .models import KnowledgeReport, DiplomaticNotice, RouteReport, SettlementReport, SiteReport, CustomsNotice
 from .serialization import RegistrySerialization, validate_actor
 from src.classes.event import FactKind
 from src.classes.research.models import TechnicalKnowledge
@@ -27,8 +27,10 @@ class KnowledgeState(RegistrySerialization):
     route_reports: dict[str, RouteReport] = field(default_factory=dict)
     settlement_reports: dict[str, SettlementReport] = field(default_factory=dict)
     site_reports: dict[str, SiteReport] = field(default_factory=dict)
+    customs_notices: dict[str, CustomsNotice] = field(default_factory=dict)
     registries = {"reports": KnowledgeReport, "technologies": TechnicalKnowledge, "notices": DiplomaticNotice,
                   "route_reports": RouteReport, "settlement_reports": SettlementReport, "site_reports": SiteReport}
+    registries["customs_notices"] = CustomsNotice
 
     def knows(self, actor_ref, technology_id):
         return any(k.owner_ref == actor_ref and k.technology_id == technology_id for k in self.technologies.values())
@@ -45,6 +47,9 @@ class KnowledgeState(RegistrySerialization):
 
     def site_report(self, actor_ref, site_id):
         return self.site_reports.get(site_report_id(actor_ref, site_id))
+
+    def customs_for_actor(self, actor_ref):
+        return tuple(item for _, item in sorted(self.customs_notices.items()) if item.recipient_ref == actor_ref)
 
     def settlements_for_actor(self, actor_ref):
         return tuple(r for _, r in sorted(self.settlement_reports.items()) if r.recipient_ref == actor_ref)
@@ -97,6 +102,43 @@ class KnowledgeState(RegistrySerialization):
             self._validate_settlement_report(world, events, report)
         for report in self.site_reports.values():
             self._validate_site_report(world, events, report)
+        for notice in self.customs_notices.values():
+            self._validate_customs_notice(world, events, notice)
+
+    @staticmethod
+    def _validate_customs_notice(world, events, notice):
+        checkpoint = world.economy.customs_checkpoints.get(notice.checkpoint_id)
+        order = world.economy.freight_orders.get(notice.order_id)
+        event = events.get(notice.event_id)
+        transition = events.get(notice.state_event_id)
+        manifest = world.economy.cargo_manifests.get(notice.manifest_id) if notice.manifest_id else None
+        if (checkpoint is None or order is None or notice.id != f"customs_notice:{notice.parcel_id}"
+                or notice.recipient_ref != order.owner_ref or notice.learned_day > world.clock.absolute_day
+                or event is None or event.day != notice.learned_day
+                or notice.resource_id != order.resource_id
+                or event.event_type != "customs_presented" or event.fact_kind != FactKind.STATE_TRANSITION
+                or not any(delta.owner_kind == "customs_notice" and delta.owner_id == notice.id
+                           and delta.aspect == "state" and delta.before == "None" and delta.after == "presented"
+                           for delta in event.deltas)
+                or transition is None
+                or (notice.state == "presented" and (notice.state_event_id != notice.event_id or notice.fee is not None or notice.manifest_id is not None))
+                or (notice.state in {"fee_due", "cleared"} and (manifest is None or manifest.parcel_id != notice.parcel_id
+                    or manifest.order_id != notice.order_id or manifest.resource_id != notice.resource_id
+                    or manifest.quantity != notice.quantity or notice.fee is None))
+                or (notice.state in {"detected", "evaded_undetected"} and (notice.manifest_id is not None or notice.fee is not None))
+                or (notice.state != "presented" and notice.event_id not in {link.cause_event_id for link in transition.causal_links})
+                or (notice.state == "fee_due" and transition.event_type != "cargo_manifest_declared")
+                or (notice.state == "detected" and transition.event_type != "customs_fee_evasion_detected")
+                or (notice.state == "evaded_undetected" and transition.event_type != "customs_fee_evaded")
+                or (notice.state == "cleared" and transition.event_type != "customs_fee_paid")
+                or (notice.state != "presented" and not any(delta.owner_kind == "customs_notice"
+                    and delta.owner_id == notice.id and delta.aspect == "state" and delta.after == notice.state
+                    for delta in transition.deltas))
+                or (notice.state == "detected" and not {
+                    (delta.aspect, delta.after) for delta in transition.deltas
+                    if delta.owner_kind == "customs_inspection"
+                } >= {("threshold_permille", "350")})):
+            raise ValueError("invalid private customs notice")
 
     @staticmethod
     def _validate_export_quote(events, report):

@@ -44,8 +44,8 @@ Operações inválidas validam antes de aplicar. O fechamento ocorre no candidat
 transacional do simulador: falha de save não publica economia parcial.
 
 O save incorporou catálogo, receitas, instalações, inventários, contas,
-abastecimento e proveniência no schema2; o formato atual é save16/Economy8, incluindo
-folhas, políticas tributárias, reparos e provisões de jornadas. Saves experimentais anteriores
+abastecimento e proveniência no schema2; o formato atual é save17/Economy9, incluindo
+folhas, políticas tributárias, reparos, provisões de jornadas e postos civis de alfândega. Saves experimentais anteriores
 não são migrados ou sobrescritos silenciosamente. O catálogo inicial é ajustável no JSON;
 seus números ainda não representam calibração das simulações de dez anos.
 
@@ -126,6 +126,23 @@ vai ao vendedor e a tarifa ao tesouro da origem. Quando vendedor e coletor usam 
 mesma conta, a soma dos deltas conserva o crédito líquido sem criar cobrança dupla.
 Revalidação, reserva e entrega continuam no executor de mercado; a tarifa não cria
 pedágio, regra de trânsito ou bloqueio.
+
+## Alfândega civil material
+
+`EconomyState.customs_checkpoints` registra um posto em `port` ou
+`mountain_pass`. Ele só é ativo quando seu proprietário atual possui mandatos
+`supply`, `trade` e `taxation`, o site está íntegro/habilitado/com serviço aberto
+e a equipe local indicada recebeu salário no ciclo. Abrir o posto não cobra nem
+retém bens; a folha consome dinheiro e força de trabalho reais.
+
+Antes de partir, uma carga encontra o posto ativo e entra em `held`. Quantidade,
+dono, rota e estoque de origem não mudam. O aviso privado permite apenas declarar
+o manifesto canônico exato ou tentar evadir a taxa. A engine consome uma vaga de
+inspeção da equipe paga e resolve a tentativa com RNG canônico salvo; se não for
+detectada, a mesma parcela volta à fila no dia seguinte. Se declarada, a taxa exata
+fica devida e o pagamento material a libera. Não há confisco, força militar,
+alteração de rota, quantidade ou propriedade nesta vertical; rerroteamento fiscal ainda
+não existe.
 
 ### Comprovantes de trabalho e limites históricos
 

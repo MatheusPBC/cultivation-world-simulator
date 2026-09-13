@@ -10,6 +10,7 @@ from .logistics import CargoParcel, FreightOrder, RouteFlow, validate_logistics
 from .expansion import ExpansionBlueprint, ExpansionProject, validate_expansions
 from .maintenance import RepairBlueprint, RepairProject, validate_repairs
 from .migration import MigrationProvision
+from .customs import CargoManifest, CustomsCheckpoint, validate_customs
 
 
 @dataclass
@@ -31,6 +32,8 @@ class EconomyState(EconomySerialization):
     repair_blueprints: dict[str, RepairBlueprint] = field(default_factory=dict)
     repairs: dict[str, RepairProject] = field(default_factory=dict)
     migration_provisions: dict[str, MigrationProvision] = field(default_factory=dict)
+    customs_checkpoints: dict[str, CustomsCheckpoint] = field(default_factory=dict)
+    cargo_manifests: dict[str, CargoManifest] = field(default_factory=dict)
 
     def used_capacity(self, stock: Stock) -> int:
         return sum(self.resources[rid].bulk * amount for rid, amount in stock.goods.items())
@@ -80,6 +83,7 @@ class EconomyState(EconomySerialization):
         validate_logistics(self, world)
         validate_expansions(self, world)
         validate_repairs(self, world)
+        validate_customs(self, world)
         for provision in self.migration_provisions.values():
             if provision.account_id not in self.accounts:
                 raise ValueError("migration provision requires its travel account")
@@ -135,13 +139,14 @@ class EconomyState(EconomySerialization):
             if item.owner_ref.id not in owners.get(item.owner_ref.kind, {}):
                 raise ValueError("unknown economic owner")
         for payroll in self.payrolls.values():
-            if (payroll.id not in {*self.facilities, *self.expansions, *self.repairs, *world.research.projects}
+            if (payroll.id not in {*self.facilities, *self.expansions, *self.repairs, *world.research.projects, *self.customs_checkpoints}
                     or payroll.day > world.clock.absolute_day
                     or payroll.last_event_id not in events
                     or set(payroll.workers_by_group) - set(world.society.population)):
                 raise ValueError("invalid payroll provenance")
             event = events[payroll.last_event_id]
             expected_types = ({"income_tax_collected"} if payroll.tax else
+                              {"customs_staff_paid"} if payroll.id in self.customs_checkpoints else
                               {"wages_paid"} if payroll.gross else
                               {"production_completed", "production_limited", "expansion_progressed", "repair_progressed"})
             if event.day != payroll.day or event.event_type not in expected_types:
@@ -168,7 +173,7 @@ class EconomyState(EconomySerialization):
             raise ValueError("unknown economy event provenance")
         for decision_id, event_id in self.payments.items():
             if (decision_id not in events or event_id not in events
-                    or events[event_id].event_type not in {"payment_completed", "export_tariff_collected", "household_purchase_completed", "household_provisions_purchased"}
+                    or events[event_id].event_type not in {"payment_completed", "export_tariff_collected", "household_purchase_completed", "household_provisions_purchased", "customs_fee_paid"}
                     or decision_id not in {link.cause_event_id for link in events[event_id].causal_links}):
                 raise ValueError("invalid payment history")
         for event in world.events:

@@ -13,7 +13,9 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !Array.isArray(data.diplomacy?.proposals) || !Array.isArray(data.diplomacy?.obligations)
       || !Array.isArray(data.diplomacy?.notices)
       || !Array.isArray(data.governance?.objectives) || !Array.isArray(data.governance?.plans)
-      || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.site_reports)) {
+      || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.site_reports)
+      || !Array.isArray(data.economy?.customs_checkpoints) || !Array.isArray(data.economy?.cargo_manifests)
+      || !Array.isArray(data.governance?.customs_notices)) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato do mundo está incompleto.')
   }
   if (data.governance.tax_policies.some(p => !Number.isInteger(p.export_rate_permille)
@@ -30,6 +32,57 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
   if (data.map.sites.some(s => typeof s.service_suspended !== 'boolean')
       || data.governance.site_reports.some(r => typeof r.service_suspended !== 'boolean')) {
     throw new ApiError('INVALID_RESPONSE', 'O estado de serviço da instalação está incompleto.')
+  }
+  if (data.economy.customs_checkpoints.some(checkpoint =>
+      typeof checkpoint.id !== 'string' || !checkpoint.id
+      || typeof checkpoint.site_id !== 'string' || !checkpoint.site_id
+      || typeof checkpoint.operator_ref !== 'object' || checkpoint.operator_ref === null
+      || typeof checkpoint.operator_ref.kind !== 'string' || typeof checkpoint.operator_ref.id !== 'string' || !checkpoint.operator_ref.id
+      || typeof checkpoint.account_id !== 'string' || !checkpoint.account_id
+      || typeof checkpoint.staff_group_id !== 'string' || !checkpoint.staff_group_id
+      || !Number.isInteger(checkpoint.staff_count) || checkpoint.staff_count < 1
+      || typeof checkpoint.fee_per_bulk !== 'number' || !Number.isFinite(checkpoint.fee_per_bulk) || checkpoint.fee_per_bulk < 0
+      || !Number.isInteger(checkpoint.started_day) || checkpoint.started_day < 0
+      || !Number.isInteger(checkpoint.last_staffed_day) || checkpoint.last_staffed_day < checkpoint.started_day
+      || !Number.isInteger(checkpoint.inspection_day) || checkpoint.inspection_day < checkpoint.started_day
+      || !Number.isInteger(checkpoint.inspection_slots_used) || checkpoint.inspection_slots_used < 0
+      || (checkpoint.last_event_id !== null && typeof checkpoint.last_event_id !== 'string'))
+      || data.governance.customs_notices.some(notice =>
+        typeof notice.id !== 'string' || !notice.id
+        || typeof notice.parcel_id !== 'string' || !notice.parcel_id
+        || typeof notice.checkpoint_id !== 'string' || !notice.checkpoint_id
+        || typeof notice.order_id !== 'string' || !notice.order_id
+        || typeof notice.recipient_ref !== 'object' || notice.recipient_ref === null
+        || typeof notice.recipient_ref.kind !== 'string' || typeof notice.recipient_ref.id !== 'string' || !notice.recipient_ref.id
+        || typeof notice.resource_id !== 'string' || !notice.resource_id
+        || typeof notice.quantity !== 'number' || !Number.isFinite(notice.quantity) || notice.quantity <= 0
+        || (notice.fee !== null && (typeof notice.fee !== 'number' || !Number.isFinite(notice.fee) || notice.fee <= 0))
+        || !Number.isInteger(notice.learned_day) || notice.learned_day < 0
+        || !['presented', 'fee_due', 'detected', 'cleared', 'evaded_undetected'].includes(notice.state)
+        || typeof notice.event_id !== 'string' || !notice.event_id
+        || typeof notice.state_event_id !== 'string' || !notice.state_event_id
+        || (notice.manifest_id !== null && (typeof notice.manifest_id !== 'string' || !notice.manifest_id))
+        || notice.channel !== 'direct_customs_notice')) {
+    throw new ApiError('INVALID_RESPONSE', 'O registro de fiscalização aduaneira está incompleto.')
+  }
+  if (data.economy.cargo_manifests.some(manifest =>
+      typeof manifest.id !== 'string' || !manifest.id
+      || typeof manifest.checkpoint_id !== 'string' || !manifest.checkpoint_id
+      || typeof manifest.parcel_id !== 'string' || !manifest.parcel_id
+      || typeof manifest.order_id !== 'string' || !manifest.order_id
+      || typeof manifest.owner_ref !== 'object' || manifest.owner_ref === null
+      || typeof manifest.owner_ref.kind !== 'string' || typeof manifest.owner_ref.id !== 'string' || !manifest.owner_ref.id
+      || typeof manifest.resource_id !== 'string' || !manifest.resource_id
+      || typeof manifest.quantity !== 'number' || !Number.isFinite(manifest.quantity) || manifest.quantity <= 0
+      || !Number.isInteger(manifest.declared_day) || manifest.declared_day < 0
+      || typeof manifest.event_id !== 'string' || !manifest.event_id)) {
+    throw new ApiError('INVALID_RESPONSE', 'O manifesto de carga está incompleto.')
+  }
+  if (data.economy.parcels.some(parcel =>
+      (parcel.stage !== 'waiting' && parcel.stage !== 'traveling' && parcel.stage !== 'unloading' && parcel.stage !== 'held')
+      || (parcel.held_checkpoint_id !== null && typeof parcel.held_checkpoint_id !== 'string')
+      || (parcel.held_notice_id !== null && typeof parcel.held_notice_id !== 'string'))) {
+    throw new ApiError('INVALID_RESPONSE', 'O estado da carga está incompleto.')
   }
   if (!Array.isArray(data.society.migrations) || !Array.isArray(data.economy.migration_provisions)
       || !Array.isArray(data.governance.settlement_reports)

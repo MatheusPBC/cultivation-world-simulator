@@ -12,13 +12,14 @@ from src.classes.economy.expansion import ExpansionBlueprint, ExpansionProject
 from src.classes.economy.maintenance import RepairBlueprint, RepairProject
 from src.classes.research.models import ResearchProject, Technology, TechnicalKnowledge
 from src.classes.governance.diplomacy import DiplomaticProposal, Obligation
-from src.classes.governance.models import DiplomaticNotice, RouteReport, SettlementReport, SiteReport
+from src.classes.governance.models import CustomsNotice, DiplomaticNotice, RouteReport, SettlementReport, SiteReport
 from src.classes.environment.geography import GeographyLayer
 from src.classes.environment.infrastructure import InfrastructureSite
 from src.classes.environment.route import Route
 from src.classes.society.models import Character, Organization, Polity, PopulationGroup, Settlement, SocietyValue
 from src.classes.society.migration import MigrationJourney
 from src.classes.economy.migration import MigrationProvision
+from src.classes.economy.customs import CargoManifest, CustomsCheckpoint
 from src.sim.medieval.activities import Activity
 from src.sim.medieval.events import WorldEvent
 
@@ -113,6 +114,8 @@ class EconomyView(SocietyValue):
     completed_order_count: int
     parcels: list[CargoParcel]
     route_flows: list[RouteFlow]
+    customs_checkpoints: list[CustomsCheckpoint]
+    cargo_manifests: list[CargoManifest]
 
 
 class RouteView(SocietyValue):
@@ -154,6 +157,7 @@ class GovernanceView(SocietyValue):
     route_reports: list[RouteReport]
     site_reports: list[SiteReport]
     settlement_reports: list[SettlementReport]
+    customs_notices: list[CustomsNotice]
 
 
 class ResearchView(SocietyValue):

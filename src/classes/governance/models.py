@@ -157,6 +157,28 @@ class SiteReport(SocietyValue):
                                 self.service_suspended)
 
 
+class CustomsNotice(SocietyValue):
+    """A private customs state receipt for one owned parcel.
+
+    It is knowledge, not the customs ledger.  Its source presentation and any
+    later declaration/evasion/payment transitions remain factual events.
+    """
+    id: Identity
+    checkpoint_id: Identity
+    parcel_id: Identity
+    order_id: Identity
+    resource_id: Identity
+    quantity: int = Field(strict=True, gt=0)
+    recipient_ref: EntityRef
+    fee: int | None = Field(default=None, strict=True, gt=0)
+    learned_day: Count
+    event_id: Identity
+    state_event_id: Identity
+    state: Literal["presented", "fee_due", "detected", "evaded_undetected", "cleared"]
+    manifest_id: Identity | None = None
+    channel: Literal["direct_customs_notice"] = "direct_customs_notice"
+
+
 class DiplomaticNotice(SocietyValue):
     id: Identity
     proposal_id: Identity

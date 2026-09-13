@@ -35,7 +35,8 @@ def governance_view(world):
                                       for o in ordered(world.strategy.objectives)], plans=ordered(world.strategy.plans),
                           route_reports=ordered(world.knowledge.route_reports),
                           site_reports=ordered(world.knowledge.site_reports),
-                          settlement_reports=ordered(world.knowledge.settlement_reports))
+                          settlement_reports=ordered(world.knowledge.settlement_reports),
+                          customs_notices=ordered(world.knowledge.customs_notices))
 
 
 def ordered(registry):
@@ -75,7 +76,7 @@ def economy_view(world):
     economy = world.economy
     registries = {name: ordered(getattr(economy, name)) for name in
                   ("resources", "recipes", "stocks", "accounts", "facilities", "payrolls", "needs", "markets", "parcels", "route_flows",
-                  "expansion_blueprints", "expansions", "repair_blueprints", "repairs", "migration_provisions")}
+                  "expansion_blueprints", "expansions", "repair_blueprints", "repairs", "migration_provisions", "customs_checkpoints", "cargo_manifests")}
     pending = [o for o in ordered(economy.freight_orders) if o.delivered_quantity < o.quantity]
     return EconomyView(**registries, pending_orders=pending, completed_order_count=len(economy.freight_orders) - len(pending))
 

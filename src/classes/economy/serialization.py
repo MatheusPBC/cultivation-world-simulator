@@ -5,6 +5,7 @@ from .logistics import FreightOrder, CargoParcel, RouteFlow
 from .expansion import ExpansionBlueprint, ExpansionProject
 from .maintenance import RepairBlueprint, RepairProject
 from .migration import MigrationProvision
+from .customs import CargoManifest, CustomsCheckpoint
 
 REGISTRIES = {"resources": Resource, "recipes": Recipe, "stocks": Stock,
               "accounts": MoneyAccount, "facilities": ProductionFacility, "payrolls": Payroll, "needs": SettlementNeeds,
@@ -12,19 +13,21 @@ REGISTRIES = {"resources": Resource, "recipes": Recipe, "stocks": Stock,
               "expansion_blueprints": ExpansionBlueprint, "expansions": ExpansionProject,
               "repair_blueprints": RepairBlueprint, "repairs": RepairProject,
               "migration_provisions": MigrationProvision}
+REGISTRIES["customs_checkpoints"] = CustomsCheckpoint
+REGISTRIES["cargo_manifests"] = CargoManifest
 
 
 class EconomySerialization:
     def to_dict(self) -> dict:
         self.validate()
-        return {"schema_version": 8, "payments": dict(sorted(self.payments.items())), **{
+        return {"schema_version": 10, "payments": dict(sorted(self.payments.items())), **{
             name: {key: value.model_dump(mode="json") for key, value in sorted(getattr(self, name).items())}
             for name in REGISTRIES}}
 
     @classmethod
     def from_dict(cls, data):
         if (not isinstance(data, dict) or set(data) != {"schema_version", "payments", *REGISTRIES}
-                or type(data["schema_version"]) is not int or data["schema_version"] != 8):
+                or type(data["schema_version"]) is not int or data["schema_version"] != 10):
             raise ValueError("invalid economy schema")
         parsed = {}
         for name, model in REGISTRIES.items():
