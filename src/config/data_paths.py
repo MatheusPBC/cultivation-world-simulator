@@ -8,8 +8,8 @@ from functools import lru_cache
 from pathlib import Path
 
 
-APP_NAME = "CultivationWorldSimulator"
-DEV_APP_NAME = "CultivationWorldSimulator-dev"
+APP_NAME = "MedievalWorldSimulator"
+DEV_APP_NAME = "MedievalWorldSimulator-dev"
 
 
 @dataclass(frozen=True)

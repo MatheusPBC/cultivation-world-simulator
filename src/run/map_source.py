@@ -366,6 +366,13 @@ def _water_body_touches_cells(body: WaterBody, cells: set[tuple[int, int]]) -> b
 def read_map_source(path: Path) -> MapSource:
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+    return parse_map_source(data, fallback_id=path.parent.name)
+
+
+def parse_map_source(data: dict[str, Any], *, fallback_id: str = "") -> MapSource:
+    """Validate a physical map supplied by either an authored file or a save."""
+    if not isinstance(data, dict):
+        raise ValueError("map source must be an object")
 
     schema_version = int(data.get("schema_version", 0) or 0)
     if schema_version != MAP_SOURCE_SCHEMA_VERSION:
@@ -408,7 +415,7 @@ def read_map_source(path: Path) -> MapSource:
     )
 
     return MapSource(
-        map_id=str(data.get("id") or path.parent.name),
+        map_id=str(data.get("id") or fallback_id),
         version=int(data.get("version", 1) or 1),
         width=width,
         height=height,

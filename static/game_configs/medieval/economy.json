@@ -1,0 +1,399 @@
+{
+  "catalog_version": 1,
+  "expansion_blueprints": [
+    {
+      "id": "irrigation-works",
+      "name": "Canais de irrigação",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 10,
+      "monthly_units": 5,
+      "capacity_gain": 0,
+      "required_technology_id": "irrigation",
+      "from_recipe_id": "harvest",
+      "to_recipe_id": "irrigated_harvest"
+    },
+    {
+      "id": "efficient-furnaces",
+      "name": "Adaptação dos fornos",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 10,
+      "monthly_units": 5,
+      "capacity_gain": 0,
+      "required_technology_id": "metallurgy",
+      "from_recipe_id": "ironworking",
+      "to_recipe_id": "efficient_ironworking"
+    },
+    {
+      "id": "workshop-extension",
+      "name": "Ampliação das instalações",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 10,
+      "monthly_units": 5,
+      "capacity_gain": 10
+    },
+    {
+      "id": "charcoal-kilns",
+      "name": "Fornos de carvão",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 6,
+      "monthly_units": 3,
+      "capacity_gain": 0,
+      "required_technology_id": "metallurgy",
+      "additional_recipe_id": "charcoal",
+      "new_capacity": 10
+    },
+    {
+      "id": "steel-furnaces",
+      "name": "Aciaria",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 6,
+      "monthly_units": 3,
+      "capacity_gain": 0,
+      "required_technology_id": "steel",
+      "additional_recipe_id": "steelmaking",
+      "new_capacity": 10
+    },
+    {
+      "id": "engine-workshop",
+      "name": "Oficina de motores",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 6,
+      "monthly_units": 3,
+      "capacity_gain": 0,
+      "required_technology_id": "steam_engineering",
+      "additional_recipe_id": "engine_assembly",
+      "new_capacity": 10
+    },
+    {
+      "id": "steam-pumps",
+      "name": "Bombeamento mecanizado",
+      "inputs": {
+        "wood": 2,
+        "tools": 1,
+        "steam_engines": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 6,
+      "monthly_units": 3,
+      "capacity_gain": 0,
+      "required_technology_id": "steam_engineering",
+      "from_recipe_id": "efficient_ironworking",
+      "to_recipe_id": "steam_ironworking"
+    }
+  ],
+  "resources": [
+    {
+      "id": "food",
+      "name": "Alimentos",
+      "unit": "ração pessoa/mês",
+      "bulk": 1,
+      "base_price": 4
+    },
+    {
+      "id": "wood",
+      "name": "Madeira",
+      "unit": "feixe",
+      "bulk": 2,
+      "base_price": 6
+    },
+    {
+      "id": "stone",
+      "name": "Pedra",
+      "unit": "bloco",
+      "bulk": 3,
+      "base_price": 5
+    },
+    {
+      "id": "iron",
+      "name": "Ferro",
+      "unit": "lingote",
+      "bulk": 2,
+      "base_price": 12
+    },
+    {
+      "id": "tools",
+      "name": "Ferramentas",
+      "unit": "conjunto",
+      "bulk": 2,
+      "base_price": 40
+    },
+    {
+      "id": "weapons",
+      "name": "Armamentos",
+      "unit": "conjunto",
+      "bulk": 3,
+      "base_price": 60
+    },
+    {
+      "id": "medicine",
+      "name": "Medicamentos",
+      "unit": "dose",
+      "bulk": 1,
+      "base_price": 15
+    },
+    {
+      "id": "reagents",
+      "name": "Reagentes",
+      "unit": "frasco",
+      "bulk": 1,
+      "base_price": 20
+    },
+    {
+      "id": "crystals",
+      "name": "Cristais mágicos",
+      "unit": "cristal",
+      "bulk": 1,
+      "base_price": 80
+    },
+    {
+      "id": "coal",
+      "name": "Carvão",
+      "unit": "saco",
+      "bulk": 2,
+      "base_price": 8
+    },
+    {
+      "id": "sulfur",
+      "name": "Enxofre",
+      "unit": "saco",
+      "bulk": 1,
+      "base_price": 18
+    },
+    {
+      "id": "saltpeter",
+      "name": "Salitre",
+      "unit": "saco",
+      "bulk": 1,
+      "base_price": 18
+    },
+    {
+      "id": "steel",
+      "name": "Aço",
+      "unit": "lingote",
+      "bulk": 2,
+      "base_price": 36
+    },
+    {
+      "id": "steam_engines",
+      "name": "Motores a vapor",
+      "unit": "máquina",
+      "bulk": 15,
+      "base_price": 240
+    }
+  ],
+  "recipes": [
+    {
+      "id": "irrigated_harvest",
+      "capability_id": "food_production",
+      "occupation": "farmer",
+      "workers": 10,
+      "inputs": {},
+      "outputs": {
+        "food": 120
+      }
+    },
+    {
+      "id": "efficient_ironworking",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 10,
+      "inputs": {
+        "wood": 1
+      },
+      "outputs": {
+        "iron": 7
+      }
+    },
+    {
+      "id": "harvest",
+      "capability_id": "food_production",
+      "occupation": "farmer",
+      "workers": 10,
+      "inputs": {},
+      "outputs": {
+        "food": 100
+      }
+    },
+    {
+      "id": "logging",
+      "capability_id": "wood_production",
+      "occupation": "farmer",
+      "workers": 10,
+      "inputs": {},
+      "outputs": {
+        "wood": 20
+      }
+    },
+    {
+      "id": "ironworking",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 10,
+      "inputs": {
+        "wood": 1
+      },
+      "outputs": {
+        "iron": 5
+      }
+    },
+    {
+      "id": "toolmaking",
+      "capability_id": "craftsmanship",
+      "occupation": "artisan",
+      "workers": 10,
+      "inputs": {
+        "iron": 2,
+        "wood": 1
+      },
+      "outputs": {
+        "tools": 1
+      }
+    },
+    {
+      "id": "charcoal",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 2,
+      "inputs": {
+        "wood": 2
+      },
+      "outputs": {
+        "coal": 1
+      },
+      "required_technology_id": "metallurgy"
+    },
+    {
+      "id": "steelmaking",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 4,
+      "inputs": {
+        "iron": 3,
+        "coal": 1
+      },
+      "outputs": {
+        "steel": 2
+      },
+      "required_technology_id": "steel"
+    },
+    {
+      "id": "engine_assembly",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 6,
+      "inputs": {
+        "steel": 2,
+        "iron": 2,
+        "coal": 1,
+        "tools": 1
+      },
+      "outputs": {
+        "steam_engines": 1
+      },
+      "required_technology_id": "steam_engineering"
+    },
+    {
+      "id": "steam_ironworking",
+      "capability_id": "iron_production",
+      "occupation": "artisan",
+      "workers": 8,
+      "inputs": {
+        "wood": 1,
+        "coal": 1
+      },
+      "outputs": {
+        "iron": 12
+      },
+      "required_technology_id": "steam_engineering"
+    }
+  ],
+  "facilities": [
+    {
+      "id": "works:campos-do-lume",
+      "site_id": "campos-do-lume",
+      "stock_id": "stock:campomanso",
+      "recipe_id": "harvest",
+      "max_batches": 140,
+      "payroll_account_id": "treasury:auren",
+      "wage_per_worker": 1
+    },
+    {
+      "id": "works:bosques-de-salgueiro",
+      "site_id": "bosques-de-salgueiro",
+      "stock_id": "stock:salgueiro",
+      "recipe_id": "logging",
+      "max_batches": 80,
+      "payroll_account_id": "treasury:valedouro",
+      "wage_per_worker": 1
+    },
+    {
+      "id": "works:minas-de-ferroalto",
+      "site_id": "minas-de-ferroalto",
+      "stock_id": "stock:ferroalto",
+      "recipe_id": "ironworking",
+      "max_batches": 60,
+      "payroll_account_id": "treasury:escarlia",
+      "wage_per_worker": 1
+    },
+    {
+      "id": "works:oficinas-da-serra",
+      "site_id": "oficinas-da-serra",
+      "stock_id": "stock:oficios-da-serra",
+      "recipe_id": "toolmaking",
+      "max_batches": 30,
+      "payroll_account_id": "treasury:oficios-da-serra",
+      "wage_per_worker": 1
+    }
+  ],
+  "initial_public_goods_per_person": {
+    "food": 3
+  },
+  "initial_public_goods": {
+    "wood": 100,
+    "stone": 50,
+    "iron": 50,
+    "tools": 20
+  },
+  "initial_organization_goods": {
+    "food": 0,
+    "wood": 60,
+    "iron": 60,
+    "reagents": 20,
+    "crystals": 5
+  },
+  "public_storage_per_person": 30,
+  "organization_storage": 5000,
+  "polity_money": 20000,
+  "organization_money": 2000
+}

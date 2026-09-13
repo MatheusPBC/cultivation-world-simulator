@@ -7,7 +7,7 @@ from unittest.mock import patch
 from src.utils.config import CONFIG
 from src.sim.save.save_game import save_game, list_saves
 from src.sim.load.load_game import load_game
-from src.server.main import trigger_auto_save
+from src.server.auto_save import trigger_auto_save
 from src.sim.simulator import Simulator
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_trigger_auto_save_limit(base_world, temp_save_dir):
         
         # Trigger 6 times
         for i in range(6):
-            trigger_auto_save(base_world, sim)
+            trigger_auto_save(world=base_world, sim=sim, sects_by_id={})
         
     # Check total saves
     saves = list_saves()
@@ -110,12 +110,12 @@ def test_trigger_auto_save_does_not_delete_manual_saves_or_other_playthroughs(ba
         
         # Create auto save for other playthrough
         base_world.playthrough_id = other_uuid
-        trigger_auto_save(base_world, sim)
+        trigger_auto_save(world=base_world, sim=sim, sects_by_id={})
         
         # Now create 5 auto saves for main_uuid
         base_world.playthrough_id = main_uuid
         for i in range(5):
-            trigger_auto_save(base_world, sim)
+            trigger_auto_save(world=base_world, sim=sim, sects_by_id={})
         
     saves = list_saves()
     

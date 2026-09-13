@@ -1,0 +1,35 @@
+{
+  "catalog_version": 1,
+  "locale": "pt-BR",
+  "polities": [
+    {"id": "auren", "name": "Coroa de Auren", "capital_id": "pedraclara", "government": "crown", "interests": ["segurança das fronteiras", "legitimidade", "abastecimento"]},
+    {"id": "valedouro", "name": "Liga de Valedouro", "capital_id": "portovelho", "government": "league", "interests": ["rotas abertas", "autonomia mercantil", "prosperidade"]},
+    {"id": "escarlia", "name": "Conselho de Escárlia", "capital_id": "ferroalto", "government": "council", "interests": ["independência", "conhecimento", "acesso a alimentos"]}
+  ],
+  "settlements": [
+    {"id": "pedraclara", "region_id": 801, "name": "Pedraclara", "kind": "city", "administrator_id": "auren", "housing_capacity": 3000},
+    {"id": "portovelho", "region_id": 802, "name": "Portovelho", "kind": "city", "administrator_id": "valedouro", "housing_capacity": 2600},
+    {"id": "ferroalto", "region_id": 803, "name": "Ferroalto", "kind": "city", "administrator_id": "escarlia", "housing_capacity": 2400},
+    {"id": "campomanso", "region_id": 804, "name": "Campomanso", "kind": "village", "administrator_id": "auren", "housing_capacity": 1400},
+    {"id": "salgueiro", "region_id": 805, "name": "Salgueiro", "kind": "village", "administrator_id": "valedouro", "housing_capacity": 1300},
+    {"id": "pontenegro", "region_id": 806, "name": "Pontenegro", "kind": "village", "administrator_id": "auren", "claimant_ids": ["auren", "valedouro"], "housing_capacity": 1200},
+    {"id": "brumafria", "region_id": 807, "name": "Brumafria", "kind": "village", "administrator_id": "escarlia", "housing_capacity": 1200},
+    {"id": "cinzaverde", "region_id": 808, "name": "Cinzaverde", "kind": "village", "administrator_id": "escarlia", "housing_capacity": 1100}
+  ],
+  "population_totals": {"pedraclara": 2400, "portovelho": 2000, "ferroalto": 1800, "campomanso": 1100, "salgueiro": 1000, "pontenegro": 900, "brumafria": 900, "cinzaverde": 800},
+  "people_weights": {"human": 4, "elf": 2, "dwarf": 2, "orc": 2},
+  "organizations": [
+    {"id": "casa-alvor", "name": "Casa Alvor", "kind": "noble_house", "seat_id": "pedraclara", "interests": ["continuidade dinástica", "proteção de suas terras"]},
+    {"id": "casa-espinho", "name": "Casa Espinho", "kind": "noble_house", "seat_id": "pontenegro", "interests": ["influência política", "controle da passagem"]},
+    {"id": "liga-das-barcas", "name": "Liga das Barcas", "kind": "merchant_guild", "seat_id": "portovelho", "interests": ["navegação segura", "lucro", "redução de tarifas"]},
+    {"id": "oficios-da-serra", "name": "Companhia dos Ofícios da Serra", "kind": "merchant_guild", "seat_id": "ferroalto", "interests": ["insumos estáveis", "qualidade das ferramentas"]},
+    {"id": "torre-do-ambar", "name": "Torre do Âmbar", "kind": "arcane_tower", "seat_id": "ferroalto", "interests": ["pesquisa arcana", "autonomia", "acesso a reagentes"]},
+    {"id": "circulo-do-veu", "name": "Círculo do Véu", "kind": "arcane_tower", "seat_id": "salgueiro", "interests": ["conhecimento", "preservação das águas"]},
+    {"id": "ordem-da-aurora", "name": "Ordem da Aurora", "kind": "religious_order", "seat_id": "pedraclara", "interests": ["proteção dos vulneráveis", "prestígio", "cura"]},
+    {"id": "coro-das-cinzas", "name": "Coro das Cinzas", "kind": "cult", "seat_id": "cinzaverde", "interests": ["segredo", "poder ritual", "recrutamento"]}
+  ],
+  "first_names": ["Alda", "Beren", "Cora", "Darian", "Elira", "Fenn", "Gara", "Hadrik", "Isolde", "Joren", "Kaela", "Loran", "Mira", "Neris", "Orin"],
+  "family_names": ["Valverde", "Pedralume", "Ventoforte", "Ribeira"],
+  "motivations": ["proteger sua comunidade", "conquistar prestígio", "garantir sustento", "descobrir novos conhecimentos", "preservar seus vínculos", "aumentar sua influência"],
+  "character_count": 12
+}

@@ -1,5 +1,10 @@
 # 外接控制 API 基础重构方案
 
+> Medieval fork migration (2026-09-13): this document describes the inherited
+> xianxia design, not the current server. `src.server.main` now mounts only the
+> [medieval v2 observer API](medieval-public-api.md). Its commands cannot mutate
+> world entities directly. Legacy v1 routes and the old frontend are not served.
+
 本文档记录“外接控制 API”方向的整体设计与落地计划，目标不是零散补几个接口，而是把服务端重构成一个适合长期演进、方便外部 agent 接入、方便后续继续 vibe coding 的稳定底盘。
 
 ## 1. 背景与目标

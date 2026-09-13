@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/main.ts", "src/App.vue", "src/medieval/**/*.ts", "src/medieval/**/*.vue", "src/types/medieval-api.ts", "src/vite-env.d.ts"],
+  "exclude": ["src/medieval/__tests__"]
+}

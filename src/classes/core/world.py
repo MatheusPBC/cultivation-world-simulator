@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Optional, Any, Iterable
 import uuid
 
 from src.classes.environment.map import Map
-from src.systems.time import Year, Month, MonthStamp
+from src.systems.time import WorldClock, Year, Month, MonthStamp
+from src.systems.calendar_agenda import WorldAgenda
 from src.sim.managers.avatar_manager import AvatarManager
 from src.sim.managers.mortal_manager import MortalManager
 from src.sim.managers.deceased_manager import DeceasedManager
@@ -40,6 +41,12 @@ if TYPE_CHECKING:
 class World():
     map: Map
     month_stamp: MonthStamp
+    # Medieval simulation tasks use an absolute daily clock. The legacy month
+    # stamp remains temporarily while existing systems are migrated.
+    clock: WorldClock = field(default_factory=WorldClock)
+    # Pending situations determine when the hybrid scheduler must leave its
+    # monthly cadence and resolve a specific calendar day.
+    agenda: WorldAgenda = field(default_factory=WorldAgenda)
     avatar_manager: AvatarManager = field(default_factory=AvatarManager)
     # 凡人管理器
     mortal_manager: MortalManager = field(default_factory=MortalManager)

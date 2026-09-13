@@ -152,6 +152,13 @@ def validate() -> None:
         if preset.path is None:
             raise AssertionError(f"Preset has no path: {preset.id}")
 
+        # The authored medieval region catalog replaces the inherited CSV IDs.
+        # Historical presets still get their existing checks during migration.
+        from src.run.medieval_world import MAP_PATH
+        if preset.id == MAP_PATH.parent.name:
+            validate_medieval_preset(preset.path / "map.json")
+            continue
+
         source = read_map_source(preset.path / "map.json")
         if source.map_id != preset.id:
             raise AssertionError(f"{preset.id}: map source id mismatch: {source.map_id}")
@@ -211,6 +218,42 @@ def validate() -> None:
                 raise AssertionError(f"{preset.id}: region {region.id} center out of bounds")
 
         print(f"OK {preset.id}: {source.width}x{source.height}, regions={len(region_ids)}")
+
+
+def validate_medieval_preset(path: Path) -> None:
+    from src.run.medieval_society import create_medieval_society
+    from src.run.medieval_world import build_medieval_map
+    from src.run.map_source import collect_region_coords
+
+    source = read_map_source(path)
+    society = create_medieval_society(seed=0)
+    game_map = build_medieval_map(source, society)
+    coords = collect_region_coords(source.region_rows)
+    for region_id, cells in coords.items():
+        if _component_count(set(cells)) != 1:
+            raise AssertionError(f"{source.map_id}: disconnected region {region_id}")
+    _validate_landmarks(source.map_id, source, {rid: set(cells) for rid, cells in coords.items()})
+    reached = {next(iter(game_map.regions))}
+    while True:
+        before = set(reached)
+        for route in game_map.routes.values():
+            if game_map.get_route_operational_capacity(route.id) > 0 and reached.intersection(route.endpoint_region_ids):
+                reached.update(route.endpoint_region_ids)
+        if reached == before:
+            break
+    if reached != set(game_map.regions):
+        raise AssertionError(f"{source.map_id}: settlements disconnected from the transport network")
+    owner_registries = {
+        "polity": society.polities, "organization": society.organizations,
+        "character": society.characters,
+    }
+    for site in game_map.infrastructure_sites.values():
+        for ref in (site.owner_ref, site.maintainer_ref):
+            if ref is not None and ref.id not in owner_registries.get(ref.kind, {}):
+                raise AssertionError(f"{site.id}: unknown owner or maintainer {ref}")
+    print(f"OK {source.map_id}: {source.width}x{source.height}, regions={len(coords)}, "
+          f"routes={len(game_map.routes)}, characters={len(society.characters)}, "
+          f"population={society.total_population}")
 
 
 if __name__ == "__main__":

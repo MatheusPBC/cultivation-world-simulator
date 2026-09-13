@@ -116,6 +116,8 @@ class WorldSection:
 
         return {
             "month_stamp": int(world.month_stamp),
+            "clock_day": world.clock.absolute_day,
+            "agenda": world.agenda.to_dict(),
             "start_year": world.start_year,
             "map_snapshot": serialize_map_snapshot(world.map),
             "existed_sect_ids": [sect.id for sect in context.existed_sects],

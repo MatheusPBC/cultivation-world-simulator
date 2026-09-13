@@ -1263,3 +1263,5 @@ export type SocketMessageDTO =
   | GameReinitializedSocketMessage;
 
 export type SocketServerMessageDTO = SocketMessageDTO | PongSocketMessage;
+// Medieval responses are a separate contract, not aliases of the inherited API.
+export * as MedievalAPI from './medieval-api'

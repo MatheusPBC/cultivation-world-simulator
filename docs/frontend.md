@@ -1,5 +1,10 @@
 # 前端架构与开发指南 (Frontend Architecture Guide)
 
+> Medieval fork: this is inherited architectural documentation. The current
+> entrypoint is the [medieval observer](specs/medieval-observatory.md), which
+> preserves the typed transport/store/composable/rendering boundaries below
+> but does not load the legacy settings, socket, cultivation or sect interfaces.
+
 本文档旨在帮助开发者（及 AI 助手）快速理解 `web/` 目录下的前端架构、文件职责及核心数据流。在进行 Vibe Coding 或重构时，请参考此文档。
 
 ## 1. 技术栈概览 (Tech Stack)

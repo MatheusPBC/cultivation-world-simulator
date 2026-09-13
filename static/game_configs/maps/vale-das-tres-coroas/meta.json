@@ -1,0 +1,9 @@
+{
+  "schema_version": 6,
+  "id": "vale-das-tres-coroas",
+  "name": "Vale das Três Coroas",
+  "desc": "Um vale disputado entre uma coroa, uma liga mercantil e um conselho serrano, unidos pelo Rio Lume.",
+  "size_label": "Região disputada",
+  "version": 1,
+  "is_default": false
+}

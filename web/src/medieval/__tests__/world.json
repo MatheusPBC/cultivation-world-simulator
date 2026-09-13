@@ -1,0 +1,4621 @@
+{
+  "status": {
+    "product": "medieval-world-simulator",
+    "ready": true,
+    "paused": true,
+    "jumps_per_second": 1,
+    "day": 0,
+    "run_id": null,
+    "last_error": null
+  },
+  "world": {
+    "day": 0,
+    "calendar": {
+      "year": 1,
+      "month": 1,
+      "day": 1
+    },
+    "config": {
+      "seed": 73,
+      "character_count": 12,
+      "locale": "pt-BR",
+      "decision_policy": "routine-rules"
+    },
+    "population": 10900,
+    "living_characters": 12,
+    "settlements": 8,
+    "polities": 3,
+    "organizations": 8,
+    "events": 0,
+    "next_scheduled_day": null
+  },
+  "society": {
+    "characters": [
+      {
+        "id": "character:001",
+        "name": "Kaela Valverde",
+        "people": "human",
+        "birth_day": -8489,
+        "location_id": "brumafria",
+        "population_group_id": "pop:brumafria:human:farmer",
+        "skills": {
+          "combat": 62,
+          "command": 19,
+          "diplomacy": 29,
+          "commerce": 29,
+          "investigation": 20,
+          "craftsmanship": 27,
+          "elemental_magic": 22,
+          "protection_magic": 12,
+          "restoration_magic": 16,
+          "evocation_magic": 14
+        },
+        "personality": {
+          "ambition": 0.108,
+          "compassion": 0.428,
+          "loyalty": 0.843,
+          "caution": 0.663,
+          "curiosity": 0.973
+        },
+        "motivations": [
+          "garantir sustento",
+          "descobrir novos conhecimentos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 23
+      },
+      {
+        "id": "character:002",
+        "name": "Fenn Pedralume",
+        "people": "elf",
+        "birth_day": -16692,
+        "location_id": "campomanso",
+        "population_group_id": "pop:campomanso:elf:farmer",
+        "skills": {
+          "combat": 10,
+          "command": 74,
+          "diplomacy": 29,
+          "commerce": 20,
+          "investigation": 7,
+          "craftsmanship": 9,
+          "elemental_magic": 12,
+          "protection_magic": 8,
+          "restoration_magic": 22,
+          "evocation_magic": 14
+        },
+        "personality": {
+          "ambition": 0.712,
+          "compassion": 0.081,
+          "loyalty": 0.033,
+          "caution": 0.768,
+          "curiosity": 0.105
+        },
+        "motivations": [
+          "aumentar sua influência",
+          "garantir sustento"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 46
+      },
+      {
+        "id": "character:003",
+        "name": "Neris Valverde",
+        "people": "dwarf",
+        "birth_day": -13781,
+        "location_id": "cinzaverde",
+        "population_group_id": "pop:cinzaverde:dwarf:farmer",
+        "skills": {
+          "combat": 22,
+          "command": 19,
+          "diplomacy": 53,
+          "commerce": 7,
+          "investigation": 25,
+          "craftsmanship": 11,
+          "elemental_magic": 15,
+          "protection_magic": 6,
+          "restoration_magic": 12,
+          "evocation_magic": 8
+        },
+        "personality": {
+          "ambition": 0.872,
+          "compassion": 0.932,
+          "loyalty": 0.136,
+          "caution": 0.027,
+          "curiosity": 0.711
+        },
+        "motivations": [
+          "preservar seus vínculos",
+          "descobrir novos conhecimentos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 38
+      },
+      {
+        "id": "character:004",
+        "name": "Joren Ventoforte",
+        "people": "orc",
+        "birth_day": -22516,
+        "location_id": "ferroalto",
+        "population_group_id": "pop:ferroalto:orc:artisan",
+        "skills": {
+          "combat": 23,
+          "command": 25,
+          "diplomacy": 25,
+          "commerce": 65,
+          "investigation": 9,
+          "craftsmanship": 5,
+          "elemental_magic": 11,
+          "protection_magic": 29,
+          "restoration_magic": 9,
+          "evocation_magic": 21
+        },
+        "personality": {
+          "ambition": 0.135,
+          "compassion": 0.384,
+          "loyalty": 0.753,
+          "caution": 0.11,
+          "curiosity": 0.412
+        },
+        "motivations": [
+          "preservar seus vínculos",
+          "descobrir novos conhecimentos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 62
+      },
+      {
+        "id": "character:005",
+        "name": "Fenn Valverde",
+        "people": "human",
+        "birth_day": -11053,
+        "location_id": "pedraclara",
+        "population_group_id": "pop:pedraclara:human:artisan",
+        "skills": {
+          "combat": 13,
+          "command": 11,
+          "diplomacy": 14,
+          "commerce": 29,
+          "investigation": 74,
+          "craftsmanship": 16,
+          "elemental_magic": 9,
+          "protection_magic": 19,
+          "restoration_magic": 18,
+          "evocation_magic": 20
+        },
+        "personality": {
+          "ambition": 0.3,
+          "compassion": 0.525,
+          "loyalty": 0.715,
+          "caution": 0.27,
+          "curiosity": 0.673
+        },
+        "motivations": [
+          "proteger sua comunidade",
+          "preservar seus vínculos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 30
+      },
+      {
+        "id": "character:006",
+        "name": "Orin Ventoforte",
+        "people": "elf",
+        "birth_day": -19277,
+        "location_id": "pontenegro",
+        "population_group_id": "pop:pontenegro:elf:farmer",
+        "skills": {
+          "combat": 21,
+          "command": 20,
+          "diplomacy": 22,
+          "commerce": 30,
+          "investigation": 27,
+          "craftsmanship": 70,
+          "elemental_magic": 16,
+          "protection_magic": 21,
+          "restoration_magic": 7,
+          "evocation_magic": 25
+        },
+        "personality": {
+          "ambition": 0.699,
+          "compassion": 0.465,
+          "loyalty": 0.773,
+          "caution": 0.046,
+          "curiosity": 0.73
+        },
+        "motivations": [
+          "aumentar sua influência",
+          "proteger sua comunidade"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 53
+      },
+      {
+        "id": "character:007",
+        "name": "Alda Ribeira",
+        "people": "dwarf",
+        "birth_day": -7457,
+        "location_id": "portovelho",
+        "population_group_id": "pop:portovelho:dwarf:artisan",
+        "skills": {
+          "combat": 6,
+          "command": 16,
+          "diplomacy": 11,
+          "commerce": 30,
+          "investigation": 13,
+          "craftsmanship": 20,
+          "elemental_magic": 56,
+          "protection_magic": 29,
+          "restoration_magic": 26,
+          "evocation_magic": 15
+        },
+        "personality": {
+          "ambition": 0.443,
+          "compassion": 0.758,
+          "loyalty": 0.483,
+          "caution": 0.36,
+          "curiosity": 0.859
+        },
+        "motivations": [
+          "garantir sustento",
+          "preservar seus vínculos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 20
+      },
+      {
+        "id": "character:008",
+        "name": "Loran Ventoforte",
+        "people": "orc",
+        "birth_day": -10877,
+        "location_id": "salgueiro",
+        "population_group_id": "pop:salgueiro:orc:farmer",
+        "skills": {
+          "combat": 28,
+          "command": 8,
+          "diplomacy": 11,
+          "commerce": 27,
+          "investigation": 25,
+          "craftsmanship": 30,
+          "elemental_magic": 25,
+          "protection_magic": 75,
+          "restoration_magic": 23,
+          "evocation_magic": 29
+        },
+        "personality": {
+          "ambition": 0.598,
+          "compassion": 0.783,
+          "loyalty": 0.761,
+          "caution": 0.604,
+          "curiosity": 0.531
+        },
+        "motivations": [
+          "conquistar prestígio",
+          "proteger sua comunidade"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 30
+      },
+      {
+        "id": "character:009",
+        "name": "Isolde Pedralume",
+        "people": "human",
+        "birth_day": -14868,
+        "location_id": "campomanso",
+        "population_group_id": "pop:campomanso:human:farmer",
+        "skills": {
+          "combat": 26,
+          "command": 20,
+          "diplomacy": 7,
+          "commerce": 20,
+          "investigation": 25,
+          "craftsmanship": 16,
+          "elemental_magic": 20,
+          "protection_magic": 11,
+          "restoration_magic": 58,
+          "evocation_magic": 25
+        },
+        "personality": {
+          "ambition": 0.59,
+          "compassion": 0.254,
+          "loyalty": 0.208,
+          "caution": 0.278,
+          "curiosity": 0.699
+        },
+        "motivations": [
+          "preservar seus vínculos",
+          "descobrir novos conhecimentos"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 41
+      },
+      {
+        "id": "character:010",
+        "name": "Alda Pedralume",
+        "people": "elf",
+        "birth_day": -19791,
+        "location_id": "brumafria",
+        "population_group_id": "pop:brumafria:elf:farmer",
+        "skills": {
+          "combat": 12,
+          "command": 25,
+          "diplomacy": 17,
+          "commerce": 27,
+          "investigation": 11,
+          "craftsmanship": 28,
+          "elemental_magic": 9,
+          "protection_magic": 20,
+          "restoration_magic": 18,
+          "evocation_magic": 62
+        },
+        "personality": {
+          "ambition": 0.017,
+          "compassion": 0.244,
+          "loyalty": 0.216,
+          "caution": 0.668,
+          "curiosity": 0.321
+        },
+        "motivations": [
+          "aumentar sua influência",
+          "conquistar prestígio"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 54
+      },
+      {
+        "id": "character:011",
+        "name": "Elira Ventoforte",
+        "people": "dwarf",
+        "birth_day": -9579,
+        "location_id": "ferroalto",
+        "population_group_id": "pop:ferroalto:dwarf:artisan",
+        "skills": {
+          "combat": 71,
+          "command": 14,
+          "diplomacy": 18,
+          "commerce": 30,
+          "investigation": 10,
+          "craftsmanship": 11,
+          "elemental_magic": 27,
+          "protection_magic": 24,
+          "restoration_magic": 21,
+          "evocation_magic": 28
+        },
+        "personality": {
+          "ambition": 0.547,
+          "compassion": 0.703,
+          "loyalty": 0.324,
+          "caution": 0.411,
+          "curiosity": 0.924
+        },
+        "motivations": [
+          "conquistar prestígio",
+          "aumentar sua influência"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 26
+      },
+      {
+        "id": "character:012",
+        "name": "Orin Ribeira",
+        "people": "orc",
+        "birth_day": -7980,
+        "location_id": "cinzaverde",
+        "population_group_id": "pop:cinzaverde:orc:farmer",
+        "skills": {
+          "combat": 14,
+          "command": 60,
+          "diplomacy": 5,
+          "commerce": 11,
+          "investigation": 17,
+          "craftsmanship": 19,
+          "elemental_magic": 26,
+          "protection_magic": 24,
+          "restoration_magic": 18,
+          "evocation_magic": 19
+        },
+        "personality": {
+          "ambition": 0.531,
+          "compassion": 0.999,
+          "loyalty": 0.826,
+          "caution": 0.842,
+          "curiosity": 0.054
+        },
+        "motivations": [
+          "conquistar prestígio",
+          "garantir sustento"
+        ],
+        "titles": [],
+        "death_day": null,
+        "age_years": 22
+      }
+    ],
+    "settlements": [
+      {
+        "id": "brumafria",
+        "region_id": 807,
+        "name": "Brumafria",
+        "kind": "village",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1200,
+        "population": 900,
+        "center": [
+          20,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "campomanso",
+        "region_id": 804,
+        "name": "Campomanso",
+        "kind": "village",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1400,
+        "population": 1100,
+        "center": [
+          2,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "cinzaverde",
+        "region_id": 808,
+        "name": "Cinzaverde",
+        "kind": "village",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1100,
+        "population": 800,
+        "center": [
+          14,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "ferroalto",
+        "region_id": 803,
+        "name": "Ferroalto",
+        "kind": "city",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 2400,
+        "population": 1800,
+        "center": [
+          20,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "pedraclara",
+        "region_id": 801,
+        "name": "Pedraclara",
+        "kind": "city",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 3000,
+        "population": 2400,
+        "center": [
+          8,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "pontenegro",
+        "region_id": 806,
+        "name": "Pontenegro",
+        "kind": "village",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [
+          "auren",
+          "valedouro"
+        ],
+        "housing_capacity": 1200,
+        "population": 900,
+        "center": [
+          14,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "portovelho",
+        "region_id": 802,
+        "name": "Portovelho",
+        "kind": "city",
+        "administrator_id": "valedouro",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 2600,
+        "population": 2000,
+        "center": [
+          8,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "salgueiro",
+        "region_id": 805,
+        "name": "Salgueiro",
+        "kind": "village",
+        "administrator_id": "valedouro",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1300,
+        "population": 1000,
+        "center": [
+          2,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      }
+    ],
+    "polities": [
+      {
+        "id": "auren",
+        "name": "Coroa de Auren",
+        "capital_id": "pedraclara",
+        "government": "crown",
+        "interests": [
+          "segurança das fronteiras",
+          "legitimidade",
+          "abastecimento"
+        ]
+      },
+      {
+        "id": "escarlia",
+        "name": "Conselho de Escárlia",
+        "capital_id": "ferroalto",
+        "government": "council",
+        "interests": [
+          "independência",
+          "conhecimento",
+          "acesso a alimentos"
+        ]
+      },
+      {
+        "id": "valedouro",
+        "name": "Liga de Valedouro",
+        "capital_id": "portovelho",
+        "government": "league",
+        "interests": [
+          "rotas abertas",
+          "autonomia mercantil",
+          "prosperidade"
+        ]
+      }
+    ],
+    "organizations": [
+      {
+        "id": "casa-alvor",
+        "name": "Casa Alvor",
+        "kind": "noble_house",
+        "seat_id": "pedraclara",
+        "member_ids": [
+          "character:001",
+          "character:009"
+        ],
+        "interests": [
+          "continuidade dinástica",
+          "proteção de suas terras"
+        ]
+      },
+      {
+        "id": "casa-espinho",
+        "name": "Casa Espinho",
+        "kind": "noble_house",
+        "seat_id": "pontenegro",
+        "member_ids": [
+          "character:002",
+          "character:010"
+        ],
+        "interests": [
+          "influência política",
+          "controle da passagem"
+        ]
+      },
+      {
+        "id": "circulo-do-veu",
+        "name": "Círculo do Véu",
+        "kind": "arcane_tower",
+        "seat_id": "salgueiro",
+        "member_ids": [
+          "character:006"
+        ],
+        "interests": [
+          "conhecimento",
+          "preservação das águas"
+        ]
+      },
+      {
+        "id": "coro-das-cinzas",
+        "name": "Coro das Cinzas",
+        "kind": "cult",
+        "seat_id": "cinzaverde",
+        "member_ids": [
+          "character:008"
+        ],
+        "interests": [
+          "segredo",
+          "poder ritual",
+          "recrutamento"
+        ]
+      },
+      {
+        "id": "liga-das-barcas",
+        "name": "Liga das Barcas",
+        "kind": "merchant_guild",
+        "seat_id": "portovelho",
+        "member_ids": [
+          "character:003",
+          "character:011"
+        ],
+        "interests": [
+          "navegação segura",
+          "lucro",
+          "redução de tarifas"
+        ]
+      },
+      {
+        "id": "oficios-da-serra",
+        "name": "Companhia dos Ofícios da Serra",
+        "kind": "merchant_guild",
+        "seat_id": "ferroalto",
+        "member_ids": [
+          "character:004",
+          "character:012"
+        ],
+        "interests": [
+          "insumos estáveis",
+          "qualidade das ferramentas"
+        ]
+      },
+      {
+        "id": "ordem-da-aurora",
+        "name": "Ordem da Aurora",
+        "kind": "religious_order",
+        "seat_id": "pedraclara",
+        "member_ids": [
+          "character:007"
+        ],
+        "interests": [
+          "proteção dos vulneráveis",
+          "prestígio",
+          "cura"
+        ]
+      },
+      {
+        "id": "torre-do-ambar",
+        "name": "Torre do Âmbar",
+        "kind": "arcane_tower",
+        "seat_id": "ferroalto",
+        "member_ids": [
+          "character:005"
+        ],
+        "interests": [
+          "pesquisa arcana",
+          "autonomia",
+          "acesso a reagentes"
+        ]
+      }
+    ],
+    "population_groups": [
+      {
+        "id": "pop:brumafria:dwarf:farmer",
+        "settlement_id": "brumafria",
+        "people": "dwarf",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:brumafria:elf:farmer",
+        "settlement_id": "brumafria",
+        "people": "elf",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:brumafria:human:farmer",
+        "settlement_id": "brumafria",
+        "people": "human",
+        "occupation": "farmer",
+        "count": 360
+      },
+      {
+        "id": "pop:brumafria:orc:farmer",
+        "settlement_id": "brumafria",
+        "people": "orc",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:campomanso:dwarf:farmer",
+        "settlement_id": "campomanso",
+        "people": "dwarf",
+        "occupation": "farmer",
+        "count": 220
+      },
+      {
+        "id": "pop:campomanso:elf:farmer",
+        "settlement_id": "campomanso",
+        "people": "elf",
+        "occupation": "farmer",
+        "count": 220
+      },
+      {
+        "id": "pop:campomanso:human:farmer",
+        "settlement_id": "campomanso",
+        "people": "human",
+        "occupation": "farmer",
+        "count": 440
+      },
+      {
+        "id": "pop:campomanso:orc:farmer",
+        "settlement_id": "campomanso",
+        "people": "orc",
+        "occupation": "farmer",
+        "count": 220
+      },
+      {
+        "id": "pop:cinzaverde:dwarf:farmer",
+        "settlement_id": "cinzaverde",
+        "people": "dwarf",
+        "occupation": "farmer",
+        "count": 160
+      },
+      {
+        "id": "pop:cinzaverde:elf:farmer",
+        "settlement_id": "cinzaverde",
+        "people": "elf",
+        "occupation": "farmer",
+        "count": 160
+      },
+      {
+        "id": "pop:cinzaverde:human:farmer",
+        "settlement_id": "cinzaverde",
+        "people": "human",
+        "occupation": "farmer",
+        "count": 320
+      },
+      {
+        "id": "pop:cinzaverde:orc:farmer",
+        "settlement_id": "cinzaverde",
+        "people": "orc",
+        "occupation": "farmer",
+        "count": 160
+      },
+      {
+        "id": "pop:ferroalto:dwarf:artisan",
+        "settlement_id": "ferroalto",
+        "people": "dwarf",
+        "occupation": "artisan",
+        "count": 360
+      },
+      {
+        "id": "pop:ferroalto:elf:artisan",
+        "settlement_id": "ferroalto",
+        "people": "elf",
+        "occupation": "artisan",
+        "count": 360
+      },
+      {
+        "id": "pop:ferroalto:human:artisan",
+        "settlement_id": "ferroalto",
+        "people": "human",
+        "occupation": "artisan",
+        "count": 720
+      },
+      {
+        "id": "pop:ferroalto:orc:artisan",
+        "settlement_id": "ferroalto",
+        "people": "orc",
+        "occupation": "artisan",
+        "count": 360
+      },
+      {
+        "id": "pop:pedraclara:dwarf:artisan",
+        "settlement_id": "pedraclara",
+        "people": "dwarf",
+        "occupation": "artisan",
+        "count": 480
+      },
+      {
+        "id": "pop:pedraclara:elf:artisan",
+        "settlement_id": "pedraclara",
+        "people": "elf",
+        "occupation": "artisan",
+        "count": 480
+      },
+      {
+        "id": "pop:pedraclara:human:artisan",
+        "settlement_id": "pedraclara",
+        "people": "human",
+        "occupation": "artisan",
+        "count": 960
+      },
+      {
+        "id": "pop:pedraclara:orc:artisan",
+        "settlement_id": "pedraclara",
+        "people": "orc",
+        "occupation": "artisan",
+        "count": 480
+      },
+      {
+        "id": "pop:pontenegro:dwarf:farmer",
+        "settlement_id": "pontenegro",
+        "people": "dwarf",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:pontenegro:elf:farmer",
+        "settlement_id": "pontenegro",
+        "people": "elf",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:pontenegro:human:farmer",
+        "settlement_id": "pontenegro",
+        "people": "human",
+        "occupation": "farmer",
+        "count": 360
+      },
+      {
+        "id": "pop:pontenegro:orc:farmer",
+        "settlement_id": "pontenegro",
+        "people": "orc",
+        "occupation": "farmer",
+        "count": 180
+      },
+      {
+        "id": "pop:portovelho:dwarf:artisan",
+        "settlement_id": "portovelho",
+        "people": "dwarf",
+        "occupation": "artisan",
+        "count": 400
+      },
+      {
+        "id": "pop:portovelho:elf:artisan",
+        "settlement_id": "portovelho",
+        "people": "elf",
+        "occupation": "artisan",
+        "count": 400
+      },
+      {
+        "id": "pop:portovelho:human:artisan",
+        "settlement_id": "portovelho",
+        "people": "human",
+        "occupation": "artisan",
+        "count": 800
+      },
+      {
+        "id": "pop:portovelho:orc:artisan",
+        "settlement_id": "portovelho",
+        "people": "orc",
+        "occupation": "artisan",
+        "count": 400
+      },
+      {
+        "id": "pop:salgueiro:dwarf:farmer",
+        "settlement_id": "salgueiro",
+        "people": "dwarf",
+        "occupation": "farmer",
+        "count": 200
+      },
+      {
+        "id": "pop:salgueiro:elf:farmer",
+        "settlement_id": "salgueiro",
+        "people": "elf",
+        "occupation": "farmer",
+        "count": 200
+      },
+      {
+        "id": "pop:salgueiro:human:farmer",
+        "settlement_id": "salgueiro",
+        "people": "human",
+        "occupation": "farmer",
+        "count": 400
+      },
+      {
+        "id": "pop:salgueiro:orc:farmer",
+        "settlement_id": "salgueiro",
+        "people": "orc",
+        "occupation": "farmer",
+        "count": 200
+      }
+    ],
+    "activities": []
+  },
+  "economy": {
+    "expansion_blueprints": [
+      {
+        "id": "charcoal-kilns",
+        "name": "Fornos de carvão",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 6,
+        "monthly_units": 3,
+        "capacity_gain": 0,
+        "required_technology_id": "metallurgy",
+        "from_recipe_id": null,
+        "to_recipe_id": null,
+        "additional_recipe_id": "charcoal",
+        "new_capacity": 10
+      },
+      {
+        "id": "efficient-furnaces",
+        "name": "Adaptação dos fornos",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 10,
+        "monthly_units": 5,
+        "capacity_gain": 0,
+        "required_technology_id": "metallurgy",
+        "from_recipe_id": "ironworking",
+        "to_recipe_id": "efficient_ironworking",
+        "additional_recipe_id": null,
+        "new_capacity": null
+      },
+      {
+        "id": "engine-workshop",
+        "name": "Oficina de motores",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 6,
+        "monthly_units": 3,
+        "capacity_gain": 0,
+        "required_technology_id": "steam_engineering",
+        "from_recipe_id": null,
+        "to_recipe_id": null,
+        "additional_recipe_id": "engine_assembly",
+        "new_capacity": 10
+      },
+      {
+        "id": "irrigation-works",
+        "name": "Canais de irrigação",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 10,
+        "monthly_units": 5,
+        "capacity_gain": 0,
+        "required_technology_id": "irrigation",
+        "from_recipe_id": "harvest",
+        "to_recipe_id": "irrigated_harvest",
+        "additional_recipe_id": null,
+        "new_capacity": null
+      },
+      {
+        "id": "steam-pumps",
+        "name": "Bombeamento mecanizado",
+        "inputs": {
+          "wood": 2,
+          "tools": 1,
+          "steam_engines": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 6,
+        "monthly_units": 3,
+        "capacity_gain": 0,
+        "required_technology_id": "steam_engineering",
+        "from_recipe_id": "efficient_ironworking",
+        "to_recipe_id": "steam_ironworking",
+        "additional_recipe_id": null,
+        "new_capacity": null
+      },
+      {
+        "id": "steel-furnaces",
+        "name": "Aciaria",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 6,
+        "monthly_units": 3,
+        "capacity_gain": 0,
+        "required_technology_id": "steel",
+        "from_recipe_id": null,
+        "to_recipe_id": null,
+        "additional_recipe_id": "steelmaking",
+        "new_capacity": 10
+      },
+      {
+        "id": "workshop-extension",
+        "name": "Ampliação das instalações",
+        "inputs": {
+          "wood": 2,
+          "tools": 1
+        },
+        "workers_per_unit": 2,
+        "wage_per_worker": 2,
+        "required_units": 10,
+        "monthly_units": 5,
+        "capacity_gain": 10,
+        "required_technology_id": null,
+        "from_recipe_id": null,
+        "to_recipe_id": null,
+        "additional_recipe_id": null,
+        "new_capacity": null
+      }
+    ],
+    "expansions": [],
+    "resources": [
+      {
+        "id": "coal",
+        "name": "Carvão",
+        "unit": "saco",
+        "bulk": 2,
+        "base_price": 8
+      },
+      {
+        "id": "crystals",
+        "name": "Cristais mágicos",
+        "unit": "cristal",
+        "bulk": 1,
+        "base_price": 80
+      },
+      {
+        "id": "food",
+        "name": "Alimentos",
+        "unit": "ração pessoa/mês",
+        "bulk": 1,
+        "base_price": 4
+      },
+      {
+        "id": "iron",
+        "name": "Ferro",
+        "unit": "lingote",
+        "bulk": 2,
+        "base_price": 12
+      },
+      {
+        "id": "medicine",
+        "name": "Medicamentos",
+        "unit": "dose",
+        "bulk": 1,
+        "base_price": 15
+      },
+      {
+        "id": "reagents",
+        "name": "Reagentes",
+        "unit": "frasco",
+        "bulk": 1,
+        "base_price": 20
+      },
+      {
+        "id": "saltpeter",
+        "name": "Salitre",
+        "unit": "saco",
+        "bulk": 1,
+        "base_price": 18
+      },
+      {
+        "id": "steam_engines",
+        "name": "Motores a vapor",
+        "unit": "máquina",
+        "bulk": 15,
+        "base_price": 240
+      },
+      {
+        "id": "steel",
+        "name": "Aço",
+        "unit": "lingote",
+        "bulk": 2,
+        "base_price": 36
+      },
+      {
+        "id": "stone",
+        "name": "Pedra",
+        "unit": "bloco",
+        "bulk": 3,
+        "base_price": 5
+      },
+      {
+        "id": "sulfur",
+        "name": "Enxofre",
+        "unit": "saco",
+        "bulk": 1,
+        "base_price": 18
+      },
+      {
+        "id": "tools",
+        "name": "Ferramentas",
+        "unit": "conjunto",
+        "bulk": 2,
+        "base_price": 40
+      },
+      {
+        "id": "weapons",
+        "name": "Armamentos",
+        "unit": "conjunto",
+        "bulk": 3,
+        "base_price": 60
+      },
+      {
+        "id": "wood",
+        "name": "Madeira",
+        "unit": "feixe",
+        "bulk": 2,
+        "base_price": 6
+      }
+    ],
+    "recipes": [
+      {
+        "id": "charcoal",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 2,
+        "inputs": {
+          "wood": 2
+        },
+        "outputs": {
+          "coal": 1
+        },
+        "required_technology_id": "metallurgy"
+      },
+      {
+        "id": "efficient_ironworking",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 10,
+        "inputs": {
+          "wood": 1
+        },
+        "outputs": {
+          "iron": 7
+        },
+        "required_technology_id": null
+      },
+      {
+        "id": "engine_assembly",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 6,
+        "inputs": {
+          "steel": 2,
+          "iron": 2,
+          "coal": 1,
+          "tools": 1
+        },
+        "outputs": {
+          "steam_engines": 1
+        },
+        "required_technology_id": "steam_engineering"
+      },
+      {
+        "id": "harvest",
+        "capability_id": "food_production",
+        "occupation": "farmer",
+        "workers": 10,
+        "inputs": {},
+        "outputs": {
+          "food": 100
+        },
+        "required_technology_id": null
+      },
+      {
+        "id": "ironworking",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 10,
+        "inputs": {
+          "wood": 1
+        },
+        "outputs": {
+          "iron": 5
+        },
+        "required_technology_id": null
+      },
+      {
+        "id": "irrigated_harvest",
+        "capability_id": "food_production",
+        "occupation": "farmer",
+        "workers": 10,
+        "inputs": {},
+        "outputs": {
+          "food": 120
+        },
+        "required_technology_id": null
+      },
+      {
+        "id": "logging",
+        "capability_id": "wood_production",
+        "occupation": "farmer",
+        "workers": 10,
+        "inputs": {},
+        "outputs": {
+          "wood": 20
+        },
+        "required_technology_id": null
+      },
+      {
+        "id": "steam_ironworking",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 8,
+        "inputs": {
+          "wood": 1,
+          "coal": 1
+        },
+        "outputs": {
+          "iron": 12
+        },
+        "required_technology_id": "steam_engineering"
+      },
+      {
+        "id": "steelmaking",
+        "capability_id": "iron_production",
+        "occupation": "artisan",
+        "workers": 4,
+        "inputs": {
+          "iron": 3,
+          "coal": 1
+        },
+        "outputs": {
+          "steel": 2
+        },
+        "required_technology_id": "steel"
+      },
+      {
+        "id": "toolmaking",
+        "capability_id": "craftsmanship",
+        "occupation": "artisan",
+        "workers": 10,
+        "inputs": {
+          "iron": 2,
+          "wood": 1
+        },
+        "outputs": {
+          "tools": 1
+        },
+        "required_technology_id": null
+      }
+    ],
+    "stocks": [
+      {
+        "id": "stock:brumafria",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "location_id": "brumafria",
+        "capacity": 27000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 2700
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:campomanso",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "location_id": "campomanso",
+        "capacity": 33000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 3300
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:casa-alvor",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "casa-alvor"
+        },
+        "location_id": "pedraclara",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:casa-espinho",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "casa-espinho"
+        },
+        "location_id": "pontenegro",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:cinzaverde",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "location_id": "cinzaverde",
+        "capacity": 24000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 2400
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:circulo-do-veu",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "circulo-do-veu"
+        },
+        "location_id": "salgueiro",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:coro-das-cinzas",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "coro-das-cinzas"
+        },
+        "location_id": "cinzaverde",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:ferroalto",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "location_id": "ferroalto",
+        "capacity": 54000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 5400
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:liga-das-barcas",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "location_id": "portovelho",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:oficios-da-serra",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "location_id": "ferroalto",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:ordem-da-aurora",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "location_id": "pedraclara",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:pedraclara",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "location_id": "pedraclara",
+        "capacity": 72000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 7200
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:pontenegro",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "location_id": "pontenegro",
+        "capacity": 27000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 2700
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:portovelho",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "location_id": "portovelho",
+        "capacity": 60000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 6000
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:salgueiro",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "location_id": "salgueiro",
+        "capacity": 30000,
+        "goods": {
+          "wood": 100,
+          "stone": 50,
+          "iron": 50,
+          "tools": 20,
+          "food": 3000
+        },
+        "last_event_ids": {}
+      },
+      {
+        "id": "stock:torre-do-ambar",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "location_id": "ferroalto",
+        "capacity": 5000,
+        "goods": {
+          "food": 0,
+          "wood": 60,
+          "iron": 60,
+          "reagents": 20,
+          "crystals": 5
+        },
+        "last_event_ids": {}
+      }
+    ],
+    "accounts": [
+      {
+        "id": "household:pop:brumafria:dwarf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:brumafria:dwarf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:brumafria:elf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:brumafria:elf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:brumafria:human:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:brumafria:human:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:brumafria:orc:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:brumafria:orc:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:campomanso:dwarf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:campomanso:dwarf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:campomanso:elf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:campomanso:elf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:campomanso:human:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:campomanso:human:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:campomanso:orc:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:campomanso:orc:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:cinzaverde:dwarf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:cinzaverde:dwarf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:cinzaverde:elf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:cinzaverde:elf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:cinzaverde:human:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:cinzaverde:human:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:cinzaverde:orc:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:cinzaverde:orc:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:ferroalto:dwarf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:ferroalto:dwarf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:ferroalto:elf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:ferroalto:elf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:ferroalto:human:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:ferroalto:human:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:ferroalto:orc:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:ferroalto:orc:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pedraclara:dwarf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pedraclara:dwarf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pedraclara:elf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pedraclara:elf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pedraclara:human:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pedraclara:human:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pedraclara:orc:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pedraclara:orc:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pontenegro:dwarf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pontenegro:dwarf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pontenegro:elf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pontenegro:elf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pontenegro:human:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pontenegro:human:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:pontenegro:orc:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:pontenegro:orc:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:portovelho:dwarf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:portovelho:dwarf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:portovelho:elf:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:portovelho:elf:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:portovelho:human:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:portovelho:human:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:portovelho:orc:artisan",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:portovelho:orc:artisan"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:salgueiro:dwarf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:salgueiro:dwarf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:salgueiro:elf:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:salgueiro:elf:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:salgueiro:human:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:salgueiro:human:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "household:pop:salgueiro:orc:farmer",
+        "owner_ref": {
+          "kind": "population_group",
+          "id": "pop:salgueiro:orc:farmer"
+        },
+        "balance": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:auren",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "balance": 20000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:casa-alvor",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "casa-alvor"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:casa-espinho",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "casa-espinho"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:circulo-do-veu",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "circulo-do-veu"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:coro-das-cinzas",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "coro-das-cinzas"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:escarlia",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "balance": 20000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:liga-das-barcas",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:oficios-da-serra",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:ordem-da-aurora",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:torre-do-ambar",
+        "owner_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "balance": 2000,
+        "last_event_id": null
+      },
+      {
+        "id": "treasury:valedouro",
+        "owner_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "balance": 20000,
+        "last_event_id": null
+      }
+    ],
+    "facilities": [
+      {
+        "id": "works:bosques-de-salgueiro",
+        "site_id": "bosques-de-salgueiro",
+        "stock_id": "stock:salgueiro",
+        "recipe_id": "logging",
+        "max_batches": 80,
+        "payroll_account_id": "treasury:valedouro",
+        "wage_per_worker": 1,
+        "last_batches": 0,
+        "last_limitations": [],
+        "last_event_id": null
+      },
+      {
+        "id": "works:campos-do-lume",
+        "site_id": "campos-do-lume",
+        "stock_id": "stock:campomanso",
+        "recipe_id": "harvest",
+        "max_batches": 140,
+        "payroll_account_id": "treasury:auren",
+        "wage_per_worker": 1,
+        "last_batches": 0,
+        "last_limitations": [],
+        "last_event_id": null
+      },
+      {
+        "id": "works:minas-de-ferroalto",
+        "site_id": "minas-de-ferroalto",
+        "stock_id": "stock:ferroalto",
+        "recipe_id": "ironworking",
+        "max_batches": 60,
+        "payroll_account_id": "treasury:escarlia",
+        "wage_per_worker": 1,
+        "last_batches": 0,
+        "last_limitations": [],
+        "last_event_id": null
+      },
+      {
+        "id": "works:oficinas-da-serra",
+        "site_id": "oficinas-da-serra",
+        "stock_id": "stock:oficios-da-serra",
+        "recipe_id": "toolmaking",
+        "max_batches": 30,
+        "payroll_account_id": "treasury:oficios-da-serra",
+        "wage_per_worker": 1,
+        "last_batches": 0,
+        "last_limitations": [],
+        "last_event_id": null
+      }
+    ],
+    "payrolls": [],
+    "needs": [
+      {
+        "id": "brumafria",
+        "stock_id": "stock:brumafria",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "campomanso",
+        "stock_id": "stock:campomanso",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "cinzaverde",
+        "stock_id": "stock:cinzaverde",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "ferroalto",
+        "stock_id": "stock:ferroalto",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "pedraclara",
+        "stock_id": "stock:pedraclara",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "pontenegro",
+        "stock_id": "stock:pontenegro",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "portovelho",
+        "stock_id": "stock:portovelho",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "salgueiro",
+        "stock_id": "stock:salgueiro",
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0,
+        "last_event_id": null
+      }
+    ],
+    "markets": [
+      {
+        "id": "brumafria",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "campomanso",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "cinzaverde",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "ferroalto",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "pedraclara",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "pontenegro",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "portovelho",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      },
+      {
+        "id": "salgueiro",
+        "prices": {
+          "food": 4,
+          "wood": 6,
+          "stone": 5,
+          "iron": 12,
+          "tools": 40,
+          "weapons": 60,
+          "medicine": 15,
+          "reagents": 20,
+          "crystals": 80,
+          "coal": 8,
+          "sulfur": 18,
+          "saltpeter": 18,
+          "steel": 36,
+          "steam_engines": 240
+        },
+        "updated_day": 0,
+        "last_event_id": null
+      }
+    ],
+    "pending_orders": [],
+    "completed_order_count": 0,
+    "parcels": [],
+    "route_flows": []
+  },
+  "map": {
+    "map_id": "vale-das-tres-coroas",
+    "name": "Vale das Três Coroas",
+    "width": 24,
+    "height": 16,
+    "region_rows": [
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        804,
+        804,
+        804,
+        804,
+        804,
+        804,
+        801,
+        801,
+        801,
+        801,
+        801,
+        801,
+        806,
+        806,
+        806,
+        806,
+        806,
+        806,
+        803,
+        803,
+        803,
+        803,
+        803,
+        803
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ],
+      [
+        805,
+        805,
+        805,
+        805,
+        805,
+        805,
+        802,
+        802,
+        802,
+        802,
+        802,
+        802,
+        808,
+        808,
+        808,
+        808,
+        808,
+        808,
+        807,
+        807,
+        807,
+        807,
+        807,
+        807
+      ]
+    ],
+    "geography": {
+      "width": 24,
+      "height": 16,
+      "terrain_rows": [
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "mountain",
+          "mountain",
+          "mountain",
+          "mountain"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ],
+        [
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "forest",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "water",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "plain",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland",
+          "grassland"
+        ]
+      ],
+      "elevation_rows": [
+        [
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          180,
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          230,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          172,
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          223,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          164,
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          216,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          156,
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          209,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          148,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          202,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          140,
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          195,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          132,
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          188,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          124,
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          181,
+          450,
+          490,
+          530,
+          1250,
+          1410,
+          1570,
+          1730
+        ],
+        [
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          116,
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          174,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          108,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          167,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          100,
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          160,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          92,
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          153,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          84,
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          146,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          76,
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          139,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          68,
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          132,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ],
+        [
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          60,
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          125,
+          450,
+          490,
+          530,
+          570,
+          610,
+          650,
+          690
+        ]
+      ],
+      "water_bodies": [
+        {
+          "id": "rio-lume",
+          "kind": "river",
+          "cell_refs": [
+            [
+              9,
+              0
+            ],
+            [
+              9,
+              1
+            ],
+            [
+              9,
+              2
+            ],
+            [
+              9,
+              3
+            ],
+            [
+              9,
+              4
+            ],
+            [
+              9,
+              5
+            ],
+            [
+              9,
+              6
+            ],
+            [
+              9,
+              7
+            ],
+            [
+              9,
+              8
+            ],
+            [
+              9,
+              9
+            ],
+            [
+              9,
+              10
+            ],
+            [
+              9,
+              11
+            ],
+            [
+              9,
+              12
+            ],
+            [
+              9,
+              13
+            ],
+            [
+              9,
+              14
+            ],
+            [
+              9,
+              15
+            ]
+          ],
+          "navigable": true,
+          "region_id": null,
+          "flow_direction": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    "settlements": [
+      {
+        "id": "brumafria",
+        "region_id": 807,
+        "name": "Brumafria",
+        "kind": "village",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1200,
+        "population": 900,
+        "center": [
+          20,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "campomanso",
+        "region_id": 804,
+        "name": "Campomanso",
+        "kind": "village",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1400,
+        "population": 1100,
+        "center": [
+          2,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "cinzaverde",
+        "region_id": 808,
+        "name": "Cinzaverde",
+        "kind": "village",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1100,
+        "population": 800,
+        "center": [
+          14,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "ferroalto",
+        "region_id": 803,
+        "name": "Ferroalto",
+        "kind": "city",
+        "administrator_id": "escarlia",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 2400,
+        "population": 1800,
+        "center": [
+          20,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "pedraclara",
+        "region_id": 801,
+        "name": "Pedraclara",
+        "kind": "city",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 3000,
+        "population": 2400,
+        "center": [
+          8,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "pontenegro",
+        "region_id": 806,
+        "name": "Pontenegro",
+        "kind": "village",
+        "administrator_id": "auren",
+        "occupier_id": null,
+        "claimant_ids": [
+          "auren",
+          "valedouro"
+        ],
+        "housing_capacity": 1200,
+        "population": 900,
+        "center": [
+          14,
+          3
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "portovelho",
+        "region_id": 802,
+        "name": "Portovelho",
+        "kind": "city",
+        "administrator_id": "valedouro",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 2600,
+        "population": 2000,
+        "center": [
+          8,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      },
+      {
+        "id": "salgueiro",
+        "region_id": 805,
+        "name": "Salgueiro",
+        "kind": "village",
+        "administrator_id": "valedouro",
+        "occupier_id": null,
+        "claimant_ids": [],
+        "housing_capacity": 1300,
+        "population": 1000,
+        "center": [
+          2,
+          11
+        ],
+        "health": 1000,
+        "unrest": 0,
+        "missing_food": 0
+      }
+    ],
+    "routes": [
+      {
+        "route": {
+          "id": "river-pedraclara-portovelho",
+          "endpoint_region_ids": [
+            801,
+            802
+          ],
+          "mode": "river",
+          "capacity": 360,
+          "quality": 0.9,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 324
+      },
+      {
+        "route": {
+          "id": "road-brumafria-ferroalto",
+          "endpoint_region_ids": [
+            807,
+            803
+          ],
+          "mode": "road",
+          "capacity": 100,
+          "quality": 0.7,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 70
+      },
+      {
+        "route": {
+          "id": "road-campomanso-pedraclara",
+          "endpoint_region_ids": [
+            804,
+            801
+          ],
+          "mode": "road",
+          "capacity": 180,
+          "quality": 0.9,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 162
+      },
+      {
+        "route": {
+          "id": "road-cinzaverde-brumafria",
+          "endpoint_region_ids": [
+            808,
+            807
+          ],
+          "mode": "road",
+          "capacity": 60,
+          "quality": 0.6,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 36
+      },
+      {
+        "route": {
+          "id": "road-pedraclara-pontenegro",
+          "endpoint_region_ids": [
+            801,
+            806
+          ],
+          "mode": "road",
+          "capacity": 120,
+          "quality": 0.8,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 96
+      },
+      {
+        "route": {
+          "id": "road-pontenegro-ferroalto",
+          "endpoint_region_ids": [
+            806,
+            803
+          ],
+          "mode": "road",
+          "capacity": 80,
+          "quality": 0.7,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 56
+      },
+      {
+        "route": {
+          "id": "road-portovelho-cinzaverde",
+          "endpoint_region_ids": [
+            802,
+            808
+          ],
+          "mode": "road",
+          "capacity": 100,
+          "quality": 0.7,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 70
+      },
+      {
+        "route": {
+          "id": "road-portovelho-salgueiro",
+          "endpoint_region_ids": [
+            802,
+            805
+          ],
+          "mode": "road",
+          "capacity": 160,
+          "quality": 0.8,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 128
+      },
+      {
+        "route": {
+          "id": "road-salgueiro-campomanso",
+          "endpoint_region_ids": [
+            805,
+            804
+          ],
+          "mode": "road",
+          "capacity": 90,
+          "quality": 0.6,
+          "enabled": true,
+          "allowed_resource_ids": []
+        },
+        "operational_capacity": 54
+      }
+    ],
+    "sites": [
+      {
+        "id": "bosques-de-salgueiro",
+        "kind": "forestry",
+        "name": "Bosques de Salgueiro",
+        "cell_refs": [
+          [
+            2,
+            12
+          ]
+        ],
+        "region_ids": [
+          805
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "wood_production"
+        ],
+        "owner_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "maintainer_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "campos-do-lume",
+        "kind": "farm",
+        "name": "Campos do Lume",
+        "cell_refs": [
+          [
+            3,
+            3
+          ]
+        ],
+        "region_ids": [
+          804
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "food_production"
+        ],
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "maintainer_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "docas-de-portovelho",
+        "kind": "port",
+        "name": "Docas de Portovelho",
+        "cell_refs": [
+          [
+            10,
+            10
+          ]
+        ],
+        "region_ids": [
+          802,
+          801
+        ],
+        "route_ids": [
+          "river-pedraclara-portovelho"
+        ],
+        "water_body_ids": [
+          "rio-lume"
+        ],
+        "capability_ids": [
+          "transport"
+        ],
+        "owner_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "maintainer_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "hospicio-da-aurora",
+        "kind": "hospital",
+        "name": "Casa de Cura da Aurora",
+        "cell_refs": [
+          [
+            7,
+            4
+          ]
+        ],
+        "region_ids": [
+          801
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "restoration"
+        ],
+        "owner_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "maintainer_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "minas-de-ferroalto",
+        "kind": "mine",
+        "name": "Minas de Ferroalto",
+        "cell_refs": [
+          [
+            21,
+            3
+          ]
+        ],
+        "region_ids": [
+          803
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "iron_production"
+        ],
+        "owner_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "maintainer_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "oficinas-da-serra",
+        "kind": "workshop",
+        "name": "Oficinas da Serra",
+        "cell_refs": [
+          [
+            19,
+            6
+          ]
+        ],
+        "region_ids": [
+          803
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "craftsmanship"
+        ],
+        "owner_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "maintainer_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "passagem-negra",
+        "kind": "mountain_pass",
+        "name": "Passagem Negra",
+        "cell_refs": [
+          [
+            17,
+            3
+          ]
+        ],
+        "region_ids": [
+          806,
+          803
+        ],
+        "route_ids": [
+          "road-pontenegro-ferroalto"
+        ],
+        "water_body_ids": [],
+        "capability_ids": [
+          "transport"
+        ],
+        "owner_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "maintainer_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      },
+      {
+        "id": "torre-do-ambar",
+        "kind": "arcane_tower",
+        "name": "Torre do Âmbar",
+        "cell_refs": [
+          [
+            19,
+            5
+          ]
+        ],
+        "region_ids": [
+          803
+        ],
+        "route_ids": [],
+        "water_body_ids": [],
+        "capability_ids": [
+          "arcane_research"
+        ],
+        "owner_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "maintainer_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "integrity": 1,
+        "enabled": true,
+        "last_event_id": null
+      }
+    ]
+  },
+  "governance": {
+    "offices": [
+      {
+        "id": "office:organization:casa-alvor",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "casa-alvor"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "casa-alvor"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:casa-espinho",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "casa-espinho"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "casa-espinho"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:circulo-do-veu",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "circulo-do-veu"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "circulo-do-veu"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:coro-das-cinzas",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "coro-das-cinzas"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "coro-das-cinzas"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:liga-das-barcas",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "liga-das-barcas"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:oficios-da-serra",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:ordem-da-aurora",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "ordem-da-aurora"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:organization:torre-do-ambar",
+        "institution_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "holder_ref": {
+          "kind": "organization",
+          "id": "torre-do-ambar"
+        },
+        "scopes": [
+          "trade",
+          "supply"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:polity:auren",
+        "institution_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "holder_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "scopes": [
+          "trade",
+          "supply",
+          "taxation"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:polity:escarlia",
+        "institution_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "holder_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "scopes": [
+          "trade",
+          "supply",
+          "taxation"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      },
+      {
+        "id": "office:polity:valedouro",
+        "institution_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "holder_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "scopes": [
+          "trade",
+          "supply",
+          "taxation"
+        ],
+        "starts_day": 0,
+        "ends_day": null
+      }
+    ],
+    "tax_policies": [
+      {
+        "id": "auren",
+        "account_id": "treasury:auren",
+        "income_rate": 100,
+        "last_event_id": null
+      },
+      {
+        "id": "escarlia",
+        "account_id": "treasury:escarlia",
+        "income_rate": 100,
+        "last_event_id": null
+      },
+      {
+        "id": "valedouro",
+        "account_id": "treasury:valedouro",
+        "income_rate": 100,
+        "last_event_id": null
+      }
+    ],
+    "reports": [],
+    "objectives": [
+      {
+        "id": "inputs:stock:ferroalto:wood",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "settlement_id": "ferroalto",
+        "stock_id": "stock:ferroalto",
+        "resource_id": "wood",
+        "kind": "maintain_production_inputs",
+        "reserve_months": 2,
+        "motivation": "Manter insumos para o trabalho produtivo.",
+        "target_quantity": 120
+      },
+      {
+        "id": "inputs:stock:oficios-da-serra:iron",
+        "actor_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "settlement_id": "ferroalto",
+        "stock_id": "stock:oficios-da-serra",
+        "resource_id": "iron",
+        "kind": "maintain_production_inputs",
+        "reserve_months": 2,
+        "motivation": "Manter insumos para o trabalho produtivo.",
+        "target_quantity": 120
+      },
+      {
+        "id": "inputs:stock:oficios-da-serra:wood",
+        "actor_ref": {
+          "kind": "organization",
+          "id": "oficios-da-serra"
+        },
+        "settlement_id": "ferroalto",
+        "stock_id": "stock:oficios-da-serra",
+        "resource_id": "wood",
+        "kind": "maintain_production_inputs",
+        "reserve_months": 2,
+        "motivation": "Manter insumos para o trabalho produtivo.",
+        "target_quantity": 60
+      },
+      {
+        "id": "supply:brumafria",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "settlement_id": "brumafria",
+        "stock_id": "stock:brumafria",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 1800
+      },
+      {
+        "id": "supply:campomanso",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "settlement_id": "campomanso",
+        "stock_id": "stock:campomanso",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 2200
+      },
+      {
+        "id": "supply:cinzaverde",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "settlement_id": "cinzaverde",
+        "stock_id": "stock:cinzaverde",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 1600
+      },
+      {
+        "id": "supply:ferroalto",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "escarlia"
+        },
+        "settlement_id": "ferroalto",
+        "stock_id": "stock:ferroalto",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 3600
+      },
+      {
+        "id": "supply:pedraclara",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "settlement_id": "pedraclara",
+        "stock_id": "stock:pedraclara",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 4800
+      },
+      {
+        "id": "supply:pontenegro",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "auren"
+        },
+        "settlement_id": "pontenegro",
+        "stock_id": "stock:pontenegro",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 1800
+      },
+      {
+        "id": "supply:portovelho",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "settlement_id": "portovelho",
+        "stock_id": "stock:portovelho",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 4000
+      },
+      {
+        "id": "supply:salgueiro",
+        "actor_ref": {
+          "kind": "polity",
+          "id": "valedouro"
+        },
+        "settlement_id": "salgueiro",
+        "stock_id": "stock:salgueiro",
+        "resource_id": "food",
+        "kind": "maintain_food_reserve",
+        "reserve_months": 2,
+        "motivation": "Proteger o abastecimento dos habitantes.",
+        "target_quantity": 2000
+      }
+    ],
+    "plans": []
+  },
+  "research": {
+    "technologies": [
+      {
+        "id": "irrigation",
+        "name": "Irrigação de campos",
+        "field": "agricultura",
+        "prerequisites": [],
+        "capability_id": "food_production",
+        "skill": "craftsmanship",
+        "min_skill": 10,
+        "required_units": 6,
+        "monthly_units": 2,
+        "inputs": {
+          "wood": 1,
+          "tools": 1
+        },
+        "assistant_occupation": "farmer",
+        "assistants_per_unit": 2,
+        "wage_per_worker": 2
+      },
+      {
+        "id": "metallurgy",
+        "name": "Metalurgia de alto rendimento",
+        "field": "metalurgia",
+        "prerequisites": [],
+        "capability_id": "iron_production",
+        "skill": "craftsmanship",
+        "min_skill": 10,
+        "required_units": 6,
+        "monthly_units": 2,
+        "inputs": {
+          "wood": 1,
+          "tools": 1
+        },
+        "assistant_occupation": "artisan",
+        "assistants_per_unit": 2,
+        "wage_per_worker": 2
+      },
+      {
+        "id": "steam_engineering",
+        "name": "Engenharia a vapor",
+        "field": "engenharia",
+        "prerequisites": [
+          "steel"
+        ],
+        "capability_id": "iron_production",
+        "skill": "craftsmanship",
+        "min_skill": 10,
+        "required_units": 6,
+        "monthly_units": 2,
+        "inputs": {
+          "steel": 1,
+          "coal": 1,
+          "tools": 1
+        },
+        "assistant_occupation": "artisan",
+        "assistants_per_unit": 2,
+        "wage_per_worker": 2
+      },
+      {
+        "id": "steel",
+        "name": "Fabricação de aço",
+        "field": "metalurgia",
+        "prerequisites": [
+          "metallurgy"
+        ],
+        "capability_id": "iron_production",
+        "skill": "craftsmanship",
+        "min_skill": 10,
+        "required_units": 6,
+        "monthly_units": 2,
+        "inputs": {
+          "iron": 1,
+          "coal": 1,
+          "tools": 1
+        },
+        "assistant_occupation": "artisan",
+        "assistants_per_unit": 2,
+        "wage_per_worker": 2
+      }
+    ],
+    "projects": [],
+    "knowledge": []
+  }
+}

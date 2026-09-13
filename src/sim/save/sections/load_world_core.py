@@ -17,7 +17,8 @@ class WorldCoreLoadSection:
         from src.run.load_map import load_cultivation_world_map
         from src.run.map_snapshot import load_map_from_snapshot
         from src.sim.load.load_game import get_events_db_path
-        from src.systems.time import MonthStamp
+        from src.systems.time import MonthStamp, WorldClock
+        from src.systems.calendar_agenda import WorldAgenda
         from src.systems.world_secret import load_world_secret_from_save
         from src.classes.mechanical_language import MechanicalLanguageState
         from src.classes.environment.climate import ClimateState
@@ -45,6 +46,8 @@ class WorldCoreLoadSection:
             ),
             start_year=world_data.get("start_year", 100),
         )
+        world.clock = WorldClock(int(world_data.get("clock_day", 0)))
+        world.agenda = WorldAgenda.from_dict(world_data.get("agenda"))
         context.world = world
 
         CustomContentRegistry.load_from_dict(context.save_data.get("custom_content"))

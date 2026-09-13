@@ -1,5 +1,94 @@
 # AGENTS.md
 
+## Medieval fork — current entrypoint (2026-09-13)
+
+The medieval plan supersedes inherited xianxia product assumptions below.
+`src.server.main` mounts only `src.server.medieval.app:create_app`. Public queries
+and observer commands use `/api/v2`; do not reconnect `game_instance`, cultivation
+routes or the legacy frontend bundle. The connected observer is in web/src/medieval.
+See `docs/specs/medieval-public-api.md` for the current contract.
+
+- Runtime queries, commands and automatic jumps share one mutation lock; build
+  JSON DTO snapshots while holding it. Pause must drain the in-flight jump.
+- Keep domain state in canonical owners. Public controls do not authorize edits
+  to characters, materials, territories, decisions or outcomes.
+- Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
+  save schema 11 rejects incomplete configuration and older experimental saves.
+  Preserve old files. Session IDs, pause, speed, locks and secrets are not saved.
+- Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
+  for isolated tests. Save IDs are confined basenames; manual overwrite is explicit.
+- Tests of inherited `main.py` routes/imports are historical contracts, not
+  compatibility requirements. Port or retire them deliberately during migration;
+  focused medieval tests do not establish that the full inherited suite passes.
+- Keep README, this section and API/runtime specs aligned with public behavior.
+  Do not claim AI, autonomous strategy or visual completion from backend tests.
+- AuthorityState, KnowledgeState and StrategyState are independent medieval
+  owners in classes/governance. Do not merge them into economy/society or use
+  legacy Avatar/monthly institutional code as a second runtime. See
+  docs/specs/medieval-autonomy.md for current supply-policy scope and limitations.
+- Supply decisions use own dated reports/public bulletins. Seller consent,
+  authorization and material executors revalidate independently. No private
+  foreign inventory in actor context; an order is not delivered stock.
+- Objectives name the actual stock/resource. Food goals use public subsistence;
+  productive-input goals use the owner's facility recipes, not city population.
+  Reports and route searches are resource-specific. Sellers protect productive
+  reserves as well as food; active public/workshop stores publish authorized offers,
+  not all private holdings. ObjectiveView.target_quantity is a derived projection.
+- Economy owns expansion blueprints/projects (economy schema6). Construction and
+  production share monthly workforce and wage/tax settlement. Materials and paid
+  work accumulate before capacity changes; completed projects cannot repeat.
+  Resource targets add remaining construction materials once, not per reserve month.
+- Additional production lines use deterministic site/recipe IDs and share their
+  anchor's stock/account/workforce without replacing it. Completed construction
+  needs the line and its commissioning receipt; advanced recipes need owned
+  knowledge during operation. Finances shows the new line's capacity, not its
+  anchor's capacity, and identifies productive payrolls by their output products.
+- ResearchState owns the saved technology catalog and experiments; KnowledgeState
+  owns institution-specific techniques. Discovery never changes a recipe directly.
+  Monthly paid research reserves the named leader inside cohort labor, not an extra
+  person. Application is a knowledge-gated material construction project. Teaching
+  requires current bilateral consent; see docs/specs/medieval-research.md for limits.
+- The observatory includes research in its atomic snapshot; research queries are
+  omniscient views, not actor knowledge. Finances distinguishes recipe improvement
+  from capacity gain and names research payroll sources.
+- Standalone payments also require the source owner's exact actor_ref intent and
+  current trade authority; a decision is not a durable authorization token.
+- RelationsState owns diplomatic proposals/obligations, not assets. Counteroffers
+  retain original conditions; acceptance binds intentions only. Fulfillment needs
+  new current material decisions and delegates to economy/teaching. Dated diplomacy
+  deadlines expire offers and record breach/excuse without forced transfers.
+  KnowledgeState.notices disclose these facts only to the proposal participants.
+  Saved pending diplomacy requires its agenda deadline. See medieval-diplomacy.md;
+  autonomous bargaining and its observer panel are not integrated yet.
+- Event deepcopy must isolate nested mutable payloads, not share frozen outer
+  models. Freight provenance is batch-local; never retain it across dated steps.
+- Economy owns cohort accounts and last payroll receipts; AuthorityState owns tax
+  policies, not balances. Actual productive labor must be paid from employer funds.
+  Income tax applies only to new wages and the current administrator's mandate.
+- Initial employment terms are authored standing agreements. Monthly household
+  purchases consume actual rations and debit savings with bilateral decisions;
+  public relief covers the unpaid share of the existing public distribution.
+  Allocate available rations by people, not wealth, and never consume paid food
+  again in relief. Both decision receipts and same-day closure survive save/load.
+  Savings do not yet finance investment or follow a raw population cohort move.
+  This initial provision rule is not a universal fiscal policy or proof of equilibrium.
+- IncomePanel/useIncome separates accumulated savings from dated payrolls and
+  exposes causal evidence. Inspector tabs wrap; do not restore horizontal overflow.
+- Default monthly routine now opens real supply orders. Tests of elapsed years
+  must use clock_day, not twelve jumps. Prepared practice-only tests may clear
+  strategic objectives explicitly; natural/public tests must keep bootstrap goals.
+- Frontend main/App mount only ObserverApp; scene/overlay in useAppShell, snapshot
+  in Pinia shallowRef, typed v2 transport and projection mappers, Pixi lifecycle in
+  useAtlas. query/observatory takes one coherent snapshot under the runtime lock.
+- PT-BR UI copy lives in medieval/i18n.ts, independent of untranslated xianxia UI.
+  No old settings/socket/sound bootstrap is loaded. Audio is not integrated yet.
+- npm test runs vitest.medieval.config.ts with real timers by default; legacy tests
+  remain explicitly accessible via test:legacy. The old fake-timer setup captures
+  vue-test-utils timers and must not leak into the new suite.
+- npm run build/type-check use vue-tsc and tsconfig.medieval.json; build output is
+  dist-medieval only. Server refuses unmarked/missing index and confines static
+  assets; API 404s never receive an HTML fallback. Legacy cleanup is still pending.
+
 本文件是仓库级的 agent 工作说明，目标是把 `.cursor/` 下的规则、技能、命令做统一沉淀，供 Codex/Cursor 等代理在进入仓库后直接读取。
 
 ## 1. Codex 自动读取 AGENTS.md 的格式与规则（官方核对）

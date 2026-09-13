@@ -1,5 +1,36 @@
+from dataclasses import dataclass
 from enum import Enum
 from src.i18n import t
+
+
+@dataclass(frozen=True, slots=True)
+class WorldClock:
+    """Medieval simulation time as an absolute day in a 12 × 30-day calendar."""
+
+    absolute_day: int = 0
+
+    DAYS_PER_MONTH = 30
+    MONTHS_PER_YEAR = 12
+
+    def __post_init__(self) -> None:
+        if isinstance(self.absolute_day, bool) or not isinstance(self.absolute_day, int):
+            raise TypeError("absolute_day must be an integer")
+        if self.absolute_day < 0:
+            raise ValueError("absolute_day must not be negative")
+
+    @property
+    def calendar_date(self) -> tuple[int, int, int]:
+        """Return ``(year, month, day)`` with one-based month and day values."""
+        year, day_of_year = divmod(self.absolute_day, self.DAYS_PER_MONTH * self.MONTHS_PER_YEAR)
+        month_index, day_index = divmod(day_of_year, self.DAYS_PER_MONTH)
+        return year, month_index + 1, day_index + 1
+
+    def advance(self, days: int = 1) -> "WorldClock":
+        if isinstance(days, bool) or not isinstance(days, int):
+            raise TypeError("days must be an integer")
+        if days < 0:
+            raise ValueError("days must not be negative")
+        return WorldClock(self.absolute_day + days)
 
 class Month(Enum):
     JANUARY = 1
