@@ -19,11 +19,33 @@ export function useDiplomacy() {
             debtor: entityName(data, clause.debtor_ref), creditor: entityName(data, clause.creditor_ref),
             technology: clause.kind === 'teaching'
               ? data.research.technologies.find(t => t.id === clause.technology_id)?.name ?? clause.technology_id : null,
+            // The Dao reads the promised quantity of the commitment itself; the
+            // provider's stock, surplus and route stay out of this projection.
+            resource: clause.kind === 'resource_transfer'
+              ? data.economy.resources.find(r => r.id === clause.resource_id)?.name ?? clause.resource_id : null,
             informed: obligation ? informed(obligation.last_event_id) : [],
           }
         }),
       }))
   })
+  const aidTrail = computed(() => {
+    const data = store.snapshot!
+    return [...data.diplomacy.aid_notices]
+      .sort((a, b) => a.learned_day - b.learned_day || a.id.localeCompare(b.id))
+      .map(n => ({ ...n, requester: entityName(data, n.requester_ref), recipient: entityName(data, n.recipient_ref) }))
+  })
+  const memories = computed(() => {
+    const data = store.snapshot!
+    return [...data.diplomacy.memories]
+      .sort((a, b) => b.last_reinforced_day - a.last_reinforced_day || a.id.localeCompare(b.id))
+      .map(m => ({ ...m, institution: entityName(data, m.institution_ref) }))
+  })
+  const readings = computed(() => {
+    const data = store.snapshot!
+    return [...data.diplomacy.aid_readings]
+      .sort((a, b) => a.value - b.value || a.observer_ref.id.localeCompare(b.observer_ref.id))
+      .map(r => ({ ...r, observer: entityName(data, r.observer_ref), subject: entityName(data, r.subject_ref) }))
+  })
   const source = (id: string) => { store.focusEventId = id }
-  return { proposals, source }
+  return { proposals, aidTrail, memories, readings, source }
 }

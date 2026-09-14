@@ -46,7 +46,12 @@ def validate_activities(world) -> None:
             raise ValueError("activity is ahead of the world clock")
         actors.add(activity.character_id)
         decision = events.get(activity.decision_event_id)
-        if decision is None or decision.decision is None or decision.decision.get("character_id") != activity.character_id:
+        # A practice names its person directly; an affordance-driven journey
+        # carries the compact decision shape and names the same person as actor.
+        actor = decision.decision.get("actor_ref") if decision is not None and decision.decision else None
+        named = isinstance(actor, dict) and actor.get("kind") == "character" and actor.get("id") == activity.character_id
+        if (decision is None or decision.decision is None
+                or (decision.decision.get("character_id") != activity.character_id and not named)):
             raise ValueError("activity has no supporting decision")
         if activity.kind == "travel":
             if (activity.origin_id not in world.society.settlements or activity.destination_id not in world.society.settlements

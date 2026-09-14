@@ -1,7 +1,12 @@
 """Strict JSON boundary for society state; all cross-domain references are IDs."""
 
 from .models import Character, Organization, Polity, PopulationGroup, Settlement
+from .force import (AssemblyDenial, Detachment, DetachmentCommand, FieldEngagement, ForcePosition, ForceStandoff,
+                    RouteInterdiction, SettlementInvestment)
+from .civic import CivicProtest
+from .demography import BirthCohort
 from .migration import MigrationJourney
+from .workforce import WorkforceTransition
 
 
 REGISTRIES = {
@@ -11,6 +16,17 @@ REGISTRIES = {
     "population": PopulationGroup,
     "settlements": Settlement,
     "migrations": MigrationJourney,
+    "workforce_transitions": WorkforceTransition,
+    "detachments": Detachment,
+    "force_standoffs": ForceStandoff,
+    "force_positions": ForcePosition,
+    "detachment_commands": DetachmentCommand,
+    "field_engagements": FieldEngagement,
+    "route_interdictions": RouteInterdiction,
+    "settlement_investments": SettlementInvestment,
+    "assembly_denials": AssemblyDenial,
+    "civic_protests": CivicProtest,
+    "birth_cohorts": BirthCohort,
 }
 
 
@@ -18,7 +34,7 @@ class SocietySerialization:
     def to_dict(self) -> dict:
         self.validate()
         return {
-            "schema_version": 2,
+            "schema_version": 13,
             **{
                 name: {
                     key: value.model_dump(mode="json")
@@ -32,7 +48,7 @@ class SocietySerialization:
     def from_dict(cls, data: dict):
         if not isinstance(data, dict) or set(data) != {"schema_version", *REGISTRIES}:
             raise ValueError("invalid society fields")
-        if type(data["schema_version"]) is not int or data["schema_version"] != 2:
+        if type(data["schema_version"]) is not int or data["schema_version"] != 13:
             raise ValueError("unsupported society schema")
         parsed = {}
         for name, model in REGISTRIES.items():

@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { useObserverStore } from '../stores/world'
 import { entityName } from '../mappers'
 export function useInspection() {
-  const store=useObserverStore(), tab=ref<'inspection'|'people'|'governments'|'reserves'|'finances'|'research'|'diplomacy'|'migrations'>('inspection')
+  const store=useObserverStore(), tab=ref<'inspection'|'people'|'governments'|'reserves'|'finances'|'research'|'diplomacy'|'migrations'|'workforce'>('inspection')
   const data=computed(()=>store.snapshot!)
   const settlement=computed(()=>data.value.society.settlements.find(s=>store.selection?.kind==='settlement' && s.id===store.selection.id))
   const character=computed(()=>data.value.society.characters.find(s=>store.selection?.kind==='character' && s.id===store.selection.id))

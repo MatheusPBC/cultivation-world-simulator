@@ -84,7 +84,7 @@ def test_presentation_then_manifest_payment_releases_same_parcel_and_survives_sa
     path = tmp_path / "customs.mws"
     save_world(world, path)
     world = load_world(path)
-    assert SCHEMA == 19
+    assert SCHEMA == 32
     option = customs_payment_options(world, order.owner_ref)[0]
     payment = pay_customs_fee(world, option.id, decision_event_id=decided(world, option, "customs_fee_decided").id)
     released = world.economy.parcels[parcel.id]

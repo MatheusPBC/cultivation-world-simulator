@@ -2439,3 +2439,52 @@ contains perceived cause, credibility, objective, reach, urgency, expected
 cost, expected gain, and available alternatives. Missing evidence remains
 unknown; it is never replaced by a fabricated value. An ImperialCrisis
 produces AuthorityClaims, not CasusBelliReadings by itself.
+
+## Armed Contact De-escalation
+
+An Armed Contact De-escalation is a bilateral proposal between institutions
+whose detachments are currently in an Armed Contact. Its only possible term is
+the withdrawal of the debtor's own named detachment. A unilateral-self proposal
+binds only its proposer; a mutual proposal binds one detachment of each party.
+Acceptance changes neither presence nor control. Each debtor must later choose
+and complete a current Withdrawal, or the obligation may become a breach.
+_Avoid_: negotiated victory, ordered retreat, territory concession.
+
+## Force Position
+
+A Force Position is a detachment's three-day preparation at the settlement
+where it remains physically present. It may be anchored to an existing local
+Map site, but anchoring neither creates terrain nor grants control, occupation,
+or combat advantage. A Preparing Position is still seen as ordinary presence;
+only a Prepared Position is observed as fortified. Leaving, moving, dissolving,
+or lacking provisions abandons the Position as its own fact.
+_Avoid_: fortification system, siege, defensive bonus, territorial control.
+
+## Field Engagement
+
+A Field Engagement is a voluntary, deterministic clash between the two
+detachments in an active Armed Contact. One party offers it and the other must
+independently join; silence, withdrawal, or standing down produces no combat.
+It records bounded participant outcomes and factual casualties, but grants no
+occupation, administration, resources, or other territorial consequence. The
+losing detachment disperses its surviving people through the existing force
+owner; the winner remains only where it already stood.
+_Avoid_: campaign system, automatic battle, conquest, siege, loot.
+
+## Field Aftermath
+
+A Field Aftermath is one private review for the surviving winner named by a
+Field Engagement Outcome Notice. It grants no territory or reward: the actor
+may only select a current occupation, withdrawal, or force-position
+affordance, each revalidated and executed by the existing force owner. Silence
+or provider failure leaves the settlement unchanged.
+_Avoid_: automatic occupation, conquest reward, post-battle loot, campaign planner.
+
+## Route Interdiction
+
+A Route Interdiction is a prepared, present detachment's physical restriction
+of one route at its own settlement endpoint. Society records the column and
+decision; Map derives the route's unavailable capacity as a separate cause,
+without changing route ownership, administration, cargo, or any other closure
+cause. Lifting or physical departure removes only that force cause.
+_Avoid_: tolls, seizure, route ownership, automatic reopening, siege.

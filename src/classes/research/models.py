@@ -50,8 +50,172 @@ class TechnicalKnowledge(SocietyValue):
     owner_ref: EntityRef
     technology_id: Identity
     learned_day: Count
-    channel: Literal['research', 'teaching']
+    channel: Literal['research', 'teaching', 'apprenticeship', 'copied']
     event_id: Identity
+
+
+class RiteBlueprint(SocietyValue):
+    """One authored restorative rite. There is no spell language here.
+
+    Every term is material and engine-owned: where it may be performed, who is
+    qualified, what it consumes, who is paid, how long it takes and the bounded
+    relief it may give. It creates no goods, money, people or capacity.
+    """
+    id: Identity
+    name: Identity
+    capability_id: Identity
+    skill: Identity
+    min_skill: int = Field(strict=True, ge=1, le=100)
+    inputs: dict[Identity, Positive]
+    assistants: Positive
+    assistant_occupation: Occupation
+    wage_per_worker: Positive
+    days: Positive
+    health_gain_permille: int = Field(strict=True, ge=0, le=200)
+    # Reach is one existing, currently usable route segment, never a plan.
+    reach: Literal['local', 'adjacent'] = 'local'
+    kind: Literal['restoration', 'ward'] = 'restoration'
+    ward_days: int = Field(strict=True, ge=0, le=360, default=0)
+
+    @model_validator(mode='after')
+    def valid_rite(self):
+        if self.skill not in Skills.model_fields or not self.inputs:
+            raise ValueError('rite requires a known skill and real materials')
+        if self.kind == 'ward':
+            if self.reach != 'local' or self.ward_days <= 0 or self.health_gain_permille:
+                raise ValueError('a ward protects its own place for a real term and heals nobody')
+        elif self.ward_days or self.health_gain_permille < 1:
+            raise ValueError('a restoration gives bounded relief and no protection')
+        return self
+
+
+class Rite(SocietyValue):
+    """A dated rite in progress; its existence is public at the place."""
+    id: Identity
+    sponsor_ref: EntityRef
+    blueprint_id: Identity
+    officiant_id: Identity
+    site_id: Identity
+    settlement_id: Identity
+    stock_id: Identity
+    account_id: Identity
+    started_day: Count
+    due_day: Count
+    stage: Literal['officiating', 'completed', 'failed', 'interrupted'] = 'officiating'
+    # A ranged working names the place it reaches and the one segment it uses.
+    target_settlement_id: Identity | None = None
+    route_id: Identity | None = None
+    sponsor_decision_id: Identity
+    officiant_decision_id: Identity
+    last_event_id: Identity
+
+    @model_validator(mode='after')
+    def valid_reach(self):
+        if (self.target_settlement_id is None) != (self.route_id is None):
+            raise ValueError('a ranged rite requires both its target and its segment')
+        if self.target_settlement_id == self.settlement_id:
+            raise ValueError('a ranged rite must reach another place')
+        return self
+
+
+class TechniqueCopy(SocietyValue):
+    """Dated, paid work of copying a technique from works one already reaches.
+
+    It is not espionage and holds no agent, document or secret: it names only
+    the actor's own sighting, its own site observation and the site whose
+    running line already requires the technique. The holder loses nothing.
+    """
+    id: Identity
+    actor_ref: EntityRef
+    holder_ref: EntityRef
+    technology_id: Identity
+    site_id: Identity
+    stock_id: Identity
+    account_id: Identity
+    sighting_event_id: Identity
+    report_event_id: Identity
+    # The opening day proved work at the site.  A continuing repair or
+    # apprenticeship is retained so the later dated resolution can verify
+    # that access lasted across a monthly calendar boundary without inventing
+    # a second same-day payroll.
+    access_kind: Literal['repair', 'apprenticeship']
+    access_id: Identity
+    access_event_id: Identity
+    started_day: Count
+    due_day: Count
+    stage: Literal['copying', 'completed', 'failed'] = 'copying'
+    blocker: Identity | None = None
+    decision_event_id: Identity
+    last_event_id: Identity
+
+    @model_validator(mode='after')
+    def valid_copy(self):
+        if (self.id != f'technique-copy:{self.decision_event_id}' or self.due_day <= self.started_day
+                or self.actor_ref == self.holder_ref
+                or (self.stage == 'failed') != (self.blocker is not None)):
+            raise ValueError('technique copy identity, term or outcome is inconsistent')
+        return self
+
+
+class Ward(SocietyValue):
+    """Dated protection of one settlement against foreign ranged workings.
+
+    It hurts nobody, blocks no cargo, person, route or authority, and does not
+    hinder the local working of whoever raised it.
+    """
+    id: Identity
+    settlement_id: Identity
+    sponsor_ref: EntityRef
+    rite_id: Identity
+    started_day: Count
+    until_day: Count
+    last_event_id: Identity
+
+    @model_validator(mode='after')
+    def valid_term(self):
+        if self.id != f'ward:{self.rite_id}' or self.until_day <= self.started_day:
+            raise ValueError('a ward requires its own rite and a real term')
+        return self
+
+
+class RiteRecovery(SocietyValue):
+    """An officiant spent; the cost of a working is time of a real person."""
+    id: Identity
+    character_id: Identity
+    until_day: Count
+    rite_id: Identity
+    last_event_id: Identity
+
+    @model_validator(mode='after')
+    def valid_recovery(self):
+        if self.id != self.character_id:
+            raise ValueError('recovery is keyed by its own person')
+        return self
+
+
+class Apprenticeship(SocietyValue):
+    """A dated, paid instruction contract with a resident named specialist.
+
+    It holds only the commitment: the host institution, the technique already
+    in the catalog, the specialist, the local site, and the stock, account and
+    cohort that will pay for the instruction. No knowledge exists until the
+    dated completion, and the specialist keeps no technique of their own.
+    """
+    id: Identity
+    host_ref: EntityRef
+    technology_id: Identity
+    specialist_id: Identity
+    site_id: Identity
+    stock_id: Identity
+    account_id: Identity
+    workers: Positive
+    wage_per_worker: Positive
+    started_day: Count
+    due_day: Count
+    stage: Literal['training', 'completed', 'failed'] = 'training'
+    specialist_decision_id: Identity
+    sponsor_decision_id: Identity
+    last_event_id: Identity
 
 
 def research_terms(project):

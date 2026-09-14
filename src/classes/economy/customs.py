@@ -84,8 +84,15 @@ def validate_customs(economy, world=None) -> None:
                          if events.get(link.cause_event_id) is not None and events[link.cause_event_id].fact_kind.name == "DECISION"), None) if opening else None
         expected = {"action": "open_customs_checkpoint", "actor_ref": checkpoint.operator_ref.to_dict(),
                     "site_id": checkpoint.site_id, "account_id": checkpoint.account_id,
-                    "staff_group_id": checkpoint.staff_group_id, "staff_count": checkpoint.staff_count,
-                    "fee_per_bulk": checkpoint.fee_per_bulk}
+                    "staff_count": checkpoint.staff_count, "fee_per_bulk": checkpoint.fee_per_bulk}
+        opening_staff_id = (decision.decision or {}).get("staff_group_id") if decision is not None else None
+        reassigned = any(
+            event.event_type == "workforce_transition_completed" and event.fact_kind.name == "STATE_TRANSITION"
+            and any(delta.owner_kind == "customs_checkpoint" and delta.owner_id == checkpoint.id
+                    and delta.aspect == "staff_group_id" and delta.after == checkpoint.staff_group_id
+                    for delta in event.deltas)
+            for event in events.values()
+        )
         if (site is None or site.kind not in {"port", "mountain_pass"}
                 or account is None
                 or staff is None
@@ -94,6 +101,7 @@ def validate_customs(economy, world=None) -> None:
                 or (checkpoint.last_event_id is not None and checkpoint.last_event_id not in events)
                 or opening is None or decision is None
                 or (decision.decision or {}).get("option_id") is None
+                or (opening_staff_id != checkpoint.staff_group_id and not reassigned)
                 or any((decision.decision or {}).get(key) != value for key, value in expected.items())):
             raise ValueError("invalid customs checkpoint")
     # V1 has no checkpoint position along a route.  Refusing ambiguous maps is

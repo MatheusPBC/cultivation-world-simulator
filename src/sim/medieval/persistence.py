@@ -18,6 +18,8 @@ from src.classes.society import SocietyState
 from src.classes.economy import EconomyState
 from src.classes.governance import AuthorityState, KnowledgeState, StrategyState
 from src.classes.research import ResearchState
+from src.classes.environment.creature import CreatureState
+from src.classes.environment.regional_overflow import RegionalOverflowState
 from src.classes.governance.diplomacy import RelationsState
 from src.run.map_snapshot import serialize_map_snapshot
 from src.run.map_source import parse_map_source
@@ -29,11 +31,11 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-SCHEMA = 19
+SCHEMA = 50
 
 
 def world_snapshot(world: MedievalWorld) -> dict:
-    world.society.validate(set(world.map.regions))
+    world.society.validate(set(world.map.regions), world)
     validate_activities(world)
     world.economy.validate(world)
     world.authority.validate(world)
@@ -41,6 +43,8 @@ def world_snapshot(world: MedievalWorld) -> dict:
     world.strategy.validate(world)
     world.research.validate(world)
     world.relations.validate(world)
+    world.regional_overflow.validate(world)
+    world.creatures.validate(world)
     validate_infrastructure(world)
     snapshot = serialize_map_snapshot(world.map)
     source = {
@@ -51,12 +55,15 @@ def world_snapshot(world: MedievalWorld) -> dict:
     return {
         "product": PRODUCT, "schema_version": SCHEMA, "catalog_version": 1,
         "event_count": len(world.events),
+        "map_force_route_interdictors": dict(sorted(world.map.force_route_interdictors.items())),
         "clock_day": world.clock.absolute_day, "agenda": world.agenda.to_dict(),
         "activities": {key: a.model_dump(mode="json") for key, a in sorted(world.activities.items())},
         "society": world.society.to_dict(), "map": source, "map_name": world.map.map_name,
         "economy": world.economy.to_dict(),
         "research": world.research.to_dict(),
         "relations": world.relations.to_dict(),
+        "regional_overflow": world.regional_overflow.to_dict(),
+        "creatures": world.creatures.to_dict(),
         "authority": world.authority.to_dict(),
         "knowledge": world.knowledge.to_dict(), "strategy": world.strategy.to_dict(),
         "config": world.config.model_dump(mode="json"),
@@ -66,7 +73,7 @@ def world_snapshot(world: MedievalWorld) -> dict:
 
 def restore_snapshot(data: dict, events: list[WorldEvent]) -> MedievalWorld:
     required = {"product", "schema_version", "catalog_version", "clock_day", "agenda",
-                "society", "economy", "research", "relations", "authority", "knowledge", "strategy", "map", "map_name", "rng_state", "activities", "event_count", "config"}
+                "society", "economy", "research", "relations", "regional_overflow", "creatures", "authority", "knowledge", "strategy", "map", "map_name", "map_force_route_interdictors", "rng_state", "activities", "event_count", "config"}
     if (not isinstance(data, dict) or set(data) != required or data.get("product") != PRODUCT
             or type(data.get("schema_version")) is not int or data["schema_version"] != SCHEMA
             or type(data.get("catalog_version")) is not int or data["catalog_version"] != 1):
@@ -83,6 +90,13 @@ def restore_snapshot(data: dict, events: list[WorldEvent]) -> MedievalWorld:
     validate_history(events, clock.absolute_day)
     society = SocietyState.from_dict(data["society"])
     game_map = build_medieval_map(parse_map_source(data["map"]), society)
+    interdictors = data["map_force_route_interdictors"]
+    if (not isinstance(interdictors, dict)
+            or any(not isinstance(route_id, str) or not isinstance(interdiction_id, str)
+                   or route_id not in game_map.routes or not interdiction_id
+                   for route_id, interdiction_id in interdictors.items())):
+        raise ValueError("invalid saved force route interdictors")
+    game_map.force_route_interdictors = dict(interdictors)
     if not isinstance(data["map_name"], str):
         raise ValueError("invalid map name")
     game_map.map_name = data["map_name"]
@@ -104,6 +118,8 @@ def restore_snapshot(data: dict, events: list[WorldEvent]) -> MedievalWorld:
                           strategy=StrategyState.from_dict(data["strategy"]),
                           research=ResearchState.from_dict(data["research"]),
                           relations=RelationsState.from_dict(data["relations"]),
+                          regional_overflow=RegionalOverflowState.from_dict(data["regional_overflow"]),
+                          creatures=CreatureState.from_dict(data["creatures"]),
                           config=MedievalRunConfig.model_validate(data["config"]))
     validate_activities(world)
     return world

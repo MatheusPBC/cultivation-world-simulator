@@ -11,14 +11,21 @@ from src.classes.economy.logistics import CargoParcel, FreightOrder, RouteFlow
 from src.classes.economy.expansion import ExpansionBlueprint, ExpansionProject
 from src.classes.economy.maintenance import RepairBlueprint, RepairProject
 from src.classes.research.models import ResearchProject, Technology, TechnicalKnowledge
-from src.classes.governance.diplomacy import DiplomaticProposal, Obligation
-from src.classes.governance.models import (CustomsNotice, DiplomaticNotice, FiscalRouteReport, RouteReport,
-                                            SettlementReport, SiteReport)
+from src.classes.governance.diplomacy import DiplomaticProposal, InstitutionalMemory, Obligation
+from src.classes.governance.models import (AuthorityClaim, AuthorityRecognition, CreatureTributeNotice, CustomsNotice, DiplomaticNotice, FiscalRouteReport,
+                                            InstitutionalAidNotice, RouteReport,
+                                            SettlementReport, SiteReport, WorkforceDemandReport, WorkforceOfferNotice)
+from src.classes.mechanical_language import EntityRef
+from src.classes.environment.creature import Creature, CreatureDemand
 from src.classes.environment.geography import GeographyLayer
 from src.classes.environment.infrastructure import InfrastructureSite
+from src.classes.environment.regional_overflow import RegionalOverflowOccurrence
 from src.classes.environment.route import Route
 from src.classes.society.models import Character, Organization, Polity, PopulationGroup, Settlement, SocietyValue
 from src.classes.society.migration import MigrationJourney
+from src.classes.society.workforce import WorkforceTransition
+from src.classes.society.force import (AssemblyDenial, Detachment, DetachmentCommand, FieldEngagement, ForcePosition,
+                                       ForceStandoff, RouteInterdiction, SettlementInvestment)
 from src.classes.economy.migration import MigrationProvision
 from src.classes.economy.customs import CargoManifest, CustomsCheckpoint
 from src.sim.medieval.activities import Activity
@@ -61,10 +68,21 @@ class OptionsView(SocietyValue):
     ai_available: bool = False
 
 
+class DecisionSourceView(SocietyValue):
+    """Derived from canonical receipts: consultations versus routine fallback.
+
+    It never carries a prompt, an answer or any provider setting.
+    """
+    provider_consultations: int
+    provider_failures: int
+    ai_enabled: bool
+
+
 class WorldView(SocietyValue):
     day: int
     calendar: CalendarView
     config: MedievalRunConfig
+    decision_sources: DecisionSourceView
     population: int
     living_characters: int
     settlements: int
@@ -72,6 +90,7 @@ class WorldView(SocietyValue):
     organizations: int
     events: int
     next_scheduled_day: int | None
+    regional_overflows: list[RegionalOverflowOccurrence]
 
 
 class CharacterView(Character):
@@ -95,6 +114,26 @@ class SocietyView(SocietyValue):
     population_groups: list[PopulationGroup]
     activities: list[Activity]
     migrations: list[MigrationJourney]
+    workforce_transitions: list[WorkforceTransition]
+
+
+class OccupationView(SocietyValue):
+    """The Map-independent physical occupation presently held at one settlement."""
+    settlement_id: str
+    occupier_ref: EntityRef
+
+
+class CampaignView(SocietyValue):
+    """Dao-only projection of canonical campaign state; it is not actor knowledge."""
+    detachments: list[Detachment]
+    commands: list[DetachmentCommand]
+    positions: list[ForcePosition]
+    standoffs: list[ForceStandoff]
+    field_engagements: list[FieldEngagement]
+    route_interdictions: list[RouteInterdiction]
+    settlement_investments: list[SettlementInvestment]
+    assembly_denials: list[AssemblyDenial]
+    occupations: list[OccupationView]
 
 
 class EconomyView(SocietyValue):
@@ -160,6 +199,10 @@ class GovernanceView(SocietyValue):
     site_reports: list[SiteReport]
     settlement_reports: list[SettlementReport]
     customs_notices: list[CustomsNotice]
+    workforce_demand_reports: list[WorkforceDemandReport]
+    workforce_offer_notices: list[WorkforceOfferNotice]
+    claims: list[AuthorityClaim]
+    authority_recognitions: list[AuthorityRecognition]
 
 
 class ResearchView(SocietyValue):
@@ -168,10 +211,42 @@ class ResearchView(SocietyValue):
     knowledge: list[TechnicalKnowledge]
 
 
+class InstitutionalMemoryView(InstitutionalMemory):
+    """Relevance only: the derived salience of a fact the institution knows."""
+    effective_salience: int
+
+
+class AidRelationshipView(SocietyValue):
+    """One directional reading, evidenced by the observer's own aid memories."""
+    observer_ref: EntityRef
+    subject_ref: EntityRef
+    value: int
+    evidence_event_ids: list[str]
+
+
 class DiplomacyView(SocietyValue):
     proposals: list[DiplomaticProposal]
     obligations: list[Obligation]
     notices: list[DiplomaticNotice]
+    aid_notices: list[InstitutionalAidNotice]
+    memories: list[InstitutionalMemoryView]
+    aid_readings: list[AidRelationshipView]
+
+
+class CreatureDamageView(SocietyValue):
+    """A pending creature damage binding, joined to the current Map-owned site."""
+    creature_id: str
+    site_id: str
+    damage_event_id: str
+    integrity: float
+
+
+class CreatureView(SocietyValue):
+    """Omniscient read-only projection: creatures, demands and private notices."""
+    creatures: list[Creature]
+    demands: list[CreatureDemand]
+    tribute_notices: list[CreatureTributeNotice]
+    damaged_sites: list[CreatureDamageView]
 
 
 class ObservatoryView(SocietyValue):
@@ -183,6 +258,8 @@ class ObservatoryView(SocietyValue):
     governance: GovernanceView
     research: ResearchView
     diplomacy: DiplomacyView
+    creatures: CreatureView
+    campaigns: CampaignView
 
 
 class CausalView(SocietyValue):

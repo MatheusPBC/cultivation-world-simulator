@@ -397,14 +397,17 @@ async def test_a_failed_save_on_the_repairing_jump_restores_work_money_and_the_s
     resumed = load_world(path)
     assert world_snapshot(resumed) == world_snapshot(world)
     assert resumed.economy.repairs == world.economy.repairs
-    assert resumed.map.infrastructure_sites[SITE].integrity == 0.5
+    # Monthly operating wear (apply_monthly_infrastructure_wear) already took
+    # the port from 0.5 to 0.49 at the day60 boundary, before this pause.
+    assert resumed.map.infrastructure_sites[SITE].integrity == 0.49
 
     # Prove the next candidate actually contains repair work before testing the
     # failed durable commit; this is not merely a rollback of an idle jump.
     control = load_world(path)
     await MedievalSimulator(control).step()
     assert control.economy.repairs[project.id].restored_permille == 100
-    assert control.map.infrastructure_sites[SITE].integrity == pytest.approx(0.6)
+    # Day90's own wear (-0.01) lands before the batch's repair (+0.10): 0.49 -> 0.48 -> 0.58.
+    assert control.map.infrastructure_sites[SITE].integrity == pytest.approx(0.58)
 
     before, history = world_snapshot(world), list(world.events)
     rng_state, knowledge = world.rng.getstate(), world.knowledge.to_dict()
@@ -419,13 +422,16 @@ async def test_a_failed_save_on_the_repairing_jump_restores_work_money_and_the_s
     assert world_snapshot(world) == before and world.events == history
     assert world.rng.getstate() == rng_state and world.knowledge.to_dict() == knowledge
     assert world.economy.repairs[project.id].restored_permille == 0
-    assert world.map.infrastructure_sites[SITE].integrity == 0.5
+    assert world.map.infrastructure_sites[SITE].integrity == 0.49
     monkeypatch.undo()
 
     await MedievalSimulator(world).step()
     assert world.economy.repairs[project.id].restored_permille == 100
-    assert world.map.infrastructure_sites[SITE].integrity == pytest.approx(0.6)
+    assert world.map.infrastructure_sites[SITE].integrity == pytest.approx(0.58)
     assert world_snapshot(world) == world_snapshot(control)
+    # The same jump's wear is a real, causally-linked fact, not an invented number.
+    assert any(e.event_type == "site_worn" and any(d.owner_kind == "site" and d.owner_id == SITE for d in e.deltas)
+               for e in world.events)
 
     with sqlite3.connect(path) as connection:
         connection.execute("UPDATE metadata SET schema_version=12")

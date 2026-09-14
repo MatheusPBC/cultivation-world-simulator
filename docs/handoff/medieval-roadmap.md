@@ -1,6 +1,6 @@
 # Roadmap do fork medieval
 
-Atualizado em 13/09/2026. Este é o plano de produto que substitui o roteiro
+Atualizado em 14/09/2026. Este é o plano de produto que substitui o roteiro
 herdado de xianxia para o fork medieval. Este roadmap e
 `docs/handoff/medieval-current-state.md`, ambos versionados, são a fonte
 canônica do plano e do estado atual. `.agent/tasks/medieval-world-simulator/`
@@ -66,6 +66,11 @@ barreiras e doutrina; implementar difusão por ensino, venda, roubo e migração
 Conhecimento não substitui instalação, operador, equipamento, manutenção ou
 suprimento.
 
+Já existe uma fatia validada de apprenticeship: especialista que migrou oferece
+uma técnica, anfitrião paga trabalhadores locais e a conclusão datada copia a
+técnica institucionalmente. Isso não fecha difusão por ensino geral, venda, roubo
+ou migração.
+
 **Aceite:** uma descoberta + produção + treinamento muda uma negociação, defesa ou
 campanha por fatores materiais observáveis.
 
@@ -74,6 +79,11 @@ campanha por fatores materiais observáveis.
 Criar forças agregadas, recrutamento, manutenção, comando, reconhecimento,
 posições, suprimento, táticas, retirada, cerco, interdição, ocupação e solução
 política. QG e comando são capacidades de instituições, não bônus narrativos.
+
+Forças/destacamentos V1 já levantam soldados e provisões reais, marcham por rotas,
+registram ocupação revogável e dissolvem com retorno à coorte quando a provisão
+acaba. Batalha, comando, cerco, tática, campanha completa e solução política ainda
+não existem.
 
 **Aceite:** força menor pode vencer por preparo verificável; mudar terreno,
 informação, moral, fadiga, suprimento ou comando muda a explicação causal do
@@ -86,6 +96,11 @@ contramedidas; rituais detectáveis/interrompíveis; criaturas com território,
 necessidades, memória e decisões próprias. O dragão pode negociar, exigir,
 recuar ou atacar conforme condições, sem ser uma catástrofe programada.
 
+O WIP já tem ritos restaurativos materiais e um drake autônomo do Rio Lume: ele
+percebe travessias reais, pode pedir tributo/restringir sua própria passagem, e um
+provider pode escolher uma resposta enumerada. Isso é uma vertical estreita, não
+um sistema geral de magia, criaturas, ameaças ou dragões.
+
 **Aceite:** ameaça ritual e defesa de vila admitem investigação/intervenção real;
 um ataque de criatura afeta pessoas, instalações e decisões posteriores.
 
@@ -95,6 +110,12 @@ Adicionar provedores reais somente depois de as affordances, validações, limit
 orçamento e fallback determinístico estarem cobertos. Expandir o observatório para
 mapa de controle/ocupação, rotas, forças, ameaças, disputas, planos, crenças e
 cronologia investigável.
+
+O primeiro caminho de decisão por provider V1 está integrado: o provider recebe
+apenas contexto/avisos do ator e escolhe um ID enumerado; a interpretação é receipt
+sem delta e falha/indisponibilidade retorna ao fallback determinístico. Ainda não
+há validação de provider remoto em produção, nem autonomia geral ou observabilidade
+completa.
 
 **Aceite:** rodar três seeds naturais por dez anos e cenários preparados para cada
 vertical, com artefatos, auditoria causal e custo de IA registrados. Erros do

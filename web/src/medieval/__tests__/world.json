@@ -27,7 +27,8 @@
     "polities": 3,
     "organizations": 8,
     "events": 0,
-    "next_scheduled_day": null
+    "next_scheduled_day": null,
+    "decision_sources": { "provider_consultations": 0, "provider_failures": 0, "ai_enabled": false }
   },
   "society": {
     "characters": [
@@ -991,7 +992,8 @@
         "provision_id": "provision:migration:1",
         "last_event_id": "event:migration-started"
       }
-    ]
+    ],
+    "workforce_transitions": []
   },
   "economy": {
     "expansion_blueprints": [
@@ -4595,7 +4597,9 @@
         "target_quantity": 2000
       }
     ],
-    "plans": []
+    "plans": [],
+    "workforce_demand_reports": [],
+    "workforce_offer_notices": []
   },
   "research": {
     "technologies": [
@@ -4681,5 +4685,6 @@
     "projects": [],
     "knowledge": []
   },
-  "diplomacy": { "proposals": [], "obligations": [], "notices": [] }
+  "diplomacy": { "proposals": [], "obligations": [], "notices": [], "aid_notices": [], "memories": [], "aid_readings": [] },
+  "creatures": { "creatures": [], "demands": [], "tribute_notices": [] }
 }

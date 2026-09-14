@@ -9,6 +9,8 @@ import random
 from typing import TYPE_CHECKING
 
 from src.classes.environment.map import Map
+from src.classes.environment.creature import CreatureState
+from src.classes.environment.regional_overflow import RegionalOverflowState
 from src.classes.society import SocietyState
 from src.classes.economy import EconomyState
 from src.classes.governance import AuthorityState, KnowledgeState, StrategyState
@@ -36,18 +38,22 @@ class MedievalWorld:
     research: ResearchState
     relations: RelationsState = field(default_factory=RelationsState)
     knowledge: KnowledgeState = field(default_factory=KnowledgeState)
+    regional_overflow: RegionalOverflowState = field(default_factory=RegionalOverflowState)
+    creatures: CreatureState = field(default_factory=CreatureState)
     clock: WorldClock = field(default_factory=WorldClock)
     agenda: WorldAgenda = field(default_factory=WorldAgenda)
     events: list["WorldEvent"] = field(default_factory=list)
     activities: dict[str, "Activity"] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        self.society.validate(set(self.map.regions))
+        self.society.validate(set(self.map.regions), self)
         self.economy.validate(self)
         self.authority.validate(self)
         self.strategy.validate(self)
         self.knowledge.validate(self)
         self.research.validate(self)
         self.relations.validate(self)
+        self.regional_overflow.validate(self)
+        self.creatures.validate(self)
         validate_infrastructure(self)
         MedievalRunConfig.model_validate(self.config.model_dump())

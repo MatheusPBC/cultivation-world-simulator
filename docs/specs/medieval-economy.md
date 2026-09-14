@@ -144,6 +144,22 @@ fica devida e o pagamento material a libera. Não há confisco, força militar,
 alteração de rota, quantidade ou propriedade nesta vertical; rerroteamento fiscal ainda
 não existe.
 
+### Transição de equipe do checkpoint
+
+Um checkpoint só produz demanda de trabalho `merchant` quando está materialmente
+ativo, sua capacidade de inspeção paga foi realmente esgotada no dia e não há
+merchant local plenamente disponível. A engine emite o `labor_shortfall` tipado
+do próprio checkpoint e calcula demanda, oferta, `target_occupation`, quantidade
+e estipêndio; nenhum desses termos vem da prosa ou do ator.
+
+A oferta privada só alcança um grupo local de farmers totalmente disponível. A
+decisão contém apenas os IDs atuais do aviso e da opção. Ao aceitar, Society
+revalida caixa, autoridade, demanda e disponibilidade, paga o estipêndio e
+reserva a fração por 30 dias. Depois, a resolução converte a fração em
+`merchant` e a vincula como `staff_group` do checkpoint para payroll futuro.
+Não há educação genérica, população, migração, autoaceite, UI/API ou outras
+ocupações nessa V1.
+
 ## Desgaste por uso
 
 Integridade continua sendo estado físico dono do Map. O ciclo medieval aplica
@@ -155,6 +171,39 @@ causaram. O `SiteReport` produzido no mesmo ciclo torna a condição observável
 mantenedor, mas não executa reparo nem reativa `enabled=false`: a recuperação
 continua sendo um lote explícito de `repair_batch_decided`, com seus materiais,
 salários e capacidade revalidados.
+
+## Conveyance produtiva V1
+
+Uma conveyance é uma decisão bilateral sobre um workshop já comissionado. O site
+do mapa é a identidade física que permanece; o proprietário/mantenedor atual
+apresenta uma opção transitória determinística, e uma contraparte elegível recebe
+uma opção de aceitação reconstruída a partir dessa decisão. O executor canônico
+recompõe a opção no dia atual e revalida owner, maintainer, autoridade `supply` e
+`trade`, integridade, ausência de projeto ativo e os vínculos locais da instalação.
+
+Ao concluir, somente o owner e o maintainer do site e os `stock_id` e
+`payroll_account_id` da instalação são atualizados. O estoque, seu conteúdo, as
+contas monetárias, projetos e demais recursos continuam pertencendo aos seus
+donos; a operação tem preço zero nesta V1. Os eventos de proposta, aceitação e
+execução preservam as decisões e suas causas, e as affordances não são persistidas.
+
+Esse fluxo não introduz `PropertyTitle` nem um mercado imobiliário: não cobre
+arrendamento, herança, captura militar, guerra, ocupação, transferência genérica
+de patrimônio ou controles no observatório/UI. Ele existe apenas para provar a
+mudança bilateral de controle de uma instalação produtiva real e seus vínculos
+operacionais.
+
+## Mobilidade produtiva V1
+
+Uma limitação `labor` em recibo material de produção artesanal é a única base
+para uma demanda local de transição. O engine limita a demanda a uma pessoa por
+observação e calcula o estipêndio; não infere educação pela prosa. Ofertas são
+privadas, datadas e destinadas a agricultores locais, no máximo 20% do grupo.
+Elas não reservam pessoas nem moeda. Uma decisão corrente paga o estipêndio e
+cria indisponibilidade por 30 dias; a resolução revalida fonte, autoridade,
+contas e disponibilidade antes de mover a fração agregada para `artisan`.
+Esta vertical não modela escola, aprendizagem individual, migração especializada,
+aceitação autônoma ou IA real.
 
 ## Relatório fiscal de rota
 

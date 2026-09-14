@@ -29,7 +29,9 @@ def research_blocker(world, technology, site_id, stock_id, account_id, researche
         return 'researcher_absent'
     if getattr(lead.skills, technology.skill) < technology.min_skill:
         return 'qualification'
-    if any(a.character_id == lead.id for a in world.activities.values()):
+    if (any(a.character_id == lead.id for a in world.activities.values())
+            or any(a.specialist_id == lead.id and a.stage == 'training'
+                   for a in world.research.apprenticeships.values())):
         return 'researcher_busy'
     return None
 
@@ -70,7 +72,9 @@ def learn_technology(world, owner, technology_id, channel, causes):
         return
     key = f'technology:{owner.kind}:{owner.id}:{technology_id}'
     technology = world.research.technologies[technology_id]
-    event = record_event(world, 'technology_discovered' if channel == 'research' else 'technology_taught',
+    event = record_event(world, {'research': 'technology_discovered', 'teaching': 'technology_taught',
+                                 'apprenticeship': 'technology_apprenticed',
+                                 'copied': 'technique_copy_completed'}[channel],
         f'{technology.name}: conhecimento adquirido; instalações e equipamentos não foram criados.',
         fact_kind=FactKind.STATE_TRANSITION, cause_ids=causes,
         deltas=(_delta('technical_knowledge', key, 'technology_id', None, technology_id),))

@@ -3,17 +3,18 @@
 
 class RegistrySerialization:
     registries = {}
+    schema_version = 1
 
     def to_dict(self):
         self.validate()
-        return {"schema_version": 1, **{
+        return {"schema_version": self.schema_version, **{
             name: {key: item.model_dump(mode="json") for key, item in sorted(getattr(self, name).items())}
             for name in self.registries}}
 
     @classmethod
     def from_dict(cls, data):
         if (not isinstance(data, dict) or set(data) != {"schema_version", *cls.registries}
-                or type(data["schema_version"]) is not int or data["schema_version"] != 1):
+                or type(data["schema_version"]) is not int or data["schema_version"] != cls.schema_version):
             raise ValueError("invalid governance state schema")
         parsed = {}
         for name, model in cls.registries.items():

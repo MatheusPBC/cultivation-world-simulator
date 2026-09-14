@@ -6,12 +6,16 @@ site state which was changed by history carries the fact that changed it, and
 that a repair obligation still refers to a real site, maintainer and blueprint.
 """
 
+import json
+
 from src.classes.event import FactKind
 
 
 def site_aspect(site, aspect):
     return {"integrity": str(site.integrity), "enabled": str(site.enabled),
-            "service_suspended": str(site.service_suspended)}.get(aspect)
+            "service_suspended": str(site.service_suspended),
+            "owner_ref": json.dumps(site.owner_ref.to_dict(), sort_keys=True) if site.owner_ref else "None",
+            "maintainer_ref": json.dumps(site.maintainer_ref.to_dict(), sort_keys=True) if site.maintainer_ref else "None"}.get(aspect)
 
 
 def validate_infrastructure(world) -> None:

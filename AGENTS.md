@@ -13,8 +13,8 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 19 requires the current snapshot shape and rejects incomplete
-  configuration and older experimental saves (schema 18 and below), preserved
+  save schema 28 (Society schema 4, economy schema 11) requires the current snapshot shape and rejects incomplete
+  configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
 - Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
@@ -58,8 +58,23 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   identity and route facts before opening freight. Existing orders are immutable
   and never rerouted. There is no force, confiscation, blockade, secret route or
   actor-invented fiscal selection in this vertical.
+- A blocked `FreightOrder` (`freight_recovery.py`) is history: its original route,
+  quantity, decisions and receipts stay immutable and are never rewritten,
+  rerouted or re-executed. `wait`/`successor` are transient, engine-enumerated
+  affordance objects are transient and never persisted; only the selected
+  affordance ID may persist in the decision, receipt and causal provenance. Only
+  the owner's own unpaid, undelivered internal transfer is
+  recoverable today. A blocked bilateral purchase has a separate V1 in
+  `purchase_recovery.py`: only an already-paid, tariff-free, wholly blocked
+  purchase with no partial delivery qualifies. The buyer requests an
+  engine-enumerated alternative and the seller independently accepts or rejects
+  it. The original order, payment and parcel remain immutable; acceptance
+  returns the parcel explicitly to seller stock and opens a successor from
+  fresh stock without a second payment. No refund, tariff, automatic recovery,
+  public UI/API or affordance dispatcher exists in this vertical. There is no
+  force or military blockade here.
 - Economy owns expansion blueprints/projects, repairs, migration provisions and
-  civil customs checkpoints/manifests (economy schema 10; older schema 9 references are
+  civil customs checkpoints/manifests (economy schema 11; older schema 10 references are
   historical). Construction and
   production share monthly workforce and wage/tax settlement. Materials and paid
   work accumulate before capacity changes; completed projects cannot repeat.
@@ -69,6 +84,61 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   cycle under the engine law. It uses no climate/random event and never repairs or
   re-enables a site automatically; the same-cycle report exposes the damage so the
   existing maintainer repair decision can respond.
+- Regional overflow is a medieval-only, Map-owned seasonal law using declared
+  water bodies and elevation. It requires two consecutive high assessments and
+  damages at most one aquatic site per occurrence; reports observe damage in the
+  same cycle. Dao exposes occurrences, actors do not receive canonical climate.
+  There is no legacy climate/xianxia path, drought/population/harvest coupling,
+  disaster quota, automatic repair/maintenance decision, or public UI/API.
+- Productive-site conveyance is a minimal bilateral institutional decision for an
+  already commissioned workshop. The Map site is the physical identity: a seller
+  proposes and a buyer accepts an engine-enumerated option, then the canonical
+  executor revalidates owner/maintainer authority and buyer-local stock/payroll
+  bindings before changing them. Inventory, balances and projects remain where
+  they are. This V1 has no PropertyTitle, lease, inheritance, capture/war or UI
+  control surface; it is not a generic property system.
+- Workforce transition is a Society-owned, dated V1 for local aggregate groups:
+  actual artisan labor limitation produces an engine-bounded demand report, and
+  a private dated offer can be accepted only by an eligible local farmer group.
+  Offers reserve neither people nor funds; an exact current decision is required.
+  Acceptance pays a stipend, marks the selected people unavailable for 30 days,
+  and the resolver revalidates the source before transferring them to artisan.
+  This is not generic education, autonomous acceptance, or real-AI strategy.
+- Customs-to-workforce is narrowly bounded: an active checkpoint with paid
+  inspection capacity actually exhausted today and no local available merchant
+  emits typed `labor_shortfall`. The engine owns demand, offer, target occupation,
+  stipend and reservation; a local farmer group selects only current IDs, receives
+  the stipend, is reserved 30 days, then becomes `merchant` and the checkpoint's
+  `staff_group` for later payroll. No generic education, population change,
+  migration, autoacceptance, UI/API control or other occupation is introduced.
+- Institutional food aid is a prepared/direct-executor vertical. The requester
+  uses only its own current causal `SettlementReport.missing_food` and selects a
+  transient engine-enumerated option; the persisted notice contains only
+  engine-owned `requested_food` from that causal requester report, never a live
+  requester report. It discloses no provider offer, inventory or route. The
+  provider evaluates the notice against its own stock and dated fiscal reports,
+  then independently accepts or rejects it.
+  Acceptance changes no stock, money or freight. A later current supply decision
+  revalidates authority, dated fiscal-route knowledge and supply, opens canonical
+  food freight, fulfills the obligation at dispatch, and leaves arrival to
+  logistics. A missed dispatch persists as a breach; remediation requires a later
+  provider decision, a private breach notice, current authority/stock/valid-route
+  revalidation, and opens a new freight without erasing the breach. There is no
+  automatic policy, real-AI decision, public mutation UI/API or foreign-inventory
+  disclosure. RelationsState persists only active InstitutionalMemory records
+  (`id`, `institution_ref`, `event_id`, `recorded_day`, `last_reinforced_day`);
+  KnowledgeState remains the owner of fact knowledge through DiplomaticNotice.
+  Each memory must reference its canonical state-transition fact and its creation
+  or reinforcement receipt delta. Salience/view are pure derived read models over
+  360 days. V1 derives only the aid view (creditor sees breach -4, remediation
+  +2); there is no generic stored social score or LLM factor, UI/API, real-AI or
+  general-strategy surface. A deterministic `routine-rules` fallback allows at
+  most one action per polity/review in priority `respond`, `fulfill`, `remediate`,
+  `request`; requests name only a blocked food plan, current shortfall and one
+  open chain/settlement, while accept/fulfill/remediate use current valid options.
+  The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
+  older than schema 28 are rejected and preserved
+  without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
   needs the line and its commissioning receipt; advanced recipes need owned
@@ -246,7 +316,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 40. `AuthorityClaim` 的生命周期只能是 `active`/`withdrawn`/`defeated`/`expired`；`can_actor_act_for(actor, institution, scope)` 必须从当前 canonical state 确定性计算，禁止缓存或从叙事文本推断。`ImperialCrisis` 只产出 `AuthorityClaim`，不直接授予领土、承认或物理控制。
 41. V1 中城市机构以其 `CityRegion` 标识，这是当前版本的身份简化，不得在代码或文档中当作永恒领域真相描述；跨领域引用一律使用 `EntityRef`，为未来拆分机构与地点身份留出空间。禁止在 V1 新增独立的 `CityInstitution`。
 42. `InstitutionalCommitment` 的 `Term` 状态只能是 `proposed`/`active`/`fulfilled`/`breached`/`remediation_proposed`/`remediated`/`cancelled`/`expired`；聚合状态必须由 Term 派生，不得单独存储。Term 保存引擎枚举并被双方接受的不可变机械参数（包括引擎计算的数量），但不得拥有或预留库存。履约与补救都必须经过新的决策、当前 affordance、材料可行性与权限校验，再由 canonical owner 执行；到期未履约可以派生违约/过期事实，但不得自动执行任何物质转移；补救只解决当前义务，不得抹除历史违约事实。
-43. 知识系统是"谁知道某个事实"的唯一所有者；`InstitutionalMemory` 只记录已知 canonical 事实对某机构的重要程度，且每条记忆必须引用 canonical event ID。历史权重只使用相对规模、机构变动、承诺违约与对 `InstitutionalIdentityAnchor` 的影响这四类因素，未经模拟证据不得新增其他因子。
+43. 知识系统是"谁知道某个事实"的唯一所有者；`InstitutionalMemory` 只记录已知 canonical 事实对某机构的活动关联，且每条记忆必须引用 canonical event ID 及其 receipt/delta。当前 V1 的 salience/view 是 360 天线性派生读模型；仅 aid 视图使用 breach -4 与 remediation +2，不保存通用 social score、LLM 因子或 general strategy。
 44. 所有机构类选择（认领、正式承认、主动履约、故意采取不兼容行动、补救、建立关系）必须落为不携带 `StateDelta` 的 `FactKind.DECISION` + `AgentDecision`；其 `actor_ref` 可以是机构，office/holder 只通过 `can_actor_act_for` 授权。canonical owner 随后以独立、指向该决定的 state-transition 事件携带 `StateDelta`；到期未履约等违约也可以从事实确定性派生。LLM/Story 只能在引擎枚举的 `DomainAffordance` 中选择或做事后解读，不得凭空发明证据、数量、目标、条款或权限。`CasusBelliReading` 中缺失的证据保持未知，不得由文本臆造填充，且其本身不构成开战或认领的授权。
 
 ## 4. `.cursor/skills` 沉淀

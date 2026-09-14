@@ -1,5 +1,16 @@
 # Autoridade, informação e abastecimento autônomo
 
+## Fallback determinístico de ajuda alimentar
+
+O pedido persistido contém somente `requested_food`, valor engine-owned derivado do
+`SettlementReport.missing_food` causal atual do requester; não contém report vivo,
+oferta, estoque ou rota do provider. O provider avalia o aviso contra seu próprio
+stock e relatórios fiscais datados. O fallback `routine-rules` não é IA real: cada
+polity executa no máximo uma ação por revisão, na prioridade `respond`, `fulfill`,
+`remediate`, `request`. Request usa apenas plano alimentar bloqueado, shortfall
+atual e uma cadeia/settlement aberto; as demais ações usam opções atuais válidas.
+A agenda permite request em N, reply em N+1 e fulfillment em N+2.
+
 Primeira política institucional executável das etapas2/3. Não equivale a toda a
 estratégia/diplomacia do plano nem à integração de LLM.
 
@@ -145,7 +156,7 @@ Falha técnica de execução/save aborta o salto inteiro, não vira recusa do ve
 ## Persistência e observação
 
 Schema8 inclui alvos/relatórios por recurso e projetos econômicos; o save atual é
-schema19 e a economia interna é schema10. Schemas1–18 experimentais são preservados e
+schema21 e a economia interna é schema11. Schemas1–20 experimentais são preservados e
 rejeitados, sem migração silenciosa. Load confere identidades, referências,
 proveniência e canais; retomada mantém observações/intenções/pedidos/RNG.
 
@@ -156,6 +167,19 @@ carga pendente, etapa, impedimento, data da avaliação e boletins conhecidos.
 O painel de inspeção de rota mostra o conhecimento datado por instituição ao
 lado da capacidade canônica atual da rota selecionada. Ver causa navega para
 os eventos canônicos. Nenhum novo comando material público.
+
+## Transição produtiva local
+
+Uma limitação de trabalho artesanal observada por um recibo material pode gerar
+uma demanda `WorkforceDemandReport`, com quantidade e estipêndio calculados pelo
+engine. O conhecimento é datado e o aviso direto alcança somente grupos de
+agricultores locais plenamente disponíveis; não reserva população, caixa ou
+aceitação. O grupo escolhe uma opção enumerada e registra a decisão atual. O
+owner Society paga o estipêndio e mantém a fração selecionada indisponível por
+30 dias; na resolução, revalida demanda, fonte, autoridade, saldo e grupo antes
+da transferência agregada para `artisan`. O limite de 20% por grupo e a demanda
+de uma pessoa por observação são leis engine-owned V1, não parâmetros de prosa.
+Não há educação geral, oferta remota, aceitação automática ou decisão por IA real.
 
 ## Evidência e limites
 

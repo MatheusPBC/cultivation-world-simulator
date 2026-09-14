@@ -200,6 +200,21 @@ class InfrastructureSite:
             self.last_event_id = last_event_id
         return changed
 
+    def transfer_control(self, owner_ref: EntityRef, maintainer_ref: EntityRef) -> bool:
+        """Transfer the institutional control of this physical site.
+
+        Ownership is part of the Map's canonical identity and therefore cannot
+        be changed through ordinary attribute assignment.  Material owners
+        call this narrow method only after the conveyance executor has
+        revalidated both decisions and the linked economic bindings.
+        """
+        if not isinstance(owner_ref, EntityRef) or not isinstance(maintainer_ref, EntityRef):
+            raise ValueError("site control requires entity references")
+        changed = self.owner_ref != owner_ref or self.maintainer_ref != maintainer_ref
+        object.__setattr__(self, "owner_ref", owner_ref)
+        object.__setattr__(self, "maintainer_ref", maintainer_ref)
+        return changed
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,

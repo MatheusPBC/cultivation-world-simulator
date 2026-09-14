@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-Atualizado em 13/09/2026. Este documento descreve o WIP local que será publicado
+Atualizado em 14/09/2026. Este documento descreve o WIP local que será publicado
 na branch de trabalho; não é uma declaração de produto concluído.
 
 ## Visão que orienta o fork
@@ -18,8 +18,8 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
 
 ## O que já existe no WIP local
 
-- Runtime medieval separado, configuração persistente e save schema 19 (Society2,
-  Economy10); dados de execução usam namespace próprio e saves schema 18 e anteriores são rejeitados,
+- Runtime medieval separado, configuração persistente e save schema 32 (Society4,
+  Economy11); dados de execução usam namespace próprio e saves antigos são rejeitados,
   preservados sem sobrescrita ou migração.
 - Calendário híbrido de 12 meses de 30 dias. Rotinas agregadas usam o salto mensal;
   agendas, prazos, viagem, carga e situações ativas podem exigir processamento por
@@ -89,6 +89,108 @@ explica fatos; nunca cria recursos, vitórias, mortes, obrigações ou consequê
   sem posto (taxa zero); relatórios vencidos, IDs inventados e postos divergentes
   são rejeitados. Ordens existentes não são redirecionadas, e a camada não cria
   força, confisco, bloqueio ou rotas secretas.
+- Conveyance produtiva V1 permite transferir bilateralmente o controle institucional
+  de um workshop já comissionado. As duas decisões são opções transitórias
+  enumeradas pelo engine; o executor revalida identidade física do site,
+  owner/maintainer, autoridade e vínculos locais de estoque e folha antes de
+  alterar o Map e a instalação. Estoques, saldos e projetos não são movidos.
+  Não existe ainda `PropertyTitle`, arrendamento, herança, captura de guerra nem
+  controle dessa operação na UI.
+- Recuperação de frete bloqueado (`freight_recovery.py`): a `FreightOrder`
+  original é imutável — rotas, quantidade, decisões e recibos nunca são
+  reescritos, reroteados ou reexecutados. `wait`/`successor` são opções
+  transitórias enumeradas pelo engine a cada chamada, nunca persistidas; a
+  decisão só nomeia o ID da opção. Por ora, só uma transferência interna não
+  paga e ainda não entregue é recuperável; uma compra bilateral bloqueada exige
+  sua própria decisão bilateral futura e não é rerroteada por este módulo.
+  Escolher `successor` retira estoque novo e abre uma ordem própria com
+  vínculos causais para a decisão e para a ordem bloqueada, sem restituição
+  nem duplo pagamento sobre a original. Não há rotina automática, força ou
+  bloqueio militar nesta vertical.
+- Recuperação bilateral de compra pré-paga (`purchase_recovery.py`) agora cobre
+  a V1 específica de compra já paga, sem tarifa, sem entrega parcial e com o
+  frete integralmente bloqueado. O comprador solicita uma rota fiscal alternativa
+  por opção transitória; o vendedor aceita ou recusa em decisão independente.
+  Ordem, pagamento, recibo e carga originais permanecem imutáveis. Na aceitação,
+  a carga original é explicitamente devolvida ao estoque do vendedor e uma ordem
+  sucessora usa estoque novo sem novo pagamento; a execução registra deltas e
+  causas correspondentes. Não há refund, tarifa, recuperação automática,
+  despachante de affordances, UI ou API pública para essa vertical.
+- Fornecimento recíproco V1 permite que um settlement com plano alimentar bloqueado
+  ofereça uma concessão que realmente possui. O requester compõe a proposta apenas
+  de seu relatório, estoque, conta e rotas conhecidas; o counterpart não expõe
+  inventário privado. Aceite só vincula duas entregas independentes: alimento
+  primeiro e recurso prometido depois, cada uma com decisão atual, freight canônico,
+  dependência e breach causal quando não cumprida. Isto não é mercado geral nem
+  estratégia ampla.
+- Apprenticeship V1 difunde uma técnica por um especialista que migrou de fato e
+  reside no settlement anfitrião. O especialista oferece; a instituição anfitriã
+  patrocina, paga trabalhadores locais e uma agenda de 30 dias conclui a cópia da
+  técnica no catálogo institucional. A origem mantém seu conhecimento; não há
+  conhecimento pessoal nem treinamento geral.
+- Forças agregadas V1 levantam soldados de coortes reais, descontam rações, pagam
+  salário, marcham por rotas operacionais e podem registrar ocupação revogável de
+  settlement. Ocupação não concede administração, estoque, conta ou imposto; falta
+  de provisão/dissolução limpa a ocupação e devolve sobreviventes à coorte real.
+  Campanha, batalha, cerco, comando e solução política continuam fora deste slice.
+- Ritos restaurativos V1 são trabalho material delimitado: oficiante residente,
+  site capaz, reagentes próprios, assistentes pagos e testemunhas. A conclusão
+  reduz saúde registrada dentro do limite do blueprint; interrupção/cancelamento
+  perde os reagentes e não cria recursos, pessoas, capacidade ou controle.
+- Criaturas agora existem no runtime em uma vertical estreita: o drake do Rio Lume
+  percebe somente cargas que cruzam sua rota, pode pedir tributo, restringir sua
+  própria passagem e recuar; instituições recebem aviso e respondem com alimento
+  próprio. A decisão por provider V1 escolhe apenas IDs enumerados e registra
+  interpretação sem delta; fallback/indisponibilidade não fecha a rota. Não há
+  ainda um sistema geral de monstros, ameaças, magia ou dragões múltiplos.
+
+### Customs-to-workforce
+
+Um checkpoint civil só gera demanda de `merchant` quando está ativo, tem equipe
+e folha válidas, esgotou realmente as inspeções pagas do dia e não possui
+merchant local plenamente disponível. O `labor_shortfall` é tipado e emitido
+pela engine; demand, offer e `target_occupation` não vêm da prosa. Um farmer
+local aceita somente os IDs atuais, recebe estipêndio, fica reservado por 30
+dias e então vira `merchant`, ligado como `staff_group` para payroll posterior.
+Não há educação genérica, população, migração, autoaceite, UI/API ou outras
+ocupações.
+
+### Ajuda alimentar institucional
+
+A vertical está preparada para execução direta, mas não constitui autonomia geral
+ou Stage 2 concluída. A instituição solicitante usa somente seu próprio
+`SettlementReport` atual com `missing_food`; as affordances são objetos transitórios,
+enumerados pelo engine e não persistidos. O ID selecionado persiste somente na
+decisão, no receipt e na proveniência causal. O pedido gera um aviso privado ao
+provedor, e a aceitação ou recusa gera uma resposta privada ao solicitante. O aviso
+não leva oferta, inventário estrangeiro ou rota, e a aceitação não altera estoque,
+dinheiro ou frete. Uma decisão posterior, atual e de abastecimento do provedor
+revalida autoridade, estoque e relatórios fiscais datados de rota, abre o frete
+canônico e cumpre a obrigação no despacho; a chegada permanece sob a logística.
+Se o despacho falhar, a quebra persiste. A remediação exige decisão posterior do
+provedor, aviso privado da quebra e nova validação de autoridade, estoque e rota
+atual; abre um novo frete e nunca apaga a quebra original. Não há política
+automática, decisão por IA real, mutação pública na UI/API ou divulgação de
+inventário estrangeiro. O aviso persistido contém somente `requested_food`, quantidade
+engine-owned derivada do relatório causal atual do requester; nunca é um relatório
+vivo. O provider avalia-o contra seu próprio stock e relatórios fiscais datados.
+No fallback determinístico `routine-rules`, cada polity faz no máximo uma ação por
+revisão, na prioridade `respond`, `fulfill`, `remediate`, `request`. Request usa
+somente plano alimentar bloqueado, shortfall atual e uma cadeia/settlement aberto;
+as demais ações exigem opções atuais válidas. A agenda permite request em N, reply
+em N+1 e fulfillment em N+2; isso não é IA real nem Stage 2.
+
+### Memória institucional
+
+`KnowledgeState` continua sendo o owner do conhecimento factual por meio de
+`DiplomaticNotice`; `RelationsState` persiste apenas memórias institucionais
+ativas com `id`, `institution_ref`, `event_id`, `recorded_day` e
+`last_reinforced_day`. Cada memória aponta para o fato canônico de transição e
+para o receipt/delta que a criou ou reforçou. Saliência e view são read models
+puros, derivados no momento da leitura com decaimento linear em 360 dias. A V1
+tem somente a view direcional de ajuda: o credor vê breach como -4 e remediação
+como +2. Não há score social genérico persistido, fator de LLM, UI/API, IA real
+ou estratégia geral nessa camada.
 
 ## Evidência disponível e limites
 
@@ -213,11 +315,33 @@ A estabilização inicial está verificada apenas nos recortes testados acima; i
 não encerra o roadmap nem constitui aprovação global. O WIP continua local e não
 publicado.
 
+Evidência atual da vertical de ajuda (histórica, schema28): o recorte focado aprovou 33 testes de
+política/ajuda/memória/customs em 16,51s. O smoke natural de 120 dias (seed 73)
+salvou schema 28 com 2.867 eventos, 32
+`orders` e 76.000 moedas; alimentos e recursos foram conservados e a continuação
+após save/load foi equivalente. Não houve eventos de ajuda nem chamadas de IA real
+nesse mundo estável — ambos são resultados válidos, não uma exigência de drama.
+
+Validação recente dos slices novos: o recorte
+`tests/test_medieval_reciprocal_supply.py tests/test_medieval_apprenticeship.py
+tests/test_medieval_force.py tests/test_medieval_rites.py
+tests/test_medieval_creatures.py tests/test_medieval_creature_autonomy.py
+tests/test_medieval_ai_decision.py` aprovou 16 testes em 12,16s. Isso cobre os
+contratos focados, inclusive decisão por provider com fallback e save/load do
+drake; não é suíte global, smoke natural ou prova de provider remoto/deploy.
+
 **Etapa1 do roadmap está PARCIAL.** O que já existe (fundação, informação
 datada, abastecimento/logística/mercados, diplomacia determinística, conhecimento
-de rotas, migração temporal/provisão e obrigação material de reparo) está coberto pelos recortes de teste
-acima. Ainda faltam, explicitamente: hazards naturais, clima e desgaste,
-mobilidade/treinamento de força de trabalho (as vilas são todas farmer, então
+de rotas, migração temporal/provisão, obrigação material de reparo, desgaste por
+uso, conveyance produtiva bilateral, fornecimento recíproco, apprenticeship,
+forças/destacamentos, rito restaurativo, criatura do Rio Lume e decisão por provider
+V1)
+está coberto pelos recortes de teste acima. O overflow regional sazonal já existe
+como vertical limitada: Map-owned, baseada em água/elevação, exige duas avaliações
+altas consecutivas, danifica no máximo um site aquático por ocorrência, e reports
+observam no mesmo ciclo; o Dao expõe a ocorrência sem ensinar clima aos atores.
+Ainda faltam, explicitamente: outros hazards naturais e clima geral,
+mobilidade/treinamento geral de força de trabalho (a primeira transição farmer→artisan agregada já existe, mas as vilas continuam farmer, então
 o trabalho artesanal pode bloquear), genealogia profunda e difusão de conhecimento
 por migração,
   pedágios/trânsito/bloqueios/contrabando e qualquer integração de IA real.
@@ -235,7 +359,9 @@ Etapa1 não deve ser lida como encerrada.
   continuam pendentes.
 - Magia é apenas uma direção arquitetural do produto; rituais, custos, detecção,
   proteção e contramedidas ainda não foram implementados como sistemas completos.
-- Criaturas autônomas, ameaças dinâmicas e o dragão não existem no runtime atual.
+- O drake autônomo do Rio Lume e sua decisão por provider já existem nesta vertical
+  estreita; ainda faltam criaturas múltiplas, ameaças dinâmicas, dragões adicionais,
+  ecologia geral e o sistema amplo de magia/criaturas.
 - Demografia profunda, herança, famílias individualizadas e patrimônio além de
   dinheiro/provisões, pedágios, trânsito, bloqueios, contrabando e
   calibração econômica de longo prazo continuam abertos. Preços locais já existem
@@ -243,14 +369,15 @@ Etapa1 não deve ser lida como encerrada.
   mercado local completo.
 - O executor de reparo material existe apenas para os kinds catalogados; o desgaste
   por uso já existe, mas não há dano natural/climático que o acione nem reativação
-  automática de instalações interditadas.
+  automática de instalações interditadas. Conveyance existe somente para workshops
+  já comissionados e não é ainda um sistema geral de propriedade.
 - O observatório ainda não mostra campanha, criatura, estratégia geral ou todas as
   cadeias de informação. Testes de backend não substituem inspeção visual e mundos
   naturais de longa duração.
 
 ## Handoff Git
 
-A branch real desta execução é `codex/medieval-remote`, HEAD `85fe9717`, com WIP
+A branch real desta execução é `codex/medieval-remote`, com WIP
 local não commitado além desse ponto. Não há autorização de commit, push ou
 deploy nesta preparação. O remote `github-personal` é o GitHub pessoal do
 usuário; `origin` aponta para a VPS e não deve ser confundido com o destino de

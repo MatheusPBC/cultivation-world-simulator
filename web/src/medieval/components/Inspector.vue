@@ -7,6 +7,7 @@ import IncomePanel from './IncomePanel.vue'
 import ResearchPanel from './ResearchPanel.vue'
 import DiplomacyPanel from './DiplomacyPanel.vue'
 import MigrationPanel from './MigrationPanel.vue'
+import WorkforcePanel from './WorkforcePanel.vue'
 const {t,te}=useI18n()
 const {tab,data,settlement,character,site,route,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
@@ -24,13 +25,14 @@ const checkpointLabel=(checkpointId:string)=>{
 </script>
 <template>
   <aside class="inspector panel" data-testid="inspector">
-    <nav class="inspector-tabs" :aria-label="t('inspection')"><button v-for="key in (['inspection','people','governments','reserves','finances','research','diplomacy','migrations'] as const)" :key="key" :aria-pressed="tab===key" @click="tab=key">{{t(key)}}</button></nav>
+    <nav class="inspector-tabs" :aria-label="t('inspection')"><button v-for="key in (['inspection','people','governments','reserves','finances','research','diplomacy','migrations','workforce'] as const)" :key="key" :aria-pressed="tab===key" @click="tab=key">{{t(key)}}</button></nav>
     <div class="inspector-body">
       <SupplyPlans v-if="tab==='reserves'" />
       <IncomePanel v-if="tab==='finances'" />
       <ResearchPanel v-if="tab==='research'" />
       <DiplomacyPanel v-if="tab==='diplomacy'" />
       <MigrationPanel v-if="tab==='migrations'" />
+      <WorkforcePanel v-if="tab==='workforce'" />
       <template v-if="tab==='inspection'">
         <template v-if="settlement">
           <p class="eyebrow">{{label(settlement.kind)}} · {{polityName(settlement.administrator_id)}}</p><h2>{{settlement.name}}</h2>

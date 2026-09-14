@@ -44,9 +44,22 @@ descoberta por terceiros precisam de canais próprios em uma unidade posterior.
 
 ## Persistência e provas
 
-Save11 exige RelationsState e notices; schemas1–10 são preservados e rejeitados.
+O save atual exige `RelationsState`, notices e memória institucional no schema
+28; schemas anteriores são preservados e rejeitados, sem migração ou sobrescrita.
 Validação liga condições ao recibo original e status ao próprio evento de mudança;
 obrigações aceitas, pagamento/ensino e prazos mantêm referências causais.
+
+### Conhecimento e memória institucional
+
+`KnowledgeState` é o owner do conhecimento factual: cada parte recebe seu
+`DiplomaticNotice` privado. `RelationsState` não copia o conteúdo do fato; ele
+persiste somente a `InstitutionalMemory` ativa (`id`, `institution_ref`,
+`event_id`, `recorded_day`, `last_reinforced_day`). A memória precisa apontar
+para o evento canônico de transição conhecido e para o receipt/delta que registra
+sua criação ou reforço. Saliência e view são derivadas na leitura, com decaimento
+linear em 360 dias, sem mutar o estado. Na V1, apenas ajuda alimentar tem view
+direcional: o credor lê breach como -4 e remediação como +2. Não existe score
+social genérico salvo, fator de LLM, UI/API, IA real ou estratégia geral.
 
 Testes preparados em tests/test_medieval_diplomacy.py provam contraproposta100→80, oferta anterior não aceitável,
 aceitação sem transferência, pagamento80 pelo owner econômico, ensino dependente
@@ -65,6 +78,34 @@ intenção de trair e descoberta por terceiros ainda não têm política/executo
 Ensino continua institucional e imediato quando executado, não curso com duração.
 Propostas superadas/aceitas deixam o lembrete de expiração na agenda: ele é
 consumido sem efeitos, podendo produzir um salto intermediário inócuo.
+
+## Ajuda alimentar institucional (vertical preparada)
+
+A ajuda alimentar é um executor direto delimitado, não uma política automática nem
+uma conclusão da Stage 2. O solicitante recompõe opções transitórias apenas a partir
+do seu próprio `SettlementReport` atual com `missing_food`; as affordances são
+objetos transitórios e não são persistidas. O ID selecionado persiste somente na
+decisão, no receipt e na proveniência causal. O pedido entrega ao provedor somente
+um aviso privado, e a aceitação ou recusa produz uma resposta privada ao
+solicitante; nenhum desses avisos revela oferta, estoque estrangeiro ou rota. O
+único valor quantitativo persistido é `requested_food`, calculado pelo engine a
+partir do relatório causal atual do requester, não um report vivo; o provider
+avalia-o contra seu próprio stock e relatórios fiscais datados.
+O provedor decide aceitar ou recusar de forma independente.
+
+Aceitação não movimenta estoque, dinheiro ou frete. Uma decisão posterior, atual e
+de abastecimento do provedor recompõe os termos com autoridade, oferta e relatórios
+fiscais datados de rota, revalida a rota válida, abre o frete de comida e marca a
+obrigação como cumprida no despacho; a chegada e qualquer bloqueio posterior
+continuam pertencendo à logística. Se o despacho não ocorrer, a quebra persiste.
+Sua remediação exige nova decisão do provedor, aviso privado da quebra, autoridade,
+estoque e rota atualmente válidos; abre um novo frete e nunca apaga a quebra
+original. Não há decisão por IA real, mutação pública por UI/API ou divulgação de
+inventário estrangeiro nessa vertical. O fallback `routine-rules` faz no máximo uma
+ação por polity/revisão, na prioridade `respond`, `fulfill`, `remediate`, `request`;
+request usa apenas plano bloqueado, shortfall atual e uma cadeia/settlement aberto,
+e as demais ações exigem opções atuais válidas. A agenda permite request N, reply
+N+1 e fulfillment N+2.
 
 ## Integração autônoma determinística (implementada)
 

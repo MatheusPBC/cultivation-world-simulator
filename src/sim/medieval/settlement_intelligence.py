@@ -21,8 +21,16 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
     day = world.clock.absolute_day
     key = settlement_report_id(actor, settlement_id)
     previous = world.knowledge.settlement_reports.get(key)
+    rite_underway = any(rite.settlement_id == settlement_id and rite.stage == "officiating"
+                        for rite in world.research.rites.values())
+    protest_underway = any(protest.settlement_id == settlement_id and protest.stage == "open"
+                           for protest in world.society.civic_protests.values())
+    warded = any(ward.settlement_id == settlement_id and ward.until_day > day
+                 for ward in world.research.wards.values())
     if (previous is not None and previous.observed_day == day
-            and previous.recipient_ref == actor and previous.publisher_ref == actor):
+            and previous.recipient_ref == actor and previous.publisher_ref == actor
+            and previous.rite_underway == rite_underway and previous.protest_underway == protest_underway
+            and previous.warded == warded):
         return previous
     settlement = world.society.settlements[settlement_id]
     need = world.economy.needs[settlement_id]
@@ -31,6 +39,14 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
                               present_population=world.society.present_population_at(settlement_id),
                               housing_capacity=settlement.housing_capacity, health=need.health,
                               missing_food=need.missing_food, unrest=need.unrest,
+                              occupier_id=settlement.occupier_id,
+                              # Only that a rite is underway here: never who
+                              # performs it, with what skill, stock or funds.
+                              rite_underway=rite_underway,
+                              protest_underway=protest_underway,
+                              # Standing protective works are visible; the rite
+                              # that raised them and its sponsor are not.
+                              warded=warded,
                               channel="local_settlement_report", event_id="pending")
     event = record_event(world, "settlement_observed",
                          f"{settlement.name}: {report.present_population}/{report.population} presentes, saúde {report.health}/1000.",
@@ -52,6 +68,22 @@ def observe_present_household(world, group_id, settlement_id, journey_event_id):
         raise ValueError("settlement observation requires the household's stranded journey")
     return _observe(world, EntityRef("population_group", group_id), settlement_id,
                     presence_causes=(journey_event_id,))
+
+
+def observe_present_force(world, detachment_id):
+    """A detachment standing somewhere lets its owner observe that place.
+
+    Reconnaissance produces knowledge and nothing else: no control, no access
+    to anyone's stock, and no reading of another institution's force.
+    """
+    detachment = world.society.detachments.get(detachment_id)
+    if detachment is None or detachment.stage != "present":
+        raise ValueError("settlement observation requires a present detachment")
+    report = _observe(world, detachment.owner_ref, detachment.location_id,
+                      presence_causes=(detachment.last_event_id,))
+    from .rites import observe_rites
+    observe_rites(world, settlement_id=detachment.location_id)
+    return report
 
 
 def _recipients(world):
@@ -98,7 +130,7 @@ def _publish(world, report):
 
 
 def refresh_settlement_reports(world):
-    """Publish no mandatory gossip: only supplied administrations and local cohorts observe."""
+    """Publish no mandatory gossip: only supplied administrations and local residents observe."""
     for settlement_id in sorted(world.society.settlements):
         settlement = world.society.settlements[settlement_id]
         actors = []
@@ -106,10 +138,47 @@ def refresh_settlement_reports(world):
             admin = EntityRef("polity", settlement.administrator_id)
             if can_actor_act_for(world, admin, admin, "supply"):
                 actors.append(admin)
+        # An institution that owns a local site can inspect the settlement it
+        # operates in.  This is still an actor-specific observation: it does
+        # not expose another institution's stock or accounts, and it creates
+        # no report while merely enumerating affordances.
+        site_owners = {
+            site.owner_ref
+            for site in world.map.infrastructure_sites.values()
+            if site.owner_ref is not None and settlement.region_id in site.region_ids
+        }
+        actors.extend(
+            owner for owner in sorted(site_owners, key=lambda item: (item.kind, item.id))
+            if can_actor_act_for(world, owner, owner, "supply")
+        )
         actors.extend(EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
                       if world.society.population[group_id].settlement_id == settlement_id
                       and world.society.available_count(group_id) > 0)
+        # Relevant named residents make the same aggregate local observation as
+        # their cohort. This grants neither stores, accounts, offices nor
+        # information about other settlements.
+        actors.extend(
+            EntityRef("character", character_id)
+            for character_id, character in sorted(world.society.characters.items())
+            if character.death_day is None and character.location_id == settlement_id
+        )
         for actor in actors:
             report = _observe(world, actor, settlement_id)
             if actor.kind == "polity":
                 _publish(world, report)
+    from .rites import observe_rites
+    observe_rites(world)
+
+
+def refresh_existing_local_settlement_reports(world, settlement_id):
+    """Refresh a changed local status without creating new observers.
+
+    Some public flags (such as a civic demand underway) are readable only by
+    actors who already held a direct local observation.  This helper therefore
+    never publishes a new bulletin and never turns mere reachability into
+    knowledge; it only replaces an existing own local report.
+    """
+    for report in tuple(world.knowledge.settlement_reports.values()):
+        if (report.settlement_id == settlement_id and report.recipient_ref == report.publisher_ref
+                and report.channel == "local_settlement_report"):
+            _observe(world, report.recipient_ref, settlement_id)

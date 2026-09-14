@@ -13,7 +13,7 @@ def create_authority(society):
         for identity in sorted(registry):
             ref = EntityRef(kind=kind, id=identity)
             office = AuthorityOffice(id=f"office:{kind}:{identity}", institution_ref=ref,
-                                     holder_ref=ref, scopes=("trade", "supply", "taxation", "research", "diplomacy") if kind == "polity" else ("trade", "supply", "research", "diplomacy"))
+                                     holder_ref=ref, scopes=("trade", "supply", "taxation", "research", "diplomacy", "military") if kind == "polity" else ("trade", "supply", "research", "diplomacy"))
             state.offices[office.id] = office
     for polity_id in society.polities:
         state.tax_policies[polity_id] = TaxPolicy(id=polity_id, account_id=f"treasury:{polity_id}")

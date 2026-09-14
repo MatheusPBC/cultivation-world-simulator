@@ -77,13 +77,17 @@ state changes.
   breach.
 - A missed due date may produce a deterministic breach or expiry fact, but
   never performs the promised material action automatically.
-- `InstitutionalKnowledgeState` is the sole owner of which institution knows a
-  fact.
-  `InstitutionalMemory` records only how much a known canonical fact matters to
-  an institution. Every memory references canonical event IDs.
-- Active memory has salience, decay, and reinforcement. Engine-owned historical
-  weight uses only relative scale, institutional change, commitment breach,
-  and impact on an `InstitutionalIdentityAnchor`.
+- `KnowledgeState` is the sole owner of which institution knows a fact, through
+  a private `DiplomaticNotice`. `RelationsState` persists only active
+  `InstitutionalMemory` records with `id`, `institution_ref`, `event_id`,
+  `recorded_day`, and `last_reinforced_day`; memory copies no fact content.
+- Every memory must reference a known canonical state-transition fact and the
+  receipt/delta that created or reinforced it. Salience and institutional views
+  are pure derived read models with linear 360-day decay; reads do not mutate
+  the world.
+- The implemented V1 has one directional aid view: the creditor reads a breach
+  as `-4` and remediation as `+2`. There is no generic persisted social score,
+  no LLM factor, and no general strategy, UI, or API surface for memory.
 - Identity anchors reference canonical founders, headquarters/capitals, core
   relics, sacred sites, or founding commitments.
 
@@ -133,7 +137,8 @@ story-driven execution path.
 5. Route decisions through transient `DomainAffordance` options or `NO_ACTION`,
    with owner-side recomposition and stale-option rejection.
 6. Add fulfillment, breach, remediation, memory decay/reinforcement, and their
-   effect on future decisions.
+   effect on future decisions. The current aid slice is deliberately bounded to
+   the derived directional view above.
 7. Expose the full chain through API and Dao UI.
 8. Generate factual prehistory from engine-enumerated valid episodes; LLMs may
    select and interpret, while owners execute canonical effects.

@@ -54,6 +54,10 @@ class WorldAgenda:
             raise ValueError(f"situation {situation.id!r} is already scheduled")
         self._situations[situation.id] = situation
 
+    def cancel(self, situation_id: str) -> bool:
+        """Remove one pending situation after its owner resolved it early."""
+        return self._situations.pop(situation_id, None) is not None
+
     def pop_due(self, day: int) -> tuple[ScheduledSituation, ...]:
         if isinstance(day, bool) or not isinstance(day, int):
             raise TypeError("day must be an integer")

@@ -92,8 +92,8 @@ def damage_site(world, site_id, *, event_id):
             if delta.after != "False" or not site.enabled:
                 raise ValueError("this fact can only interdict an operating site")
             updates["enabled"] = False
-    site.update_runtime(**updates, last_event_id=event.id)
-    return site
+    world.map.update_infrastructure_site_runtime(site_id, **updates, last_event_id=event.id)
+    return world.map.infrastructure_sites[site_id]
 
 
 def start_repair(world, site_id, blueprint_id, *, decision_event_id):
@@ -153,7 +153,13 @@ def _limits(world, project, site, blueprint, stock, account, available, report):
         limits["locality"] = 0
     if report is None:
         limits["observation"] = 0
-    return limits
+    return limits, artisans
+
+
+def _labor_shortfall(limits, artisans, blueprint):
+    """Artisans still missing for the batch every other condition would allow."""
+    intended = min(value for key, value in limits.items() if key != "labor")
+    return max(1, math.ceil(blueprint.workers * intended / blueprint.restored_permille) - artisans)
 
 
 def _reason(world, blocker):
@@ -171,18 +177,23 @@ def _progress_repair(world, project, available, day):
     blueprint = economy.repair_blueprints[project.blueprint_id]
     stock, account = economy.stocks[project.stock_id], economy.accounts[project.account_id]
     report = current_observation(world, project.maintainer_ref, project.site_id)
-    limits = _limits(world, project, site, blueprint, stock, account, available, report)
+    limits, artisans = _limits(world, project, site, blueprint, stock, account, available, report)
     units = min(limits.values())
     blocker = next((name for name in sorted(limits) if limits[name] == 0), None)
     restored = project.restored_permille + units
     integrity = min(1.0, site.integrity + units / 1000)
     stage = "completed" if integrity >= 1.0 else "repairing" if units else "blocked"
     if not units:
+        deltas = (_delta("repair", project.id, "restored_permille", restored, restored),
+                  _delta("repair", project.id, "stage", project.stage, stage),
+                  _delta("repair", project.id, "blocker", project.blocker, blocker))
+        if blocker == "labor":
+            # Same typed signal as production: how many artisans are missing.
+            deltas += (_delta("repair", project.id, "labor_shortfall", 0,
+                              _labor_shortfall(limits, artisans, blueprint)),)
         event = record_event(world, "repair_progressed",
                              f"{site.name}: reparo impedido; {_reason(world, blocker)}.",
-                             fact_kind=FactKind.STATE_TRANSITION,
-                             deltas=(_delta("repair", project.id, "restored_permille", restored, restored),
-                                     _delta("repair", project.id, "stage", project.stage, stage)),
+                             fact_kind=FactKind.STATE_TRANSITION, deltas=deltas,
                              cause_ids=_causes(project.last_event_id, site.last_event_id,
                                                report.event_id if report else None))
         economy.repairs[project.id] = project.model_copy(update={

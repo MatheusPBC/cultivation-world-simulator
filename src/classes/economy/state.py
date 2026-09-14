@@ -2,13 +2,17 @@
 
 from dataclasses import dataclass, field
 
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 
-from .models import Market, MoneyAccount, Payroll, ProductionFacility, Recipe, Resource, SettlementNeeds, Stock
+from .models import (FreightRecoveryCase, Market, MoneyAccount, Payroll, ProductionFacility, Recipe, Resource,
+                     SettlementNeeds, Stock)
 from .serialization import EconomySerialization, REGISTRIES
 from .logistics import CargoParcel, FreightOrder, RouteFlow, validate_logistics
 from .expansion import ExpansionBlueprint, ExpansionProject, validate_expansions
 from .maintenance import RepairBlueprint, RepairProject, validate_repairs
+from .investigation import Investigation, validate_investigations
 from .migration import MigrationProvision
 from .customs import CargoManifest, CustomsCheckpoint, validate_customs
 
@@ -34,6 +38,8 @@ class EconomyState(EconomySerialization):
     migration_provisions: dict[str, MigrationProvision] = field(default_factory=dict)
     customs_checkpoints: dict[str, CustomsCheckpoint] = field(default_factory=dict)
     cargo_manifests: dict[str, CargoManifest] = field(default_factory=dict)
+    freight_recovery_cases: dict[str, FreightRecoveryCase] = field(default_factory=dict)
+    investigations: dict[str, Investigation] = field(default_factory=dict)
 
     def used_capacity(self, stock: Stock) -> int:
         return sum(self.resources[rid].bulk * amount for rid, amount in stock.goods.items())
@@ -83,6 +89,7 @@ class EconomyState(EconomySerialization):
         validate_logistics(self, world)
         validate_expansions(self, world)
         validate_repairs(self, world)
+        validate_investigations(self, world)
         validate_customs(self, world)
         for provision in self.migration_provisions.values():
             if provision.account_id not in self.accounts:
@@ -139,7 +146,10 @@ class EconomyState(EconomySerialization):
             if item.owner_ref.id not in owners.get(item.owner_ref.kind, {}):
                 raise ValueError("unknown economic owner")
         for payroll in self.payrolls.values():
-            if (payroll.id not in {*self.facilities, *self.expansions, *self.repairs, *world.research.projects, *self.customs_checkpoints}
+            if (payroll.id not in {*self.facilities, *self.expansions, *self.repairs, *self.investigations, *world.research.projects,
+                                   *world.research.apprenticeships, *world.research.rites,
+                                   *world.research.technique_copies,
+                                   *world.society.detachments, *self.customs_checkpoints}
                     or payroll.day > world.clock.absolute_day
                     or payroll.last_event_id not in events
                     or set(payroll.workers_by_group) - set(world.society.population)):
@@ -148,7 +158,8 @@ class EconomyState(EconomySerialization):
             expected_types = ({"income_tax_collected"} if payroll.tax else
                               {"customs_staff_paid"} if payroll.id in self.customs_checkpoints else
                               {"wages_paid"} if payroll.gross else
-                              {"production_completed", "production_limited", "expansion_progressed", "repair_progressed"})
+                              {"production_completed", "production_limited", "expansion_progressed",
+                               "repair_progressed", "investigation_completed", "rite_completed"})
             if event.day != payroll.day or event.event_type not in expected_types:
                 raise ValueError("invalid payroll event type or date")
         for stock in self.stocks.values():
@@ -223,3 +234,67 @@ class EconomyState(EconomySerialization):
                       if delta.owner_kind == "account" and delta.aspect == "balance"}
             if actual != {account_id: change for account_id, change in expected.items() if change}:
                 raise ValueError("export tariff receipt account deltas are not conserved")
+        self._validate_freight_recovery_cases(world, events)
+
+    def _validate_freight_recovery_cases(self, world, events):
+        """Validate persisted purchase-recovery records without rebuilding options."""
+        for case in self.freight_recovery_cases.values():
+            order = self.freight_orders.get(case.order_id)
+            source, destination = self.stocks.get(case.source_id), self.stocks.get(case.destination_id)
+            if (order is None or source is None or destination is None
+                    or order.source_id != case.source_id or order.destination_id != case.destination_id
+                    or order.resource_id != case.resource_id or order.quantity != case.quantity
+                    or order.owner_ref != case.buyer_ref or source.owner_ref != case.seller_ref
+                    or destination.owner_ref != case.buyer_ref):
+                raise ValueError("freight recovery case does not match its purchase")
+            if (case.payment_event_id not in events or self.payments.get(case.buy_decision_id) != case.payment_event_id
+                    or case.original_freight_event_id not in events
+                    or any(item not in events for item in case.blocked_event_ids)):
+                raise ValueError("freight recovery case lacks payment or blockage provenance")
+            buy = events.get(case.buy_decision_id)
+            sell = events.get(case.sell_decision_id)
+            payment = events.get(case.payment_event_id)
+            opened = events.get(case.original_freight_event_id)
+            expected_request = {"action": "request_paid_purchase_recovery",
+                                "actor_ref": case.buyer_ref.to_dict(), "option_id": case.requested_option_id}
+            if (buy is None or sell is None or payment is None or opened is None
+                    or buy.fact_kind != FactKind.DECISION or sell.fact_kind != FactKind.DECISION
+                    or (buy.decision or {}).get("action") != "buy"
+                    or (sell.decision or {}).get("action") != "sell"
+                    or payment.event_type not in {"payment_completed", "export_tariff_collected"}
+                    or case.buy_decision_id not in {link.cause_event_id for link in payment.causal_links}
+                    or case.sell_decision_id not in {link.cause_event_id for link in payment.causal_links}
+                    or opened.event_type != "freight_opened"
+                    or not any(delta.owner_kind == "cargo" and delta.owner_id == case.original_parcel_id
+                               and delta.aspect == "quantity" and delta.after == str(case.quantity)
+                               for delta in opened.deltas)
+                    or case.request_decision_id not in events
+                    or events[case.request_decision_id].decision != expected_request):
+                raise ValueError("freight recovery case has invalid decision provenance")
+            request = events[case.request_decision_id]
+            if (request.fact_kind != FactKind.DECISION or request.day > world.clock.absolute_day
+                    or request.causal_origin == CausalOrigin.LLM_INTERPRETATION
+                    or case.last_event_id not in events):
+                raise ValueError("freight recovery case request is invalid")
+            response = events.get(case.response_decision_id) if case.response_decision_id else None
+            last = events.get(case.last_event_id)
+            if case.status == "requested":
+                if response is not None or last.event_type != "purchase_recovery_requested":
+                    raise ValueError("open freight recovery case has invalid receipt")
+            elif case.status == "rejected":
+                if (response is None or response.decision is None
+                        or response.decision.get("action") != "respond_paid_purchase_recovery"
+                        or last.event_type != "purchase_recovery_rejected"):
+                    raise ValueError("rejected freight recovery case has invalid receipt")
+            else:
+                successor = self.freight_orders.get(case.successor_order_id)
+                resolution = events.get(case.resolution_event_id)
+                parcel = [item for item in self.parcels.values() if item.order_id == case.order_id]
+                if (response is None or successor is None or resolution is None
+                        or response.decision is None
+                        or response.decision.get("action") != "respond_paid_purchase_recovery"
+                        or successor.id == order.id or successor.quantity != case.quantity
+                        or order.resolved_quantity != case.quantity or order.resolution_event_id != resolution.id
+                        or parcel or resolution.event_type != "purchase_recovery_completed"
+                        or last.event_type != "purchase_recovery_completed"):
+                    raise ValueError("completed freight recovery case has invalid resolution")

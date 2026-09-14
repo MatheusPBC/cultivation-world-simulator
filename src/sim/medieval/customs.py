@@ -439,7 +439,20 @@ def attempt_customs_fee_evasion(world, option_id, *, decision_event_id):
     used = checkpoint.inspection_slots_used if checkpoint.inspection_day == today else 0
     capacity = checkpoint.staff_count * CUSTOMS_INSPECTIONS_PER_STAFF_PER_DAY
     if used >= capacity:
-        return _release_undetected(world, notice, parcel, order, checkpoint, decision)
+        # The post has no paid inspection headroom left.  This is the only
+        # material evidence from which the separate workforce owner may later
+        # derive a merchant transition; it is not a prose/event-name trigger.
+        event = _release_undetected(
+            world, notice, parcel, order, checkpoint, decision,
+            inspection_deltas=(_delta("customs_checkpoint", checkpoint.id, "labor_shortfall", 0, 1),),
+        )
+        world.economy.customs_checkpoints[checkpoint.id] = checkpoint.model_copy(update={"last_event_id": event.id})
+        # Unlike monthly production, a checkpoint can exhaust its capacity on
+        # any dated cargo action.  Publish only the same engine-owned, current
+        # workforce receipts now; this never accepts an offer automatically.
+        from .workforce import refresh_workforce_notices
+        refresh_workforce_notices(world)
+        return event
     slot = used + 1
     roll = world.rng.randrange(1000)
     detected = roll < CUSTOMS_DETECTION_PERMILLE

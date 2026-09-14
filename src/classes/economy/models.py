@@ -1,6 +1,6 @@
 """Validated economic values, using integer goods and currency units."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
@@ -95,3 +95,52 @@ class Market(SocietyValue):
     prices: dict[Identity, Positive]
     updated_day: Count = 0
     last_event_id: Identity | None = None
+
+
+class FreightRecoveryCase(SocietyValue):
+    """Persistent bilateral record for one already-paid blocked purchase.
+
+    The route affordance itself is deliberately absent.  The request stores
+    only the selected transient ID and the causal receipts needed to
+    reconstruct and audit the case after save/load.
+    """
+
+    id: Identity
+    order_id: Identity
+    source_id: Identity
+    destination_id: Identity
+    resource_id: Identity
+    quantity: Positive
+    buyer_ref: EntityRef
+    seller_ref: EntityRef
+    buy_decision_id: Identity
+    sell_decision_id: Identity
+    payment_event_id: Identity
+    original_freight_event_id: Identity
+    original_parcel_id: Identity
+    blocked_event_ids: tuple[Identity, ...]
+    requested_option_id: Identity
+    request_decision_id: Identity
+    status: Literal["requested", "rejected", "completed"]
+    response_decision_id: Identity | None = None
+    successor_order_id: Identity | None = None
+    resolution_event_id: Identity | None = None
+    last_event_id: Identity | None = None
+
+    @model_validator(mode="after")
+    def valid_lifecycle(self):
+        if self.id != f"purchase-recovery:{self.order_id}:{self.request_decision_id}":
+            raise ValueError("freight recovery case ID must name its request")
+        if not self.blocked_event_ids or len(set(self.blocked_event_ids)) != len(self.blocked_event_ids):
+            raise ValueError("freight recovery case requires unique blockage evidence")
+        if self.status == "requested" and any(
+                value is not None for value in (self.response_decision_id, self.successor_order_id,
+                                                self.resolution_event_id)):
+            raise ValueError("open freight recovery case cannot have a response or successor")
+        if self.status == "rejected" and (self.response_decision_id is None or
+                                          self.successor_order_id is not None or self.resolution_event_id is not None):
+            raise ValueError("rejected freight recovery case has invalid lifecycle")
+        if self.status == "completed" and (self.response_decision_id is None or
+                                            self.successor_order_id is None or self.resolution_event_id is None):
+            raise ValueError("completed freight recovery case has incomplete lifecycle")
+        return self

@@ -212,14 +212,56 @@ def _present(world, actor, site):
     return False
 
 
+def _local_site_observers(world, site):
+    """Actors with material local presence may inspect a site they do not own.
+
+    This adds no surveillance channel: a present column is visible at the
+    settlement, while work presence is either payroll settled today or an
+    already active paid apprenticeship.  The observation still contains only
+    the site's public physical condition, never another actor's presence.
+    """
+    observers = set()
+    for detachment in world.society.detachments.values():
+        settlement = world.society.settlements.get(detachment.location_id)
+        if detachment.stage == "present" and settlement is not None and settlement.region_id in site.region_ids:
+            observers.add(detachment.owner_ref)
+    for payroll in world.economy.payrolls.values():
+        if payroll.day != world.clock.absolute_day:
+            continue
+        facility = world.economy.facilities.get(payroll.id)
+        if facility is not None and facility.site_id == site.id:
+            observers.add(world.economy.stocks[facility.stock_id].owner_ref)
+        project = world.economy.expansions.get(payroll.id)
+        if project is not None and project.site_id == site.id:
+            observers.add(project.owner_ref)
+        repair = world.economy.repairs.get(payroll.id)
+        if repair is not None and repair.site_id == site.id:
+            observers.add(repair.maintainer_ref)
+        project = world.research.projects.get(payroll.id)
+        if project is not None and project.site_id == site.id:
+            observers.add(project.owner_ref)
+    observers.update(contract.host_ref for contract in world.research.apprenticeships.values()
+                     if contract.stage == "training" and contract.site_id == site.id)
+    return observers
+
+
 def refresh_site_reports(world, *, site_ids=None):
     """Authorized owner/maintainer observers see a local site, never remotely."""
     day = world.clock.absolute_day
     for site_id in sorted(world.map.infrastructure_sites if site_ids is None else site_ids):
         site = world.map.infrastructure_sites[site_id]
         actors = {actor for actor in (site.owner_ref, site.maintainer_ref) if actor is not None}
+        actors |= _local_site_observers(world, site)
+        # Residents can see a damaged local installation as an aggregate local
+        # fact.  They do not gain its accounts, maintenance mandate or service
+        # details beyond the same public integrity reading.
+        actors |= {EntityRef("population_group", group.id) for group in world.society.population.values()
+                   if world.society.available_count(group.id) > 0
+                   and world.society.settlements[group.settlement_id].region_id in site.region_ids}
         for actor in sorted(actors, key=lambda ref: (ref.kind, ref.id)):
-            if not can_actor_act_for(world, actor, actor, "supply") or not _present(world, actor, site):
+            local_group = actor.kind == "population_group"
+            if ((not local_group and not can_actor_act_for(world, actor, actor, "supply"))
+                    or (actor in {site.owner_ref, site.maintainer_ref} and not _present(world, actor, site))):
                 continue
             key = site_report_id(actor, site_id)
             previous = world.knowledge.site_reports.get(key)
@@ -237,7 +279,7 @@ def refresh_site_reports(world, *, site_ids=None):
             world.knowledge.site_reports[key] = SiteReport(
                 id=key, recipient_ref=actor, publisher_ref=actor, site_id=site_id, observed_day=day,
                 integrity=site.integrity, enabled=site.enabled, service_suspended=site.service_suspended,
-                event_id=event.id)
+                event_id=event.id, channel="local_site_report" if local_group else "administrative_site_report")
 
 
 def refresh_route_reports(world, *, route_ids=None):

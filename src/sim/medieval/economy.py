@@ -88,6 +88,11 @@ def produce_monthly(world, available=None) -> None:
         updated = facility.model_copy(update={"last_batches": batches, "last_limitations": limitations})
         changes = tuple(_delta("production", facility.id, name, getattr(facility, name), getattr(updated, name))
                         for name in ("last_batches", "last_limitations") if getattr(facility, name) != getattr(updated, name))
+        if "labor" in limitations:
+            # Typed, repeatable signal of a material labour shortage: how many
+            # workers this line still lacks to raise its output by one batch.
+            changes += (_delta("production", facility.id, "labor_shortfall", 0,
+                               recipe.workers * (batches + 1) - workers[workforce]),)
         event = _apply_stock(world, stock, goods, "production_completed" if batches else "production_limited",
                              f"{site.name}: {batches} lotes de produção concluídos.",
                              cause_ids=_causes(site.last_event_id, facility.last_event_id,
@@ -166,7 +171,8 @@ def _consume_household_food(world, settlement_id, requirements):
     return total, tuple(receipts)
 
 
-def transfer_money(world, source_id: str, target_id: str, amount: int, *, decision_event_id: str) -> None:
+def transfer_money(world, source_id: str, target_id: str, amount: int, *, decision_event_id: str,
+                   decision_intent=None) -> None:
     """Execute the account owner's payment once, with a current trading mandate."""
     economy = world.economy
     economy.validate(world)
@@ -179,10 +185,11 @@ def transfer_money(world, source_id: str, target_id: str, amount: int, *, decisi
         raise ValueError("insufficient money")
     event = next((e for e in world.events if e.id == decision_event_id), None)
     intent = event.decision if event is not None else None
+    expected = decision_intent or {"action": "pay", "source_id": source_id,
+                                   "target_id": target_id, "amount": amount,
+                                   "actor_ref": source.owner_ref.to_dict()}
     if (event is None or event.fact_kind != FactKind.DECISION or intent is None
-            or intent != {"action": "pay", "source_id": source_id,
-                          "target_id": target_id, "amount": amount,
-                          "actor_ref": source.owner_ref.to_dict()}
+            or intent != expected
             or decision_event_id in economy.payments):
         raise ValueError("payment needs a matching unexecuted decision")
     if event.day != world.clock.absolute_day:

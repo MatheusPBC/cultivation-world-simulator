@@ -115,19 +115,72 @@ Um `.mws` é um arquivo SQLite com tabelas `metadata`, `world` e `events`, e
 índice por dia/sequência. O snapshot JSON interno carrega sociedade, mapa físico,
 rotas, instalações, relógio, agenda, atividades, economia, autoridade, conhecimento,
 estratégia, pesquisa, configuração e RNG.
-A identidade de produto é `medieval-world-simulator`, com schema 19 e versão de catálogo explícitos; Society está no schema 2 e Economy no schema 10.
+A identidade de produto é `medieval-world-simulator`, com schema 28 e versão de catálogo explícitos; Society está no schema 4 e Economy no schema 11.
 Nenhum loader consulta o catálogo atual para reconstruir o mundo salvo.
-Saves experimentais schema 1–18 são rejeitados e preservados; use um novo arquivo
+Saves anteriores ao schema 28 são rejeitados e preservados; use um novo arquivo
 para o smoke atualizado, sem sobrescrever a prova histórica anterior. O snapshot
-atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 10 com `repair_blueprints`,
+atual inclui migrações, provisões de viagem, observações de povoado e a economia schema 11 com `repair_blueprints`,
 `repairs`, postos civis de alfândega e manifestos; nenhum loader migra schemas antigos. O catálogo de custos é propriedade
 do engine e os DTOs apenas o projetam.
+
+### Overflow regional
+
+`RegionalOverflowState` guarda avaliações mensais e ocorrências ativas, sem
+duplicar clima, rotas ou integridade. A lei engine-owned calcula carga sazonal
+com seed, água declarada e elevação; exige duas avaliações altas consecutivas e
+limita a uma instalação aquática danificada por ocorrência. O Map aplica a
+integridade e reports observam o dano no mesmo ciclo. O observatório do Dao expõe
+a ocorrência; atores não recebem clima canônico. Não há clima legado/xianxia,
+seca/população/colheita, quota de desastre, reparo ou decisão automática, nem
+contrato público de UI/API.
+
+Demandas de mão de obra e ofertas de transição persistem como recibos de
+Knowledge, enquanto a transição ativa pertence a Society. O relatório deriva de
+limitação real de trabalho; o aviso privado é datado e não reserva recursos. Uma
+decisão exata paga o estipêndio e cria indisponibilidade por 30 dias; uma situação
+agendada resolve a conversão farmer→artisan após revalidar oportunidade,
+autoridade, contas e disponibilidade. O fluxo é agregado e local, não educação
+genérica, aceitação automática ou IA real.
 
 Relatórios fiscais de rota são conhecimento datado e persistem como recibos:
 observação do operador do checkpoint e boletins físicos publicados por decisão.
 Rotas legais sem posto permanecem opções distintas. A abertura de uma nova carga
 revalida a opção enumerada pelo engine; ordens existentes não são redirecionadas,
 e esta vertical não cria força, confisco, bloqueio ou rota secreta.
+
+### Ajuda alimentar institucional
+
+A ajuda é uma vertical preparada de executor direto. O solicitante só conhece o
+próprio `SettlementReport.missing_food` atual e seleciona um ID de affordance
+transitório; o aviso persistido leva somente `requested_food` engine-owned, não um
+report vivo; o provedor recebe aviso privado sem oferta, inventário ou rota.
+Aceitação ou recusa é uma decisão independente e não move recursos. O fulfillment
+revalida autoridade, estoque e conhecimento fiscal datado da rota antes de abrir o
+frete canônico, cumprindo a obrigação no despacho; a chegada é logística.
+Descumprimento persiste como breach. A remediação exige uma decisão posterior do
+provedor, aviso privado da quebra e nova autoridade, estoque e rota válida; abre
+novo frete e não apaga a quebra. Apenas o ID selecionado aparece na decisão,
+receipt e proveniência causal. Não há affordance persistida, política automática,
+IA real ou UI/API pública para esta vertical. O fallback `routine-rules` não é IA:
+no máximo uma ação por polity/revisão, na prioridade `respond`, `fulfill`,
+`remediate`, `request`; request usa apenas plano bloqueado, shortfall atual e uma
+cadeia/settlement aberto. A agenda suporta request N, reply N+1 e fulfillment N+2.
+
+`KnowledgeState` continua dono do conhecimento por `DiplomaticNotice`. A memória
+institucional ativa pertence a `RelationsState` e persiste apenas seus cinco
+campos de identidade/relevância; cada registro referencia o evento canônico e o
+receipt/delta de criação ou reforço. Saliência e view são puras, derivadas em
+leitura, com decaimento linear de 360 dias. Somente a view de ajuda V1 é
+direcional (credor: breach -4, remediação +2); não há score social genérico
+persistido, fator de LLM, estratégia geral, UI ou API.
+
+O fluxo customs→workforce é uma exceção específica de mobilidade produtiva:
+um checkpoint ativo só gera `labor_shortfall` tipado quando esgota a capacidade
+de inspeção paga do dia e não tem merchant local disponível. A engine calcula a
+demanda e oferta transitórias; um farmer local escolhe apenas seus IDs atuais,
+recebe estipêndio e reserva por 30 dias, e então torna-se merchant ligado como
+`staff_group` para payroll posterior. Não é educação genérica, população,
+migração, autoaceite, UI/API ou suporte a outras ocupações.
 
 A escrita valida o candidato, prepara um arquivo temporário na mesma pasta,
 fecha conexões e substitui atomicamente o destino. Um arquivo existente de
@@ -138,8 +191,9 @@ credenciais, sessões, locks ou configurações secretas no arquivo.
 ## Pendências de integração
 
 Etapa 1 (fundação/informação/abastecimento) está **PARCIAL**: o núcleo de dano e
-reparo material de instalações existe, mas ainda faltam hazards naturais, clima e
-desgaste, mobilidade/treinamento de força de trabalho (as vilas são todas farmer,
+reparo material de instalações, desgaste por uso e conveyance produtiva bilateral
+de workshops já existem, mas ainda faltam hazards naturais, clima,
+mobilidade/treinamento de força de trabalho (as vilas são todas farmer,
 portanto o trabalho artesanal pode bloquear),
 pedágio/trânsito/bloqueios/contrabando e decisões de IA real. Diplomacia com barganha
 determinística já está integrada (ver medieval-diplomacy.md), mas sem IA real.

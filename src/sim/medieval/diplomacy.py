@@ -2,7 +2,8 @@
 from src.classes.event import FactKind
 from src.classes.governance.authority import require_authority
 from src.classes.governance.models import DiplomaticNotice
-from src.classes.governance.diplomacy import DiplomaticProposal, Obligation, offer_intent, validate_clause_assets
+from src.classes.governance.diplomacy import (DiplomaticProposal, Obligation, offer_intent, validate_clause_assets,
+                                              validate_teaching_request_sightings)
 from src.systems.calendar_agenda import ScheduledSituation
 from .events import record_event
 from .economy import _delta
@@ -21,16 +22,23 @@ def disclose(world, proposal, event):
         world.knowledge.notices[notice.id] = notice
 
 
-def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, *, decision_event_id, parent_id=None):
+def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, *, decision_event_id,
+                   parent_id=None, intent=None, proposal_kind='negotiated', request_affordance_id=None):
+    """``intent`` lets a vertical authorize the offer with its own affordance
+    decision shape; the decision still has to be this actor's exact current one."""
     world.relations.validate(world)
     p = DiplomaticProposal(id=f'proposal:{decision_event_id}', proposer_ref=proposer_ref,
         counterparty_ref=counterparty_ref, clauses=clauses, offered_day=world.clock.absolute_day,
-        expires_day=expires_day, parent_id=parent_id, decision_event_id=decision_event_id, last_event_id=decision_event_id)
-    require_decision(world, decision_event_id, offer_intent(proposer_ref, counterparty_ref, p.clauses, expires_day, parent_id))
+        expires_day=expires_day, parent_id=parent_id, decision_event_id=decision_event_id, last_event_id=decision_event_id,
+        proposal_kind=proposal_kind, request_affordance_id=request_affordance_id)
+    require_decision(world, decision_event_id,
+                     intent or offer_intent(proposer_ref, counterparty_ref, p.clauses, expires_day, parent_id))
     require_authority(world, proposer_ref, 'diplomacy')
     from src.classes.governance.serialization import validate_actor
     validate_actor(world, counterparty_ref)
-    validate_clause_assets(world, p)
+    if not (proposal_kind == 'reciprocal_supply' and p.status == 'offered'):
+        validate_clause_assets(world, p)
+    validate_teaching_request_sightings(world, p)
     if p.id in world.relations.proposals:
         raise ValueError('decision already used for a proposal')
     parent = world.relations.proposals.get(parent_id) if parent_id else None
@@ -52,15 +60,15 @@ def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, 
     return p
 
 
-def respond_proposal(world, proposal_id, response, *, decision_event_id):
+def respond_proposal(world, proposal_id, response, *, decision_event_id, intent=None):
     world.relations.validate(world)
     p = world.relations.proposals.get(proposal_id)
     if p is None or p.status != 'offered' or p.expires_day <= world.clock.absolute_day:
         raise ValueError('response requires an open proposal')
     if response not in {'accept', 'reject'}:
         raise ValueError('unknown proposal response')
-    require_decision(world, decision_event_id, {'action':'respond_proposal', 'actor_ref':p.counterparty_ref.to_dict(),
-        'proposal_id':p.id, 'response':response})
+    require_decision(world, decision_event_id, intent or {'action':'respond_proposal',
+        'actor_ref':p.counterparty_ref.to_dict(), 'proposal_id':p.id, 'response':response})
     require_authority(world, p.counterparty_ref, 'diplomacy')
     require_authority(world, p.proposer_ref, 'diplomacy')
     status = 'accepted' if response == 'accept' else 'rejected'

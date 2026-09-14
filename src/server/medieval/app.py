@@ -81,7 +81,8 @@ def create_app(*, save_dir=None, frontend_dir=None):
 
     @app.get("/api/v2/query/options", response_model=Envelope[OptionsView])
     async def options():
-        return await runtime.read(lambda r: OptionsView())
+        from src.sim.medieval.ai_decider import provider_available
+        return await runtime.read(lambda r: OptionsView(ai_available=provider_available()))
 
     @app.get("/api/v2/query/world", response_model=Envelope[WorldView])
     async def world():

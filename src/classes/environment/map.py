@@ -46,6 +46,10 @@ class Map():
         self.cultivate_regions = {}
         self.city_regions = {}
         self.routes: dict[str, Route] = {}
+        # This is Map runtime, not a second force registry. Society records
+        # who is physically holding the route; Map alone derives the resulting
+        # capacity alongside its own route and site causes.
+        self.force_route_interdictors: dict[str, str] = {}
         self.infrastructure_sites: dict[str, InfrastructureSite] = {}
         self._infrastructure_site_updates: list[dict[str, Any]] = []
         self.geography = GeographyLayer(
@@ -332,6 +336,29 @@ class Map():
             )
         return changed
 
+    def transfer_infrastructure_site_control(
+        self,
+        site_id: str,
+        *,
+        owner_ref,
+        maintainer_ref,
+        last_event_id: str | None = None,
+        track_update: bool = True,
+    ) -> bool:
+        """Apply a validated owner/maintainer transfer to the Map-owned site."""
+        site = self.infrastructure_sites.get(site_id)
+        if site is None:
+            raise KeyError(f"unknown infrastructure site: {site_id}")
+        changed = site.transfer_control(owner_ref, maintainer_ref)
+        if last_event_id is not None:
+            site.update_runtime(last_event_id=last_event_id)
+            changed = True
+        if changed and track_update:
+            self._infrastructure_site_updates.append(
+                {"op": "upsert", "id": site.id, "site": site.to_dict()}
+            )
+        return changed
+
     def get_infrastructure_site_updates(self) -> list[dict[str, Any]]:
         """Return pending projection updates without acknowledging delivery."""
         return list(self._infrastructure_site_updates)
@@ -354,6 +381,7 @@ class Map():
             route
             for route in self.routes.values()
             if route.enabled
+            and route.id not in self.force_route_interdictors
             and route.connects(region_a, region_b)
             and route.allows_resource(resource_id)
         ]
@@ -377,6 +405,7 @@ class Map():
         route_id: str,
         *,
         site_runtime_overrides: Mapping[str, tuple[float, bool, bool]] | None = None,
+        ignore_force_interdictor: bool = False,
     ) -> float:
         """Derive usable capacity from the route and its declared sites.
 
@@ -390,6 +419,8 @@ class Map():
         if route is None:
             raise KeyError(f"unknown route: {route_id}")
         if not route.enabled:
+            return 0.0
+        if route_id in self.force_route_interdictors and not ignore_force_interdictor:
             return 0.0
 
         dependency_factor = 1.0
@@ -408,6 +439,18 @@ class Map():
             )
 
         return float(route.capacity) * float(route.quality) * dependency_factor
+
+    def set_force_route_interdictor(self, route_id: str, interdiction_id: str) -> None:
+        if route_id not in self.routes or not isinstance(interdiction_id, str) or not interdiction_id:
+            raise ValueError("invalid force route interdiction")
+        if route_id in self.force_route_interdictors:
+            raise ValueError("route already has a force interdictor")
+        self.force_route_interdictors[route_id] = interdiction_id
+
+    def clear_force_route_interdictor(self, route_id: str, interdiction_id: str) -> None:
+        if self.force_route_interdictors.get(route_id) != interdiction_id:
+            raise ValueError("force route interdiction no longer holds")
+        del self.force_route_interdictors[route_id]
 
     def is_in_bounds(self, x: int, y: int) -> bool:
         """

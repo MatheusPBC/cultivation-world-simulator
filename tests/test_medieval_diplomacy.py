@@ -28,6 +28,16 @@ def clauses(amount=100):
 def offer(world, amount=100, parent_id=None):
     from src.sim.medieval.diplomacy import offer_proposal
     proposer, other = (BUYER, SELLER) if parent_id else (SELLER, BUYER)
+    if parent_id:
+        # A counteroffer that keeps Escarlia as the teacher is an initiated
+        # request by Auren, so the fixture supplies the same factual private
+        # indication a live provider would have received first.
+        from src.sim.medieval.technology_sighting import disclosure_options, execute_disclosure
+        option = next(item for item in disclosure_options(world, SELLER)
+                      if item.recipient_ref == BUYER and item.technology_id == 'metallurgy')
+        disclosed = record_event(world, 'diplomatic_decision', 'Divulgar indício técnico próprio.',
+            fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=option.causes())
+        execute_disclosure(world, option, disclosed.id)
     terms = clauses(amount)
     intent = {'action': 'offer_proposal', 'actor_ref': proposer.to_dict(),
         'counterparty_ref': other.to_dict(), 'clauses': [c.model_dump(mode='json') for c in terms],

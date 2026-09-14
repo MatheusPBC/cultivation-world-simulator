@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 from src.classes.research import ResearchState
-from src.classes.research.models import Technology
+from src.classes.research.models import RiteBlueprint, Technology
 
 CATALOG = Path(__file__).resolve().parents[2] / 'static/game_configs/medieval/research.json'
 
@@ -17,5 +17,10 @@ def create_research():
         if tech.id in state.technologies:
             raise ValueError('duplicate technology')
         state.technologies[tech.id] = tech
+    for raw in data.get('rite_blueprints', ()):
+        rite = RiteBlueprint.model_validate(raw)
+        if rite.id in state.rite_blueprints:
+            raise ValueError('duplicate rite blueprint')
+        state.rite_blueprints[rite.id] = rite
     state.validate()
     return state

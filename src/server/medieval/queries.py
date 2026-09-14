@@ -3,6 +3,7 @@
 from .contracts import (CalendarView, CausalView, CharacterView, EconomyView, EventsView,
                         MapView, RouteView, SettlementView, SocietyView, WorldView)
 from .errors import RuntimeProblem
+from src.classes.mechanical_language import EntityRef
 
 
 def observatory_view(runtime):
@@ -11,14 +12,69 @@ def observatory_view(runtime):
     return ObservatoryView(status=runtime.status(), world=world_view(world),
                            society=society_view(world), economy=economy_view(world),
                            map=map_view(world), governance=governance_view(world), research=research_view(world),
-                           diplomacy=diplomacy_view(world))
+                           diplomacy=diplomacy_view(world), creatures=creature_view(world),
+                           campaigns=campaign_view(world))
+
+
+def creature_view(world):
+    """Omniscient Dao read: creatures, their demands and the private notices."""
+    from .contracts import CreatureDamageView, CreatureView
+    damages = []
+    for creature in ordered(world.creatures.creatures):
+        if creature.damaged_site_id is None:
+            continue
+        site = world.map.infrastructure_sites.get(creature.damaged_site_id)
+        if site is None or creature.damage_event_id is None:
+            raise RuntimeError("validated creature damage is missing its canonical site")
+        damages.append(CreatureDamageView(creature_id=creature.id, site_id=site.id,
+                                          damage_event_id=creature.damage_event_id,
+                                          integrity=site.integrity))
+    return CreatureView(creatures=ordered(world.creatures.creatures),
+                        demands=ordered(world.creatures.demands),
+                        tribute_notices=ordered(world.knowledge.creature_tribute_notices),
+                        damaged_sites=damages)
+
+
+def campaign_view(world):
+    """Dao-only campaign state assembled from Society's canonical registries.
+
+    This deliberately reads no KnowledgeState registry.  The viewer may see a
+    force, claim or threat even when the actors involved have received no
+    corresponding notice.
+    """
+    from .contracts import CampaignView, OccupationView
+    occupations = [OccupationView(settlement_id=settlement.id,
+                                  occupier_ref=EntityRef("polity", settlement.occupier_id))
+                   for settlement in ordered(world.society.settlements)
+                   if settlement.occupier_id is not None]
+    return CampaignView(detachments=ordered(world.society.detachments),
+                        commands=ordered(world.society.detachment_commands),
+                        positions=ordered(world.society.force_positions),
+                        standoffs=ordered(world.society.force_standoffs),
+                        field_engagements=ordered(world.society.field_engagements),
+                        route_interdictions=ordered(world.society.route_interdictions),
+                        settlement_investments=ordered(world.society.settlement_investments),
+                        assembly_denials=ordered(world.society.assembly_denials),
+                        occupations=occupations)
 
 
 def diplomacy_view(world):
-    from .contracts import DiplomacyView
+    from .contracts import AidRelationshipView, DiplomacyView, InstitutionalMemoryView
+    from src.sim.medieval.institutional_memory import aid_evidence, effective_salience, institutional_view
+    memories = [InstitutionalMemoryView(**memory.model_dump(),
+                                        effective_salience=effective_salience(world, memory))
+                for memory in ordered(world.relations.memories)]
+    observers = sorted({memory.institution_ref for memory in world.relations.memories.values()},
+                       key=lambda ref: (ref.kind, ref.id))
+    readings = [AidRelationshipView(observer_ref=observer, subject_ref=subject,
+                                    value=institutional_view(world, observer, subject),
+                                    evidence_event_ids=list(event_ids))
+                for observer in observers for subject, event_ids in aid_evidence(world, observer)]
     return DiplomacyView(proposals=ordered(world.relations.proposals),
                          obligations=ordered(world.relations.obligations),
-                         notices=ordered(world.knowledge.notices))
+                         notices=ordered(world.knowledge.notices),
+                         aid_notices=ordered(world.knowledge.institutional_aid_notices),
+                         memories=memories, aid_readings=readings)
 
 
 def research_view(world):
@@ -37,7 +93,11 @@ def governance_view(world):
                           fiscal_route_reports=ordered(world.knowledge.fiscal_route_reports),
                           site_reports=ordered(world.knowledge.site_reports),
                           settlement_reports=ordered(world.knowledge.settlement_reports),
-                          customs_notices=ordered(world.knowledge.customs_notices))
+                          customs_notices=ordered(world.knowledge.customs_notices),
+                          workforce_demand_reports=ordered(world.knowledge.workforce_demand_reports),
+                          workforce_offer_notices=ordered(world.knowledge.workforce_offer_notices),
+                          claims=ordered(world.authority.claims),
+                          authority_recognitions=ordered(world.relations.authority_recognitions))
 
 
 def ordered(registry):
@@ -45,13 +105,20 @@ def ordered(registry):
 
 
 def world_view(world):
+    from .contracts import DecisionSourceView
+    from src.sim.medieval.ai_decider import FAILED_EVENT, INTERPRETED_EVENT
     year, month, day = world.clock.calendar_date
+    sources = DecisionSourceView(
+        provider_consultations=sum(1 for item in world.events if item.event_type == INTERPRETED_EVENT),
+        provider_failures=sum(1 for item in world.events if item.event_type == FAILED_EVENT),
+        ai_enabled=world.config.ai_enabled)
     return WorldView(day=world.clock.absolute_day, calendar=CalendarView(year=year + 1, month=month, day=day),
-                     config=world.config, population=world.society.total_population,
+                     config=world.config, decision_sources=sources, population=world.society.total_population,
                      living_characters=sum(c.death_day is None for c in world.society.characters.values()),
                      settlements=len(world.society.settlements), polities=len(world.society.polities),
                      organizations=len(world.society.organizations), events=len(world.events),
-                     next_scheduled_day=min(world.agenda.due_days, default=None))
+                     next_scheduled_day=min(world.agenda.due_days, default=None),
+                     regional_overflows=ordered(world.regional_overflow.active_occurrences))
 
 
 def settlements(world):
@@ -70,7 +137,8 @@ def society_view(world):
                                                            - c.birth_day) // 360) for c in ordered(world.society.characters)]
     return SocietyView(characters=characters, settlements=settlements(world), polities=ordered(world.society.polities),
                        organizations=ordered(world.society.organizations), population_groups=ordered(world.society.population),
-                       activities=ordered(world.activities), migrations=ordered(world.society.migrations))
+                       activities=ordered(world.activities), migrations=ordered(world.society.migrations),
+                       workforce_transitions=ordered(world.society.workforce_transitions))
 
 
 def economy_view(world):

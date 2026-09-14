@@ -208,7 +208,9 @@ def _review_objective(world, objective):
 
 def review_supply(world):
     """Monthly policy boundary; no RNG, LLM calls or required quota of conflicts."""
-    for objective in sorted(world.strategy.objectives.values(), key=lambda o: (o.kind != "maintain_food_reserve", o.id)):
+    for objective in sorted((item for item in world.strategy.objectives.values()
+                             if item.kind != "defend_occupied_settlement"),
+                            key=lambda o: (o.kind != "maintain_food_reserve", o.id)):
         _review_objective(world, objective)
 
 

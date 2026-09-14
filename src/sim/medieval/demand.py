@@ -62,6 +62,7 @@ def reserve_quantity(world, stock_id, resource_id="food"):
     if resource_id == "food" and world.economy.needs[stock.location_id].stock_id == stock.id:
         monthly += world.society.population_at(stock.location_id)
     months = max((o.reserve_months for o in world.strategy.objectives.values()
-                  if o.actor_ref == stock.owner_ref and o.stock_id == stock_id and o.resource_id == resource_id), default=2)
+                  if o.kind != "defend_occupied_settlement" and o.actor_ref == stock.owner_ref
+                  and o.stock_id == stock_id and o.resource_id == resource_id), default=2)
     return (months * monthly + construction_demand(world, stock_id, resource_id)
             + research_demand(world, stock_id, resource_id) + repair_demand(world, stock_id, resource_id))

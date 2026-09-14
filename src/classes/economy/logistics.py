@@ -18,12 +18,14 @@ class FreightOrder(SocietyValue):
     resource_id: Identity
     quantity: Positive
     delivered_quantity: Count = 0
+    resolved_quantity: Count = 0
     owner_ref: EntityRef
     route_ids: tuple[Identity, ...]
     created_day: Count
     priority: Positive
     decision_ids: tuple[Identity, ...]
     last_event_id: Identity | None = None
+    resolution_event_id: Identity | None = None
 
 
 class CargoParcel(SocietyValue):
@@ -85,8 +87,12 @@ def validate_logistics(economy, world=None):
             raise ValueError("invalid cargo position")
         quantities[parcel.order_id] += parcel.quantity
     for order in economy.freight_orders.values():
-        if order.quantity != order.delivered_quantity + quantities[order.id]:
+        if order.quantity != order.delivered_quantity + order.resolved_quantity + quantities[order.id]:
             raise ValueError("freight quantity is not conserved")
+        if order.resolved_quantity and order.resolution_event_id is None:
+            raise ValueError("resolved freight quantity requires a resolution receipt")
+        if order.resolution_event_id is not None and order.resolved_quantity == 0:
+            raise ValueError("freight resolution receipt requires resolved quantity")
         if (order.resource_id not in economy.resources or order.source_id not in economy.stocks
                 or order.destination_id not in economy.stocks):
             raise ValueError("unknown freight stock or resource")
@@ -105,6 +111,14 @@ def validate_logistics(economy, world=None):
             raise ValueError("future freight creation")
         if any(d not in events or events[d].fact_kind != FactKind.DECISION for d in order.decision_ids):
             raise ValueError("missing freight decision")
+        if order.resolution_event_id is not None:
+            resolution = events.get(order.resolution_event_id)
+            if (resolution is None or resolution.event_type != "purchase_recovery_completed"
+                    or not any(delta.owner_kind == "freight" and delta.owner_id == order.id
+                               and delta.aspect == "resolved_quantity"
+                               and delta.after == str(order.resolved_quantity)
+                               for delta in resolution.deltas)):
+                raise ValueError("invalid freight resolution provenance")
     for item in (*economy.freight_orders.values(), *economy.parcels.values()):
         if item.last_event_id is None or item.last_event_id not in events:
             raise ValueError("missing cargo provenance")

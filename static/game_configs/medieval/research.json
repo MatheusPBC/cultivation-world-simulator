@@ -1,5 +1,57 @@
 {
   "catalog_version": 1,
+  "rite_blueprints": [
+    {
+      "id": "rite-of-restoration",
+      "name": "Rito de restauração",
+      "capability_id": "restoration",
+      "skill": "restoration_magic",
+      "min_skill": 20,
+      "inputs": {
+        "reagents": 4,
+        "crystals": 1
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 10,
+      "health_gain_permille": 60
+    },
+    {
+      "id": "rite-of-distant-mending",
+      "name": "Rito de amparo distante",
+      "capability_id": "restoration",
+      "skill": "restoration_magic",
+      "min_skill": 30,
+      "inputs": {
+        "reagents": 6,
+        "crystals": 2
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 10,
+      "health_gain_permille": 40,
+      "reach": "adjacent"
+    },
+    {
+      "id": "rite-of-warding",
+      "name": "Rito de resguardo",
+      "capability_id": "transport",
+      "skill": "protection_magic",
+      "min_skill": 20,
+      "inputs": {
+        "reagents": 3
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 6,
+      "health_gain_permille": 0,
+      "kind": "ward",
+      "ward_days": 60
+    }
+  ],
   "technologies": [
     {
       "id": "irrigation",

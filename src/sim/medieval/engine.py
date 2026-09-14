@@ -17,7 +17,7 @@ from .research_policy import review_research
 from .markets import update_markets
 from .intelligence import refresh_reports, refresh_trade_reports
 from .procurement import review_supply, progress_supply
-from .diplomacy_policy import review_diplomacy
+from .diplomacy_policy import review_diplomacy, review_diplomacy_with_provider
 from .infrastructure import progress_repairs, review_maintenance
 from .migration_policy import review_migration
 from .household_provisioning import review_household_provisions
@@ -26,6 +26,23 @@ from .site_services import review_site_services
 from .route_intelligence import refresh_route_reports, refresh_site_reports
 from .customs import staff_customs_checkpoints
 from .infrastructure_wear import apply_monthly_infrastructure_wear
+from .demography import apply_monthly_births
+from .mortality import apply_monthly_mortality
+from .regional_overflow import apply_monthly_regional_overflow
+from .workforce import refresh_workforce_notices
+from .institutional_aid_policy import review_institutional_aid_with_provider
+from .creature_policy import review_creatures
+from .recourse_policy import review_recourse
+from .character_rite_policy import review_character_rites, schedule_character_rite_offers
+from .character_travel import review_character_travel, schedule_character_travel_reviews
+from .force_contact_policy import review_force_contacts
+from .field_aftermath_policy import review_field_aftermaths
+from .campaign_supply import review_campaign_supplies
+from .civic_protest_policy import review_civic_protests_with_provider
+from .authority_claims import lapse_invalid_claims
+from .force_command import revoke_invalid_detachment_commands
+from .technique_copy_policy import review_technique_copies_with_provider
+from .strategy_response import review_strategy_responses_with_provider
 from src.classes.core.infrastructure import validate_infrastructure
 
 
@@ -38,23 +55,50 @@ class MedievalSimulator:
     async def step(self):
         async with self._lock:
             # 1. Validate and prepare an isolated canonical candidate, including RNG.
-            validate_activities(self.world)
-            self.world.economy.validate(self.world)
-            self.world.authority.validate(self.world)
-            self.world.strategy.validate(self.world)
-            self.world.knowledge.validate(self.world)
-            self.world.research.validate(self.world)
-            self.world.relations.validate(self.world)
-            if any(day <= self.world.clock.absolute_day for day in self.world.agenda.due_days):
-                raise ValueError("resolve pending dates before advancing")
+            # A command may have become invalid because its office ended or its
+            # real person died since the preceding dated tick.  Release it in
+            # the isolated candidate before strict cross-owner validation.
             candidate = copy.deepcopy(self.world)
+            revoke_invalid_detachment_commands(candidate)
+            validate_activities(candidate)
+            candidate.society.validate(set(candidate.map.regions), candidate)
+            candidate.economy.validate(candidate)
+            candidate.authority.validate(candidate)
+            candidate.strategy.validate(candidate)
+            candidate.knowledge.validate(candidate)
+            candidate.research.validate(candidate)
+            candidate.relations.validate(candidate)
+            if any(day <= candidate.clock.absolute_day for day in candidate.agenda.due_days):
+                raise ValueError("resolve pending dates before advancing")
             jump = CalendarScheduler.next_jump(candidate.clock, candidate.agenda.due_days)
             candidate.clock = candidate.clock.advance(jump.elapsed_days)
             # 2. Resolve dated work before the monthly aggregation on a tie.
             if jump.agenda_due:
-                resolve_dated(candidate, candidate.agenda.pop_due(jump.to_day))
+                due = candidate.agenda.pop_due(jump.to_day)
+                resolve_dated(candidate, due)
                 progress_supply(candidate)
-                review_diplomacy(candidate)
+                if candidate.config.ai_enabled:
+                    await review_diplomacy_with_provider(candidate)
+                else:
+                    review_diplomacy(candidate)
+                # A dated step may answer, fulfil or repair an aid commitment,
+                # but never opens a new request outside the monthly review.
+                await review_institutional_aid_with_provider(candidate, allow_requests=False)
+                # A scheduled creature review only offers turns; the deadline
+                # itself never demands, restricts or reopens anything.
+                await review_creatures(candidate, due)
+                await review_character_rites(candidate, due)
+                # An individual leg is chosen after the day's dated arrivals, so
+                # a person decides from where it actually stands today.
+                await review_character_travel(candidate, due)
+                await review_force_contacts(candidate, due)
+                await review_strategy_responses_with_provider(candidate, due)
+                await review_field_aftermaths(candidate, due)
+                await review_campaign_supplies(candidate, due)
+                # Breaches have already been concluded by ``resolve_dated`` and
+                # columns have already eaten and moved, so a wronged creditor
+                # decides on today's real situation and never on a stale one.
+                await review_recourse(candidate, due)
                 review_migration(candidate)
             # 3. Process monthly domains exactly once per month boundary.
             if jump.monthly_boundary:
@@ -65,13 +109,27 @@ class MedievalSimulator:
                 progress_expansions(candidate, available)
                 produce_monthly(candidate, available)
                 consume_monthly(candidate)
+                # The subsistence receipt of this very cycle is the only source
+                # of deprivation deaths, and a lifetime ends on the same closing.
+                # Remaining monthly work sees the corrected availability.
+                apply_monthly_mortality(candidate, available)
+                # The same receipt, read from the other side: a fed cycle with
+                # room to house people grows. Newborns are dependents, so the
+                # workforce of this cycle is unchanged by construction.
+                apply_monthly_births(candidate)
                 # Material use has completed.  Wear belongs to the Map and is
                 # applied before reports, so a maintainer sees this exact cycle.
                 apply_monthly_infrastructure_wear(candidate)
+                # A sustained, seed-derived water load can affect one declared
+                # water-exposed Map site.  It runs after wear but before local
+                # observations, never creates weather knowledge for actors.
+                apply_monthly_regional_overflow(candidate)
                 review_research(candidate)
                 review_expansions(candidate)
                 update_markets(candidate)
                 refresh_reports(candidate)
+                schedule_character_rite_offers(candidate)
+                schedule_character_travel_reviews(candidate)
                 if review_export_tariffs(candidate):
                     # A changed policy republishes only affected market quotes;
                     # route/site/settlement observations remain single receipts.
@@ -88,19 +146,34 @@ class MedievalSimulator:
                     )
                 review_household_provisions(candidate)
                 progress_repairs(candidate, available)
+                # Paid local work may expose a fresh, bounded copy option.
+                # A provider can decline; this review has no scripted fallback.
+                await review_technique_copies_with_provider(candidate)
+                # Production and repair have now recorded their actual labour
+                # limitations.  Only then may the affected sponsor receive a
+                # dated demand receipt and a local group receive a direct offer.
+                refresh_workforce_notices(candidate)
                 review_maintenance(candidate)
                 review_supply(candidate)
-                review_diplomacy(candidate, allow_offers=True)
+                await review_strategy_responses_with_provider(candidate, allow_adoptions=True)
+                if candidate.config.ai_enabled:
+                    await review_diplomacy_with_provider(candidate, allow_offers=True)
+                else:
+                    review_diplomacy(candidate, allow_offers=True)
+                await review_institutional_aid_with_provider(candidate, allow_requests=True)
+                await review_civic_protests_with_provider(candidate)
                 review_migration(candidate)
+                lapse_invalid_claims(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")
             # 4. Validate and durably commit the candidate before publishing any change.
-            candidate.society.validate(set(candidate.map.regions))
+            candidate.society.validate(set(candidate.map.regions), candidate)
             candidate.economy.validate(candidate)
             candidate.authority.validate(candidate)
             candidate.strategy.validate(candidate)
             candidate.knowledge.validate(candidate)
             candidate.research.validate(candidate)
             candidate.relations.validate(candidate)
+            candidate.regional_overflow.validate(candidate)
             validate_infrastructure(candidate)
             validate_activities(candidate)
             validate_history(candidate.events, candidate.clock.absolute_day)

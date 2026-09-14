@@ -13,6 +13,7 @@ from src.run.medieval_society import create_medieval_society
 from src.run.medieval_economy import create_medieval_economy
 from src.run.medieval_governance import create_authority, create_strategy
 from src.run.medieval_research import create_research
+from src.run.medieval_creatures import create_creatures
 
 
 MAP_PATH = Path(__file__).resolve().parents[2] / "static/game_configs/maps/vale-das-tres-coroas/map.json"
@@ -50,4 +51,5 @@ def create_medieval_world(seed: int, *, character_count: int | None = None) -> M
                          authority=create_authority(society),
                          strategy=create_strategy(society, economy),
                          research=create_research(),
+                         creatures=create_creatures(game_map),
                          config=MedievalRunConfig(seed=seed, character_count=len(society.characters)))

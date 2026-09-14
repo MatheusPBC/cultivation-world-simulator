@@ -19,8 +19,13 @@ def check_freight(world, source_id, destination_id, resource_id, quantity, route
         raise ValueError("insufficient goods")
 
 
-def open_order(world, source_id, destination_id, resource_id, quantity, route_ids, *, decision_ids):
-    """Private material operation shared by approved internal transfers and purchases."""
+def open_order(world, source_id, destination_id, resource_id, quantity, route_ids, *, decision_ids, cause_ids=()):
+    """Private material operation shared by approved internal transfers and purchases.
+
+    ``cause_ids`` lets a caller link this shipment to the facts that motivated
+    it, such as an earlier order held by a passage without capacity. It never
+    changes what is moved, from where, or by whom.
+    """
     check_freight(world, source_id, destination_id, resource_id, quantity, route_ids)
     economy = world.economy
     if any(set(decision_ids).intersection(o.decision_ids) for o in economy.freight_orders.values()):
@@ -40,7 +45,7 @@ def open_order(world, source_id, destination_id, resource_id, quantity, route_id
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("stock", source.id, resource_id, available, available - quantity),
                                  _delta("cargo", parcel.id, "quantity", 0, quantity)),
-                         cause_ids=_causes(*decision_ids, source.last_event_ids.get(resource_id)))
+                         cause_ids=_causes(*decision_ids, *cause_ids, source.last_event_ids.get(resource_id)))
     order = order.model_copy(update={"last_event_id": event.id})
     parcel = parcel.model_copy(update={"last_event_id": event.id})
     economy.stocks[source.id] = source.model_copy(update={
@@ -184,9 +189,12 @@ def _resolve_parcel(world, parcel, route_causes):
     flow = RouteFlow(id=route_id, day=day, bulk=used + quantity * economy.resources[order.resource_id].bulk)
     deltas = (_delta("route_flow", route_id, "day", old_flow.day if old_flow else None, day),
               _delta("route_flow", route_id, "bulk", old_flow.bulk if old_flow else 0, flow.bulk))
-    _record_parcel(world, parcel, updated, "cargo_departed", f"Carga de {quantity} unidades despachada.",
-                   extra_deltas=deltas, cause_ids=causes, remainder=remainder)
+    departure = _record_parcel(world, parcel, updated, "cargo_departed", f"Carga de {quantity} unidades despachada.",
+                               extra_deltas=deltas, cause_ids=causes, remainder=remainder)
     economy.route_flows[route_id] = flow
+    # Only a real departure across a creature's water may be perceived by it.
+    from .creatures import perceive_cargo
+    perceive_cargo(world, route_id, departure.id)
 
 
 def resolve_parcels(world, situations):

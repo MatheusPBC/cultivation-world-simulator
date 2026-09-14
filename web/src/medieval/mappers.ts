@@ -11,12 +11,16 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !Array.isArray(data.research?.projects) || !Array.isArray(data.research?.technologies)
       || !Array.isArray(data.research?.knowledge) || !Array.isArray(data.governance?.reports)
       || !Array.isArray(data.diplomacy?.proposals) || !Array.isArray(data.diplomacy?.obligations)
-      || !Array.isArray(data.diplomacy?.notices)
+      || !Array.isArray(data.diplomacy?.notices) || !Array.isArray(data.diplomacy?.aid_notices)
+      || !Array.isArray(data.diplomacy?.memories) || !Array.isArray(data.diplomacy?.aid_readings)
       || !Array.isArray(data.governance?.objectives) || !Array.isArray(data.governance?.plans)
       || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.fiscal_route_reports)
       || !Array.isArray(data.governance?.site_reports)
       || !Array.isArray(data.economy?.customs_checkpoints) || !Array.isArray(data.economy?.cargo_manifests)
-      || !Array.isArray(data.governance?.customs_notices)) {
+      || !Array.isArray(data.governance?.customs_notices)
+      || !Array.isArray(data.governance?.workforce_demand_reports)
+      || !Array.isArray(data.governance?.workforce_offer_notices)
+      || !Array.isArray(data.society?.workforce_transitions)) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato do mundo está incompleto.')
   }
   if (data.governance.tax_policies.some(p => !Number.isInteger(p.export_rate_permille)
@@ -107,6 +111,47 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || data.economy.migration_provisions.some(p => (p.consumed_day !== null && !Number.isInteger(p.consumed_day))
         || (p.consumed_event_id !== null && typeof p.consumed_event_id !== 'string'))) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato das migrações está incompleto.')
+  }
+  if (data.governance.workforce_demand_reports.some(report =>
+      typeof report.id !== 'string' || !report.id
+      || !report.recipient_ref || typeof report.recipient_ref.kind !== 'string' || typeof report.recipient_ref.id !== 'string' || !report.recipient_ref.id
+      || !report.publisher_ref || typeof report.publisher_ref.kind !== 'string' || typeof report.publisher_ref.id !== 'string' || !report.publisher_ref.id
+      || !report.sponsor_ref || typeof report.sponsor_ref.kind !== 'string' || typeof report.sponsor_ref.id !== 'string' || !report.sponsor_ref.id
+      || !['facility', 'repair'].includes(report.work_kind)
+      || typeof report.work_id !== 'string' || !report.work_id
+      || typeof report.account_id !== 'string' || !report.account_id
+      || !Number.isInteger(report.count) || report.count <= 0
+      || !Number.isInteger(report.stipend_per_person) || report.stipend_per_person <= 0
+      || !Number.isInteger(report.observed_day) || report.observed_day < 0
+      || typeof report.source_event_id !== 'string' || !report.source_event_id
+      || typeof report.event_id !== 'string' || !report.event_id
+      || report.channel !== 'administrative_workforce_demand')
+      || data.governance.workforce_offer_notices.some(notice =>
+        typeof notice.id !== 'string' || !notice.id
+        || !notice.recipient_ref || typeof notice.recipient_ref.kind !== 'string' || typeof notice.recipient_ref.id !== 'string' || !notice.recipient_ref.id
+        || !notice.publisher_ref || typeof notice.publisher_ref.kind !== 'string' || typeof notice.publisher_ref.id !== 'string' || !notice.publisher_ref.id
+        || !notice.sponsor_ref || typeof notice.sponsor_ref.kind !== 'string' || typeof notice.sponsor_ref.id !== 'string' || !notice.sponsor_ref.id
+        || typeof notice.demand_id !== 'string' || !notice.demand_id
+        || typeof notice.source_group_id !== 'string' || !notice.source_group_id
+        || !Number.isInteger(notice.count) || notice.count <= 0
+        || !Number.isInteger(notice.stipend_per_person) || notice.stipend_per_person <= 0
+        || !Number.isInteger(notice.observed_day) || notice.observed_day < 0
+        || typeof notice.event_id !== 'string' || !notice.event_id
+        || notice.channel !== 'direct_workforce_offer')
+      || data.society.workforce_transitions.some(transition =>
+        typeof transition.id !== 'string' || !transition.id
+        || !transition.sponsor_ref || typeof transition.sponsor_ref.kind !== 'string' || typeof transition.sponsor_ref.id !== 'string' || !transition.sponsor_ref.id
+        || typeof transition.source_group_id !== 'string' || !transition.source_group_id
+        || typeof transition.target_group_id !== 'string' || !transition.target_group_id
+        || !['facility', 'repair'].includes(transition.work_kind)
+        || typeof transition.work_id !== 'string' || !transition.work_id
+        || !Number.isInteger(transition.count) || transition.count <= 0
+        || !Number.isInteger(transition.stipend_per_person) || transition.stipend_per_person <= 0
+        || !Number.isInteger(transition.started_day) || transition.started_day < 0
+        || !Number.isInteger(transition.due_day) || transition.due_day < transition.started_day
+        || typeof transition.decision_event_id !== 'string' || !transition.decision_event_id
+        || typeof transition.last_event_id !== 'string' || !transition.last_event_id)) {
+    throw new ApiError('INVALID_RESPONSE', 'O retrato da força de trabalho está incompleto.')
   }
   const stocks = new Set(data.economy.stocks.map(s => s.id))
   const resources = new Set(data.economy.resources.map(r => r.id))
