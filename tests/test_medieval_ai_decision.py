@@ -6,7 +6,7 @@ import pytest
 
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
-from src.sim.medieval.ai_decider import FAILED_EVENT, INTERPRETED_EVENT
+from src.sim.medieval.ai_decider import DECLINED_EVENT, FAILED_EVENT, INTERPRETED_EVENT
 from src.sim.medieval.institutional_aid_policy import (review_institutional_aid,
                                                        review_institutional_aid_with_provider)
 from src.sim.medieval.institutional_aid import aid_request_options
@@ -104,9 +104,28 @@ async def test_a_failed_or_invalid_answer_does_not_fabricate_an_aid_action(answe
     provider(monkeypatch, answer)
     await review_institutional_aid_with_provider(world, allow_requests=False)
 
-    receipts = [item for item in world.events if item.event_type in {INTERPRETED_EVENT, FAILED_EVENT}]
+    receipts = [item for item in world.events
+                if item.event_type in {INTERPRETED_EVENT, DECLINED_EVENT, FAILED_EVENT}]
     assert receipts and all(item.deltas == () for item in receipts)
     assert not any(item.event_type in {"institutional_aid_accepted", "institutional_aid_rejected",
                                        "institutional_aid_fulfilled", "institutional_aid_remediated"}
                    for item in world.events)
     assert json.dumps(world.config.model_dump(mode="json")).count("api_key") == 0
+
+
+async def test_a_decline_is_its_own_event_type_not_a_sentence(monkeypatch):
+    """A reader must tell "chose nothing" from "chose something" and from
+    "could not be asked" by event type alone, never by parsing the prose."""
+    world, _ = await requested_world()
+    provider(monkeypatch, {"selected_id": ai_decider.NO_ACTION})
+    await review_institutional_aid_with_provider(world, allow_requests=False)
+
+    declines = [item for item in world.events if item.event_type == DECLINED_EVENT]
+    assert len(declines) == 1
+    assert declines[0].deltas == ()
+    assert declines[0].causal_origin.value == "llm_interpretation"
+    # The three outcomes never share one type.
+    assert not any(item.event_type == INTERPRETED_EVENT for item in world.events)
+    assert DECLINED_EVENT not in {INTERPRETED_EVENT, FAILED_EVENT}
+    # A decline still spends the shared budget, exactly as before.
+    assert ai_decider.spent_calls(world) == 1

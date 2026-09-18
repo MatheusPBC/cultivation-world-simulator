@@ -14,3 +14,15 @@ class MedievalRunConfig(SocietyValue):
     ai_enabled: bool = False
     ai_calls_per_step: int = Field(default=1, strict=True, ge=0, le=8)
     ai_max_calls: int = Field(default=0, strict=True, ge=0, le=10000)
+    # An explicit, per-institution monthly ceiling on top of the shared daily
+    # budget above: 0 means no ceiling (unchanged behaviour). It bounds how
+    # many times one actor may consult a provider in one calendar month,
+    # counting every attempt -- success, explicit NO_ACTION or technical
+    # failure alike -- because the ceiling is about a sustainable pace of
+    # asking, not about how often the answer happened to be useful.
+    institutional_actions_per_month: int = Field(default=0, strict=True, ge=0, le=1000)
+    # Consumption ledger keyed by ``f"{actor.kind}:{actor.id}:{month_index}"``.
+    # Old months are never pruned; the map only ever grows, which is
+    # acceptable for a V1 policy counter and avoids guessing which months are
+    # safe to forget.
+    institutional_actions_consumed: dict[str, int] = Field(default_factory=dict)

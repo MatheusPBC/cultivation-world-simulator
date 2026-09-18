@@ -1,8 +1,13 @@
 """Monthly supply intentions and independent seller decisions over real executors."""
 
+import copy
+from dataclasses import dataclass
+
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.models import StrategicPlan
+from src.classes.mechanical_language import EntityRef
+from src.classes.society.models import Identity
 from .economy import _causes, _delta
 from .events import record_event
 from .intelligence import reserve_quantity
@@ -11,6 +16,8 @@ from .markets import purchase
 from .routing import fiscal_route_options, known_supply_path
 from .demand import objective_target
 from .tariffs import export_fee
+
+SUPPLY_OBJECTIVE_ACTION = "execute_supply_objective"
 
 
 def _account(world, actor_ref):
@@ -206,12 +213,83 @@ def _review_objective(world, objective):
                       *(world.economy.freight_orders[oid].last_event_id for oid in order_ids)])
 
 
-def review_supply(world):
-    """Monthly policy boundary; no RNG, LLM calls or required quota of conflicts."""
+def review_supply(world, *, exclude_objective_ids=()):
+    """Monthly policy boundary; no RNG, LLM calls or required quota of conflicts.
+
+    ``exclude_objective_ids`` lets a concurrent, actor-facing review claim an
+    objective for this same boundary; the automatic pass then leaves it alone
+    instead of silently executing behind a menu the actor already saw.
+    """
     for objective in sorted((item for item in world.strategy.objectives.values()
-                             if item.kind != "defend_occupied_settlement"),
+                             if item.kind != "defend_occupied_settlement"
+                             and item.id not in exclude_objective_ids),
                             key=lambda o: (o.kind != "maintain_food_reserve", o.id)):
         _review_objective(world, objective)
+
+
+@dataclass(frozen=True)
+class SupplyObjectiveOption:
+    """Transient engine option. A decider may only select this ID.
+
+    It names only the objective; procurement's own executor recomposes and
+    revalidates the source, quantity and route at execution time. No supplier,
+    quantity or route is ever exposed here.
+    """
+
+    id: Identity
+    actor_ref: EntityRef
+    objective_id: Identity
+
+    def decision(self):
+        return {"action": SUPPLY_OBJECTIVE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "objective_id": self.objective_id}
+
+
+def _would_open_an_order(world, objective_id):
+    """Preview only: run the real policy on an isolated copy and discard it.
+
+    This reuses ``_review_objective`` verbatim so the preview can never drift
+    from what the real executor does; nothing here duplicates the buy/freight
+    selection logic.
+    """
+    candidate = copy.deepcopy(world)
+    _review_objective(candidate, candidate.strategy.objectives[objective_id])
+    plan = candidate.strategy.plans.get(f"plan:{objective_id}")
+    return plan is not None and plan.stage == "await_delivery"
+
+
+def supply_objective_options(world, actor):
+    """Objectives whose current plan would materially open an order today.
+
+    Scoped to the actor's own currently food-pressured settlements (the same
+    condition institutional aid already gates on), so this never turns routine
+    production-input procurement into an actor-facing decision.
+    """
+    from .institutional_aid_policy import _pressured_settlements
+    if not isinstance(actor, EntityRef) or actor.kind != "polity":
+        return ()
+    options = []
+    for settlement_id in _pressured_settlements(world, actor):
+        objective = next((item for item in world.strategy.objectives.values()
+                          if item.actor_ref == actor and item.settlement_id == settlement_id
+                          and item.resource_id == "food"), None)
+        if objective is None or not _would_open_an_order(world, objective.id):
+            continue
+        options.append(SupplyObjectiveOption(
+            id=f"supply-objective:{actor.kind}:{actor.id}:{objective.id}:{world.clock.absolute_day}",
+            actor_ref=actor, objective_id=objective.id))
+    return tuple(options)
+
+
+def execute_supply_objective_option(world, actor, option_id, decision_event_id):
+    """Revalidate everything, then run the same, unmodified procurement policy."""
+    decision = next((event for event in world.events if event.id == decision_event_id), None)
+    option = next((item for item in supply_objective_options(world, actor) if item.id == option_id), None)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+        raise ValueError("supply objective option is stale or unknown")
+    _review_objective(world, world.strategy.objectives[option.objective_id])
+    return world.strategy.plans[f"plan:{option.objective_id}"]
 
 
 def progress_supply(world):

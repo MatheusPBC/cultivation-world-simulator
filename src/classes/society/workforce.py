@@ -1,10 +1,15 @@
-"""Dated local changes of economic occupation.
+"""Dated local or cross-settlement changes of economic occupation.
 
 This is deliberately narrower than education or a generic skill system.  A
-transition only records a paid, local farmer-to-artisan or farmer-to-merchant
+transition only records a paid farmer-to-artisan or farmer-to-merchant
 conversion that was made possible by a real labour deficit.  While it is active
 the people remain members of their source cohort, but Society marks them
-unavailable to every other material use.
+unavailable to every other material use.  When ``destination_settlement_id``
+differs from the source group's own settlement, the same conversion also
+relocates the recruited people there once the current travel time this
+sponsor's own route knowledge names has actually elapsed; a customs
+checkpoint's merchant demand never recruits beyond its own settlement in this
+version.
 """
 
 from typing import Annotated, Literal
@@ -28,6 +33,7 @@ class WorkforceTransition(SocietyValue):
     work_kind: Literal["facility", "repair", "customs"]
     work_id: Identity
     target_occupation: Literal["artisan", "merchant"]
+    destination_settlement_id: Identity
     count: PositiveCount
     stipend_per_person: PositiveCount
     started_day: Count

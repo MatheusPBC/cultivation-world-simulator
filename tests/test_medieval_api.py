@@ -78,7 +78,20 @@ async def test_public_month_exposes_paid_food_and_its_two_decisions(client):
     consumed = sum(int(d["before"]) - int(d["after"]) for e in history
                    if e["event_type"] in {"household_purchase_completed", "subsistence_resolved"}
                    for d in e["deltas"] if d["owner_kind"] == "stock" and d["aspect"] == "food")
-    assert consumed == 10900  # named people included once; no double removal after purchase
+    # Public relief is no longer automatic: what leaves public stock is only
+    # what households could actually afford. The rest of the population's
+    # need is either eaten from a household's own private stock (domestic,
+    # not a public-stock delta) or goes unmet as real, reported hunger
+    # (missing_food). Named people counted exactly once means these three
+    # shares add back up to the whole population, with nothing left over and
+    # nothing double-removed.
+    world = await query(client, "world")
+    society = await query(client, "society")
+    domestic = sum(int(d["before"]) - int(d["after"]) for e in history
+                   if e["event_type"] == "household_rations_consumed"
+                   for d in e["deltas"] if d["owner_kind"] == "stock" and d["aspect"] == "food")
+    missing = sum(s["missing_food"] for s in society["settlements"])
+    assert consumed == world["population"] - domestic - missing
     detail = await query(client, f"causal/{purchases[0]['id']}")
     assert {e["decision"]["action"] for e in detail["causes"] if e["decision"]} >= {"buy_rations", "sell_rations"}
     assert any(e["event_type"] == "subsistence_resolved" for e in detail["effects"])

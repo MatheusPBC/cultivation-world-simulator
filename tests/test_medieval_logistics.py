@@ -147,6 +147,7 @@ def test_cargo_quantity_corruption_and_missing_agenda_are_rejected(tmp_path):
 
 async def test_delivery_on_month_boundary_feeds_population_before_consumption():
     from src.systems.time import WorldClock
+    from tests.medieval_relief_helpers import relieve_settlement
     world = cargo_world()
     world.clock = WorldClock(26)
     world.map.routes[ROAD].update_runtime(capacity=1000, quality=1)
@@ -157,10 +158,14 @@ async def test_delivery_on_month_boundary_feeds_population_before_consumption():
     await engine.step()
     await engine.step()
     assert world.clock.absolute_day == 30
-    assert world.economy.needs["pedraclara"].missing_food == 2100
+    # No household can pay, so the full ration is missing this cycle; the
+    # 300 units that arrived just before the boundary sit in the granary
+    # until the administration chooses to give them away.
+    assert world.economy.needs["pedraclara"].missing_food == 2400
     arrival = next(e for e in world.events if e.event_type == "cargo_delivered")
-    consumption = next(e for e in world.events if any(d.owner_id == "pedraclara" and d.aspect == "missing_food" for d in e.deltas))
-    assert arrival.id in {link.cause_event_id for link in consumption.causal_links}
+    relief = relieve_settlement(world, "pedraclara")
+    assert world.economy.needs["pedraclara"].missing_food == 2100
+    assert arrival.id in {link.cause_event_id for link in relief.causal_links}
 
 
 @pytest.mark.parametrize("routes", [("missing",), (ROAD, ROAD), ("river-pedraclara-portovelho",)])

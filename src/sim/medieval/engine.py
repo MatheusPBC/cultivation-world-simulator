@@ -17,7 +17,8 @@ from .research_policy import review_research
 from .markets import update_markets
 from .intelligence import refresh_reports, refresh_trade_reports
 from .procurement import review_supply, progress_supply
-from .diplomacy_policy import review_diplomacy, review_diplomacy_with_provider
+from .diplomacy_policy import (review_diplomacy, review_diplomacy_with_provider,
+                               review_promised_teaching_turns)
 from .infrastructure import progress_repairs, review_maintenance
 from .migration_policy import review_migration
 from .household_provisioning import review_household_provisions
@@ -38,11 +39,10 @@ from .character_travel import review_character_travel, schedule_character_travel
 from .force_contact_policy import review_force_contacts
 from .field_aftermath_policy import review_field_aftermaths
 from .campaign_supply import review_campaign_supplies
-from .civic_protest_policy import review_civic_protests_with_provider
 from .authority_claims import lapse_invalid_claims
 from .force_command import revoke_invalid_detachment_commands
-from .technique_copy_policy import review_technique_copies_with_provider
 from .strategy_response import review_strategy_responses_with_provider
+from .institutional_agenda import review_monthly_institutional_turn
 from src.classes.core.infrastructure import validate_infrastructure
 
 
@@ -146,22 +146,29 @@ class MedievalSimulator:
                     )
                 review_household_provisions(candidate)
                 progress_repairs(candidate, available)
-                # Paid local work may expose a fresh, bounded copy option.
-                # A provider can decline; this review has no scripted fallback.
-                await review_technique_copies_with_provider(candidate)
                 # Production and repair have now recorded their actual labour
                 # limitations.  Only then may the affected sponsor receive a
                 # dated demand receipt and a local group receive a direct offer.
                 refresh_workforce_notices(candidate)
-                review_maintenance(candidate)
-                review_supply(candidate)
-                await review_strategy_responses_with_provider(candidate, allow_adoptions=True)
+                # One consultation per institution across every discretionary
+                # family at once -- supply, aid request, repair, diplomacy,
+                # technique copying, civic demands and strategic adoption --
+                # before any automatic pass runs. Claimed objectives/sites and
+                # covered actors then skip their own pass below, so nothing
+                # second-guesses the single menu the actor already saw.
+                claims, covered = await review_monthly_institutional_turn(candidate)
+                # Relief has no deterministic fallback: without a discretionary
+                # decision this boundary, no food moves as aid at all.
+                review_maintenance(candidate, exclude_site_ids=claims.get("site", set()))
+                review_supply(candidate, exclude_objective_ids=claims.get("objective", set()))
                 if candidate.config.ai_enabled:
-                    await review_diplomacy_with_provider(candidate, allow_offers=True)
+                    # The learner's acceptance keeps its own ordered turn for
+                    # whoever the composed menu left untouched.
+                    await review_promised_teaching_turns(candidate, consulted=covered)
                 else:
                     review_diplomacy(candidate, allow_offers=True)
-                await review_institutional_aid_with_provider(candidate, allow_requests=True)
-                await review_civic_protests_with_provider(candidate)
+                await review_institutional_aid_with_provider(candidate, allow_requests=True,
+                                                             excluded_requesters=covered)
                 review_migration(candidate)
                 lapse_invalid_claims(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")

@@ -8,6 +8,7 @@ interdiction: turning ``enabled`` back on is an authority decision, not work.
 """
 
 import math
+from dataclasses import dataclass
 
 from src.classes.economy.maintenance import RepairProject, batch_intent, repair_intent
 from src.classes.causal_origin import CausalOrigin
@@ -15,11 +16,14 @@ from src.classes.event import FactKind
 from src.classes.governance.models import SiteReport
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.models import Objective
+from src.classes.mechanical_language import EntityRef
+from src.classes.society.models import Identity
 from .economy import _apply_stock, _causes, _delta
 from .events import record_event
 from .labor import settle_work
 
 OBSERVATION_DAYS = 30
+REPAIR_AUTHORIZATION_ACTION = "authorize_infrastructure_repair"
 
 
 def _event(world, event_id):
@@ -240,29 +244,93 @@ def progress_repairs(world, available):
         _progress_repair(world, project, available, day)
 
 
-def review_maintenance(world):
-    """Deterministic policy: a maintainer that saw its own damage may authorize work."""
+@dataclass(frozen=True)
+class RepairAuthorizationOption:
+    """Transient engine option. A decider may only select this ID.
+
+    It names only the maintainer and the site; the executor recomposes and
+    revalidates the blueprint, local stock and account at execution time.
+    None of those ever appears on the option itself.
+    """
+
+    id: Identity
+    actor_ref: EntityRef
+    site_id: Identity
+
+    def decision(self):
+        return {"action": REPAIR_AUTHORIZATION_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "site_id": self.site_id}
+
+
+def repair_authorization_options(world, actor):
+    """Sites this maintainer could authorize a fresh repair for right now.
+
+    Exactly the eligibility ``review_maintenance`` already enforced: its own
+    current observation of real damage, its own local stock/account, no repair
+    already open for the site, and current supply/trade authority.
+    """
+    if not isinstance(actor, EntityRef):
+        return ()
+    options = []
     for site_id in sorted(world.map.infrastructure_sites):
         site = world.map.infrastructure_sites[site_id]
-        maintainer = site.maintainer_ref
-        # The intention comes from the maintainer's own observation, not from the
-        # canonical condition; the owner revalidates before any obligation exists.
-        if (maintainer is None
+        if (site.maintainer_ref != actor
                 or any(p.site_id == site_id and p.stage != "completed" for p in world.economy.repairs.values())):
             continue
         blueprint = site_blueprint(world, site)
-        report = current_observation(world, maintainer, site_id)
-        stock, account = local_holdings(world, maintainer, site)
+        report = current_observation(world, actor, site_id)
+        stock, account = local_holdings(world, actor, site)
         if (blueprint is None or report is None or report.integrity >= 1.0 or stock is None or account is None
-                or any(not can_actor_act_for(world, maintainer, maintainer, scope) for scope in ("supply", "trade"))):
+                or any(not can_actor_act_for(world, actor, actor, scope) for scope in ("supply", "trade"))):
             continue
-        decision = record_event(world, "repair_decided", f"{site.name}: autorizar o reparo da instalação.",
-                                fact_kind=FactKind.DECISION,
-                                decision=repair_intent(maintainer, site_id, blueprint.id, stock.id, account.id),
-                                cause_ids=_causes(report.event_id))
-        project = start_repair(world, site_id, blueprint.id, decision_event_id=decision.id)
-        if project is not None:
-            _hold_material_objectives(world, project, blueprint, stock)
+        options.append(RepairAuthorizationOption(
+            id=f"repair-authorization:{actor.kind}:{actor.id}:{site_id}:{report.event_id}",
+            actor_ref=actor, site_id=site_id))
+    return tuple(options)
+
+
+def _authorize_repair(world, maintainer, option, *, cause_ids=()):
+    """Shared by the deterministic fallback and the menu executor alike."""
+    site = world.map.infrastructure_sites[option.site_id]
+    blueprint = site_blueprint(world, site)
+    stock, account = local_holdings(world, maintainer, site)
+    report = current_observation(world, maintainer, option.site_id)
+    decision = record_event(world, "repair_decided", f"{site.name}: autorizar o reparo da instalação.",
+                            fact_kind=FactKind.DECISION,
+                            decision=repair_intent(maintainer, option.site_id, blueprint.id, stock.id, account.id),
+                            cause_ids=_causes(*cause_ids, report.event_id if report else None))
+    project = start_repair(world, option.site_id, blueprint.id, decision_event_id=decision.id)
+    if project is not None:
+        _hold_material_objectives(world, project, blueprint, stock)
+    return project
+
+
+def execute_repair_authorization_option(world, actor, option_id, decision_event_id):
+    """Revalidate everything fresh, then delegate to the unmodified start_repair."""
+    option = next((item for item in repair_authorization_options(world, actor) if item.id == option_id), None)
+    decision = _event(world, decision_event_id)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+        raise ValueError("repair authorization option is stale or unknown")
+    return _authorize_repair(world, actor, option, cause_ids=(decision_event_id,))
+
+
+def review_maintenance(world, *, exclude_site_ids=()):
+    """Deterministic policy: a maintainer that saw its own damage may authorize work.
+
+    ``exclude_site_ids`` lets a concurrent, actor-facing review claim a site for
+    this same boundary; the automatic pass then leaves it alone instead of
+    silently authorizing behind a menu the maintainer already saw.
+    """
+    maintainers = sorted({site.maintainer_ref for site in world.map.infrastructure_sites.values()
+                          if site.maintainer_ref is not None}, key=lambda ref: (ref.kind, ref.id))
+    options_by_site = {option.site_id: (maintainer, option) for maintainer in maintainers
+                       for option in repair_authorization_options(world, maintainer)}
+    for site_id in sorted(world.map.infrastructure_sites):
+        if site_id in exclude_site_ids or site_id not in options_by_site:
+            continue
+        maintainer, option = options_by_site[site_id]
+        _authorize_repair(world, maintainer, option)
 
 
 def _hold_material_objectives(world, project, blueprint, stock):

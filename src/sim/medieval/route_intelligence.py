@@ -232,7 +232,7 @@ def _local_site_observers(world, site):
         if facility is not None and facility.site_id == site.id:
             observers.add(world.economy.stocks[facility.stock_id].owner_ref)
         project = world.economy.expansions.get(payroll.id)
-        if project is not None and project.site_id == site.id:
+        if project is not None and world.economy.facilities[project.facility_id].site_id == site.id:
             observers.add(project.owner_ref)
         repair = world.economy.repairs.get(payroll.id)
         if repair is not None and repair.site_id == site.id:

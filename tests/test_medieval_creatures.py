@@ -136,9 +136,16 @@ async def test_an_unanswered_demand_only_closes_the_river_by_explicit_decision()
     assert world.map.routes[ROUTE_ID].enabled is False
     assert world.creatures.demands[demand.id].stage == "expired"
     assert world.creatures.creatures[DRAKE_ID].restricted_route_id == ROUTE_ID
+    # Real institutional aid now competes for the same calendar: an unrelated
+    # obligation due at the crossing can pause the clock there before the
+    # bilateral cargo itself reaches the river. Keep stepping (bounded) until
+    # it does, verifying on every tick that the held cargo never moves.
     engine = MedievalSimulator(world)
-    await engine.step()
-    assert sum(item.quantity for item in world.economy.parcels.values()) == pending, "held cargo is preserved"
+    for _ in range(10):
+        await engine.step()
+        assert sum(item.quantity for item in world.economy.parcels.values()) == pending, "held cargo is preserved"
+        if any(item.event_type == "cargo_delayed" for item in world.events):
+            break
     assert any(item.event_type == "cargo_delayed" for item in world.events)
 
     withdraw = pick(world, "withdraw", route_id=ROUTE_ID)

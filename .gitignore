@@ -206,3 +206,6 @@ desktop/release/
 desktop-eos-helper/bin/
 desktop-eos-helper/obj/
 desktop-eos-helper/publish/
+
+# Medições de trabalho da vertical medieval (logs descartáveis)
+.tmp-relief-measurements/

@@ -24,11 +24,20 @@ def famine_world():
 
 
 def feed(world):
+    """Stock the granary and fund every household so the ration is actually
+    bought this cycle -- there is no automatic relief left to fill the gap
+    for free, so being fed now requires real, paid consumption."""
     for key, need in world.economy.needs.items():
         stock = world.economy.stocks[need.stock_id]
         ration = world.society.population_at(key) * 2
         world.economy.stocks[stock.id] = stock.model_copy(
             update={"goods": {**stock.goods, "food": ration}})
+        price = world.economy.markets[key].prices["food"]
+        for group in world.society.population.values():
+            if group.settlement_id != key:
+                continue
+            account = world.economy.accounts[f"household:{group.id}"]
+            world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price})
 
 
 def people_total(world):

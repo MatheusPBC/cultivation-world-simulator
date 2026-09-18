@@ -8,8 +8,11 @@ from src.systems.calendar_agenda import ScheduledSituation
 from .events import record_event
 from .diplomacy import offer_proposal, respond_proposal
 from .diplomacy_context import diplomatic_context
-from .commitments import fulfill_obligation
+from .commitments import fulfill_obligation, repudiate_obligation
+from . import ai_decider
 from .ai_decider import NO_ACTION, select_option
+from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
+                                          review_institutional_decision_turn_with_provider)
 from .technology_sighting import (DISCLOSE_TECHNOLOGY_ACTION, disclosure_options,
                                   execute_disclosure)
 
@@ -20,6 +23,7 @@ RESPONSE_ACTION = 'respond_teaching_bargain'
 PAY_ACTION = 'fulfill_teaching_payment'
 TEACH_ACTION = 'fulfill_promised_teaching'
 LEARN_ACTION = 'accept_promised_teaching'
+REPUDIATE_ACTION = 'repudiate_obligation'
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,24 @@ def fulfill(world, ctx, proposal):
         ctx = diplomatic_context(world,ctx.actor)
 
 
+def _disclose_teaching_offer(world, actor, other, technology_id):
+    """A teacher's own offer to teach IS a factual disclosure of its
+    technique to that exact counterparty: without this, the counterparty's
+    later, legitimate counteroffer (still proposer of the same known
+    bargain, not a request fabricated from nothing) would fail the causal
+    sighting gate on ``offer_proposal`` for want of a fact the teacher's own
+    offer already made true. Skipped silently when a current sighting
+    already exists or disclosure is not presently possible (unreachable);
+    the offer itself still proceeds exactly as before either way."""
+    option = next((item for item in disclosure_options(world, actor)
+                   if item.recipient_ref == other and item.technology_id == technology_id), None)
+    if option is None:
+        return
+    event = decision(world, option.decision(),
+                     'Divulgar indício factual da técnica ofertada ao ensino.', option.causes())
+    execute_disclosure(world, option, event.id)
+
+
 def propose(world, ctx, addresses):
     if not ctx.account_id or not {'diplomacy','research','trade'} <= ctx.authority: return
     for tech_id in sorted(ctx.techniques):
@@ -148,6 +170,7 @@ def propose(world, ctx, addresses):
             terms = (PaymentClause(debtor_ref=other,creditor_ref=ctx.actor,due_day=day+20,
                 source_account_id=account_id,target_account_id=ctx.account_id,amount=dict(ctx.research_costs)[tech_id]),
                 TeachingClause(debtor_ref=ctx.actor,creditor_ref=other,due_day=day+25,depends_on=(0,),technology_id=tech_id))
+            _disclose_teaching_offer(world, ctx.actor, other, tech_id)
             event = decision(world,offer_intent(ctx.actor,other,terms,day+15,None),
                 'Oferecer ensino de técnica própria como fonte de receita.')
             offer_proposal(world,ctx.actor,other,terms,day+15,decision_event_id=event.id)
@@ -331,6 +354,32 @@ def _payment_options(world, actor):
     return tuple(options)
 
 
+def _repudiation_options(world, actor):
+    """The debtor's own choice, while still able to honor a term, not to.
+
+    Scoped like every other family option: only obligations from proposals
+    this actor already knows of (``_known_proposals``), where it is the
+    named debtor, still ``active`` and before the clause's own deadline.
+    Once the deadline passes the lapse in ``resolve_diplomacy`` takes over
+    instead; this option never reaches past its own deadline."""
+    ctx = diplomatic_context(world, actor)
+    if 'diplomacy' not in ctx.authority:
+        return ()
+    day = world.clock.absolute_day
+    options = []
+    for proposal in _known_proposals(world, ctx):
+        for index, clause in enumerate(proposal.clauses):
+            if clause.debtor_ref != actor:
+                continue
+            obligation = world.relations.obligations.get(f'{proposal.id}:term:{index}')
+            if obligation is None or obligation.status != 'active' or day > clause.due_day:
+                continue
+            options.append(TeachingDiplomacyOption(
+                f'diplomatic-repudiation:{obligation.id}:{obligation.last_event_id}', actor, REPUDIATE_ACTION,
+                proposal_id=proposal.id, obligation_id=obligation.id))
+    return tuple(options)
+
+
 def _teaching_options(world, actor):
     ctx = diplomatic_context(world, actor)
     if 'research' not in ctx.authority:
@@ -406,6 +455,7 @@ def _choice(option):
         PAY_ACTION: 'Cumprir o pagamento prometido.',
         TEACH_ACTION: f'Oferecer o ensino prometido de {option.technology_id}.',
         LEARN_ACTION: f'Aceitar o ensino prometido de {option.technology_id}.',
+        REPUDIATE_ACTION: 'Repudiar a obrigação ainda ativa, em vez de tentar cumpri-la a tempo.',
     }[option.action]}
 
 
@@ -467,6 +517,7 @@ def _execute_offer(world, option, decision_event_id):
                                source_account_id=target, target_account_id=account_id, amount=current.amount),
                  TeachingClause(debtor_ref=current.actor_ref, creditor_ref=other, due_day=day + 25,
                                 depends_on=(0,), technology_id=current.technology_id))
+        _disclose_teaching_offer(world, current.actor_ref, other, current.technology_id)
     else:
         terms = (PaymentClause(debtor_ref=current.actor_ref, creditor_ref=other, due_day=day + 20,
                                source_account_id=account_id, target_account_id=target, amount=current.amount),
@@ -484,6 +535,16 @@ def _execute_payment(world, option, decision_event_id):
         return False
     fulfill_obligation(world, current.obligation_id, decision_event_id=decision_event_id,
                        decision_intent=current.decision())
+    schedule_review(world)
+    return True
+
+
+def _execute_repudiation(world, option, decision_event_id):
+    current = next((item for item in _repudiation_options(world, option.actor_ref) if item.id == option.id), None)
+    if current is None:
+        return False
+    repudiate_obligation(world, current.obligation_id, decision_event_id=decision_event_id,
+                         decision_intent=current.decision())
     schedule_review(world)
     return True
 
@@ -508,48 +569,228 @@ def _execute_learning(world, option, decision_event_id):
     return True
 
 
-async def review_diplomacy_with_provider(world, *, allow_offers=False):
-    """One provider consultation per institution; no answer means no action.
+def _execute_teaching(world, option, decision_event_id):
+    """A teacher's promised-teaching decision is only an offer of consent;
+    it never changes knowledge until the learner independently accepts, so
+    executing it (once the composed menu's decision event already recorded
+    the choice) is only ever a re-validated schedule, never a mutation."""
+    current = next((item for item in _teaching_options(world, option.actor_ref) if item.id == option.id), None)
+    if current is None:
+        return False
+    schedule_review(world)
+    return True
 
-    The phase order lets a teacher make a current offer before its learner is
-    consulted, while keeping both consents separate and current.
+
+def _diplomacy_actors(world):
+    from .authority_claims import provider_actors
+    return tuple(sorted({ref for ref, _ in _addresses(world)} | set(provider_actors(world)),
+                        key=lambda ref: (ref.kind, ref.id)))
+
+
+def _option_causes(world, option):
+    """Same aggregation every phase already used: a linked proposal's last
+    event plus whatever the option's own ``causes()`` names."""
+    causes = set()
+    if getattr(option, "proposal_id", None):
+        causes.add(world.relations.proposals[option.proposal_id].last_event_id)
+    if hasattr(option, "causes"):
+        causes.update(option.causes())
+    causes.discard(None)
+    return tuple(sorted(causes))
+
+
+def _repudiation_cause(world, event):
+    """Whether ``event`` (a breach's own terminal transition) was itself
+    caused by the debtor's decision to repudiate, rather than only by the
+    deadline lapsing. No score is derived; this is a single dated fact."""
+    return any((cause := _event(world, link.cause_event_id)) is not None
+               and cause.fact_kind == FactKind.DECISION and cause.decision is not None
+               and cause.decision.get('action') == REPUDIATE_ACTION
+               for link in event.causal_links)
+
+
+def _known_counterparty_breaches(world, actor):
+    """The counterparty (in)fulfillment history this actor has a right to
+    know, over every proposal it was itself a party to.
+
+    Discovery stays causal, not omniscient: a proposal this actor never
+    negotiated never contributes an entry, and a breach only counts once the
+    same notice-based channel ``authority_claims._breach_evidence`` already
+    relies on -- ``world.knowledge.notices`` -- actually reached this actor
+    for that exact breach event. Three distinct facts are surfaced, never a
+    score: ``repudiated`` (the debtor chose not to honor it), ``breached_by_
+    deadline`` (it lapsed unmet) and ``excused`` (its own dependency failed
+    first, so the failure was never this debtor's).
     """
-    from .authority_claims import (all_options as authority_claim_options,
-                                   execute_option as execute_authority_claim_option,
-                                   provider_actors)
-
-    actors = tuple(sorted({ref for ref, _ in _addresses(world)} | set(provider_actors(world)),
-                          key=lambda ref: (ref.kind, ref.id)))
-    consulted = set()
-    phases = (
-        (authority_claim_options, execute_authority_claim_option),
-        (disclosure_options, execute_disclosure),
-        (_proposal_response_options, _execute_response),
-        (_payment_options, _execute_payment),
-        (_teaching_options, None),
-        (_learning_options, _execute_learning),
-        (teaching_initiation_options if allow_offers else lambda _w, _a: (), _execute_offer),
-    )
-    for option_builder, executor in phases:
-        for actor in actors:
-            if actor in consulted:
+    ctx = diplomatic_context(world, actor)
+    records = []
+    for proposal_id in ctx.proposal_ids:
+        proposal = world.relations.proposals.get(proposal_id)
+        if proposal is None or actor not in (proposal.proposer_ref, proposal.counterparty_ref):
+            continue
+        counterparty = proposal.counterparty_ref if proposal.proposer_ref == actor else proposal.proposer_ref
+        for index, clause in enumerate(proposal.clauses):
+            if clause.debtor_ref != counterparty:
                 continue
-            options = option_builder(world, actor)
-            proposal_causes = {world.relations.proposals[option.proposal_id].last_event_id
-                               if getattr(option, "proposal_id", None) else None for option in options}
-            option_causes = {cause for option in options if hasattr(option, "causes")
-                             for cause in option.causes()}
-            causes = tuple(sorted((proposal_causes | option_causes) - {None}))
-            option = await _choose(world, actor, options, causes)
-            if option is None:
-                if options:
-                    consulted.add(actor)
+            obligation = world.relations.obligations.get(f'{proposal_id}:term:{index}')
+            if obligation is None or obligation.status not in {'breached', 'excused'}:
                 continue
-            consulted.add(actor)
-            event = _record_option_decision(world, option, causes)
-            if executor is not None:
-                executor(world, option, event.id)
+            event = _event(world, obligation.last_event_id)
+            if event is None:
+                continue
+            if obligation.status == 'excused':
+                kind = 'excused'
+            elif any(notice.recipient_ref == actor and notice.event_id == obligation.breach_event_id
+                     for notice in world.knowledge.notices.values()):
+                kind = 'repudiated' if _repudiation_cause(world, event) else 'breached_by_deadline'
             else:
-                # A teaching decision is only an offer of consent.  It never
-                # changes knowledge until the learner independently accepts.
-                schedule_review(world)
+                continue
+            records.append({'counterparty': counterparty.to_dict(), 'proposal_id': proposal_id,
+                            'obligation_id': obligation.id, 'kind': kind, 'day': event.day})
+    return tuple(sorted(records, key=lambda item: (item['counterparty']['kind'], item['counterparty']['id'],
+                                                    item['obligation_id'])))
+
+
+def _diplomacy_situation(world, actor, options):
+    """Exactly the original per-phase situation, now over every currently
+    combined option: only proposal/obligation IDs this actor already knows
+    of, never a settlement report, objective or foreign holding. The
+    counterparty breach history is likewise bounded to what this specific
+    actor was itself notified of -- see ``_known_counterparty_breaches``."""
+    return {
+        "today": world.clock.absolute_day,
+        "known_proposal_ids": sorted({option.proposal_id for option in options
+                                      if getattr(option, "proposal_id", None)}),
+        "own_obligation_ids": sorted({option.obligation_id for option in options
+                                      if getattr(option, "obligation_id", None)}),
+        "known_counterparty_breaches": _known_counterparty_breaches(world, actor),
+    }
+
+
+def _adapter_execute(options_fn, real_executor, kind):
+    """Adapt an existing phase executor (which takes the option object, not a
+    bare ID) to InstitutionalDecisionTurn's ``(world, actor, option_id, ...)``
+    convention, without changing what it does."""
+    def execute(world, actor, option_id, decision_event_id):
+        option = next((item for item in options_fn(world, actor) if item.id == option_id), None)
+        if option is None:
+            raise ValueError(f"stale or unknown {kind} option")
+        real_executor(world, option, decision_event_id)
+    return execute
+
+
+def _diplomacy_adapter(name, options_fn, execute_fn):
+    return DiscretionaryAdapter(name=name, family="diplomacy", options_fn=options_fn,
+                                label_fn=lambda option: _choice(option)["label"],
+                                causes_fn=_option_causes, execute_fn=execute_fn,
+                                situation_fn=_diplomacy_situation)
+
+
+def _authority_claim_adapter():
+    from .authority_claims import all_options, execute_option
+    return _diplomacy_adapter("authority_claim", all_options, execute_option)
+
+
+DISCLOSURE_ADAPTER = _diplomacy_adapter(
+    "technology_disclosure", disclosure_options,
+    _adapter_execute(disclosure_options, execute_disclosure, "technology disclosure"))
+
+PROPOSAL_RESPONSE_ADAPTER = _diplomacy_adapter(
+    "proposal_response", _proposal_response_options,
+    _adapter_execute(_proposal_response_options, _execute_response, "proposal response"))
+
+PAYMENT_ADAPTER = _diplomacy_adapter(
+    "teaching_payment", _payment_options,
+    _adapter_execute(_payment_options, _execute_payment, "teaching payment"))
+
+REPUDIATION_ADAPTER = _diplomacy_adapter(
+    "obligation_repudiation", _repudiation_options,
+    _adapter_execute(_repudiation_options, _execute_repudiation, "obligation repudiation"))
+
+OFFER_ADAPTER = _diplomacy_adapter(
+    "teaching_initiation", teaching_initiation_options,
+    _adapter_execute(teaching_initiation_options, _execute_offer, "teaching initiation"))
+
+TEACHING_ADAPTER = _diplomacy_adapter(
+    "promised_teaching", _teaching_options,
+    _adapter_execute(_teaching_options, _execute_teaching, "promised teaching"))
+
+
+def diplomacy_actors(world):
+    return _diplomacy_actors(world)
+
+
+def diplomacy_adapters(*, allow_offers=False):
+    """Every family without a same-boundary counterpart dependency, which
+    now includes the teacher's own promised-teaching consent: it depends on
+    nothing this boundary decides, only on its own already-fulfilled
+    payment dependency. Only the learner's acceptance is deliberately
+    absent (see :func:`review_promised_teaching_turns`), since it alone
+    depends on the teacher's decision from this exact boundary -- a
+    same-boundary dependency a single flat menu cannot safely express.
+    Excluding the teacher's option here too, as before, would let any
+    unrelated concern (an outstanding disclosure candidate, an obligation it
+    could instead repudiate) spend the actor's one consultation for the
+    boundary and starve the learner phase of the teacher's consent for a
+    reason that has nothing to do with this bargain.
+    """
+    return (_authority_claim_adapter(), DISCLOSURE_ADAPTER, PROPOSAL_RESPONSE_ADAPTER, PAYMENT_ADAPTER,
+            REPUDIATION_ADAPTER, TEACHING_ADAPTER, *((OFFER_ADAPTER,) if allow_offers else ()))
+
+
+async def review_promised_teaching_turns(world, *, consulted=(), actors=None):
+    """Learner acceptance, kept in its own turn after the composed menu.
+
+    A learner's option only exists once its teacher's current consent is
+    already on the record; since the teacher's own promised-teaching
+    decision is now made inside the composed turn (see
+    :func:`diplomacy_adapters`), this phase only ever needs to run after
+    that turn has already visited every actor. ``consulted`` names the
+    actors the composed turn already spent this boundary; they get no
+    second turn here.
+    """
+    if not world.config.ai_enabled:
+        return set(consulted)
+    consulted = set(consulted)
+    actors = _rotated(world, _diplomacy_actors(world)) if actors is None else actors
+    for actor in actors:
+        if actor in consulted:
+            continue
+        options = _learning_options(world, actor)
+        if not options:
+            continue
+        # A never-actually-asked actor (no budget, no provider, monthly cap)
+        # must still be told apart from one that got a turn and declined or
+        # answered badly; only a real answer spends this boundary's turn.
+        was_askable = ai_decider.consultable(world, actor)
+        proposal_causes = {world.relations.proposals[option.proposal_id].last_event_id
+                           if getattr(option, "proposal_id", None) else None for option in options}
+        option_causes = {cause for option in options if hasattr(option, "causes")
+                         for cause in option.causes()}
+        causes = tuple(sorted((proposal_causes | option_causes) - {None}))
+        option = await _choose(world, actor, options, causes)
+        if option is None:
+            if was_askable:
+                consulted.add(actor)
+            continue
+        consulted.add(actor)
+        event = _record_option_decision(world, option, causes)
+        _execute_learning(world, option, event.id)
+    return consulted
+
+
+async def review_diplomacy_with_provider(world, *, allow_offers=False):
+    """One provider consultation per institution across every safe family.
+
+    Authority claims, technology disclosure, proposal response, teaching
+    payment, the teacher's own promised-teaching consent and (when allowed)
+    a fresh teaching offer are all shown together; the institution picks
+    freely among whichever concerns it currently has, instead of a fixed
+    phase priority. The learner's acceptance then runs its own ordered turn
+    for whoever this one left untouched.
+    """
+    actors = _rotated(world, _diplomacy_actors(world))
+    _, consulted = await review_institutional_decision_turn_with_provider(
+        world, diplomacy_adapters(allow_offers=allow_offers), actors=actors,
+        situation_fn=_diplomacy_situation)
+    await review_promised_teaching_turns(world, consulted=consulted, actors=actors)

@@ -5,15 +5,9 @@ select one current ID and delegates the revalidation to ``technique_copy``.
 No provider, invalid answer, or NO_ACTION opens no dated work.
 """
 
-from src.classes.event import FactKind
-
-from . import ai_decider
-from .events import record_event
+from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
+                                          review_institutional_decision_turn_with_provider)
 from .technique_copy import open_technique_copy, technique_copy_options
-
-
-def _turn_available(world):
-    return ai_decider.provider_available() and ai_decider.within_budget(world)
 
 
 def _situation(world, actor, options):
@@ -39,43 +33,39 @@ def _situation(world, actor, options):
     }
 
 
+def _causes(world, option):
+    return (option.sighting_event_id, option.report_event_id, option.access_event_id)
+
+
+def technique_copy_actors(world):
+    return sorted({item.recipient_ref for item in world.knowledge.technology_sightings.values()},
+                  key=lambda item: (item.kind, item.id))
+
+
+def technique_copy_adapters(on_executed=None):
+    """The family's adapters; ``on_executed`` only reports that a material
+    copy actually opened, for the standalone caller's boolean contract."""
+    def _execute(world, actor, option_id, decision_event_id):
+        option = next((item for item in technique_copy_options(world, actor) if item.id == option_id), None)
+        if option is None:
+            raise ValueError("stale or unknown technique copy option")
+        open_technique_copy(world, actor, option.id, decision_event_id)
+        if on_executed is not None:
+            on_executed()
+
+    return (DiscretionaryAdapter(
+        name="technique_copy", family="technique_copy", options_fn=technique_copy_options,
+        label_fn=lambda option: "Copiar a técnica observada por trabalho local já em curso.",
+        causes_fn=_causes, execute_fn=_execute, situation_fn=_situation),)
+
+
 async def review_technique_copies_with_provider(world):
     """At most one real-AI decision per eligible institution per boundary."""
-    if not world.config.ai_enabled or not _turn_available(world):
-        return False
-    actors = sorted({item.recipient_ref for item in world.knowledge.technology_sightings.values()},
-                    key=lambda item: (item.kind, item.id))
-    changed = False
-    for actor in actors:
-        options = technique_copy_options(world, actor)
-        if not options:
-            continue
-        choices = [{"id": item.id, "label": "Copiar a técnica observada por trabalho local já em curso."}
-                   for item in options]
-        causes = tuple(sorted({item.sighting_event_id for item in options}
-                              | {item.report_event_id for item in options}
-                              | {item.access_event_id for item in options}))
-        selected = await ai_decider.select_option(
-            world, actor, _situation(world, actor, options), choices, causes=causes)
-        if selected in (None, ai_decider.NO_ACTION):
-            continue
-        option = next((item for item in options if item.id == selected), None)
-        if option is None:
-            continue
-        decision = record_event(
-            world, "technique_copy_decided", "Uma instituição selecionou uma cópia técnica permitida.",
-            fact_kind=FactKind.DECISION, decision=option.decision(),
-            # Never cite the LLM receipt: it interpreted a fact but did not
-            # cause the material decision.
-            cause_ids=causes,
-        )
-        try:
-            open_technique_copy(world, actor, option.id, decision.id)
-        except ValueError:
-            # Recomposition in the owner keeps a stale selected ID harmless.
-            continue
-        changed = True
-    return changed
+    changed = {"value": False}
+    adapters = technique_copy_adapters(on_executed=lambda: changed.__setitem__("value", True))
+    await review_institutional_decision_turn_with_provider(
+        world, adapters, actors=_rotated(world, technique_copy_actors(world)), situation_fn=_situation)
+    return changed["value"]
 
 
-__all__ = ["review_technique_copies_with_provider"]
+__all__ = ["review_technique_copies_with_provider", "technique_copy_actors", "technique_copy_adapters"]

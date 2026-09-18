@@ -136,12 +136,19 @@ class SocietyState(SocietySerialization):
             source = self.population.get(transition.source_group_id)
             expected_occupation = {"facility": "artisan", "repair": "artisan", "customs": "merchant"}.get(
                 transition.work_kind)
+            traveling = source is not None and transition.destination_settlement_id != source.settlement_id
+            # A customs recruitment never leaves its own settlement in this
+            # version; only facility/repair demand may relocate the recruit.
             if (key != transition.id or source is None or transition.source_group_id in migrating_groups
                     or transition.source_group_id in transitioning_groups
                     or source.occupation != "farmer" or expected_occupation is None
                     or transition.target_occupation != expected_occupation
-                    or transition.target_group_id != f"pop:{source.settlement_id}:{source.people}:{expected_occupation}"
-                    or transition.due_day != transition.started_day + 30):
+                    or transition.destination_settlement_id not in self.settlements
+                    or (traveling and transition.work_kind == "customs")
+                    or transition.target_group_id != (f"pop:{transition.destination_settlement_id}:"
+                                                       f"{source.people}:{expected_occupation}")
+                    or (transition.due_day != transition.started_day + 30 if not traveling
+                        else transition.due_day <= transition.started_day)):
                 raise ValueError("invalid workforce transition")
             self._select_people(transition.source_group_id, transition.count, ())
             transitioning_groups.add(transition.source_group_id)

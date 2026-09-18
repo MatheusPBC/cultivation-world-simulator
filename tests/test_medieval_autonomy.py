@@ -95,11 +95,19 @@ async def test_natural_monthly_supply_creates_real_orders_without_daily_decision
     assert sum(a.balance for a in world.economy.accounts.values()) == money
     assert any(p.stage == "await_delivery" for p in world.strategy.plans.values())
     orders = len(world.economy.freight_orders)
-    decisions = len([e for e in world.events if e.fact_kind.value == "decision"])
+    # "No daily decision spam" is about supply itself: the same iron/wood
+    # objective must not be re-decided every day once its order is open. Real
+    # hunger now drives its own, independent institutional-aid traffic (a
+    # settlement request answered, say), which is genuine new activity, not
+    # spam, and must not be mistaken for it here.
+    supply_decision_types = {"freight_decided", "buy_decided"}
+    supply_decisions = len([e for e in world.events
+                            if e.fact_kind.value == "decision" and e.event_type in supply_decision_types])
     await engine.step()
     assert world.clock.absolute_day == 61
     assert len(world.economy.freight_orders) == orders
-    assert len([e for e in world.events if e.fact_kind.value == "decision"]) == decisions
+    assert len([e for e in world.events if e.fact_kind.value == "decision"
+               and e.event_type in supply_decision_types]) == supply_decisions
     path = tmp_path / "autonomous.mws"
     save_world(world, path)
     resumed = load_world(path)

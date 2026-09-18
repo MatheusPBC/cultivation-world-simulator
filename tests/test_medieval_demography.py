@@ -1,7 +1,9 @@
 """Generations are an accounted law: fed and housed people grow, and only
 whoever really remains ever becomes working age."""
 
+from src.classes.economy.models import MoneyAccount
 from src.classes.event import FactKind
+from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.demography import BIRTH_PERMILLE, DEPENDENT, MATURE_OCCUPATION
 from src.sim.medieval.engine import MedievalSimulator
@@ -12,11 +14,31 @@ TARGET = "campomanso"
 
 
 def refill(world):
-    """Keep the prepared plenty real for as long as the scenario lasts."""
+    """Keep the prepared plenty real for as long as the scenario lasts.
+
+    There is no automatic relief left to feed anyone for free, so being fed
+    means every household also has the money to actually buy its ration.
+    """
     for key, need in tuple(world.economy.needs.items()):
         stock = world.economy.stocks[need.stock_id]
         world.economy.stocks[stock.id] = stock.model_copy(
             update={"goods": {**stock.goods, "food": world.society.population_at(key) * 2}})
+        price = world.economy.markets[key].prices["food"]
+        for group in world.society.population.values():
+            if group.settlement_id != key:
+                continue
+            account_id = f"household:{group.id}"
+            account = world.economy.accounts.get(account_id)
+            balance = group.count * price
+            if account is None:
+                # A newborn dependent cohort has no household account of its
+                # own yet; without one it could never pay for its own ration
+                # and would drag the whole settlement into a chronic, unpaid
+                # shortfall that the old automatic relief used to hide.
+                world.economy.accounts[account_id] = MoneyAccount(
+                    id=account_id, owner_ref=EntityRef("population_group", group.id), balance=balance)
+            else:
+                world.economy.accounts[account.id] = account.model_copy(update={"balance": balance})
 
 
 def fed_world():

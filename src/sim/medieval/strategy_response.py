@@ -19,6 +19,8 @@ from . import ai_decider
 from .economy import _causes, _delta
 from .events import record_event
 from .force import RAISE_ACTION, raise_detachment, raise_options
+from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
+                                          review_institutional_decision_turn_with_provider)
 
 
 ADOPT_ACTION = "adopt_occupied_settlement_defense"
@@ -169,35 +171,36 @@ def _adoption_situation(world, actor, options):
         for option in options], "today": world.clock.absolute_day}
 
 
+def strategy_adoption_actors(world):
+    return sorted({report.recipient_ref for report in world.knowledge.settlement_reports.values()
+                   if report.recipient_ref.kind == "polity"}, key=lambda item: item.id)
+
+
+def strategy_adoption_adapters(on_executed=None):
+    """The family's adapters; ``on_executed`` only reports that an adoption
+    actually persisted, for the standalone caller's boolean contract."""
+    def _execute(world, actor, option_id, decision_event_id):
+        adopt_occupied_settlement_defense(world, actor, option_id, decision_event_id)
+        if on_executed is not None:
+            on_executed()
+
+    return (DiscretionaryAdapter(
+        name="defense_adoption", family="strategy", options_fn=defense_adoption_options,
+        label_fn=lambda option: "Adotar resposta defensiva ao assentamento ocupado observado.",
+        causes_fn=lambda world, option: (option.report_event_id,), execute_fn=_execute,
+        situation_fn=_adoption_situation),)
+
+
 async def _review_adoptions(world):
-    if not world.config.ai_enabled:
-        return False
-    actors = sorted({report.recipient_ref for report in world.knowledge.settlement_reports.values()
-                     if report.recipient_ref.kind == "polity"}, key=lambda item: item.id)
-    changed = False
-    for actor in actors:
-        options = defense_adoption_options(world, actor)
-        if not options:
-            continue
-        causes = tuple(sorted({item.report_event_id for item in options}))
-        selected = await ai_decider.select_option(
-            world, actor, _adoption_situation(world, actor, options),
-            [{"id": item.id, "label": "Adotar resposta defensiva ao assentamento ocupado observado."}
-             for item in options], causes=causes)
-        if selected in (None, ai_decider.NO_ACTION):
-            continue
-        option = next((item for item in options if item.id == selected), None)
-        if option is None:
-            continue
-        decision = record_event(world, "strategy_defense_adoption_decided",
-                                "Uma instituição escolheu uma resposta defensiva válida.",
-                                fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=causes)
-        try:
-            adopt_occupied_settlement_defense(world, actor, option.id, decision.id)
-        except ValueError:
-            continue
-        changed = True
-    return changed
+    """Adoption is discretionary and monthly, so it runs through the shared
+    InstitutionalDecisionTurn; the scheduled material turn below stays out of
+    it, being both daily and a plan already in course."""
+    changed = {"value": False}
+    adapters = strategy_adoption_adapters(on_executed=lambda: changed.__setitem__("value", True))
+    await review_institutional_decision_turn_with_provider(
+        world, adapters, actors=_rotated(world, strategy_adoption_actors(world)),
+        situation_fn=_adoption_situation)
+    return changed["value"]
 
 
 async def _review_material_turn(world, plan):

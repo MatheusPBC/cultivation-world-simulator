@@ -11,8 +11,7 @@ class AuthorityState(RegistrySerialization):
     offices: dict[str, AuthorityOffice] = field(default_factory=dict)
     tax_policies: dict[str, TaxPolicy] = field(default_factory=dict)
     claims: dict[str, AuthorityClaim] = field(default_factory=dict)
-    registries = {"offices": AuthorityOffice, "tax_policies": TaxPolicy,
-                  "claims": AuthorityClaim}
+    registries = {"offices": AuthorityOffice, "tax_policies": TaxPolicy, "claims": AuthorityClaim}
 
     def validate(self, world=None):
         super().validate(world)

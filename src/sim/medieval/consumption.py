@@ -87,7 +87,7 @@ def purchase_monthly_rations(world, need, consumed, requirements=None):
     shares = requirement_shares(requirements, consumed) if requirements is not None else ration_shares(groups, consumed)
     accounts = sorted((a for a in economy.accounts.values() if a.owner_ref == stock.owner_ref), key=lambda a: a.id)
     if not accounts or not can_actor_act_for(world, stock.owner_ref, stock.owner_ref, "trade"):
-        return 0, ()  # No authorized commercial supplier; existing public relief remains.
+        return 0, ()  # No authorized commercial supplier; nothing is paid, so it stays missing.
     seller_id = accounts[0].id
     market = economy.markets[need.id]
     price = market.prices["food"]

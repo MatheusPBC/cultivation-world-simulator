@@ -335,12 +335,18 @@ async def test_a_damaged_crossing_delays_cargo_and_the_repaired_one_delivers_aga
     # The road leg reaches Pedraclara on day 35; the river departure is due on
     # day 36, so damage must land between those two physical resolutions.
     await run_to(world, 35)
+    # Real hunger (missing_food is no longer papered over by automatic relief)
+    # now drives the settlement's own administrator to import food on its own
+    # initiative, so part of this order may already have crossed before the
+    # storm. What the storm must prove is that it blocks *further* movement,
+    # not that nothing legitimate moved before it.
+    crossed_before_storm = world.economy.freight_orders[order.id].delivered_quantity
     fact, site = damage(world, SITE, 0.002)
     assert world.map.get_route_operational_capacity(RIVER) < 1
     await run_to(world, 36)
     delayed = [e for e in world.events if e.event_type == "cargo_delayed" and e.sequence > fact.sequence]
     assert delayed and any(fact.id in {link.cause_event_id for link in e.causal_links} for e in delayed)
-    assert world.economy.freight_orders[order.id].delivered_quantity == 0
+    assert world.economy.freight_orders[order.id].delivered_quantity == crossed_before_storm
 
     await run_to(world, 60)
     project = next(p for p in world.economy.repairs.values() if p.site_id == SITE)
@@ -372,7 +378,7 @@ async def test_a_damaged_crossing_delays_cargo_and_the_repaired_one_delivers_aga
     assert world.map.get_route_operational_capacity(RIVER) >= 1
 
     await run_to(world, 120)
-    assert world.economy.freight_orders[order.id].delivered_quantity > 0
+    assert world.economy.freight_orders[order.id].delivered_quantity > crossed_before_storm
     deliveries = [e for e in world.events if e.event_type == "cargo_delivered"
                   and any(d.owner_kind == "freight" and d.owner_id == order.id for d in e.deltas)]
     assert deliveries and deliveries[-1].sequence > repaired.sequence

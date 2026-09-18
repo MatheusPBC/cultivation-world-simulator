@@ -124,24 +124,25 @@ def consume_monthly(world) -> None:
         domestic, domestic_receipts = _consume_household_food(world, need.id, required_by_group)
         required = sum(required_by_group.values()) + domestic
         public_required = sum(required_by_group.values())
-        consumed = min(public_required, stock.goods.get("food", 0))
-        missing = public_required - consumed
+        pool = min(public_required, stock.goods.get("food", 0))
+        paid, receipts = purchase_monthly_rations(world, need, pool, required_by_group)
+        stock = economy.stocks[need.stock_id]
+        # Whatever public demand went unpaid is a real shortfall, not a
+        # standing subsidy: only a later, explicit relief act can cover it.
+        missing = public_required - paid
         pressure = math.ceil(100 * missing / required) if required else 0
         health = max(0, need.health - pressure) if missing else min(1000, need.health + 20)
         unrest = min(1000, need.unrest + pressure) if missing else max(0, need.unrest - 20)
         updated = need.model_copy(update={"health": health, "unrest": unrest, "missing_food": missing})
         deltas = tuple(_delta("subsistence", need.id, field, getattr(need, field), getattr(updated, field))
                        for field in ("health", "unrest", "missing_food") if getattr(need, field) != getattr(updated, field))
-        paid, receipts = purchase_monthly_rations(world, need, consumed, required_by_group)
-        stock = economy.stocks[need.stock_id]
-        relief = consumed - paid
-        goods = {**stock.goods, "food": stock.goods.get("food", 0) - relief}
         settlement = world.society.settlements[need.id]
-        event = _apply_stock(world, stock, goods, "subsistence_resolved",
-                             f"{settlement.name}: {domestic + consumed}/{required} rações atendidas; {domestic} domésticas, {paid} compradas, "
-                             f"{relief} de ajuda pública; déficit de {missing}.",
-                             extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"), *domestic_receipts, *receipts,
-                                 *(group.last_event_id for group in groups),
+        event = _apply_stock(world, stock, stock.goods, "subsistence_resolved",
+                             f"{settlement.name}: {domestic + paid}/{required} rações atendidas; {domestic} domésticas, {paid} compradas; "
+                             f"déficit de {missing}.",
+                             extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"),
+                                  *domestic_receipts, *receipts,
+                                  *(group.last_event_id for group in groups),
                                  *(f.last_event_id for f in economy.facilities.values() if f.stock_id == stock.id
                                    and "food" in economy.recipes[f.recipe_id].outputs),
                                  *(o.last_event_id for o in economy.freight_orders.values() if o.destination_id == stock.id

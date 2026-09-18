@@ -54,6 +54,17 @@ async def run(seed: int, output: Path) -> dict:
     world.economy.facilities.clear()
     destination = world.economy.stocks["stock:portovelho"]
     world.economy.stocks[destination.id] = destination.model_copy(update={"goods": {"food": 0}})
+    # No automatic relief exists anymore: once the blockade lifts and the
+    # prepaid cargo arrives, portovelho's own households still need money of
+    # their own to actually buy the ration and be counted as fed.
+    # Funded generously: the blockade lets the local price drift upward for a
+    # month before delivery, so a bare one-month ration would starve short.
+    price = world.economy.markets["portovelho"].prices["food"]
+    for group in world.society.population.values():
+        if group.settlement_id != "portovelho":
+            continue
+        account = world.economy.accounts[f"household:{group.id}"]
+        world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price * 10})
     initial_food = food_total(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
     closure = set_passage(world, False)
@@ -95,7 +106,15 @@ async def run(seed: int, output: Path) -> dict:
         await engine.step()
         assert_conservation(world, initial_food, initial_money)
     recovered = world.economy.needs["portovelho"]
-    if recovered.missing_food != 0 or recovered.health <= blocked.health or world.economy.parcels:
+    delivered_order = world.economy.freight_orders[order.id]
+    our_parcels_pending = any(parcel.order_id == order.id for parcel in world.economy.parcels.values())
+    # `world.economy.parcels` is no longer a proxy for "our delivery is done":
+    # once public relief stopped being automatic and infinite, real hunger
+    # persists across the rest of the world too, and other settlements keep
+    # their own freight moving indefinitely in response. What this scenario
+    # actually owns is portovelho's recovery and its own prepared order.
+    if (recovered.missing_food != 0 or recovered.health <= blocked.health
+            or delivered_order.delivered_quantity != delivered_order.quantity or our_parcels_pending):
         raise AssertionError("delivery did not restore subsistence")
     loaded = load_world(output)
     if world_snapshot(loaded) != world_snapshot(world) or loaded.events != world.events:

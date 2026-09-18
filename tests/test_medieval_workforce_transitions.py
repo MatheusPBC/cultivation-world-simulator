@@ -10,6 +10,7 @@ from src.sim.medieval.economy import produce_monthly
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.workforce import (accept_workforce_transition, labor_shortfall, refresh_workforce_notices,
                                          resolve_workforce_transitions, workforce_transition_options)
 
@@ -440,3 +441,82 @@ def test_customs_workforce_acceptance_revalidates_current_material_boundary(fail
         accept_workforce_transition(world, option.id, decision_event_id=decision.id)
     assert world.society.workforce_transitions == before[0]
     assert world.economy.accounts == before[1]
+
+
+def cross_settlement_world():
+    """No local farmer stock at the facility's own settlement, but a reachable
+    sponsor settlement elsewhere still has one -- exactly the documented gap
+    (villages stay farmer, so nearby artisan work could never be filled)."""
+    world = create_medieval_world(73)
+    facility = world.economy.facilities["works:campos-do-lume"]
+    recipe = world.economy.recipes[facility.recipe_id]
+    world.economy.recipes[recipe.id] = recipe.model_copy(update={"occupation": "artisan"})
+    stock = world.economy.stocks[facility.stock_id]
+    refresh_route_reports(world)
+    for candidate in list(world.society.population.values()):
+        if candidate.settlement_id == stock.location_id and candidate.occupation == "farmer":
+            # Shrink to just its named residents (never below), small enough
+            # that MAX_GROUP_FRACTION_DENOMINATOR floors any offer to zero --
+            # a real, if tiny, local cohort that still cannot fill the demand.
+            named = sum(1 for c in world.society.characters.values()
+                       if c.population_group_id == candidate.id and c.death_day is None)
+            world.society.population[candidate.id] = candidate.model_copy(update={"count": named})
+    produce_monthly(world)
+    refresh_workforce_notices(world)
+    notice = next(iter(world.knowledge.workforce_offer_notices.values()))
+    group = world.society.population[notice.source_group_id]
+    options = workforce_transition_options(world, group.id)
+    assert len(options) == 1
+    return world, group, facility, options[0], stock.location_id
+
+
+def test_no_local_farmers_widens_eligibility_to_a_reachable_sponsor_settlement():
+    world, group, facility, option, destination_id = cross_settlement_world()
+    assert group.settlement_id != destination_id
+    assert (world.society.settlements[group.settlement_id].administrator_id
+            == world.society.settlements[destination_id].administrator_id)
+
+    transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
+
+    assert transition.destination_settlement_id == destination_id
+    # Real travel time was used, not the local-transition constant.
+    assert transition.due_day > transition.started_day
+    assert transition.due_day != transition.started_day + 30
+    assert world.society.available_count(group.id) == group.count - transition.count
+
+
+def test_cross_settlement_completion_both_relocates_and_reclassifies():
+    world, group, facility, option, destination_id = cross_settlement_world()
+    transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
+    origin_before = world.society.population[group.id].count
+
+    resolve_workforce_transitions(world, due_situations(world, transition))
+
+    assert transition.id not in world.society.workforce_transitions
+    assert world.society.population[group.id].count == origin_before - transition.count
+    artisans = world.society.population[transition.target_group_id]
+    assert artisans.settlement_id == destination_id
+    assert artisans.occupation == "artisan" and artisans.count == transition.count
+    world.society.validate(set(world.map.regions), world)
+
+
+def test_cross_settlement_transition_survives_save_load_and_resolves(tmp_path):
+    world, group, facility, option, destination_id = cross_settlement_world()
+    transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
+    path = tmp_path / "cross-settlement.mws"
+    save_world(world, path)
+    resumed = load_world(path)
+    assert resumed.society.workforce_transitions[transition.id] == transition
+
+    resolve_workforce_transitions(resumed, due_situations(resumed, transition))
+
+    artisans = resumed.society.population[transition.target_group_id]
+    assert artisans.settlement_id == destination_id and artisans.occupation == "artisan"
+
+
+def test_customs_demand_never_recruits_beyond_its_own_settlement():
+    """The documented narrowing: customs merchant demand stays local-only."""
+    world, _, report, notice, option = customs_staff_shortfall_world()
+    transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
+    assert transition.destination_settlement_id == world.society.population[transition.source_group_id].settlement_id
+    assert transition.due_day == transition.started_day + 30

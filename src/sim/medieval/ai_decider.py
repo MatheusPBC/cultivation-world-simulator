@@ -20,7 +20,12 @@ from .events import record_event
 
 NO_ACTION = "NO_ACTION"
 INTERPRETED_EVENT = "ai_decision_interpreted"
+# A deliberate decline is its own fact: a reader must be able to tell it from
+# a consultation that chose something, and from one that failed, without
+# reading the prose of a receipt.
+DECLINED_EVENT = "ai_decision_declined"
 FAILED_EVENT = "ai_decision_failed"
+RECEIPT_EVENTS = frozenset({INTERPRETED_EVENT, DECLINED_EVENT, FAILED_EVENT})
 MAX_LABEL = 160
 
 
@@ -40,7 +45,7 @@ def provider_available() -> bool:
 def spent_calls(world, *, since_day=None):
     """Budget is read from canonical receipts; there is no separate counter."""
     return sum(1 for event in world.events
-               if event.event_type in {INTERPRETED_EVENT, FAILED_EVENT}
+               if event.event_type in RECEIPT_EVENTS
                and (since_day is None or event.day == since_day))
 
 
@@ -51,6 +56,38 @@ def within_budget(world):
     if config.ai_max_calls and spent_calls(world) >= config.ai_max_calls:
         return False
     return spent_calls(world, since_day=world.clock.absolute_day) < config.ai_calls_per_step
+
+
+def _month_key(world, actor):
+    return f"{actor.kind}:{actor.id}:{world.clock.absolute_day // 30}"
+
+
+def actor_within_monthly_cap(world, actor):
+    """0 (the default) means no institutional ceiling; unchanged behaviour."""
+    cap = world.config.institutional_actions_per_month
+    if not cap:
+        return True
+    return world.config.institutional_actions_consumed.get(_month_key(world, actor), 0) < cap
+
+
+def _consume_monthly_slot(world, actor):
+    if not world.config.institutional_actions_per_month:
+        return
+    key = _month_key(world, actor)
+    consumed = world.config.institutional_actions_consumed
+    world.config = world.config.model_copy(
+        update={"institutional_actions_consumed": {**consumed, key: consumed.get(key, 0) + 1}})
+
+
+def consultable(world, actor):
+    """Whether this actor could actually be asked right now, before asking.
+
+    A caller that needs to tell "never got a turn" apart from "got a turn
+    and it failed or was declined" -- to decide whether its own deterministic
+    safety net should still run this boundary -- checks this first, since
+    ``select_option``'s ``None`` alone cannot make that distinction.
+    """
+    return within_budget(world) and provider_available() and actor_within_monthly_cap(world, actor)
 
 
 def _receipt(world, event_type, content, *, causes=()):
@@ -80,6 +117,14 @@ async def select_option(world, actor, situation, choices, *, causes=()):
         _receipt(world, FAILED_EVENT, "Consulta ao provedor indisponível; nenhuma ação material foi tomada.",
                  causes=causes)
         return None
+    if not actor_within_monthly_cap(world, actor):
+        _receipt(world, FAILED_EVENT,
+                 "O teto mensal de ações institucionais deste ator foi atingido; nenhuma ação material foi tomada.",
+                 causes=causes)
+        return None
+    # This consultation is genuinely happening now, whatever its outcome: the
+    # monthly ceiling counts attempts, not successes.
+    _consume_monthly_slot(world, actor)
     from src.utils.llm.client import call_llm_json
     try:
         answer = await call_llm_json(_prompt(actor, situation, choices))
@@ -91,7 +136,7 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     selected = answer.get("selected_id") if isinstance(answer, dict) else None
     known = {item["id"] for item in choices}
     if selected == NO_ACTION:
-        _receipt(world, INTERPRETED_EVENT, "O provedor optou por não agir.", causes=causes)
+        _receipt(world, DECLINED_EVENT, "O provedor optou por não agir.", causes=causes)
         return NO_ACTION
     if not isinstance(selected, str) or selected not in known:
         _receipt(world, FAILED_EVENT, "O provedor devolveu uma escolha inexistente; nenhuma ação material foi tomada.",

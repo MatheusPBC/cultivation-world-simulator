@@ -1,4 +1,4 @@
-"""Households buy actual local rations; public relief covers the unpaid share."""
+"""Households buy actual local rations; whatever stays unpaid stays missing."""
 
 import pytest
 
@@ -26,14 +26,16 @@ def total_money(world):
     return sum(a.balance for a in world.economy.accounts.values())
 
 
-def test_families_pay_only_whole_received_rations_and_public_relief_is_not_charged():
+def test_families_pay_only_whole_received_rations_and_unpaid_demand_stays_missing():
     world, group, account_id = prepared_consumers()
     initial = total_money(world)
     consume_monthly(world)
     assert world.economy.accounts[account_id].balance == 2  # two rations at4
     assert world.economy.accounts["treasury:auren"].balance == 20008
-    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 0
-    assert world.economy.needs["pedraclara"].missing_food == 0
+    # Only the two rations actually bought leave the granary; nobody else in
+    # pedraclara could pay, and no automatic relief tops up the rest for free.
+    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 2398
+    assert world.economy.needs["pedraclara"].missing_food == 2398
     assert total_money(world) == initial
     purchase = next(e for e in world.events if e.event_type == "household_purchase_completed")
     assert {(d.owner_kind, d.aspect, d.before, d.after) for d in purchase.deltas} >= {
@@ -57,11 +59,13 @@ def test_empty_granary_cannot_charge_savings():
 def test_shortage_allocates_by_people_not_wealth():
     world, _, account_id = prepared_consumers(food=5, cash=100)
     # Local cohorts have480/480/960/480 people. Five rations split1/1/2/1.
+    # Only this one group can actually pay; the other three cannot, and
+    # nothing tops up their share for free, so it stays in the granary.
     consume_monthly(world)
     assert world.economy.accounts[account_id].balance == 96
     assert world.economy.accounts["treasury:auren"].balance == 20004
-    assert world.economy.needs["pedraclara"].missing_food == 2395
-    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 0
+    assert world.economy.needs["pedraclara"].missing_food == 2399
+    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 4
 
 
 def test_remainder_allocation_is_stable_and_does_not_drop_a_ration():
@@ -73,13 +77,13 @@ def test_remainder_allocation_is_stable_and_does_not_drop_a_ration():
     assert ration_shares(list(reversed(groups)), 2) == {"a": 1, "b": 1, "c": 0}
 
 
-def test_no_commercial_mandate_means_no_charge_but_existing_relief_remains():
+def test_no_commercial_mandate_means_no_charge_and_food_stays_missing():
     world, _, account_id = prepared_consumers()
     world.authority.offices.clear()
     consume_monthly(world)
     assert world.economy.accounts[account_id].balance == 10
-    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 0
-    assert world.economy.needs["pedraclara"].missing_food == 0
+    assert world.economy.stocks["stock:pedraclara"].goods["food"] == 2400
+    assert world.economy.needs["pedraclara"].missing_food == 2400
 
 
 async def test_income_consumption_finances_next_production_month_and_resumes(tmp_path):

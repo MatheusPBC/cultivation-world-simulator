@@ -5,6 +5,8 @@ nor confiscation: every path preserves the exact parcel and its quantity.
 """
 
 import asyncio
+from contextlib import closing
+import sqlite3
 
 import pytest
 
@@ -83,8 +85,9 @@ def test_presentation_then_manifest_payment_releases_same_parcel_and_survives_sa
 
     path = tmp_path / "customs.mws"
     save_world(world, path)
+    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        assert conn.execute("SELECT schema_version FROM metadata WHERE id=1").fetchone() == (SCHEMA,)
     world = load_world(path)
-    assert SCHEMA == 32
     option = customs_payment_options(world, order.owner_ref)[0]
     payment = pay_customs_fee(world, option.id, decision_event_id=decided(world, option, "customs_fee_decided").id)
     released = world.economy.parcels[parcel.id]

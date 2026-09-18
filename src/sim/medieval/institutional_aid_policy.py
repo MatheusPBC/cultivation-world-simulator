@@ -124,7 +124,12 @@ async def _fulfill_with_provider(world, actor):
     if option is None:
         return False
     decision = _decide(world, option, "aid_fulfillment_decided", "A instituição cumpriu a ajuda acordada.")
-    fulfill_institutional_aid(world, actor, option.id, decision.id)
+    try:
+        fulfill_institutional_aid(world, actor, option.id, decision.id)
+    except ValueError:
+        # Same technical-failure boundary as the routine path: a route the
+        # provider chose in good faith may have closed since it was offered.
+        return False
     return True
 
 
@@ -136,7 +141,14 @@ def _fulfill(world, actor):
         if accepted_day is None or accepted_day >= day:
             continue
         decision = _decide(world, option, "aid_fulfillment_decided", "A instituição cumpriu a ajuda acordada.")
-        fulfill_institutional_aid(world, actor, option.id, decision.id)
+        try:
+            fulfill_institutional_aid(world, actor, option.id, decision.id)
+        except ValueError:
+            # A route the actor still believes valid may have closed since (a
+            # restriction, a lost checkpoint reading). The obligation stays
+            # active for a later attempt or remediation; this is a technical
+            # failure, never a strategic choice to withhold the shipment.
+            continue
         return True
     return False
 
@@ -176,14 +188,17 @@ def _remediate(world, actor):
 
 
 def _pressured_settlements(world, actor):
-    """Own blocked food objectives whose own current report still shows need."""
+    """Own food objectives whose own current report still shows real need.
+
+    A satisfied reserve plan does not mean a fed population: the reserve
+    target and the settlement's dated report are different quantities, so the
+    plan's stage is not a gate here.
+    """
     day = world.clock.absolute_day
     settlements = []
     for objective in sorted(world.strategy.objectives.values(), key=lambda item: item.id):
-        plan = world.strategy.plans.get(f"plan:{objective.id}")
         report = world.knowledge.settlement_report(actor, objective.settlement_id)
         if (objective.actor_ref != actor or objective.resource_id != "food"
-                or plan is None or plan.stage != "blocked"
                 or report is None or report.observed_day != day or report.missing_food <= 0):
             continue
         settlements.append(objective.settlement_id)
@@ -287,11 +302,15 @@ def review_institutional_aid(world, allow_requests=False):
             _request(world, actor)
 
 
-async def review_institutional_aid_with_provider(world, allow_requests=False):
+async def review_institutional_aid_with_provider(world, allow_requests=False, excluded_requesters=()):
     """Run one aid action per polity using either routine rules or a provider.
 
     ``ai_enabled`` is the explicit boundary: provider mode never falls back to
     a routine material action after unavailable/error/invalid/NO_ACTION.
+    ``excluded_requesters`` only narrows the *request* branch: an actor whose
+    request decision was already deferred to a concurrent menu this same
+    boundary must not be asked to request again, but it still independently
+    answers, fulfils or remediates like any other institution.
     """
     for identity in sorted(world.society.polities):
         actor = EntityRef("polity", identity)
@@ -300,9 +319,9 @@ async def review_institutional_aid_with_provider(world, allow_requests=False):
                     or await _fulfill_with_provider(world, actor)
                     or await _remediate_with_provider(world, actor)):
                 continue
-            if allow_requests:
+            if allow_requests and actor not in excluded_requesters:
                 await _request_with_provider(world, actor)
         elif (_respond(world, actor) or _fulfill(world, actor) or _remediate(world, actor)):
             continue
-        elif allow_requests:
+        elif allow_requests and actor not in excluded_requesters:
             _request(world, actor)

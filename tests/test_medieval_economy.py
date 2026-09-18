@@ -5,6 +5,7 @@ import pytest
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from tests.medieval_relief_helpers import relieve_all_settlements
 
 
 def test_world_has_owned_located_stocks_and_a_complete_resource_catalog():
@@ -92,23 +93,47 @@ async def test_month_consumes_each_person_once_and_daily_interrupt_does_not_cons
     await engine.step()
     assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
     await engine.step()
+    # No household has any money and no relief act has run yet, so nothing
+    # left any granary: the shortfall is real, not silently forgiven.
+    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
+    assert sum(need.missing_food for need in world.economy.needs.values()) == 10900
+    # The administration now chooses, settlement by settlement, to give its
+    # own stored food away -- the only way anyone actually eats.
+    relieve_all_settlements(world)
     assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before - 10900
+    assert sum(need.missing_food for need in world.economy.needs.values()) == 0
 
 
-async def test_shortage_harms_health_and_recovery_requires_new_food():
+def test_shortage_harms_health_and_recovery_requires_new_food():
+    from src.sim.medieval.economy import consume_monthly
+    from src.systems.time import WorldClock
     world = create_medieval_world(73)
     assert hasattr(world, "economy"), "economy missing"
     world.economy.facilities.clear()
     stock = world.economy.stocks["stock:pedraclara"]
     world.economy.stocks[stock.id] = stock.model_copy(update={"goods": {"food": 1200}})
-    await MedievalSimulator(world).step()
+    world.clock = WorldClock(30)
+    consume_monthly(world)
     need = world.economy.needs["pedraclara"]
-    assert (need.missing_food, need.health, need.unrest) == (1200, 950, 50)
-    assert world.economy.stocks[stock.id].goods["food"] == 0
-    world.economy.stocks[stock.id] = world.economy.stocks[stock.id].model_copy(update={"goods": {"food": 2400}})
-    await MedievalSimulator(world).step()
+    # No household has money and no relief act has run: the whole ration is
+    # simply missing this cycle, not silently forgiven by an automatic rate.
+    assert (need.missing_food, need.health, need.unrest) == (2400, 900, 100)
+    assert world.economy.stocks[stock.id].goods["food"] == 1200
+    world.economy.stocks[stock.id] = world.economy.stocks[stock.id].model_copy(
+        update={"goods": {"food": world.economy.stocks[stock.id].goods.get("food", 0) + 2400}})
+    # Recovery now requires an actual paid ration -- an unpaid one is never
+    # forgiven for free -- so every household gets enough money to buy its
+    # own share this cycle.
+    price = world.economy.markets["pedraclara"].prices["food"]
+    for group in world.society.population.values():
+        if group.settlement_id != "pedraclara":
+            continue
+        account = world.economy.accounts[f"household:{group.id}"]
+        world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price})
+    world.clock = WorldClock(60)
+    consume_monthly(world)
     need = world.economy.needs["pedraclara"]
-    assert (need.missing_food, need.health, need.unrest) == (0, 970, 30)
+    assert (need.missing_food, need.health, need.unrest) == (0, 920, 80)
     assert world.society.total_population == 10900
 
 

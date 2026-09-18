@@ -69,7 +69,8 @@ async def breached(world, engine):
 
 def ai_receipts(world):
     return tuple(item for item in world.events
-                 if item.event_type in {"ai_decision_interpreted", "ai_decision_failed"})
+                 if item.event_type in {"ai_decision_interpreted", "ai_decision_declined",
+                                        "ai_decision_failed"})
 
 
 async def test_a_breach_earns_a_turn_that_a_provider_can_answer_with_a_real_column(tmp_path, monkeypatch):

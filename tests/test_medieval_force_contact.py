@@ -134,7 +134,7 @@ async def test_contact_noaction_or_invalid_authority_cannot_mutate_and_lapse_res
     # The pre-existing column still consumes its own ration on a dated force
     # tick; the provider's NO_ACTION itself adds only a zero-delta receipt.
     new_events = world.events[before["event_count"]:]
-    assert any(event.event_type == "ai_decision_interpreted" and not event.deltas for event in new_events)
+    assert any(event.event_type == ai_decider.DECLINED_EVENT and not event.deltas for event in new_events)
     assert not any(event.event_type == "detachment_stood_down" for event in world.events)
 
     option = standoff_options(world, OWNER)[0]

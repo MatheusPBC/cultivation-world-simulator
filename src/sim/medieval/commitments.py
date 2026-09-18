@@ -1,5 +1,6 @@
 """Fulfillment delegates material changes; deadlines record consequences only."""
 from src.classes.event import FactKind
+from src.classes.governance.authority import require_authority
 from .economy import _delta, transfer_money
 from .events import record_event
 from .diplomacy import require_decision, disclose
@@ -7,11 +8,12 @@ from .institutional_memory import apply_memory_creation, memory_creation_deltas
 from .teaching import teach_technology
 
 
-def conclude_obligation(world, obligation, status, material_event_id=None, extra_causes=()):
+def conclude_obligation(world, obligation, status, material_event_id=None, extra_causes=(), repudiated=False):
     causes = tuple(dict.fromkeys((obligation.last_event_id, *extra_causes,
                                  *((material_event_id,) if material_event_id else ()))))
     text = {'fulfilled':'Obrigação cumprida por execução material.',
-        'breached':'Prazo descumprido; nenhuma transferência forçada.',
+        'breached':'A promessa foi repudiada pelo próprio devedor antes do prazo.' if repudiated
+                   else 'Prazo descumprido; nenhuma transferência forçada.',
         'excused':'Obrigação dispensada porque sua condição não foi cumprida.'}[status]
     proposal = world.relations.proposals[obligation.proposal_id]
     # A breached material delivery or withdrawal promise matters to both
@@ -73,6 +75,32 @@ def fulfill_obligation(world, obligation_id, *, decision_event_id, acceptance_id
         material = next(k.event_id for k in world.knowledge.technologies.values()
                         if k.owner_ref == clause.creditor_ref and k.technology_id == clause.technology_id)
     conclude_obligation(world, obligation, 'fulfilled', material, tuple(d.last_event_id for d in dependencies))
+
+
+def repudiate_obligation(world, obligation_id, *, decision_event_id, decision_intent=None):
+    """The debtor's own choice not to honor an obligation it could still meet.
+
+    Distinct from the deadline lapse in :func:`resolve_diplomacy`: this is
+    only reachable while the obligation is still ``active`` and its deadline
+    has not yet passed, so it can never stand in for "simply failed to act
+    in time". The material conclusion is the same ``breached`` transition
+    every other breach uses; only the decision that causes it, and the
+    ``repudiated`` flag threaded to :func:`conclude_obligation`, mark the
+    difference between not managing to honor a promise and not wanting to.
+    """
+    world.relations.validate(world)
+    obligation = world.relations.obligations.get(obligation_id)
+    if obligation is None or obligation.status != 'active':
+        raise ValueError('repudiation requires an active obligation')
+    proposal = world.relations.proposals[obligation.proposal_id]
+    clause = proposal.clauses[obligation.clause_index]
+    if world.clock.absolute_day > clause.due_day:
+        raise ValueError('repudiation deadline has passed')
+    intent = decision_intent or {'action': 'repudiate_obligation', 'actor_ref': clause.debtor_ref.to_dict(),
+                                 'obligation_id': obligation.id}
+    require_decision(world, decision_event_id, intent)
+    require_authority(world, clause.debtor_ref, 'diplomacy')
+    conclude_obligation(world, obligation, 'breached', extra_causes=(decision_event_id,), repudiated=True)
 
 
 def resolve_diplomacy(world, situations):

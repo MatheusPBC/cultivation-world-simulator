@@ -1,4 +1,4 @@
-import type { EntityRef, MapView, ObservatoryView } from '../types/medieval-api'
+import type { EntityRef, MapView, ObservatoryView, WorldEvent } from '../types/medieval-api'
 import { ApiError } from './api'
 
 export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
@@ -181,3 +181,19 @@ export function entityName(snapshot: ObservatoryView, ref: EntityRef | null): st
 }
 export const formatNumber = (n: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(n)
 export const calendar = (day: number) => 'Ano ' + (Math.floor(day / 360) + 1) + ' · mês ' + (Math.floor(day % 360 / 30) + 1) + ' · dia ' + (day % 30 + 1)
+
+export type DecisionTraceKind = 'actor_choice' | 'deliberate_inaction' | 'explicit_refusal' | 'technical_failure' | 'consultation_completed'
+
+export function decisionTraceKind(event: WorldEvent): DecisionTraceKind | null {
+  // Must come before the actor_decision check below: an omission is also
+  // recorded with causal_origin 'actor_decision', but it is not an action —
+  // it needs to read as a deliberate choice not to act, never merge with it.
+  if (event.event_type === 'institutional_decision_turn_declined') return 'deliberate_inaction'
+  if (event.causal_origin === 'actor_decision') return 'actor_choice'
+  if (event.event_type === 'ai_decision_failed') return 'technical_failure'
+  if (event.event_type === 'ai_decision_declined') return 'explicit_refusal'
+  if (event.event_type === 'ai_decision_interpreted') return 'consultation_completed'
+  return null
+}
+
+export const isDecisionConsultationEvent = (event: WorldEvent) => decisionTraceKind(event) !== null

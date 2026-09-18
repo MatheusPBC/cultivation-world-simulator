@@ -450,8 +450,11 @@ class RelationsState(RegistrySerialization):
                     # Aid and reciprocal commitments deliver through the same
                     # canonical freight owner; only the naming of the debtor's
                     # own fulfillment decision differs.
+                    fulfillment_causes = ({link.cause_event_id for link in material.causal_links}
+                                          & {link.cause_event_id for link in final.causal_links})
                     decisions = [event for event in events.values()
-                                 if event.fact_kind.name == 'DECISION'
+                                 if event.id in fulfillment_causes
+                                 and event.fact_kind.name == 'DECISION'
                                  and event.decision and event.decision.get('action') in {
                                      'fulfill_institutional_aid', 'fulfill_resource_transfer'}
                                  and event.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
@@ -461,6 +464,7 @@ class RelationsState(RegistrySerialization):
                                    and order.resource_id == clause.resource_id
                                    and order.quantity == clause.quantity
                                    and order.route_ids == clause.route_ids
+                                   and material.id == f"event:{order.id.split(':', 1)[1]}"
                                    and any(decision.id in order.decision_ids for decision in decisions))]
                     if (material.event_type != 'freight_opened' or len(freight) != 1
                             or not any(delta.owner_kind == 'stock' and delta.owner_id == clause.source_stock_id

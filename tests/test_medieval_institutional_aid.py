@@ -1,5 +1,7 @@
 """Focused contracts for the transient medieval institutional-aid vertical."""
 
+from dataclasses import replace
+
 import pytest
 
 from src.classes.event import FactKind
@@ -212,7 +214,8 @@ def test_breach_remediation_preserves_history_and_validates_after_parcel_progres
     assert balances == {key: account.balance for key, account in world.economy.accounts.items()}
 
     world.clock = world.clock.advance(1)
-    resolve_parcels(world, world.agenda.pop_due(world.clock.absolute_day))
+    resolve_parcels(world, [item for item in world.agenda.pop_due(world.clock.absolute_day)
+                            if item.kind == "cargo"])
     path = tmp_path / "remediated-aid.mws"
     save_world(world, path)
     restored = load_world(path)
@@ -251,3 +254,86 @@ def test_fulfillment_rejects_a_stale_private_route_without_mutation():
     with pytest.raises(ValueError, match="stale|unknown|option|route"):
         fulfill_institutional_aid(world, PROVIDER, option.id, stale_decision.id)
     assert world_snapshot(world) == before
+
+
+def _run_aid_chain(world):
+    request_option = next(item for item in aid_request_options(world, REQUESTER)
+                          if item.provider_ref == PROVIDER)
+    request_decision = decision(world, request_option, "aid request")
+    request_institutional_aid(world, REQUESTER, request_option.id, request_decision.id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    response_option = next(item for item in aid_response_options(world, PROVIDER) if item.kind == "accept")
+    response_decision = decision(world, response_option, "aid response")
+    respond_institutional_aid(world, PROVIDER, response_option.id, response_decision.id)
+    fulfill_option = aid_fulfillment_options(world, PROVIDER)[0]
+    fulfill_decision = decision(world, fulfill_option, "aid fulfillment")
+    order = fulfill_institutional_aid(world, PROVIDER, fulfill_option.id, fulfill_decision.id)
+    return order, world.relations.obligations[fulfill_option.obligation_id]
+
+
+def test_second_identical_aid_chain_keeps_first_fulfillment_receipt(tmp_path):
+    world = prepared_world()
+    first_order, first_obligation = _run_aid_chain(world)
+    first_events = tuple(world.events)
+    world.relations.validate(world)
+
+    second_order, second_obligation = _run_aid_chain(world)
+
+    for field in ("source_id", "destination_id", "resource_id", "quantity", "route_ids", "owner_ref"):
+        assert getattr(second_order, field) == getattr(first_order, field)
+    assert first_order.quantity > 0
+    assert first_order.id != second_order.id
+    assert first_order.decision_ids != second_order.decision_ids
+    assert first_obligation.id != second_obligation.id
+    assert first_obligation.material_event_id != second_obligation.material_event_id
+    assert first_obligation.status == second_obligation.status == "fulfilled"
+    assert world.relations.obligations[first_obligation.id] == first_obligation
+    assert world.economy.freight_orders[first_order.id] == first_order
+    assert tuple(world.events[:len(first_events)]) == first_events
+
+    world.clock = world.clock.advance(1)
+    resolve_parcels(world, [item for item in world.agenda.pop_due(world.clock.absolute_day)
+                           if item.kind == "cargo"])
+    for order, obligation in ((first_order, first_obligation), (second_order, second_obligation)):
+        assert world.economy.freight_orders[order.id].last_event_id != obligation.material_event_id
+        assert world.relations.obligations[obligation.id] == obligation
+    world.relations.validate(world)
+    save_world(world, tmp_path / "two-chains.mws")
+    assert world_snapshot(load_world(tmp_path / "two-chains.mws")) == world_snapshot(world)
+
+
+@pytest.mark.parametrize("tamper", ["swap", "reuse", "missing_order", "material_decision", "final_decision"])
+def test_identical_aid_chains_reject_invalid_material_provenance(tamper):
+    world = prepared_world()
+    first_order, first = _run_aid_chain(world)
+    second_order, second = _run_aid_chain(world)
+    world.relations.validate(world)
+
+    if tamper in {"swap", "reuse"}:
+        pairs = ((first, second), (second, first)) if tamper == "swap" else ((second, first),)
+        for obligation, other in pairs:
+            world.relations.obligations[obligation.id] = obligation.model_copy(
+                update={"material_event_id": other.material_event_id})
+            index = next(i for i, event in enumerate(world.events) if event.id == obligation.last_event_id)
+            final = world.events[index]
+            world.events[index] = final.model_copy(update={
+                "causal_links": tuple(replace(link, cause_event_id=other.material_event_id)
+                                      if link.cause_event_id == obligation.material_event_id else link
+                                      for link in final.causal_links),
+                "deltas": tuple(replace(delta, after=other.material_event_id)
+                                if delta.aspect == "material_event_id" else delta for delta in final.deltas)})
+    elif tamper == "missing_order":
+        del world.economy.freight_orders[second_order.id]
+    else:
+        event_id = second.material_event_id if tamper == "material_decision" else second.last_event_id
+        index = next(i for i, event in enumerate(world.events) if event.id == event_id)
+        event = world.events[index]
+        world.events[index] = event.model_copy(update={
+            "causal_links": tuple(replace(link, cause_event_id=first_order.decision_ids[0])
+                                  if link.cause_event_id == second_order.decision_ids[0] else link
+                                  for link in event.causal_links)})
+
+    message = ("material receipt cannot fulfill multiple obligations" if tamper == "reuse"
+               else "fulfillment requires the negotiated freight receipt")
+    with pytest.raises(ValueError, match=message):
+        world.relations.validate(world)

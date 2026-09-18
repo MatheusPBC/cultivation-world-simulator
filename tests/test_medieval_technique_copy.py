@@ -15,6 +15,7 @@ from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.infrastructure import damage_site, progress_repairs, start_repair
+from src.sim.medieval.institutional_decision_turn import DECLINED_DECISION_EVENT_TYPE
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.research import learn_technology
 from src.sim.medieval.route_intelligence import refresh_site_reports
@@ -97,14 +98,17 @@ def open_copy(world):
 
 @pytest.mark.asyncio
 async def test_sustained_foreign_paid_access_copies_without_harming_holder_and_round_trips(tmp_path, monkeypatch):
-    # This goes through the engine review: the provider sees only the current
-    # sighting/report options and returns one engine-generated ID.
+    # This goes through the engine review, where the monthly institutional turn
+    # composes every discretionary family into one menu per institution: the
+    # provider picks the copy option only when the engine actually offered it.
     world, sighting, _ = access_world(progress=False)
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1, "ai_max_calls": 3})
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8, "ai_max_calls": 30})
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
 
     async def choose_first(prompt, *_args, **_kwargs):
-        return {"selected_id": json.loads(prompt.rsplit("\n", 1)[1])["choices"][0]["id"]}
+        choices = json.loads(prompt.rsplit("\n", 1)[1])["choices"]
+        copies = [item["id"] for item in choices if item["id"].startswith("technique-copy:")]
+        return {"selected_id": copies[0] if copies else ai_decider.NO_ACTION}
 
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_first)
     await MedievalSimulator(world).step()
@@ -198,7 +202,10 @@ async def test_missing_evidence_access_prerequisite_or_authority_and_no_action_d
     assert not world.research.technique_copies and not world.knowledge.knows(COPIER, "metallurgy")
     assert world.economy.stocks[LOCAL_STOCK] == stock
     assert world.economy.accounts["treasury:auren"].balance == balance
-    assert world.events[-1].event_type == "ai_decision_interpreted" and not world.events[-1].deltas
+    # The consultation leaves its receipt, and answering NO_ACTION is itself a
+    # zero-delta decision fact: the actor saw the menu and chose not to copy.
+    assert any(event.event_type == ai_decider.DECLINED_EVENT for event in world.events)
+    assert world.events[-1].event_type == DECLINED_DECISION_EVENT_TYPE and not world.events[-1].deltas
 
     # Funds disappearing after opening resolve to a factual failure; they do
     # not let settle_work throw after the agenda has already been consumed.

@@ -20,6 +20,8 @@ from src.systems.calendar_agenda import ScheduledSituation
 
 from .economy import _causes, _delta
 from .events import record_event
+from .migration_policy import _route_path
+from .travel import route_duration
 
 
 TRANSITION_DAYS = 30
@@ -202,15 +204,32 @@ def _observe_demand(world, demand):
     return report
 
 
+def _work_settlement_id(world, work_kind, work_id):
+    """The one settlement a facility or repair demand belongs to.
+
+    ``None`` for customs: a checkpoint's region can touch more than one
+    settlement, so it has no single destination a recruit could travel to.
+    """
+    if work_kind == "facility":
+        return world.economy.stocks[world.economy.facilities[work_id].stock_id].location_id
+    if work_kind == "repair":
+        return world.economy.stocks[world.economy.repairs[work_id].stock_id].location_id
+    return None
+
+
 def _eligible_groups(world, demand):
-    """Only fully available local farmers can receive a finite direct offer."""
-    if demand.work_kind == "facility":
-        facility = world.economy.facilities[demand.work_id]
-        settlement_id = world.economy.stocks[facility.stock_id].location_id
-    elif demand.work_kind == "repair":
-        project = world.economy.repairs[demand.work_id]
-        settlement_id = world.economy.stocks[project.stock_id].location_id
-    else:
+    """Only fully available farmers can receive a finite direct offer.
+
+    A customs checkpoint's merchant demand only ever reaches a farmer already
+    standing somewhere its own region touches, exactly as before. A
+    facility/repair artisan demand also reaches this settlement's own farmers
+    first, but when none exist here a farmer group elsewhere in a settlement
+    the same sponsor administers, and that the sponsor's own current route
+    knowledge actually connects to this one, is offered too -- the mechanism
+    that ends the wait, not a bypass of the labour deficit it still proves.
+    """
+    settlement_id = _work_settlement_id(world, demand.work_kind, demand.work_id)
+    if settlement_id is None:
         checkpoint = world.economy.customs_checkpoints[demand.work_id]
         site = world.map.infrastructure_sites[checkpoint.site_id]
         settlements = {settlement.id for settlement in world.society.settlements.values()
@@ -224,6 +243,16 @@ def _eligible_groups(world, demand):
         if (group.settlement_id == settlement_id and group.occupation == "farmer"
                 and world.society.available_count(group.id) == group.count):
             yield group
+    if demand.sponsor_ref.kind != "polity":
+        return
+    for group in sorted(world.society.population.values(), key=lambda item: item.id):
+        settlement = world.society.settlements.get(group.settlement_id)
+        if (group.settlement_id == settlement_id or group.occupation != "farmer"
+                or world.society.available_count(group.id) != group.count
+                or settlement is None or settlement.administrator_id != demand.sponsor_ref.id
+                or _route_path(world, demand.sponsor_ref, group.settlement_id, settlement_id) is None):
+            continue
+        yield group
 
 
 def _publish_offers(world, report):
@@ -340,6 +369,17 @@ def accept_workforce_transition(world, option_id, *, decision_event_id):
     world.society._select_people(group_id, notice.count, ())
     require_authority(world, report.sponsor_ref, "supply")
     require_authority(world, report.sponsor_ref, "trade")
+    destination_settlement_id = _work_settlement_id(world, report.work_kind, report.work_id) or group.settlement_id
+    if destination_settlement_id == group.settlement_id:
+        due_day = world.clock.absolute_day + TRANSITION_DAYS
+    else:
+        # Revalidated fresh, exactly like every other executor here: the
+        # eligibility check that surfaced this group is not trusted to still
+        # hold at acceptance time.
+        path = _route_path(world, report.sponsor_ref, group.settlement_id, destination_settlement_id)
+        if path is None:
+            raise ValueError("workforce recruitment route is no longer known")
+        due_day = world.clock.absolute_day + sum(route_duration(world, route_id) for route_id in path[0])
     event = record_event(
         world, "workforce_transition_started", "Um grupo aceitou uma transição local de agricultor para artesão.",
         fact_kind=FactKind.STATE_TRANSITION,
@@ -355,11 +395,12 @@ def accept_workforce_transition(world, option_id, *, decision_event_id):
         update={"balance": household.balance + stipend, "last_event_id": event.id})
     transition = WorkforceTransition(
         id=transition_id, source_group_id=group.id,
-        target_group_id=f"pop:{group.settlement_id}:{group.people}:{report.target_occupation}", sponsor_ref=report.sponsor_ref,
+        target_group_id=f"pop:{destination_settlement_id}:{group.people}:{report.target_occupation}",
+        sponsor_ref=report.sponsor_ref,
         demand_id=report.id, notice_id=notice.id, work_kind=report.work_kind, work_id=report.work_id,
-        target_occupation=report.target_occupation,
+        target_occupation=report.target_occupation, destination_settlement_id=destination_settlement_id,
         count=notice.count, stipend_per_person=notice.stipend_per_person, started_day=world.clock.absolute_day,
-        due_day=world.clock.absolute_day + TRANSITION_DAYS, decision_event_id=decision_event_id, last_event_id=event.id)
+        due_day=due_day, decision_event_id=decision_event_id, last_event_id=event.id)
     world.society.workforce_transitions[transition.id] = transition
     world.agenda.schedule(ScheduledSituation(transition.id, "workforce_transition", transition.due_day))
     return transition
@@ -375,7 +416,8 @@ def _completion_plan(world, transition):
     """
     source = world.society.population.get(transition.source_group_id)
     if (source is None or source.occupation != "farmer"
-            or source.settlement_id not in world.society.settlements):
+            or source.settlement_id not in world.society.settlements
+            or transition.destination_settlement_id not in world.society.settlements):
         return None
     try:
         # No named character is moved by this V1 aggregate classification change.
@@ -384,8 +426,9 @@ def _completion_plan(world, transition):
         return None
     target = next((group for group in world.society.population.values()
                    if (group.settlement_id, group.people, group.occupation)
-                   == (source.settlement_id, source.people, transition.target_occupation)), None)
-    target_id = target.id if target else f"pop:{source.settlement_id}:{source.people}:{transition.target_occupation}"
+                   == (transition.destination_settlement_id, source.people, transition.target_occupation)), None)
+    target_id = (target.id if target
+                else f"pop:{transition.destination_settlement_id}:{source.people}:{transition.target_occupation}")
     if target_id != transition.target_group_id or (target is None and target_id in world.society.population):
         return None
     checkpoint = None
@@ -439,7 +482,8 @@ def _complete_transition(world, transition):
         cause_ids=_causes(transition.last_event_id, transition.decision_event_id, source.last_event_id,
                           target.last_event_id if target else None,
                           checkpoint.last_event_id if checkpoint is not None else None))
-    world.society.transfer_people(source.id, source.settlement_id, transition.target_occupation, transition.count)
+    world.society.transfer_people(source.id, transition.destination_settlement_id, transition.target_occupation,
+                                  transition.count)
     updated_source = world.society.population[source.id]
     updated_target = world.society.population[target_id]
     world.society.population[source.id] = updated_source.model_copy(update={"last_event_id": event.id})

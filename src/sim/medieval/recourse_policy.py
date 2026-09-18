@@ -11,12 +11,10 @@ answers a breach with force: without a provider answer the wronged institution
 simply does not act, and a deadline never becomes an action.
 """
 
-from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
-from .ai_decider import NO_ACTION, select_option
-from .events import record_event
+from .institutional_decision_turn import DiscretionaryAdapter, review_institutional_decision_turn
 from .force import (DISBAND_ACTION, OCCUPY_ACTION, RAISE_ACTION, disband_detachment, force_options,
                     occupy_settlement, raise_detachment, raise_options)
 from .institutional_memory import institutional_view
@@ -119,50 +117,83 @@ def recourse_options(world, creditor, debtor=None):
     return tuple(menu)
 
 
-async def _turn(world, creditor):
-    """One provider consultation; the owners still revalidate and execute."""
+def _recourse_menu(world, creditor):
     breach = next(iter(_known_breaches(world, creditor)), None)
     if breach is None and not _standing(world, creditor):
+        return ()
+    return recourse_options(world, creditor, breach[0].debtor_ref if breach is not None else None)
+
+
+def _recourse_situation(world, creditor, options):
+    breach = next(iter(_known_breaches(world, creditor)), None)
+    clause, _, notice = breach if breach is not None else (None, None, None)
+    debtor = clause.debtor_ref if clause is not None else None
+    return {"today": world.clock.absolute_day,
+            "broken_promise": None if clause is None else {
+                "debtor": clause.debtor_ref.to_dict(), "resource_id": clause.resource_id,
+                "quantity": clause.quantity, "was_due_day": clause.due_day,
+                "learned_day": notice.learned_day},
+            "your_reading_of_them": None if debtor is None else institutional_view(world, creditor, debtor),
+            "places_you_currently_observe": sorted(
+                report.settlement_id for report in world.knowledge.settlements_for_actor(creditor)
+                if _reported(world, creditor, report.settlement_id))}
+
+
+def _recourse_causes(world, option):
+    breach = next(iter(_known_breaches(world, option.actor_ref)), None)
+    return (breach[1].id,) if breach is not None else ()
+
+
+class _LabeledOption:
+    """The vertical's own option carrying its label, so the adapter never
+    depends on mutable adapter-level state or on the engine's call order."""
+
+    def __init__(self, option, label):
+        self._option = option
+        self.label = label
+
+    @property
+    def id(self):
+        return self._option.id
+
+    @property
+    def actor_ref(self):
+        return self._option.actor_ref
+
+    def decision(self):
+        return self._option.decision()
+
+
+def recourse_adapters(on_executed=None):
+    def options_fn(world, actor):
+        menu = _recourse_menu(world, actor)
+        return tuple(_LabeledOption(option, label) for option, label in menu)
+
+    def label_fn(option):
+        return option.label
+
+    def execute_fn(world, actor, option_id, decision_event_id):
+        option = next((item for item, _ in _recourse_menu(world, actor) if item.id == option_id), None)
+        if option is None:
+            raise ValueError("stale or unknown recourse option")
+        _EXECUTORS[option.decision()["action"]](world, actor, option.id, decision_event_id)
+        if on_executed is not None:
+            on_executed()
+
+    return (DiscretionaryAdapter(
+        name="recourse", family="recourse", options_fn=options_fn,
+        label_fn=label_fn, causes_fn=_recourse_causes,
+        execute_fn=execute_fn, situation_fn=_recourse_situation),)
+
+
+async def _turn(world, creditor):
+    if not _recourse_menu(world, creditor):
         return False
-    debtor = breach[0].debtor_ref if breach is not None else None
-    menu = recourse_options(world, creditor, debtor)
-    if not menu:
-        return False
-    clause, breach_event, notice = breach if breach is not None else (None, None, None)
-    # Strictly its own: the promise it was owed, what it already remembers of
-    # that party, and the places it currently observes. Never the debtor's
-    # stock, account, force, report or reason.
-    situation = {"today": world.clock.absolute_day,
-                 "broken_promise": None if clause is None else {
-                     "debtor": clause.debtor_ref.to_dict(), "resource_id": clause.resource_id,
-                     "quantity": clause.quantity, "was_due_day": clause.due_day,
-                     "learned_day": notice.learned_day},
-                 "your_reading_of_them": None if debtor is None else institutional_view(world, creditor, debtor),
-                 "places_you_currently_observe": sorted(
-                     report.settlement_id for report in world.knowledge.settlements_for_actor(creditor)
-                     if _reported(world, creditor, report.settlement_id))}
-    choices = [{"id": option.id, "label": label} for option, label in menu]
-    selected = await select_option(world, creditor, situation, choices,
-                                   causes=() if breach_event is None else (breach_event.id,))
-    if selected in (None, NO_ACTION):
-        return False
-    # Recomposed once more: the executor only ever sees a current option.
-    chosen = next((option for option, _ in recourse_options(world, creditor, debtor)
-                   if option.id == selected), None)
-    if chosen is None:
-        return False
-    decision = record_event(world, "recourse_decided",
-                            "A instituição prejudicada escolheu entre suas opções atuais.",
-                            fact_kind=FactKind.DECISION, decision=chosen.decision())
-    try:
-        _EXECUTORS[chosen.decision()["action"]](world, creditor, chosen.id, decision.id)
-    except ValueError:
-        # The material owner refused an option that became impossible between
-        # the turn and the execution. The decision stays as history, nothing
-        # material changed, and one institution's turn is not a reason to
-        # discard everyone else's day.
-        return False
-    return True
+    changed = {"value": False}
+    await review_institutional_decision_turn(
+        world, creditor, recourse_adapters(on_executed=lambda: changed.__setitem__("value", True)),
+        situation_fn=_recourse_situation)
+    return changed["value"]
 
 
 def _pending(world, creditor, day):
@@ -170,13 +201,18 @@ def _pending(world, creditor, day):
     return bool(_standing(world, creditor)) or any(True for _ in _known_breaches(world, creditor, day))
 
 
+def recourse_actors(world):
+    return tuple(EntityRef("polity", identity) for identity in sorted(world.society.polities)
+                 if _pending(world, EntityRef("polity", identity), world.clock.absolute_day))
+
+
+def schedule_pending_recourse(world):
+    day = world.clock.absolute_day + 1
+    if any(_pending(world, EntityRef("polity", identity), day) for identity in world.society.polities):
+        schedule_review(world, day)
+
+
 async def review_recourse(world, situations):
     """Run only on a concrete dated review; one consultation per institution."""
-    if not any(item.kind == REVIEW_KIND for item in situations):
-        return
-    day = world.clock.absolute_day
-    for identity in sorted(world.society.polities):
-        creditor = EntityRef("polity", identity)
-        await _turn(world, creditor)
-        if _pending(world, creditor, day + 1):
-            schedule_review(world, day + 1)
+    from .institutional_agenda import review_daily_institutional_turn
+    await review_daily_institutional_turn(world, situations)

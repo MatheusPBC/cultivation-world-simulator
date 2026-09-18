@@ -1,10 +1,15 @@
-import { nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { api, asError, type ApiError } from '../api'
 import type { CausalView, EventsView } from '../../types/medieval-api'
 import { useObserverStore } from '../stores/world'
+import { isDecisionConsultationEvent } from '../mappers'
+
+export type ChronicleFilter = 'all' | 'decisions'
+
 export function useChronicle() {
-  const store=useObserverStore(), after=ref(0), following=ref(true), loading=ref(false)
+  const store=useObserverStore(), after=ref(0), following=ref(true), loading=ref(false), filter=ref<ChronicleFilter>('all')
   const page=shallowRef<EventsView|null>(null), causal=shallowRef<CausalView|null>(null), error=shallowRef<ApiError|null>(null)
+  const items=computed(()=>[...(page.value?.items??[])].reverse().filter(event=>filter.value==='all'||isDecisionConsultationEvent(event)))
   const detailElement=ref<HTMLElement|null>(null)
   const setDetail=(el:unknown)=>{detailElement.value=el as HTMLElement|null}
   let pageRequest=0, causeRequest=0
@@ -39,5 +44,5 @@ export function useChronicle() {
     detailElement.value?.scrollIntoView?.({block:'nearest'})
   })
   onUnmounted(()=>{pageRequest++;causeRequest++})
-  return {store,after,following,loading,page,causal,error,go,latest,open,setDetail}
+  return {store,after,following,loading,filter,items,page,causal,error,go,latest,open,setDetail}
 }

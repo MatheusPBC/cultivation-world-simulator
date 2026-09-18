@@ -1,6 +1,7 @@
 """The fallback policy only selects enumerated options and never invents terms."""
 
 from src.sim.medieval.institutional_aid_policy import review_institutional_aid
+from src.sim.medieval.intelligence import refresh_trade_reports
 from src.sim.medieval.procurement import review_supply
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
@@ -110,3 +111,30 @@ def test_a_provider_without_surplus_or_route_only_rejects():
     response = next(item for item in world.knowledge.institutional_aid_for_actor(requester)
                     if item.kind == "response" and item.request_event_id == notice.request_event_id)
     assert response.response_status == "rejected" and response.requested_food == notice.requested_food
+
+
+def test_a_satisfied_reserve_plan_still_requests_aid_for_a_starving_population():
+    """A full buffer stock is not a fed population: 'satisfied' must not hide it.
+
+    ``maintain_food_reserve`` tracks the polity's own reserve stock target, a
+    different quantity from the settlement's population need. A plan can read
+    ``satisfied`` (the reserve target is met) while the settlement's own dated
+    report still shows real, present hunger.
+    """
+    world = prepared_world()
+    stock_id = world.economy.needs["pedraclara"].stock_id
+    stock = world.economy.stocks[stock_id]
+    world.economy.stocks[stock_id] = stock.model_copy(update={"goods": {**stock.goods, "food": 5_000}})
+    refresh_trade_reports(world)
+    review_supply(world)
+    plan = next(item for item in world.strategy.plans.values()
+                if item.objective_id == "supply:pedraclara")
+    assert plan.stage == "satisfied"
+    refresh_route_reports(world)
+
+    review_institutional_aid(world, allow_requests=True)
+
+    requested = [item for item in world.events if item.event_type == "institutional_aid_requested"
+                and any(delta.owner_kind == "aid_request" and delta.aspect == "requester_settlement_id"
+                        and delta.after == "pedraclara" for delta in item.deltas)]
+    assert len(requested) == 1
