@@ -46,7 +46,42 @@ const checkpointLabel=(checkpointId:string)=>{
           <article v-for="stock in stocks" :key="stock.id" class="stock-card"><h4>{{entityName(data,stock.owner_ref)}}</h4>
             <table><thead><tr><th>{{t('resource')}}</th><th>{{t('quantity')}}</th><th>{{t('price')}}</th></tr></thead><tbody><tr v-for="(quantity,id) in stock.goods" :key="id"><td>{{resourceName(id)}}</td><td>{{n(quantity)}}</td><td>{{market?.prices[id]??'—'}}</td></tr></tbody></table>
           </article>
+          <template v-if="market">
+            <h3>{{t('localMarket')}} <small class="muted">· {{calendar(market.updated_day)}}</small></h3>
+            <table><thead><tr><th>{{t('resource')}}</th><th>{{t('observedSupply')}}</th><th>{{t('observedDemand')}}</th><th>{{t('price')}}</th></tr></thead>
+              <tbody><tr v-for="id in Object.keys(market.prices)" :key="id"><td>{{resourceName(id)}}</td><td>{{n(market.observed_supply?.[id]??0)}}</td><td>{{n(market.observed_demand?.[id]??0)}}</td><td>{{n(market.prices[id])}}</td></tr></tbody>
+            </table>
+          </template>
           <h3>{{t('groups')}}</h3><div v-for="g in groups" :key="g.id" class="list-row"><span>{{label(g.people)}} · {{label(g.occupation)}}</span><strong>{{n(g.count)}}</strong></div>
+          <h3>{{t('civicProtests')}}</h3>
+          <p v-if="!data.society.civic_protests.some(p=>p.settlement_id===settlement!.id)" class="muted">{{t('noCivicProtests')}}</p>
+          <article v-for="protest in data.society.civic_protests.filter(p=>p.settlement_id===settlement!.id)" :key="protest.id" class="stock-card" :data-protest="protest.id">
+            <h4>{{t('protestDemands.' + protest.demand_kind)}}</h4>
+            <p>{{t('protestStages.' + protest.stage)}} · {{n(protest.participants)}} {{t('protestParticipants')}}</p>
+            <p class="muted">{{t('protestDue')}}: {{calendar(protest.due_day)}}</p>
+            <button @click="source(protest.last_event_id)">{{t('source')}}</button>
+          </article>
+          <h3>{{t('civicMovements')}}</h3>
+          <p v-if="!data.society.civic_movements.some(m=>m.settlement_id===settlement!.id)" class="muted">{{t('noCivicMovements')}}</p>
+          <article v-for="movement in data.society.civic_movements.filter(m=>m.settlement_id===settlement!.id)" :key="movement.id" class="stock-card" :data-movement="movement.id">
+            <h4>{{t('movementStages.' + movement.stage)}}</h4>
+            <p>{{n(movement.member_group_ids.length)}} {{t('movementGroups')}} · {{t('movementLeader')}}: {{data.society.characters.find(c=>c.id===movement.leader_character_id)?.name||movement.leader_character_id}}</p>
+            <button @click="source(movement.last_event_id)">{{t('source')}}</button>
+          </article>
+          <h3>{{t('civicStrikes')}}</h3>
+          <p v-if="!data.society.civic_strikes.some(s=>s.settlement_id===settlement!.id)" class="muted">{{t('noCivicStrikes')}}</p>
+          <article v-for="strike in data.society.civic_strikes.filter(s=>s.settlement_id===settlement!.id)" :key="strike.id" class="stock-card" :data-strike="strike.id">
+            <h4>{{t('strikeStages.' + strike.stage)}}</h4>
+            <p>{{t('strikeParticipants')}}: {{n(Object.values(strike.participants_by_group).reduce((total, count)=>total+count, 0))}} · {{t('strikeDue')}}: {{calendar(strike.due_day)}}</p>
+            <button @click="source(strike.last_event_id)">{{t('source')}}</button>
+          </article>
+          <h3>{{t('civicAmnesties')}}</h3>
+          <p v-if="!data.society.civic_amnesties.some(a=>a.settlement_id===settlement!.id)" class="muted">{{t('noCivicAmnesties')}}</p>
+          <article v-for="amnesty in data.society.civic_amnesties.filter(a=>a.settlement_id===settlement!.id)" :key="amnesty.id" class="stock-card" :data-amnesty="amnesty.id">
+            <h4>{{t('amnestyGranted')}}</h4>
+            <p>{{t('amnestyAdministrator')}}: {{entityName(data, amnesty.administrator_ref)}}</p>
+            <button @click="source(amnesty.last_event_id)">{{t('source')}}</button>
+          </article>
           <h3>{{t('sites')}}</h3><button v-for="s in localSites" :key="s.id" class="link-row" @click="select('site',s.id)">{{s.name}} <span>→</span></button>
           <h3>{{t('routes')}}</h3><button v-for="r in localRoutes" :key="r.route.id" class="link-row" @click="select('route',r.route.id)">{{label(r.route.mode)}} · {{n(r.operational_capacity)}} {{t('bulkDay')}} <span>→</span></button>
         </template>
@@ -120,7 +155,7 @@ const checkpointLabel=(checkpointId:string)=>{
               <h4>{{report.recipientName}}</h4>
               <p class="muted">{{t('publisher')}}: {{report.publisherName}} · {{t('routeReportChannels.' + report.channel)}}</p>
               <dl>
-                <dt>{{t('observedCapacity')}}</dt><dd>{{n(report.operational_capacity)}} {{t('bulkDay')}}</dd>
+                <dt>{{t('observedCapacity')}}</dt><dd>{{n(report.operational_capacity)}} {{t('bulkDay')}}</dd><dt>{{t('observedTraffic')}}</dt><dd>{{n(report.daily_flow_bulk ?? 0)}} {{t('bulkDay')}}</dd>
                 <dt>{{t('observedTravelDays')}}</dt><dd>{{report.travel_days!==null?`${report.travel_days} ${t('days')}`:t('impassable')}}</dd>
               </dl>
               <p class="muted">{{t('observedOn')}}: {{calendar(report.observed_day)}}</p>

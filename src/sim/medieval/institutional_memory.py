@@ -11,14 +11,20 @@ breach; relative scale and institutional change have no material owner yet,
 and an identity anchor does not exist, so its impact is zero by absence.
 """
 
+import json
+
 from src.classes.governance.diplomacy import InstitutionalMemory, institutional_memory_id
+from src.classes.mechanical_language import EntityRef
 
 from .economy import _delta
 
 
 MEMORY_SPAN_DAYS = 360
+FULFILLMENT_VIEW = 3
 BREACH_VIEW = -4
+REPUDIATION_VIEW = -6
 REMEDIATION_VIEW = 2
+REFUSAL_VIEW = -2
 
 
 def next_event_id(world):
@@ -82,29 +88,92 @@ def _remembered_obligation(world, memory, events):
             continue
         proposal = world.relations.proposals.get(obligation.proposal_id)
         clause = proposal.clauses[obligation.clause_index] if proposal is not None else None
-        # Aid and reciprocal supply are remembered through the same evidence:
-        # a material delivery that was promised to a named creditor.
-        if clause is not None and clause.kind == "resource_transfer":
+        # Every negotiated term is remembered through the same evidence: a
+        # concluded obligation whose debtor and creditor are named by the
+        # canonical clause. Assets remain owned by their material owners.
+        if clause is not None:
             return event, clause
     return None, None
 
 
-def aid_evidence(world, observer_ref):
-    """Directions this observer actually remembers, with the facts behind them.
+def _remembered_refusal(world, memory, events):
+    """Return the refused provider for a remembered aid request.
 
-    Only aid memories that name a debtor produce a direction; there is no
-    generic social graph here and no reading without its own evidence.
+    A refusal has no obligation to inspect: the canonical request event names
+    its requester and provider, while the response event remains the factual
+    memory anchor.  Only the requester receives this social reading; the
+    provider's own decision is not turned into an automatic grievance against
+    itself.
+    """
+    event = events.get(memory.event_id)
+    if event is None or event.event_type != "institutional_aid_rejected":
+        return None, None
+    request = next((candidate for link in event.causal_links
+                    for candidate in events.values()
+                    if candidate.id == link.cause_event_id
+                    and candidate.event_type == "institutional_aid_requested"), None)
+    if request is None:
+        return None, None
+    provider_payload = next((delta.after for delta in request.deltas
+                             if delta.owner_kind == "aid_request" and delta.aspect == "provider_ref"), None)
+    try:
+        provider = EntityRef.from_dict(json.loads(provider_payload)) if isinstance(provider_payload, str) else None
+    except (TypeError, ValueError, json.JSONDecodeError):
+        provider = None
+    return event, provider
+
+
+def aid_evidence(world, observer_ref):
+    """Directions this observer remembers, with the facts behind them.
+
+    The historical name is retained for the existing projection contract; the
+    evidence now covers every concluded bilateral obligation, not only aid.
     """
     events = {event.id: event for event in world.events}
     directions = {}
     for memory in world.relations.memories_for(observer_ref):
         event, clause = _remembered_obligation(world, memory, events)
-        if clause is None or clause.creditor_ref != observer_ref:
+        if clause is not None and clause.creditor_ref == observer_ref:
+            if event.event_type in {"commitment_fulfilled", "institutional_aid_fulfilled",
+                                    "commitment_breached", "institutional_aid_remediated",
+                                    "payment_obligation_remediated"}:
+                directions.setdefault(clause.debtor_ref, []).append(memory.event_id)
             continue
-        if event.event_type in {"commitment_breached", "institutional_aid_remediated"}:
-            directions.setdefault(clause.debtor_ref, []).append(memory.event_id)
+        refusal, provider = _remembered_refusal(world, memory, events)
+        if refusal is not None and provider is not None:
+            directions.setdefault(provider, []).append(memory.event_id)
     return tuple((subject, tuple(sorted(event_ids))) for subject, event_ids in
                  sorted(directions.items(), key=lambda item: (item[0].kind, item[0].id)))
+
+
+def institutional_views(world, observer_ref):
+    """Known directional readings, composed from this observer's memories.
+
+    ``KnowledgeState`` remains the privacy boundary: a memory without a
+    notice for ``observer_ref`` is not exposed to a decision context, even if
+    an invalid or partially assembled in-memory world happens to contain it.
+    The returned tuples are a read model only; no relation score or planner
+    state is stored.
+    """
+    known_event_ids = {
+        notice.event_id
+        for notice in world.knowledge.notices.values()
+        if notice.recipient_ref == observer_ref
+    }
+    known_event_ids.update(
+        notice.event_id
+        for notice in world.knowledge.institutional_aid_notices.values()
+        if notice.recipient_ref == observer_ref
+    )
+    known_directions = tuple(
+        (subject, event_ids)
+        for subject, event_ids in aid_evidence(world, observer_ref)
+        if set(event_ids) <= known_event_ids
+    )
+    return tuple(
+        (subject, institutional_view(world, observer_ref, subject), event_ids)
+        for subject, event_ids in known_directions
+    )
 
 
 def institutional_view(world, observer_ref, subject_ref):
@@ -114,14 +183,34 @@ def institutional_view(world, observer_ref, subject_ref):
     its own remediation memory offsets it. The debtor gains no artificial
     penalty for having been wronged by nobody.
     """
+    return sum(weight * effective_salience(world, memory) // 1000
+               for memory, weight in _view_entries(world, observer_ref, subject_ref))
+
+
+def _view_entries(world, observer_ref, subject_ref):
     events = {event.id: event for event in world.events}
-    total = 0
+    entries = []
     for memory in world.relations.memories_for(observer_ref):
         event, clause = _remembered_obligation(world, memory, events)
         if clause is None or clause.debtor_ref != subject_ref or clause.creditor_ref != observer_ref:
+            refusal, provider = _remembered_refusal(world, memory, events)
+            if refusal is not None and provider == subject_ref:
+                entries.append((memory, REFUSAL_VIEW))
             continue
-        weight = {"commitment_breached": BREACH_VIEW,
-                  "institutional_aid_remediated": REMEDIATION_VIEW}.get(event.event_type, 0)
+        weight = {"commitment_fulfilled": FULFILLMENT_VIEW,
+                  "institutional_aid_fulfilled": FULFILLMENT_VIEW,
+                  "institutional_aid_remediated": REMEDIATION_VIEW,
+                  "payment_obligation_remediated": REMEDIATION_VIEW}.get(event.event_type, 0)
+        if event.event_type == "commitment_breached":
+            deliberate = any(
+                (cause := next((candidate for candidate in events.values()
+                                if candidate.id == link.cause_event_id), None)) is not None
+                and cause.fact_kind.value == "decision"
+                and cause.decision is not None
+                and cause.decision.get("action") == "repudiate_obligation"
+                for link in event.causal_links
+            )
+            weight = REPUDIATION_VIEW if deliberate else BREACH_VIEW
         if weight:
-            total += weight * effective_salience(world, memory) // 1000
-    return total
+            entries.append((memory, weight))
+    return tuple(entries)

@@ -82,7 +82,10 @@ async def test_bootstrap_window_is_current_and_two_preceding_months(monkeypatch)
 
     assert result is not None
     assert captured["start_month_stamp"] == 1
+    assert captured["start_date"] == "0年2月"
+    assert captured["end_date"] == "0年4月"
     assert [item["id"] for item in captured["events"]] == ["one", "two", "three"]
+    assert [item["date"] for item in captured["events"]] == ["0年2月", "0年3月", "0年4月"]
 
 
 @pytest.mark.asyncio

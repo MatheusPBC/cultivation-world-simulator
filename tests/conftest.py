@@ -9,6 +9,18 @@ from src.classes.environment.map import Map
 from src.i18n.locale_registry import get_default_locale
 
 
+# These modules belong to the removed xianxia runtime.  The medieval fork
+# intentionally no longer exposes ``game_instance``/websocket globals from
+# ``src.server.main``; keeping them in default collection turns retired
+# contracts into import errors instead of testing the supported product.
+collect_ignore = [
+    "test_game_init_integration.py",
+    "test_init_status_api.py",
+    "test_institutional_reactivity_integration.py",
+    "test_websocket_handlers.py",
+]
+
+
 @pytest.fixture(autouse=True)
 def isolate_settings_data_root(monkeypatch, tmp_path):
     """

@@ -23,6 +23,7 @@ from src.sim.medieval.force_command import (APPOINT_ACTION, SET_DOCTRINE_ACTION,
                                             effective_doctrine, set_detachment_doctrine)
 from src.sim.medieval.force_contact_policy import review_force_contacts
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from src.sim.medieval.research import learn_technology
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
 
@@ -166,14 +167,19 @@ async def test_prepared_supplied_thirty_beats_hungry_fifty_with_only_field_effec
     await accept_through_provider(world, monkeypatch, prompts)
     engagement = world.society.field_engagements[engagement.id]
     assert engagement.status == "resolved" and engagement.winner_ref == OWNER
-    assert (engagement.challenger_casualties, engagement.defender_casualties) == (4, 10)
-    assert world.society.total_population == people_before - 14
-    assert world.society.detachments[own_id].count == 26
+    assert (engagement.challenger_casualties, engagement.defender_casualties) == (2, 10)
+    assert world.society.total_population == people_before - 12
+    assert world.society.detachments[own_id].count == 28
     assert world.society.detachments[rival_id].stage == "disbanded"
     assert all(world.society.detachments[item].count > 0 for item in (own_id, rival_id))
     assert world.society.force_positions[f"force-position:{own_id}"].stage == "prepared"
     assert world.society.force_standoffs[standoff_id].stage == "resolved"
     assert world.society.settlements[TARGET].occupier_id is None
+    resolution = next(event for event in world.events if event.event_type == "field_engagement_resolved")
+    assert any(delta.aspect == f"terrain_modifier:{own_id}" for delta in resolution.deltas)
+    assert any(delta.aspect == f"fatigue_level:{own_id}" for delta in resolution.deltas)
+    morale_delta = next(delta for delta in resolution.deltas if delta.aspect == f"morale_level:{own_id}")
+    assert int(morale_delta.after) in {0, 1, 2}
     assert "30" not in prompts[0] and "provisions" not in prompts[0] and "anchor_site_id" not in prompts[0]
     assert all(notice.counterparty_strength_band in {"1-9", "10-24", "25-49", "50-99", "100+"}
                for notice in world.knowledge.field_engagement_outcome_notices.values())
@@ -182,6 +188,47 @@ async def test_prepared_supplied_thirty_beats_hungry_fifty_with_only_field_effec
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
     assert not any(event.event_type in {"battle_resolved", "loot_taken"} for event in world.events)
+
+
+def test_learned_field_drill_has_only_a_bounded_material_strength_effect():
+    world, own_id, _, _ = prepared_challenger_world(prepared=False)
+    detachment = world.society.detachments[own_id]
+    before = field_strength(world, detachment)
+    decision = record_event(
+        world, "field_training_decided", "Autorizar exercício de campo.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "research", "actor_ref": OWNER.to_dict(), "technology_id": "field_drill"},
+    )
+    learn_technology(world, OWNER, "field_drill", "teaching", (decision.id,))
+    after = field_strength(world, detachment)
+    assert before == (detachment.count * 3, False, True)
+    assert after == (detachment.count * 4, False, True)
+    assert after[0] - before[0] == detachment.count
+
+
+def test_siegecraft_requires_field_drill_and_adds_only_one_more_strength_step():
+    world, own_id, _, _ = prepared_challenger_world(prepared=False)
+    detachment = world.society.detachments[own_id]
+    blocked = record_event(
+        world, "siegecraft_without_drill", "Tentativa de aprender cerco sem base.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "research", "actor_ref": OWNER.to_dict(), "technology_id": "siegecraft"},
+    )
+    with pytest.raises(ValueError, match="prerequisites"):
+        learn_technology(world, OWNER, "siegecraft", "teaching", (blocked.id,))
+    first = record_event(
+        world, "field_training_decided", "Autorizar exercício de campo.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "research", "actor_ref": OWNER.to_dict(), "technology_id": "field_drill"},
+    )
+    learn_technology(world, OWNER, "field_drill", "teaching", (first.id,))
+    second = record_event(
+        world, "siegecraft_training_decided", "Autorizar instrução de engenharia de cerco.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "research", "actor_ref": OWNER.to_dict(), "technology_id": "siegecraft"},
+    )
+    learn_technology(world, OWNER, "siegecraft", "teaching", (second.id, first.id))
+    assert field_strength(world, detachment)[0] == detachment.count * 5
 
 
 def test_withdrawal_or_missing_join_lapses_without_battle():

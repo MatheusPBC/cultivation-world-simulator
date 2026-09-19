@@ -33,7 +33,7 @@ const { plans, source } = useSupplyPlans()
               <details v-if="segment.reports.length">
                 <summary>{{ t('knownRouteReports') }} ({{ segment.reports.length }})</summary>
                 <p v-for="report in segment.reports" :key="report.id" class="muted">
-                  {{ t('observedOn') }} {{ report.observedOn }} · {{ t('observedCapacity') }} {{ n(report.operational_capacity) }} {{ t('bulkDay') }} · {{ report.travel_days !== null ? `${report.travel_days} ${t('days')}` : t('impassable') }}
+                  {{ t('observedOn') }} {{ report.observedOn }} · {{ t('observedCapacity') }} {{ n(report.operational_capacity) }} {{ t('bulkDay') }} · {{ t('observedTraffic') }} {{ n(report.daily_flow_bulk ?? 0) }} {{ t('bulkDay') }} · {{ report.travel_days !== null ? `${report.travel_days} ${t('days')}` : t('impassable') }}
                 </p>
               </details>
               <p v-else class="muted">{{ t('noKnownRouteReport') }}</p>

@@ -28,7 +28,7 @@
     "organizations": 8,
     "events": 0,
     "next_scheduled_day": null,
-    "decision_sources": { "provider_consultations": 0, "provider_failures": 0, "ai_enabled": false }
+    "decision_sources": { "provider_consultations": 0, "provider_declines": 0, "provider_failures": 0, "no_affordance_receipts": 0, "stale_affordance_receipts": 0, "ai_enabled": false }
   },
   "society": {
     "characters": [
@@ -993,7 +993,11 @@
         "last_event_id": "event:migration-started"
       }
     ],
-    "workforce_transitions": []
+    "workforce_transitions": [],
+    "civic_protests": [],
+    "civic_movements": [],
+    "civic_strikes": [],
+    "civic_amnesties": []
   },
   "economy": {
     "expansion_blueprints": [
@@ -2087,6 +2091,7 @@
       }
     ],
     "payrolls": [],
+    "employment_contracts": [],
     "needs": [
       {
         "id": "brumafria",
@@ -4683,8 +4688,10 @@
       }
     ],
     "projects": [],
-    "knowledge": []
+    "knowledge": [],
+    "rite_blueprints": []
   },
-  "diplomacy": { "proposals": [], "obligations": [], "notices": [], "aid_notices": [], "memories": [], "aid_readings": [] },
-  "creatures": { "creatures": [], "demands": [], "tribute_notices": [] }
+  "diplomacy": { "proposals": [], "obligations": [], "notices": [], "aid_notices": [], "memories": [], "aid_readings": [], "strategic_evidence": [] },
+  "creatures": { "creatures": [], "demands": [], "tribute_notices": [], "damaged_sites": [] },
+    "campaigns": { "detachments": [], "commands": [], "positions": [], "standoffs": [], "field_engagements": [], "route_interdictions": [], "settlement_investments": [], "garrisons": [], "siege_campaigns": [], "assembly_denials": [], "occupations": [], "territorial_controls": [], "political_settlements": [], "threats": [] }
 }

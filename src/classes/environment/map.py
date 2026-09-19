@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import copy
 from typing import TYPE_CHECKING, Any, Mapping, Optional
 
 from src.classes.environment.tile import Tile, TileType
@@ -59,6 +60,25 @@ class Map():
             elevation_rows=[[0.0 for _ in range(width)] for _ in range(height)],
             water_bodies=[],
         )
+
+    def transaction_copy(self) -> "Map":
+        """Copy mutable runtime state while sharing authored map topology.
+
+        A simulator transaction may change route runtime, infrastructure-site
+        runtime, force interdictors and the pending site upsert queue.  The
+        authored geometry, regions, tiles and geography are read-only during a
+        medieval step, so copying those large structures for every candidate is
+        unnecessary.  Keeping their references shared is safe because all
+        material runtime writers go through the four isolated fields above.
+        """
+        candidate = copy.copy(self)
+        candidate.routes = {key: copy.copy(route) for key, route in self.routes.items()}
+        candidate.infrastructure_sites = {
+            key: copy.copy(site) for key, site in self.infrastructure_sites.items()
+        }
+        candidate.force_route_interdictors = dict(self.force_route_interdictors)
+        candidate._infrastructure_site_updates = list(self._infrastructure_site_updates)
+        return candidate
 
     def set_geography(self, geography: GeographyLayer) -> None:
         """Install the map-owned physical geography layer."""

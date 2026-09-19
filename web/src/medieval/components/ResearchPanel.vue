@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useResearch } from '../composables/useResearch'
 import { formatNumber as n, calendar } from '../mappers'
 const { t } = useI18n()
-const { projects, knowledge, catalog, source } = useResearch()
+const { projects, knowledge, catalog, rites, source } = useResearch()
 </script>
 <template>
   <section aria-labelledby="research-title">
@@ -29,6 +29,12 @@ const { projects, knowledge, catalog, source } = useResearch()
       <article v-for="tech in catalog" :key="tech.id" class="stock-card"><h4>{{ tech.name }}</h4>
         <p>{{ t('prerequisites') }}: {{ tech.requirements || t('none') }}</p>
         <p>{{ t('skills') }}: {{ t('kinds.' + tech.skill) }} ≥ {{ tech.min_skill }}</p>
+      </article>
+      <h3>{{ t('riteCatalog') }}</h3>
+      <article v-for="rite in rites" :key="rite.id" class="stock-card" :data-rite="rite.id">
+        <h4>{{ rite.id }}</h4>
+        <p>{{ t('riteSchool') }}: {{ t('riteSchools.' + rite.school) }} · {{ t('riteRange') }}: {{ rite.range }}</p>
+        <p>{{ t('riteDuration') }}: {{ rite.duration_days }} {{ t('days') }}</p>
       </article>
     </details>
   </section>

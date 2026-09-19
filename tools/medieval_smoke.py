@@ -17,7 +17,7 @@ from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 
 
 async def run(seed: int, output: Path) -> dict:
-    world = create_medieval_world(seed)
+    world = create_medieval_world(seed, bootstrap_household_income=True)
     traveler = next(c for c in world.society.characters.values() if c.location_id == "campomanso")
     for character in world.society.characters.values():
         if character.id == traveler.id:

@@ -46,6 +46,13 @@ export function useDiplomacy() {
       .sort((a, b) => a.value - b.value || a.observer_ref.id.localeCompare(b.observer_ref.id))
       .map(r => ({ ...r, observer: entityName(data, r.observer_ref), subject: entityName(data, r.subject_ref) }))
   })
+  const strategicEvidence = computed(() => {
+    const data = store.snapshot!
+    return [...data.diplomacy.strategic_evidence]
+      .sort((a, b) => a.event_id.localeCompare(b.event_id)
+        || (a.finding_id || a.notice_id || '').localeCompare(b.finding_id || b.notice_id || ''))
+      .map(item => ({ ...item, recipient: entityName(data, item.recipient_ref) }))
+  })
   const source = (id: string) => { store.focusEventId = id }
-  return { proposals, aidTrail, memories, readings, source }
+  return { proposals, aidTrail, memories, readings, strategicEvidence, source }
 }

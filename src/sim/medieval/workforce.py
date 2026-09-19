@@ -6,6 +6,7 @@ then owns the temporary unavailability and the later occupational transfer.
 """
 
 from dataclasses import dataclass
+import math
 
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
@@ -26,6 +27,7 @@ from .travel import route_duration
 
 TRANSITION_DAYS = 30
 MAX_GROUP_FRACTION_DENOMINATOR = 5
+PRESSURED_FARMER_FRACTION_DENOMINATOR = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +51,7 @@ class WorkforceTransitionOption(SocietyValue):
     def decision(self):
         return {"action": "accept_workforce_offer",
                 "actor_ref": EntityRef("population_group", self.group_id).to_dict(),
-                "notice_id": self.notice_id, "option_id": self.id}
+                "selected_affordance_id": self.id}
 
 
 def _event(world, event_id):
@@ -80,7 +82,7 @@ def _current_demands(world):
         stock = world.economy.stocks[facility.stock_id]
         recipe = world.economy.recipes[facility.recipe_id]
         shortfall = labor_shortfall(event, "production", facility.id)
-        if (recipe.occupation != "artisan" or facility.last_batches >= facility.max_batches
+        if (recipe.occupation not in {"farmer", "artisan"} or facility.last_batches >= facility.max_batches
                 or shortfall is None
                 or event.day != day or event.event_type not in {"production_completed", "production_limited"}
                 or not can_actor_act_for(world, stock.owner_ref, stock.owner_ref, "supply")
@@ -89,10 +91,21 @@ def _current_demands(world):
         account = world.economy.accounts[facility.payroll_account_id]
         if account.owner_ref != stock.owner_ref:
             continue
-        # A labour limit proves at least one missing worker, but not a whole
-        # replacement cohort.  One is the bounded, engine-owned V1 demand.
-        demands.append(_Demand(stock.owner_ref, "facility", facility.id, account.id, 1,
-                               facility.wage_per_worker, event.id, "artisan"))
+        # Agriculture may need several people to restart a blocked harvest.
+        # With no observed subsistence pressure, retain the conservative
+        # one-batch signal. Once Economy records a real food shortfall,
+        # enumerate enough workers for the bounded authored batches that could
+        # cover that deficit. This is still only a demand receipt: publication
+        # limits each offer to one fifth of a cohort and a group must accept
+        # and pay for the transition independently.
+        count = shortfall if recipe.occupation == "farmer" else 1
+        if recipe.occupation == "farmer":
+            need = world.economy.needs.get(stock.location_id)
+            output = recipe.outputs.get("food", 0)
+            if need is not None and output > 0 and need.missing_food > 0:
+                count = max(count, math.ceil(need.missing_food / output) * recipe.workers)
+        demands.append(_Demand(stock.owner_ref, "facility", facility.id, account.id, count,
+                               facility.wage_per_worker, event.id, recipe.occupation))
     for project in sorted(world.economy.repairs.values(), key=lambda item: item.id):
         event = _event(world, project.last_event_id)
         if (project.last_work_day != day or project.stage != "blocked" or project.blocker != "labor"
@@ -197,7 +210,9 @@ def _observe_demand(world, demand):
         world, "workforce_demand_observed", "A administração registrou uma falta local de trabalho material.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta("workforce_demand", report.id, "observation",
-                       previous.observation() if previous else None, report.observation()),),
+                       previous.observation() if previous else None, report.observation()),
+                _delta("workforce_demand", report.id, "count",
+                       previous.count if previous else 0, report.count)),
         cause_ids=_causes(demand.source_event_id))
     report = report.model_copy(update={"event_id": event.id})
     world.knowledge.workforce_demand_reports[report.id] = report
@@ -218,7 +233,7 @@ def _work_settlement_id(world, work_kind, work_id):
 
 
 def _eligible_groups(world, demand):
-    """Only fully available farmers can receive a finite direct offer.
+    """Only fully available, differently occupied groups receive an offer.
 
     A customs checkpoint's merchant demand only ever reaches a farmer already
     standing somewhere its own region touches, exactly as before. A
@@ -235,19 +250,19 @@ def _eligible_groups(world, demand):
         settlements = {settlement.id for settlement in world.society.settlements.values()
                        if settlement.region_id in site.region_ids}
         for group in sorted(world.society.population.values(), key=lambda item: item.id):
-            if (group.settlement_id in settlements and group.occupation == "farmer"
+            if (group.settlement_id in settlements and group.occupation != demand.target_occupation
                     and world.society.available_count(group.id) == group.count):
                 yield group
         return
     for group in sorted(world.society.population.values(), key=lambda item: item.id):
-        if (group.settlement_id == settlement_id and group.occupation == "farmer"
+        if (group.settlement_id == settlement_id and group.occupation != demand.target_occupation
                 and world.society.available_count(group.id) == group.count):
             yield group
     if demand.sponsor_ref.kind != "polity":
         return
     for group in sorted(world.society.population.values(), key=lambda item: item.id):
         settlement = world.society.settlements.get(group.settlement_id)
-        if (group.settlement_id == settlement_id or group.occupation != "farmer"
+        if (group.settlement_id == settlement_id or group.occupation == demand.target_occupation
                 or world.society.available_count(group.id) != group.count
                 or settlement is None or settlement.administrator_id != demand.sponsor_ref.id
                 or _route_path(world, demand.sponsor_ref, group.settlement_id, settlement_id) is None):
@@ -263,12 +278,17 @@ def _publish_offers(world, report):
             or not can_actor_act_for(world, report.sponsor_ref, report.sponsor_ref, "trade")):
         return
     remaining = report.count
+    needs = world.economy.needs.get(_work_settlement_id(world, report.work_kind, report.work_id))
+    pressured_farmer = (report.target_occupation == "farmer" and needs is not None
+                        and needs.missing_food > 0)
     for group in _eligible_groups(world, report):
         if remaining <= 0:
             break
         # A group never converts more than one fifth at once, and the report
         # never offers more people than the material deficit it proved.
-        amount = min(remaining, group.count // MAX_GROUP_FRACTION_DENOMINATOR)
+        denominator = (PRESSURED_FARMER_FRACTION_DENOMINATOR if pressured_farmer
+                       else MAX_GROUP_FRACTION_DENOMINATOR)
+        amount = min(remaining, group.count // denominator)
         if amount <= 0:
             continue
         if account.balance < amount * report.stipend_per_person:
@@ -318,7 +338,7 @@ def _current_report(world, report):
 def workforce_transition_options(world, group_id):
     """Recompose options from valid current receipts; no offer is persisted as an action."""
     group = world.society.population.get(group_id)
-    if (group is None or group.occupation != "farmer" or world.society.available_count(group_id) != group.count):
+    if (group is None or world.society.available_count(group_id) != group.count):
         return ()
     options = []
     events = {event.id: event for event in world.events}
@@ -338,6 +358,62 @@ def workforce_transition_options(world, group_id):
             id=f"workforce_transition:{group.id}:{notice.id}:{notice.event_id}",
             notice_id=notice.id, group_id=group.id))
     return tuple(sorted(options, key=lambda item: item.id))
+
+
+def _transition_situation(world, actor, options):
+    """Give a population group only the public terms of its offers.
+
+    The sponsor account and stock remain owner-private.  The group can still
+    compare the dated notice, target occupation, stipend and the settlement
+    pressure it knows before deciding whether to accept one offer.
+    """
+    group = world.society.population[actor.id]
+    report = world.knowledge.settlement_report(actor, group.settlement_id)
+    notices = world.knowledge.workforce_offer_notices
+    demands = world.knowledge.workforce_demand_reports
+    return {
+        "you_are": actor.to_dict(),
+        "settlement_id": group.settlement_id,
+        "observed_day": report.observed_day if report is not None else None,
+        "missing_food": report.missing_food if report is not None else None,
+        "health": report.health if report is not None else None,
+        "unrest": report.unrest if report is not None else None,
+        "workforce_options": [
+            {"id": option.id, "notice_id": option.notice_id,
+             "target_occupation": notices[option.notice_id].target_occupation,
+             "count": notices[option.notice_id].count,
+             "stipend_per_person": notices[option.notice_id].stipend_per_person,
+             "sponsor_ref": notices[option.notice_id].sponsor_ref.to_dict(),
+             "work_kind": demands[notices[option.notice_id].demand_id].work_kind,
+             "work_id": demands[notices[option.notice_id].demand_id].work_id,
+             "observed_day": notices[option.notice_id].observed_day,
+             "source_event_id": notices[option.notice_id].event_id}
+            for option in options
+            if option.notice_id in notices
+            and notices[option.notice_id].demand_id in demands
+        ],
+        "today": world.clock.absolute_day,
+    }
+
+
+def workforce_adapters():
+    """Expose population-owned transitions to the same monthly menu."""
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    def options(world, actor):
+        return (workforce_transition_options(world, actor.id)
+                if actor.kind == "population_group" else ())
+
+    def execute(world, actor, option_id, decision_event_id):
+        accept_workforce_transition(world, option_id, decision_event_id=decision_event_id)
+
+    return (DiscretionaryAdapter(
+        name="workforce_transition", family="workforce", options_fn=options,
+        label_fn=lambda option: "Aceitar uma oferta de transição ocupacional.",
+        causes_fn=lambda world, option: (
+            world.knowledge.workforce_offer_notices[option.notice_id].event_id,),
+        execute_fn=execute, situation_fn=_transition_situation,
+    ),)
 
 
 def accept_workforce_transition(world, option_id, *, decision_event_id):
@@ -381,7 +457,7 @@ def accept_workforce_transition(world, option_id, *, decision_event_id):
             raise ValueError("workforce recruitment route is no longer known")
         due_day = world.clock.absolute_day + sum(route_duration(world, route_id) for route_id in path[0])
     event = record_event(
-        world, "workforce_transition_started", "Um grupo aceitou uma transição local de agricultor para artesão.",
+        world, "workforce_transition_started", f"Um grupo aceitou uma transição para {notice.target_occupation}.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta("account", sponsor_account.id, "balance", sponsor_account.balance,
                        sponsor_account.balance - stipend),
@@ -406,6 +482,72 @@ def accept_workforce_transition(world, option_id, *, decision_event_id):
     return transition
 
 
+def review_workforce_transition_fallback(world, *, excluded_actors=()):
+    """Accept one current labour offer only in offline/test mode.
+
+    This is deliberately a policy over already published notices, not a hidden
+    labour planner.  A pressured group may select one enumerated transition;
+    the normal owner then revalidates the sponsor account, route, availability
+    and stipend before reserving people. Actors that received a real provider
+    turn are excluded; an actor skipped because the shared budget was exhausted
+    still gets this bounded deterministic safety net.
+    """
+    excluded = set(excluded_actors)
+    started = []
+    groups = sorted(world.society.population.values(), key=lambda item: item.id)
+    for group in groups:
+        actor = EntityRef("population_group", group.id)
+        if actor in excluded or world.society.available_count(group.id) != group.count:
+            continue
+        report = world.knowledge.settlement_report(actor, group.settlement_id)
+        if (report is None or report.observed_day != world.clock.absolute_day
+                or (report.missing_food <= 0 and report.health >= 700 and report.unrest < 250)):
+            continue
+        options = workforce_transition_options(world, group.id)
+        if not options:
+            continue
+        # Prefer a transition that addresses the strongest observed pressure,
+        # then keep ordering stable.  The selected ID remains the only thing
+        # recorded as the actor's choice; all terms are rebuilt by the owner.
+        preferred_occupations = (("farmer",) if report.missing_food > 0
+                                 else ("artisan", "merchant"))
+        def option_priority(item):
+            notice = world.knowledge.workforce_offer_notices[item.notice_id]
+            report = world.knowledge.workforce_demand_reports.get(getattr(notice, "demand_id", None))
+            destination = (_work_settlement_id(world, report.work_kind, report.work_id)
+                           if report is not None else None)
+            # A food shortage is local evidence.  Prefer an already enumerated
+            # offer that staffs the pressured settlement itself before sending
+            # the same cohort to another facility in the sponsor's territory.
+            # This does not create a destination: it only orders existing
+            # affordances, and the owner still revalidates the route and terms.
+            local_food = (notice.target_occupation == "farmer"
+                          and destination == group.settlement_id)
+            return (
+            0 if world.knowledge.workforce_offer_notices[item.notice_id].target_occupation
+            in preferred_occupations else 1,
+            0 if local_food else 1,
+            # When several independent facilities compete for the same
+            # source cohort, prefer the largest already-enumerated offer.
+            # This keeps the fallback from spending the group's one active
+            # transition on a ten-person signal while a food shortfall has a
+            # materially larger offer waiting behind it.
+            -getattr(world.knowledge.workforce_offer_notices[item.notice_id], "count", 0),
+            item.id,
+            )
+
+        option = min(options, key=option_priority)
+        decision = record_event(
+            world, "workforce_transition_decided",
+            "O grupo escolheu uma oferta de transição ocupacional enumerada.",
+            fact_kind=FactKind.DECISION,
+            decision=option.decision(),
+            cause_ids=(world.knowledge.workforce_offer_notices[option.notice_id].event_id,),
+        )
+        started.append(accept_workforce_transition(world, option.id, decision_event_id=decision.id))
+    return tuple(started)
+
+
 def _completion_plan(world, transition):
     """Derive and check the whole transfer before any fact is appended.
 
@@ -415,7 +557,7 @@ def _completion_plan(world, transition):
     impossible; that is a material outcome, not a technical failure.
     """
     source = world.society.population.get(transition.source_group_id)
-    if (source is None or source.occupation != "farmer"
+    if (source is None or source.occupation == transition.target_occupation
             or source.settlement_id not in world.society.settlements
             or transition.destination_settlement_id not in world.society.settlements):
         return None

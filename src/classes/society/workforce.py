@@ -1,8 +1,9 @@
 """Dated local or cross-settlement changes of economic occupation.
 
 This is deliberately narrower than education or a generic skill system.  A
-transition only records a paid farmer-to-artisan or farmer-to-merchant
-conversion that was made possible by a real labour deficit.  While it is active
+transition records a paid occupational conversion made possible by a real
+labour deficit (including a return to farming when food production is blocked).
+While it is active
 the people remain members of their source cohort, but Society marks them
 unavailable to every other material use.  When ``destination_settlement_id``
 differs from the source group's own settlement, the same conversion also
@@ -32,7 +33,7 @@ class WorkforceTransition(SocietyValue):
     notice_id: Identity
     work_kind: Literal["facility", "repair", "customs"]
     work_id: Identity
-    target_occupation: Literal["artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant"]
     destination_settlement_id: Identity
     count: PositiveCount
     stipend_per_person: PositiveCount

@@ -42,14 +42,19 @@ def build_medieval_map(source: MapSource, society: SocietyState) -> Map:
     return game_map
 
 
-def create_medieval_world(seed: int, *, character_count: int | None = None) -> MedievalWorld:
+def create_medieval_world(seed: int, *, character_count: int | None = None,
+                          bootstrap_household_income: bool = False) -> MedievalWorld:
     society = create_medieval_society(seed, character_count=character_count)
     game_map = build_medieval_map(read_map_source(MAP_PATH), society)
     economy = create_medieval_economy(society)
-    return MedievalWorld(map=game_map, society=society, rng=random.Random(seed),
-                         economy=economy,
-                         authority=create_authority(society),
-                         strategy=create_strategy(society, economy),
-                         research=create_research(),
-                         creatures=create_creatures(game_map),
-                         config=MedievalRunConfig(seed=seed, character_count=len(society.characters)))
+    world = MedievalWorld(map=game_map, society=society, rng=random.Random(seed),
+                          economy=economy,
+                          authority=create_authority(society),
+                          strategy=create_strategy(society, economy),
+                          research=create_research(),
+                          creatures=create_creatures(game_map),
+                          config=MedievalRunConfig(seed=seed, character_count=len(society.characters)))
+    if bootstrap_household_income:
+        from src.sim.medieval.opening_income import allocate_opening_household_income
+        allocate_opening_household_income(world)
+    return world

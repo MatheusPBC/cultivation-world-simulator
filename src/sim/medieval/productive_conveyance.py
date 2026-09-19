@@ -77,12 +77,7 @@ class ProductiveSiteConveyanceOption(SocietyValue):
         return {
             "action": SELLER_ACTION,
             "actor_ref": self.seller_ref.to_dict(),
-            "option_id": self.id,
-            "site_id": self.site_id,
-            "facility_id": self.facility_id,
-            "recipient_ref": self.buyer_ref.to_dict(),
-            "stock_id": self.stock_id,
-            "payroll_account_id": self.payroll_account_id,
+            "selected_affordance_id": self.id,
         }
 
 
@@ -103,8 +98,7 @@ class ProductiveSiteConveyanceAcceptanceOption(SocietyValue):
         return {
             "action": ACCEPT_ACTION,
             "actor_ref": self.buyer_ref.to_dict(),
-            "proposal_event_id": self.proposal_event_id,
-            "option_id": self.option_id,
+            "selected_affordance_id": self.id,
         }
 
 
@@ -247,14 +241,15 @@ def conveyance_acceptance_options(world, buyer_ref: EntityRef):
                 or proposal.decision.get("action") != SELLER_ACTION):
             continue
         payload = proposal.decision
-        if not isinstance(payload, dict) or payload.get("recipient_ref") != buyer_ref.to_dict():
+        if not isinstance(payload, dict):
             continue
         try:
             seller_ref = _seller_from_payload(payload)
         except ValueError:
             continue
         option = next((item for item in productive_site_conveyance_options(world, seller_ref)
-                       if _proposal_payload_matches(item, payload)), None)
+                       if _proposal_payload_matches(item, payload)
+                       and item.buyer_ref == buyer_ref), None)
         if option is None or _already_conveyed(world, proposal.id):
             continue
         options.append(ProductiveSiteConveyanceAcceptanceOption(

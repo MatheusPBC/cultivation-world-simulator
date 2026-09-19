@@ -10,16 +10,20 @@ from src.sim.medieval.administration_concession import (
     administration_concession_offer_options, administration_concession_response_options,
     administration_transfer_fulfillment_options, fulfill_administration_transfer,
     offer_administration_concession, respond_administration_concession)
+from src.sim.medieval.concurrent_civil_decision import concurrent_civil_options
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import (detect_force_standoffs, force_options, force_position_options,
-                                    occupy_settlement, prepare_force_position)
+from src.sim.medieval.force import (detect_force_standoffs, establish_garrison, force_options,
+                                    force_position_options, garrison_options, occupy_settlement,
+                                    prepare_force_position)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import observe_present_force, refresh_settlement_reports
 from src.sim.medieval.settlement_investment import (execute_settlement_investment_option,
                                                      settlement_investment_options)
+from src.sim.medieval.territorial_control import (establish_territorial_control,
+                                                   territorial_control_options)
 
 
 ATTACKER = EntityRef("polity", "auren")
@@ -113,6 +117,76 @@ def test_acceptance_binds_administration_and_withdrawal_without_transferring():
     assert world.society.settlements[TARGET].occupier_id == ATTACKER.id
     assert world.society.detachments[own_id].stage == "present"
     assert {item.status for item in world.relations.obligations.values()} == {"active"}
+
+
+def test_sustained_control_can_open_a_postwar_administration_settlement():
+    world, own_id = concession_world()
+    garrison = next(item for item in garrison_options(world, ATTACKER) if item.kind == "garrison")
+    establish_garrison(world, ATTACKER, garrison.id, decide(world, garrison).id)
+    refresh_settlement_reports(world)
+    control = next(item for item in territorial_control_options(world, ATTACKER)
+                   if item.kind == "establish")
+    establish_territorial_control(world, ATTACKER, control.id, decide(world, control).id)
+    refresh_settlement_reports(world)
+
+    offer = next(item for item in administration_concession_offer_options(world, ATTACKER)
+                 if item.kind == "postwar")
+    proposal = offer_administration_concession(world, ATTACKER, offer.id, decide(world, offer).id)
+    assert len(proposal.clauses) == 1
+    response = next(item for item in administration_concession_response_options(world, DEFENDER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    respond_administration_concession(world, DEFENDER, response.id, decide(world, response).id)
+
+    fulfillment = administration_transfer_fulfillment_options(world, DEFENDER)[0]
+    obligation = fulfill_administration_transfer(world, DEFENDER, fulfillment.id, decide(world, fulfillment).id)
+
+    assert obligation.status == "fulfilled"
+    assert world.society.settlements[TARGET].administrator_id == ATTACKER.id
+    assert world.society.settlements[TARGET].occupier_id == ATTACKER.id
+    assert world.society.garrisons[f"garrison:{own_id}"].stage == "active"
+    assert world.society.territorial_controls[f"territorial-control:{TARGET}"].stage == "active"
+
+
+def test_breached_postwar_transfer_opens_a_new_remediation_proposal():
+    world, _ = concession_world()
+    garrison = next(item for item in garrison_options(world, ATTACKER) if item.kind == "garrison")
+    establish_garrison(world, ATTACKER, garrison.id, decide(world, garrison).id)
+    refresh_settlement_reports(world)
+    control = next(item for item in territorial_control_options(world, ATTACKER)
+                   if item.kind == "establish")
+    establish_territorial_control(world, ATTACKER, control.id, decide(world, control).id)
+    refresh_settlement_reports(world)
+    offer = next(item for item in administration_concession_offer_options(world, ATTACKER)
+                 if item.kind == "postwar")
+    proposal = offer_administration_concession(world, ATTACKER, offer.id, decide(world, offer).id)
+    response = next(item for item in administration_concession_response_options(world, DEFENDER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    respond_administration_concession(world, DEFENDER, response.id, decide(world, response).id)
+    for _ in range(3):
+        tick(world)
+    breached = world.relations.obligations[f"{proposal.id}:term:0"]
+    assert breached.status == "breached"
+    refresh_settlement_reports(world)
+    remediation = next(item for item in administration_concession_offer_options(world, ATTACKER)
+                       if item.kind == "postwar_remediation")
+    repaired_proposal = offer_administration_concession(world, ATTACKER, remediation.id,
+                                                        decide(world, remediation).id)
+    assert repaired_proposal.id != proposal.id
+    assert remediation.breach_event_id == breached.breach_event_id
+    response = next(item for item in administration_concession_response_options(world, DEFENDER)
+                    if item.proposal_id == repaired_proposal.id and item.response == "accept")
+    respond_administration_concession(world, DEFENDER, response.id, decide(world, response).id)
+    fulfillment = administration_transfer_fulfillment_options(world, DEFENDER)[0]
+    repaired = fulfill_administration_transfer(world, DEFENDER, fulfillment.id, decide(world, fulfillment).id)
+    assert repaired.status == "fulfilled"
+    assert world.relations.obligations[breached.id].status == "breached"
+    assert world.society.settlements[TARGET].administrator_id == ATTACKER.id
+
+
+def test_concession_offer_is_available_in_the_composed_campaign_menu():
+    world, _ = concession_world()
+    options = concurrent_civil_options(world, ATTACKER)
+    assert any(option.id.startswith("administration-concession:") for option in options)
 
 
 def test_current_administrator_fulfills_only_administration_and_persists(tmp_path):

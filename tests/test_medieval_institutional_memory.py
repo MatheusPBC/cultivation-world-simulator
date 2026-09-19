@@ -7,11 +7,12 @@ import pytest
 from src.classes.governance.diplomacy import institutional_memory_id
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.institutional_aid import aid_remediation_options, remediate_institutional_aid
-from src.sim.medieval.institutional_memory import (BREACH_VIEW, MEMORY_SPAN_DAYS, effective_salience,
-                                                   institutional_view, memories_of)
+from src.sim.medieval.institutional_memory import (BREACH_VIEW, FULFILLMENT_VIEW, MEMORY_SPAN_DAYS, REFUSAL_VIEW,
+                                                   effective_salience, institutional_view, institutional_views,
+                                                   memories_of)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
-from tests.test_medieval_institutional_aid import PROVIDER, REQUESTER, _breached_aid_world, decision
+from tests.test_medieval_institutional_aid import PROVIDER, REQUESTER, _breached_aid_world, decision, prepared_world
 
 
 def breach_event_id(world, obligation_id):
@@ -44,6 +45,51 @@ def test_only_the_creditor_reads_the_breach_against_the_debtor():
     assert institutional_view(world, PROVIDER, REQUESTER) == 0, "the wronged debtor invents no penalty"
     assert institutional_view(world, PROVIDER, PROVIDER) == 0
     assert institutional_view(world, REQUESTER, REQUESTER) == 0
+
+
+def test_fulfilled_aid_creates_positive_directional_memory():
+    from src.sim.medieval.institutional_aid import aid_fulfillment_options, fulfill_institutional_aid
+    from src.sim.medieval.institutional_aid import aid_request_options, aid_response_options, request_institutional_aid, respond_institutional_aid
+
+    world = prepared_world()
+    request_option = next(item for item in aid_request_options(world, REQUESTER) if item.provider_ref == PROVIDER)
+    request = request_institutional_aid(world, REQUESTER, request_option.id, decision(world, request_option, "request").id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    response_option = next(item for item in aid_response_options(world, PROVIDER) if item.kind == "accept")
+    respond_institutional_aid(world, PROVIDER, response_option.id, decision(world, response_option, "accept").id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    fulfill_option = aid_fulfillment_options(world, PROVIDER)[0]
+    fulfill_institutional_aid(world, PROVIDER, fulfill_option.id, decision(world, fulfill_option, "fulfill").id)
+
+    fulfilled = next(event for event in world.events if event.event_type == "institutional_aid_fulfilled")
+    assert memories_of(world, REQUESTER, fulfilled.id) is not None
+    assert institutional_view(world, REQUESTER, PROVIDER) == FULFILLMENT_VIEW
+    assert institutional_view(world, PROVIDER, REQUESTER) == 0
+    assert any(notice.event_id == fulfilled.id and notice.recipient_ref == REQUESTER
+               for notice in world.knowledge.notices.values())
+
+
+def test_deliberate_aid_refusal_creates_only_requester_negative_memory(tmp_path):
+    from src.sim.medieval.institutional_aid import (aid_request_options, aid_response_options,
+                                                    request_institutional_aid, respond_institutional_aid)
+
+    world = prepared_world()
+    request_option = next(item for item in aid_request_options(world, REQUESTER) if item.provider_ref == PROVIDER)
+    request = request_institutional_aid(world, REQUESTER, request_option.id, decision(world, request_option, "request").id)
+    reject_option = next(item for item in aid_response_options(world, PROVIDER) if item.kind == "reject")
+    response = respond_institutional_aid(world, PROVIDER, reject_option.id, decision(world, reject_option, "reject").id)
+
+    assert response.event_type == "institutional_aid_rejected"
+    assert memories_of(world, REQUESTER, response.id) is not None
+    assert memories_of(world, PROVIDER, response.id) is None
+    assert institutional_view(world, REQUESTER, PROVIDER) == REFUSAL_VIEW
+    assert institutional_view(world, PROVIDER, REQUESTER) == 0
+    assert (PROVIDER, REFUSAL_VIEW, (response.id,)) in institutional_views(world, REQUESTER)
+    assert next(item for item in world.knowledge.institutional_aid_for_actor(REQUESTER)
+                if item.kind == "response").event_id == response.id
+    save_world(world, tmp_path / "refusal-memory.mws")
+    restored = load_world(tmp_path / "refusal-memory.mws")
+    assert institutional_view(restored, REQUESTER, PROVIDER) == REFUSAL_VIEW
 
 
 def test_salience_decays_on_read_without_mutating_anything():

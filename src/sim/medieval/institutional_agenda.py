@@ -34,13 +34,43 @@ from .recourse_policy import (REVIEW_KIND as RECOURSE_REVIEW_KIND, recourse_acto
 from .relief_policy import relief_actors, relief_adapters
 from .strategy_response import strategy_adoption_actors, strategy_adoption_adapters
 from .technique_copy_policy import technique_copy_actors, technique_copy_adapters
+from .sabotage import (accusation_options, accusation_response_options, investigation_options,
+                       sabotage_adapters, sabotage_options)
+from .espionage import espionage_adapters, espionage_options
+from .bribery import (bribery_adapters, bribery_offer_options, bribery_payment_options,
+                      bribery_response_options)
+from .technology_sale_policy import technology_sale_actors, technology_sale_adapters
+from .technology_theft import technology_theft_adapters, technology_theft_options
+from .permanent_employment import permanent_employment_adapters, permanent_employment_options
+from .workforce import workforce_adapters, workforce_transition_options
+from .customs_policy import customs_adapters, customs_actors
+from .garrison_policy import garrison_adapters, garrison_actors
+from .research_policy import research_options
+from .expansion import expansion_options
+from .site_services import service_adapters, service_options
+from .tariffs import tariff_adapters, tariff_options
+from .migration_policy import migration_adapters, migration_actors
+from .household_provisioning import (household_provision_adapters,
+                                      household_provision_options,
+                                      household_provision_sale_options)
+from .assembly_denial import assembly_denial_adapters, assembly_denial_options
+from .campaign_ceasefire import campaign_ceasefire_adapters
 
 from src.classes.mechanical_language import EntityRef
 
 
 def monthly_adapters(*, allow_offers=True):
     return (*CIVIL_ADAPTERS, *diplomacy_adapters(allow_offers=allow_offers), *technique_copy_adapters(),
-            *relief_adapters(), *civic_adapters(), *strategy_adoption_adapters())
+            *technology_sale_adapters(),
+            *technology_theft_adapters(),
+            *permanent_employment_adapters(),
+            *workforce_adapters(),
+            *customs_adapters(), *service_adapters(), *tariff_adapters(), *migration_adapters(),
+            *garrison_adapters(),
+            *household_provision_adapters(),
+            *relief_adapters(), *civic_adapters(), *strategy_adoption_adapters(), *sabotage_adapters(),
+            *espionage_adapters(), *bribery_adapters(), *assembly_denial_adapters(),
+            *campaign_ceasefire_adapters())
 
 
 def monthly_actors(world):
@@ -48,10 +78,79 @@ def monthly_actors(world):
     actors = {EntityRef("polity", identity) for identity in world.society.polities}
     actors.update(diplomacy_actors(world))
     actors.update(technique_copy_actors(world))
+    actors.update(technology_sale_actors(world))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if technology_theft_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if permanent_employment_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if research_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if expansion_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if any(service_options(world, site.id, actor)
+                         for site in world.map.infrastructure_sites.values()))
+    actors.update(EntityRef("population_group", group.id)
+                  for group in world.society.population.values()
+                  if workforce_transition_options(world, group.id))
+    actors.update(customs_actors(world))
+    actors.update(garrison_actors(world))
+    # Campaign affordances are also valid for organizations with a current
+    # military/diplomatic office.  Polities remain in the base set; this only
+    # discovers non-polity owners that the same campaign adapters already
+    # enumerate and revalidate.
+    campaign_candidates = tuple(sorted(
+        {office.institution_ref for office in world.authority.offices.values()
+         if office.institution_ref.kind == "organization"},
+        key=lambda ref: (ref.kind, ref.id)))
+    for actor in campaign_candidates:
+        if any(adapter.options_fn(world, actor) for adapter in campaign_ceasefire_adapters()):
+            actors.add(actor)
     actors.update(civic_actors(world))
     actors.update(relief_actors(world))
+    actors.update(migration_actors(world))
+    actors.update(EntityRef("population_group", group.id)
+                  for group in world.society.population.values()
+                  if household_provision_options(world, EntityRef("population_group", group.id)))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if household_provision_sale_options(world, actor))
     actors.update(strategy_adoption_actors(world))
-    return _rotated(world, sorted(actors, key=lambda ref: (ref.kind, ref.id)))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if espionage_options(world, actor))
+    # Organizations do not belong to the base polity set.  Include one when
+    # it has a material bribery affordance of its own; otherwise an office
+    # holder could publish a valid offer/payment/response that never reaches
+    # the single monthly consultation simply because another family had no
+    # option for that organization.
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if any(options for options in (bribery_offer_options(world, actor),
+                                                 bribery_response_options(world, actor),
+                                                 bribery_payment_options(world, actor))))
+    # Organizations are not part of the base polity set.  Include one when a
+    # current sabotage, investigation, or accusation affordance belongs to it;
+    # otherwise the shared conflict adapters would be registered but never
+    # consulted for that actor.
+    actors.update(EntityRef("organization", identity)
+                  for identity in world.society.organizations
+                  if any(options for options in (sabotage_options(world, EntityRef("organization", identity)),
+                                                 investigation_options(world, EntityRef("organization", identity)),
+                                                 accusation_options(world, EntityRef("organization", identity)),
+                                                 accusation_response_options(world, EntityRef("organization", identity)))))
+    actors.update(actor for actor in (EntityRef("polity", identity) for identity in world.society.polities)
+                  if assembly_denial_options(world, actor))
+    # Keep the long-standing polity-first boundary deterministic.  The monthly
+    # budget is intentionally finite; adding institutional families must not
+    # silently make a population group with a current material offer lose its
+    # turn behind unrelated offices. Rotate each class independently: polities
+    # remain first, then population groups with workforce/civic affordances,
+    # then other organizations; every class still rotates fairly.
+    polities = tuple(sorted((actor for actor in actors if actor.kind == "polity"), key=lambda ref: ref.id))
+    population_groups = tuple(sorted((actor for actor in actors if actor.kind == "population_group"),
+                                     key=lambda ref: ref.id))
+    organizations = tuple(sorted((actor for actor in actors
+                                  if actor.kind not in {"polity", "population_group"}),
+                                 key=lambda ref: (ref.kind, ref.id)))
+    return _rotated(world, polities) + _rotated(world, population_groups) + _rotated(world, organizations)
 
 
 async def review_monthly_institutional_turn(world, *, allow_offers=True):

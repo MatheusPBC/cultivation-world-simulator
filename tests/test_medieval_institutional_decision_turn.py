@@ -13,6 +13,8 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.institutional_decision_turn import (
     DECLINED_DECISION_EVENT_TYPE,
     DiscretionaryAdapter,
+    NO_AFFORDANCE_EVENT_TYPE,
+    STALE_AFFORDANCE_EVENT_TYPE,
     review_institutional_decision_turn,
     review_institutional_decision_turn_with_provider,
 )
@@ -139,6 +141,28 @@ async def test_claim_fn_none_never_appears_in_claims(monkeypatch):
     assert claims == {} and covered is True
 
 
+async def test_no_affordance_records_deterministic_receipt_without_provider(monkeypatch):
+    world = enable(create_medieval_world(73))
+    called = False
+
+    async def call_llm_json(*args, **kwargs):
+        nonlocal called
+        called = True
+        raise AssertionError("no-affordance turns must not call the provider")
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    adapter = toy_adapter("only_other_actor")
+
+    claims, covered = await review_institutional_decision_turn(world, EntityRef("polity", "other"), (adapter,))
+
+    assert claims == {} and covered is False and called is False
+    receipt = next(event for event in world.events if event.event_type == NO_AFFORDANCE_EVENT_TYPE)
+    assert receipt.fact_kind == FactKind.OCCURRENCE
+    assert receipt.deltas == ()
+    assert "polity:other" in receipt.content
+
+
 async def test_claim_fn_aggregates_by_kind_across_adapters(monkeypatch):
     world = enable(create_medieval_world(73))
     provider(monkeypatch, {"selected_id": ai_decider.NO_ACTION})
@@ -174,6 +198,39 @@ async def test_selected_option_dispatches_to_its_own_adapter_executor(monkeypatc
     decision = next(e for e in world.events if e.event_type == "institutional_decision_turn_decided")
     assert decision.fact_kind == FactKind.DECISION
     assert decision.decision == {"action": "b", "toy_id": "b:1"}
+
+
+async def test_selected_id_that_becomes_stale_is_a_blocked_receipt_without_mutation(monkeypatch):
+    world = enable(create_medieval_world(73))
+    state = {"open": True}
+    executed = []
+
+    class Option:
+        id = "volatile:1"
+
+        def decision(self):
+            return {"action": "volatile", "selected_affordance_id": self.id}
+
+    def options_fn(_world, actor):
+        return (Option(),) if actor == AUREN and state["open"] else ()
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        state["open"] = False
+        return {"selected_id": "volatile:1"}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    adapter = DiscretionaryAdapter(name="volatile", options_fn=options_fn,
+                                   label_fn=lambda option: "Opção volátil.",
+                                   causes_fn=lambda world, option: (),
+                                   execute_fn=lambda *args: executed.append(True))
+
+    claims, covered = await review_institutional_decision_turn(world, AUREN, (adapter,))
+
+    assert claims == {} and covered is True and executed == []
+    blocked = [event for event in world.events if event.event_type == STALE_AFFORDANCE_EVENT_TYPE]
+    assert len(blocked) == 1 and blocked[0].deltas == ()
+    assert not any(event.event_type == "institutional_decision_turn_decided" for event in world.events)
 
 
 async def test_no_action_records_decision_only_when_actually_askable(monkeypatch):

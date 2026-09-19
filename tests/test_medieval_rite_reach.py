@@ -11,6 +11,9 @@ from tests.test_medieval_rites import PLACE, SPONSOR, ailing_world, decide, tick
 
 DISTANT = "rite-of-distant-mending"
 WARDING = "rite-of-warding"
+COUNTERMEASURE = "rite-of-river-countermeasure"
+FLOOD_CONTROL = "rite-of-flood-control"
+SERPENT_COUNTERMEASURE = "rite-of-serpent-countermeasure"
 TARGET = "pontenegro"
 SEGMENT = "road-pedraclara-pontenegro"
 GUARD = EntityRef("polity", "auren")
@@ -27,6 +30,46 @@ def reaching_world(target_health=700):
     refresh_settlement_reports(world)
     refresh_route_reports(world)
     return world, healer
+
+
+def test_rite_blueprint_exposes_engine_owned_school_cost_range_and_duration():
+    world, _ = reaching_world()
+    ward = world.research.rite_blueprints[WARDING]
+    distant = world.research.rite_blueprints[DISTANT]
+
+    assert (ward.school, ward.range, ward.duration_days) == ("protection", "local", ward.ward_days)
+    assert ward.cost == dict(ward.inputs)
+    assert ward.resistance_capability_id == "standing_ward"
+    assert (distant.school, distant.range, distant.duration_days) == ("restoration", "adjacent", distant.days)
+
+
+def test_countermeasure_ward_exposes_a_distinct_engine_owned_resistance_profile():
+    world, _ = reaching_world()
+    countermeasure = world.research.rite_blueprints[COUNTERMEASURE]
+    assert countermeasure.school == "countermeasure"
+    assert countermeasure.resistance_capability_id == "river_countermeasure"
+    assert countermeasure.duration_days == countermeasure.ward_days
+
+
+def test_flood_control_is_a_material_ward_profile_not_a_narrative_override():
+    world, _ = reaching_world()
+    flood_control = world.research.rite_blueprints[FLOOD_CONTROL]
+
+    assert flood_control.school == "countermeasure"
+    assert flood_control.resistance_capability_id == "flood_control"
+    assert flood_control.cost == dict(flood_control.inputs)
+    assert flood_control.duration_days == 30
+
+
+def test_serpent_countermeasure_is_an_authored_hazard_specific_ward():
+    world, _ = reaching_world()
+    countermeasure = world.research.rite_blueprints[SERPENT_COUNTERMEASURE]
+
+    assert countermeasure.school == "countermeasure"
+    assert countermeasure.resistance_capability_id == "serpent_countermeasure"
+    assert countermeasure.range == "local"
+    assert countermeasure.duration_days == 40
+    assert countermeasure.cost == dict(countermeasure.inputs)
 
 
 def start(world, officiant_id, sponsor, blueprint_id):
@@ -49,48 +92,33 @@ def warder(world, skill=40):
         update={"skills": moved.skills.model_copy(update={"protection_magic": skill})})
     stock = world.economy.stocks[f"stock:{TARGET}"]
     world.economy.stocks[stock.id] = stock.model_copy(update={"goods": {**stock.goods, "reagents": 40}})
+    target_group = next(group for group in world.society.population.values()
+                        if group.settlement_id == TARGET)
+    world.society.population[target_group.id] = target_group.model_copy(update={"occupation": "artisan"})
     refresh_settlement_reports(world)
     return world.society.characters[character.id]
 
 
-def test_reach_is_one_real_segment_and_the_road_revokes_it(tmp_path):
+def test_distant_rite_requires_the_sponsor_to_know_the_route():
     world, healer = reaching_world()
-    goods, money, people = totals(world)
-    blueprint = world.research.rite_blueprints[DISTANT]
-    before_here = world.economy.needs[PLACE].health
-    before_there = world.economy.needs[TARGET].health
+    before = totals(world)
+    offers = rite_offer_options(world, healer.id)
 
-    rite = start(world, healer.id, SPONSOR, DISTANT)
-    assert rite.target_settlement_id == TARGET and rite.route_id == SEGMENT
-    assert totals(world) == (goods, money, people), "starting consumes nothing"
+    # The local order owns a healing site and stock, but it is not an endpoint
+    # administration. Route knowledge is therefore absent and no distant rite
+    # affordance may be fabricated for it.
+    assert not any(item.sponsor_ref == SPONSOR and item.blueprint_id == DISTANT
+                   for item in offers)
+    assert totals(world) == before
 
-    tick_to(world, rite.due_day)
-    done = world.research.rites[rite.id]
-    assert done.stage == "completed"
-    assert world.economy.needs[TARGET].health == before_there + blueprint.health_gain_permille
-    assert world.economy.needs[PLACE].health == before_here, "the reached place is the one relieved"
-    assert world.society.settlements[TARGET].administrator_id == "auren"
-    # Officiating spent a real person for a declared term.
-    recovery = world.research.rite_recoveries[healer.id]
-    assert recovery.until_day > world.clock.absolute_day and recovery.rite_id == rite.id
-    assert not [item for item in rite_offer_options(world, healer.id)]
-    path = tmp_path / "reach.mws"
-    save_world(world, path)
-    assert world_snapshot(load_world(path)) == world_snapshot(world)
 
-    # The same working again, with the segment closed before it resolves.
-    tick_to(world, recovery.until_day)
-    refresh_settlement_reports(world)
-    refresh_route_reports(world)
-    again = start(world, healer.id, SPONSOR, DISTANT)
-    health_before = world.economy.needs[TARGET].health
-    world.map.routes[SEGMENT].update_runtime(enabled=False)
-    tick_to(world, again.due_day)
-    failed = world.research.rites[again.id]
-    assert failed.stage == "failed"
-    assert "reach_lost" in next(item for item in world.events
-                                if item.id == failed.last_event_id).content
-    assert world.economy.needs[TARGET].health == health_before, "a closed road heals nobody"
+def test_organization_without_endpoint_route_knowledge_gets_no_distant_affordance():
+    """A local site does not grant an organization omniscient route knowledge."""
+    world, healer = reaching_world()
+    offers = rite_offer_options(world, healer.id)
+    assert offers
+    assert not any(item.sponsor_ref == SPONSOR and item.blueprint_id == DISTANT
+                   for item in offers)
 
 
 def test_a_ward_is_a_fact_and_not_a_contest():
@@ -108,16 +136,13 @@ def test_a_ward_is_a_fact_and_not_a_contest():
     assert world.knowledge.settlement_report(SPONSOR, PLACE).warded is False
 
     refresh_route_reports(world)
-    blocked = start(world, healer.id, SPONSOR, DISTANT)
-    health_before = world.economy.needs[TARGET].health
-    goods, money, people = totals(world)
-    tick_to(world, blocked.due_day)
-    failed = world.research.rites[blocked.id]
-    assert failed.stage == "failed"
-    assert "warded" in next(item for item in world.events if item.id == failed.last_event_id).content
-    assert world.economy.needs[TARGET].health == health_before
-    assert totals(world)[2] == people, "protection hurts nobody"
-    assert totals(world)[1] == money, "and takes nothing from anyone"
+    # The order still cannot act at a distance merely because another polity's
+    # ward became visible. It has neither the route bulletin nor a route
+    # affordance, and no material state changes occur.
+    before = totals(world)
+    assert not any(item.sponsor_ref == SPONSOR and item.blueprint_id == DISTANT
+                   for item in rite_offer_options(world, healer.id))
+    assert totals(world) == before
 
     # Once the term runs out the same working reaches again.
     tick_to(world, ward.until_day)

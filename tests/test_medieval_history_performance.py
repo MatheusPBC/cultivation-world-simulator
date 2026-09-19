@@ -72,6 +72,88 @@ def test_recording_a_cause_addresses_its_event_without_traversing_the_history():
     assert world.events.traversals == 0
 
 
+def test_transaction_copy_shares_only_the_validated_event_prefix_and_isolates_state():
+    world = create_medieval_world(73)
+    event = record_event(world, "observed", "Fato existente.")
+
+    candidate = world.transaction_copy()
+    assert candidate is not world
+    assert candidate.events is not world.events
+    assert candidate.events == world.events
+    # The append-only prefix may be shared for speed; newly committed facts
+    # still belong exclusively to the candidate's event list.
+    assert candidate.events[0] is event
+    record_event(candidate, "candidate_only", "Fato candidato.")
+    assert len(candidate.events) == len(world.events) + 1
+    assert len(world.events) == 1
+
+    candidate.clock = candidate.clock.advance(1)
+    assert candidate.clock.absolute_day != world.clock.absolute_day
+
+
+def test_transaction_copy_isolates_registry_values_and_config_budget():
+    world = create_medieval_world(73)
+    stock = next(iter(world.economy.stocks.values()))
+    population = next(iter(world.society.population.values()))
+    candidate = world.transaction_copy()
+
+    assert candidate.economy is not world.economy
+    assert candidate.economy.stocks is not world.economy.stocks
+    assert candidate.economy.stocks[stock.id] is not stock
+    assert candidate.economy.stocks[stock.id].goods is not stock.goods
+    assert candidate.society.population[population.id] is not population
+    assert candidate.config is not world.config
+    assert candidate.config.institutional_actions_consumed is not world.config.institutional_actions_consumed
+
+    candidate.economy.stocks[stock.id] = stock.model_copy(
+        update={"goods": {**stock.goods, "food": stock.goods.get("food", 0) + 1}}
+    )
+    candidate.society.population[population.id] = population.model_copy(update={"count": population.count + 1})
+    candidate.config = candidate.config.model_copy(
+        update={"institutional_actions_consumed": {"polity:x:0": 1}}
+    )
+
+    assert candidate.economy.stocks[stock.id].goods != world.economy.stocks[stock.id].goods
+    assert candidate.society.population[population.id].count != world.society.population[population.id].count
+    assert world.config.institutional_actions_consumed == {}
+
+
+def test_transaction_copy_isolates_map_runtime_but_shares_authored_topology():
+    world = create_medieval_world(73)
+    route = next(iter(world.map.routes.values()))
+    site = next(iter(world.map.infrastructure_sites.values()))
+    candidate = world.transaction_copy()
+
+    assert candidate.map is not world.map
+    assert candidate.map.geography is world.map.geography
+    assert candidate.map.regions is world.map.regions
+    assert candidate.map.routes[route.id] is not route
+    assert candidate.map.infrastructure_sites[site.id] is not site
+
+    candidate.map.routes[route.id].update_runtime(quality=max(0.0, route.quality - 0.1))
+    candidate.map.infrastructure_sites[site.id].update_runtime(integrity=0.5)
+    candidate.map.force_route_interdictors[route.id] = "candidate-interdictor"
+    candidate.map._infrastructure_site_updates.append({"op": "candidate"})
+
+    assert world.map.routes[route.id].quality == route.quality
+    assert world.map.infrastructure_sites[site.id].integrity == site.integrity
+    assert route.id not in world.map.force_route_interdictors
+    assert not world.map._infrastructure_site_updates
+
+
+def test_event_equality_accepts_json_list_round_trip_for_tuple_decisions():
+    world = create_medieval_world(73)
+    event = record_event(
+        world,
+        "decision",
+        "Escolha estruturada.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "no_action", "declined_option_ids": ("a", "b")},
+    )
+    loaded = type(event).model_validate(event.model_dump(mode="json"))
+    assert event == loaded
+
+
 @pytest.mark.parametrize("cause", ["event:0", "event:01", "event: 1", "event:1.0", "event:one", "event:",
                                    "evento:1", "event:1:delta:0", "", None, "future"])
 def test_record_event_rejects_malformed_unknown_or_repeated_causes(cause):

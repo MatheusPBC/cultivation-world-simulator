@@ -97,7 +97,8 @@ class KnowledgeReport(SocietyValue):
     event_id: Identity
 
 
-def route_observation(route_id, publisher_ref, observed_day, operational_capacity, travel_days) -> str:
+def route_observation(route_id, publisher_ref, observed_day, operational_capacity, travel_days,
+                      daily_flow_bulk=0) -> str:
     """Canonical wire shape of one observation, shared by receipts and validation.
 
     It carries route, observer, date and observed runtime values, so a receipt
@@ -105,7 +106,7 @@ def route_observation(route_id, publisher_ref, observed_day, operational_capacit
     """
     return json.dumps({"route_id": route_id, "publisher": publisher_ref.to_dict(),
                        "observed_day": observed_day, "operational_capacity": float(operational_capacity),
-                       "travel_days": travel_days},
+                       "travel_days": travel_days, "daily_flow_bulk": int(daily_flow_bulk)},
                       sort_keys=True, ensure_ascii=False, allow_nan=False)
 
 
@@ -122,6 +123,9 @@ class RouteReport(SocietyValue):
     observed_day: Count
     operational_capacity: Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
     travel_days: Annotated[int, Field(strict=True, ge=1)] | None = None
+    # Public aggregate traffic reading; no order, stock or owner identity is
+    # exposed through this field.
+    daily_flow_bulk: Count = 0
     channel: Literal["administrative_route_report", "route_bulletin"]
     event_id: Identity
 
@@ -133,7 +137,7 @@ class RouteReport(SocietyValue):
 
     def observation(self) -> str:
         return route_observation(self.route_id, self.publisher_ref, self.observed_day,
-                                 self.operational_capacity, self.travel_days)
+                                 self.operational_capacity, self.travel_days, self.daily_flow_bulk)
 
 
 def fiscal_route_observation(route_id, publisher_ref, observed_day, checkpoint_id, fee_per_bulk) -> str:
@@ -185,7 +189,7 @@ class WorkforceDemandReport(SocietyValue):
     work_id: Identity
     # The engine derives this from the material work.  It is never selected by
     # a sponsor or a population group.
-    target_occupation: Literal["artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant"]
     account_id: Identity
     count: Annotated[int, Field(strict=True, gt=0)]
     stipend_per_person: Annotated[int, Field(strict=True, gt=0)]
@@ -218,7 +222,7 @@ class WorkforceOfferNotice(SocietyValue):
     sponsor_ref: EntityRef
     demand_id: Identity
     source_group_id: Identity
-    target_occupation: Literal["artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant"]
     count: Annotated[int, Field(strict=True, gt=0)]
     stipend_per_person: Annotated[int, Field(strict=True, gt=0)]
     observed_day: Count
@@ -285,7 +289,7 @@ class CivicDemandNotice(SocietyValue):
     protest_id: Identity
     group_id: Identity
     settlement_id: Identity
-    demand_kind: Literal["food_relief", "site_repair"]
+    demand_kind: Literal["food_relief", "site_repair", "organized_strike"]
     food_quantity: Count = 0
     site_id: Identity | None = None
     due_day: Count
@@ -296,7 +300,8 @@ class CivicDemandNotice(SocietyValue):
     @model_validator(mode="after")
     def valid_shape(self):
         if ((self.demand_kind == "food_relief") != (self.food_quantity > 0 and self.site_id is None)
-                or (self.demand_kind == "site_repair") != (self.food_quantity == 0 and self.site_id is not None)):
+                or (self.demand_kind == "site_repair") != (self.food_quantity == 0 and self.site_id is not None)
+                or (self.demand_kind == "organized_strike") != (self.food_quantity == 0 and self.site_id is None)):
             raise ValueError("civic notice demand shape is inconsistent")
         return self
 
@@ -358,6 +363,93 @@ class InvestigationFinding(SocietyValue):
         return self
 
 
+class InvestigationAccusationNotice(SocietyValue):
+    """A private, factual accusation delivered to an attributed subject."""
+    id: Identity
+    recipient_ref: EntityRef
+    accuser_ref: EntityRef
+    investigation_id: Identity
+    site_id: Identity
+    subject_ref: EntityRef
+    finding_event_id: Identity
+    event_id: Identity
+    learned_day: Count
+    channel: Literal["direct_investigation_accusation"] = "direct_investigation_accusation"
+
+
+class EspionageFinding(SocietyValue):
+    """Private result of one bounded espionage mission.
+
+    Espionage never creates a hidden fact.  A successful finding points at an
+    existing settlement observation event; failure and discovery deliberately
+    carry no evidence reference.
+    """
+    id: Identity
+    mission_id: Identity
+    decision_event_id: Identity
+    recipient_ref: EntityRef
+    agent_ref: EntityRef
+    target_ref: EntityRef
+    target_owner_ref: EntityRef
+    result: Literal["success", "failure", "discovered"]
+    evidence_event_id: Identity | None = None
+    learned_day: Count
+    event_id: Identity
+    channel: Literal["institutional_espionage"] = "institutional_espionage"
+
+    @model_validator(mode="after")
+    def valid_result(self):
+        if self.id != f"espionage_finding:{self.decision_event_id}":
+            raise ValueError("espionage finding must be keyed by its decision")
+        if self.recipient_ref.kind not in {"polity", "organization"}:
+            raise ValueError("espionage recipient must be an institution")
+        if self.agent_ref.kind != "character" or self.target_ref.kind != "settlement":
+            raise ValueError("espionage requires a character agent and settlement target")
+        if (self.result == "success") != (self.evidence_event_id is not None):
+            raise ValueError("only a successful mission may carry evidence")
+        return self
+
+
+class TechnologyTheftFinding(SocietyValue):
+    """Private result of one material attempt to steal a catalogued technique.
+
+    A theft never invents a technique or an effect.  A successful result names
+    only the observed installation, the holder's canonical TechnicalKnowledge
+    receipt, and the newly created stolen-knowledge receipt.  Failed and
+    discovered attempts retain the observation but do not grant knowledge.
+    """
+    id: Identity
+    mission_id: Identity
+    decision_event_id: Identity
+    recipient_ref: EntityRef
+    agent_ref: EntityRef
+    site_id: Identity
+    target_owner_ref: EntityRef
+    technology_id: Identity
+    observation_event_id: Identity
+    result: Literal["success", "failure", "discovered"]
+    source_knowledge_event_id: Identity | None = None
+    learned_knowledge_event_id: Identity | None = None
+    learned_day: Count
+    event_id: Identity
+    channel: Literal["institutional_technology_theft"] = "institutional_technology_theft"
+
+    @model_validator(mode="after")
+    def valid_result(self):
+        if self.id != f"technology_theft_finding:{self.decision_event_id}":
+            raise ValueError("technology theft finding must be keyed by its decision")
+        if self.recipient_ref.kind not in {"polity", "organization"}:
+            raise ValueError("technology theft recipient must be an institution")
+        if self.agent_ref.kind != "character":
+            raise ValueError("technology theft requires a character agent")
+        if self.result == "success":
+            if self.source_knowledge_event_id is None or self.learned_knowledge_event_id is None:
+                raise ValueError("successful technology theft requires canonical knowledge receipts")
+        elif self.source_knowledge_event_id is not None or self.learned_knowledge_event_id is not None:
+            raise ValueError("unsuccessful technology theft cannot grant knowledge")
+        return self
+
+
 class CustomsNotice(SocietyValue):
     """A private customs state receipt for one owned parcel.
 
@@ -370,12 +462,13 @@ class CustomsNotice(SocietyValue):
     order_id: Identity
     resource_id: Identity
     quantity: int = Field(strict=True, gt=0)
+    classification: Literal["ordinary", "contraband"]
     recipient_ref: EntityRef
     fee: int | None = Field(default=None, strict=True, gt=0)
     learned_day: Count
     event_id: Identity
     state_event_id: Identity
-    state: Literal["presented", "fee_due", "detected", "evaded_undetected", "cleared"]
+    state: Literal["presented", "fee_due", "detected", "evaded_undetected", "cleared", "returned", "seized"]
     manifest_id: Identity | None = None
     channel: Literal["direct_customs_notice"] = "direct_customs_notice"
 

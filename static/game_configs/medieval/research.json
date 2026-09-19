@@ -49,7 +49,65 @@
       "days": 6,
       "health_gain_permille": 0,
       "kind": "ward",
+      "resistance_capability_id": "standing_ward",
       "ward_days": 60
+    },
+    {
+      "id": "rite-of-river-countermeasure",
+      "name": "Rito de contramedida fluvial",
+      "capability_id": "transport",
+      "skill": "protection_magic",
+      "min_skill": 30,
+      "inputs": {
+        "reagents": 4,
+        "crystals": 1
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 8,
+      "health_gain_permille": 0,
+      "kind": "ward",
+      "resistance_capability_id": "river_countermeasure",
+      "ward_days": 45
+    },
+    {
+      "id": "rite-of-flood-control",
+      "name": "Rito de contenção das águas",
+      "capability_id": "transport",
+      "skill": "protection_magic",
+      "min_skill": 35,
+      "inputs": {
+        "reagents": 5,
+        "crystals": 1
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 9,
+      "health_gain_permille": 0,
+      "kind": "ward",
+      "resistance_capability_id": "flood_control",
+      "ward_days": 30
+    },
+    {
+      "id": "rite-of-serpent-countermeasure",
+      "name": "Rito de contramedida ofídica",
+      "capability_id": "transport",
+      "skill": "protection_magic",
+      "min_skill": 35,
+      "inputs": {
+        "reagents": 4,
+        "crystals": 1
+      },
+      "assistants": 2,
+      "assistant_occupation": "artisan",
+      "wage_per_worker": 2,
+      "days": 7,
+      "health_gain_permille": 0,
+      "kind": "ward",
+      "resistance_capability_id": "serpent_countermeasure",
+      "ward_days": 40
     }
   ],
   "technologies": [
@@ -60,6 +118,26 @@
       "capability_id": "food_production",
       "skill": "craftsmanship",
       "min_skill": 10,
+      "required_units": 6,
+      "monthly_units": 2,
+      "inputs": {
+        "wood": 1,
+        "tools": 1
+      },
+      "assistant_occupation": "farmer",
+      "assistants_per_unit": 2,
+      "wage_per_worker": 2
+    },
+    {
+      "id": "crop_rotation",
+      "name": "Rotação de culturas",
+      "field": "agricultura",
+      "prerequisites": [
+        "irrigation"
+      ],
+      "capability_id": "food_production",
+      "skill": "craftsmanship",
+      "min_skill": 12,
       "required_units": 6,
       "monthly_units": 2,
       "inputs": {
@@ -126,6 +204,82 @@
         "tools": 1
       },
       "assistant_occupation": "artisan",
+      "assistants_per_unit": 2,
+      "wage_per_worker": 2
+    },
+    {
+      "id": "field_drill",
+      "name": "Doutrina de exercício de campo",
+      "field": "militar",
+      "capability_id": "military_training",
+      "skill": "command",
+      "min_skill": 10,
+      "required_units": 6,
+      "monthly_units": 2,
+      "inputs": {
+        "tools": 1
+      },
+      "assistant_occupation": "soldier",
+      "assistants_per_unit": 2,
+      "wage_per_worker": 2
+    },
+    {
+      "id": "siegecraft",
+      "name": "Engenharia de cerco",
+      "field": "militar",
+      "prerequisites": [
+        "field_drill"
+      ],
+      "capability_id": "military_training",
+      "skill": "command",
+      "min_skill": 10,
+      "required_units": 8,
+      "monthly_units": 2,
+      "inputs": {
+        "tools": 2,
+        "iron": 1
+      },
+      "assistant_occupation": "soldier",
+      "assistants_per_unit": 2,
+      "wage_per_worker": 2
+    },
+    {
+      "id": "fortification",
+      "name": "Doutrina de fortificação",
+      "field": "militar",
+      "prerequisites": [
+        "siegecraft"
+      ],
+      "capability_id": "military_training",
+      "skill": "command",
+      "min_skill": 15,
+      "required_units": 8,
+      "monthly_units": 2,
+      "inputs": {
+        "tools": 2,
+        "iron": 1
+      },
+      "assistant_occupation": "soldier",
+      "assistants_per_unit": 2,
+      "wage_per_worker": 2
+    },
+    {
+      "id": "field_logistics",
+      "name": "Logística de campanha",
+      "field": "militar",
+      "prerequisites": [
+        "field_drill"
+      ],
+      "capability_id": "military_training",
+      "skill": "command",
+      "min_skill": 12,
+      "required_units": 6,
+      "monthly_units": 2,
+      "inputs": {
+        "tools": 1,
+        "wood": 1
+      },
+      "assistant_occupation": "soldier",
       "assistants_per_unit": 2,
       "wage_per_worker": 2
     }

@@ -48,8 +48,8 @@ continua sem rotina de protesto ou de ajuda, e "roteirizado" aqui significa
 "decisão determinística de um ator de teste explícito", nunca "condição
 automática dentro de src/sim/".
 
-Três perfis de **governo**, todos deterministas e sem heurística de mercado
-nenhuma (o comportamento do povo acima é o mesmo nos três, porque a pergunta
+Sete perfis de **governo**, todos deterministas e sem heurística de mercado
+nenhuma (o comportamento do povo acima é o mesmo nos seis, porque a pergunta
 desta medição é sobre o governo, não sobre o povo):
 
 - ``desatento``: sempre NO_ACTION, mesmo diante de fome relatada. É o "governo
@@ -67,6 +67,18 @@ desta medição é sobre o governo, não sobre o povo):
 - ``preventivo``: escolhe ajuda ao primeiro sinal de fome (``missing_food >
   0``) no relatório do próprio ator.
 
+- ``socorro``: fixture de cadeia institucional; quando o menu contém uma
+  resposta de ajuda aceita, uma obrigação de ajuda a cumprir ou um pedido
+  enumerado, escolhe essa opção nessa ordem. Só depois considera o socorro
+  direto. O perfil não inventa destinatário, quantidade, rota ou custo: todos
+  continuam sendo parâmetros recomputados pelo owner.
+- ``alivio``: fixture de comparação que prioriza uma affordance de relief
+  enumerada antes da cadeia de ajuda. Serve para medir o efeito de uma política
+  diferente sobre o mesmo estado; não é fallback do motor.
+- ``mercado``: escolhe a primeira oferta bilateral ``market-purchase:*``
+  enumerada antes de qualquer pedido de ajuda. A compra continua sujeita à
+  resposta independente do vendedor, saldo, tarifa e rota do owner.
+
 Quando a família "relief" oferece mais de uma opção (o menu sempre inclui a
 fome inteira e a metade dela, cada uma limitada ao estoque físico real), os
 perfis reativo e preventivo escolhem a de maior quantidade disponível: eles
@@ -78,6 +90,12 @@ do outro, e nenhum fallback determinístico foi acrescentado dentro do
 motor. Fora deste arnês (``--gov-profile`` ausente), nenhum ator é
 consultado e o mundo roda exatamente como antes — sem governo e sem povo
 roteirizado.
+
+``--real-provider`` é uma sondagem operacional explícita. Ele habilita o turno
+institucional real, respeita ``--ai-calls-per-step`` e falha imediatamente se
+o provider não estiver configurado; não troca silenciosamente para o perfil
+determinístico. O relatório só contabiliza chamadas reais quando esse modo foi
+solicitado.
 """
 
 import argparse
@@ -97,7 +115,7 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 
-GOV_PROFILES = ("desatento", "reativo", "preventivo")
+GOV_PROFILES = ("desatento", "reativo", "preventivo", "socorro", "alivio", "mercado", "mobilidade")
 REACTIVE_MISSING_FOOD_THRESHOLD = 100
 
 
@@ -149,7 +167,10 @@ POLITICAL_EVENTS = {"civic_protests": "civic_protest_opened",
                     "aid_requests": "institutional_aid_requested",
                     "aid_fulfilled": "institutional_aid_fulfilled",
                     "migrations_started": "migration_started",
-                    "relief_given": "relief_distributed"}
+                    "relief_given": "relief_distributed",
+                    "market_purchases": "buy_decided",
+                    "permanent_employment": "permanent_employment_created",
+                    "workforce_transitions": "workforce_transition_started"}
 
 
 def monthly_metrics(world):
@@ -214,8 +235,79 @@ def _preventivo_decision(payload):
     return ai_decider.NO_ACTION
 
 
+def _socorro_decision(payload):
+    """Drive only the enumerated institutional-aid chain in a fixture."""
+    choices = tuple(choice["id"] for choice in payload.get("choices", ()))
+    for marker in ("institutional-aid-response:", "institutional-aid-fulfill:",
+                   "institutional-aid-request:"):
+        candidates = sorted(item for item in choices if item.startswith(marker)
+                            and (not item.endswith(":reject")))
+        if candidates:
+            return candidates[0]
+    supply = sorted(item for item in choices if item.startswith("supply-objective:"))
+    if supply:
+        return supply[0]
+    transfers = sorted(item for item in choices if item.startswith("relief-transfer:"))
+    if transfers:
+        return transfers[0]
+    if _reported_missing_food(payload) > 0:
+        choice = _relief_choice(payload)
+        if choice is not None:
+            return choice
+    return ai_decider.NO_ACTION
+
+
+def _alivio_decision(payload):
+    """Fixture policy that explicitly prioritizes public relief when offered.
+
+    This exists only to compare two legal actor policies on the same pressured
+    world.  The engine still enumerates and revalidates the relief ID; nothing
+    here creates food or chooses a target/quantity outside the menu.
+    """
+    choice = _relief_choice(payload)
+    if choice is not None and _reported_missing_food(payload) > 0:
+        return choice
+    return _socorro_decision(payload)
+
+
+def _market_decision(payload):
+    """Choose only an engine-enumerated bilateral market offer."""
+    choices = sorted(item["id"] for item in payload.get("choices", ())
+                     if item["id"].startswith("market-purchase:"))
+    return choices[0] if choices else ai_decider.NO_ACTION
+
+
+def _employment_choice(payload):
+    """Choose only an engine-enumerated standing local job."""
+    # Private stock/account handles are intentionally replaced by opaque
+    # ``choice:N`` tokens before the provider sees this payload.  The fixture
+    # therefore identifies this public family by its engine-authored label;
+    # the real provider follows the same token contract and the owner still
+    # remaps/revalidates the canonical ID after selection.
+    options = sorted(choice["id"] for choice in payload.get("choices", ())
+                     if choice.get("id", "").startswith("permanent-employment:")
+                     or choice.get("label", "").startswith("Estabelecer vínculo local"))
+    return options[0] if options else None
+
+
+def _workforce_choice(payload):
+    """Choose only an engine-enumerated farmer transition offer."""
+    choices = tuple(choice["id"] for choice in payload.get("choices", ()))
+    options = sorted(item for item in choices if item.startswith("workforce_transition:"))
+    return options[0] if options else None
+
+
+def _mobilidade_decision(payload):
+    """Fixture profile for the employment/transition vertical only."""
+    return (_employment_choice(payload) or _workforce_choice(payload)
+            or _socorro_decision(payload))
+
+
 GOV_DECISIONS = {"desatento": _desatento_decision, "reativo": _reativo_decision,
-                 "preventivo": _preventivo_decision}
+                 "preventivo": _preventivo_decision, "socorro": _socorro_decision,
+                 "alivio": _alivio_decision,
+                 "mercado": _market_decision,
+                 "mobilidade": _mobilidade_decision}
 
 
 def _protest_open_choice(payload):
@@ -232,7 +324,7 @@ def _protest_open_choice(payload):
     return ids[0] if ids else None
 
 
-def _povo_decision(payload):
+def _povo_decision(payload, *, workforce=False):
     """The population's own test actor: open a protest whenever it can.
 
     Deliberately narrower than the engine's own civic menu: dissolving an
@@ -240,7 +332,8 @@ def _povo_decision(payload):
     left to NO_ACTION, a declared scope limit, not a claim that groups never
     back down.
     """
-    choice = _protest_open_choice(payload)
+    choice = _workforce_choice(payload) if workforce else None
+    choice = choice or _protest_open_choice(payload)
     return choice if choice is not None else ai_decider.NO_ACTION
 
 
@@ -265,36 +358,56 @@ def _install_gov_profile(gov_profile):
     async def call_llm_json(prompt, *args, **kwargs):
         payload = _payload_of(prompt)
         if _actor_kind(payload) == "population_group":
-            return {"selected_id": _povo_decision(payload)}
+            return {"selected_id": _povo_decision(payload, workforce=gov_profile == "mobilidade")}
         return {"selected_id": decide(payload)}
 
     return (patch("src.sim.medieval.ai_decider.provider_available", return_value=True),
             patch("src.utils.llm.client.call_llm_json", call_llm_json))
 
 
-async def run(seed, days, output, profile=False, gov_profile=None):
+async def run(seed, days, output, profile=False, gov_profile=None, real_provider=False,
+              ai_calls_per_step=8):
+    # The CLI passes a Path, while callers such as release notebooks and
+    # focused probes commonly pass a string.  Normalize at the public
+    # boundary so persistence and the returned artifact path use one contract.
+    output = Path(output)
+    if real_provider and gov_profile is not None:
+        raise ValueError("real_provider cannot be combined with gov_profile")
     if gov_profile is not None and gov_profile not in GOV_PROFILES:
         raise ValueError(f"gov_profile must be one of {GOV_PROFILES}")
+    if type(ai_calls_per_step) is not int or ai_calls_per_step <= 0:
+        raise ValueError("ai_calls_per_step must be a positive integer")
+    if real_provider:
+        from src.sim.medieval.ai_decider import provider_available
+        if not provider_available():
+            raise RuntimeError("real provider is not configured or is disabled in this runtime")
+        return await _run(seed, days, output, profile, None, real_provider=True,
+                          ai_calls_per_step=ai_calls_per_step)
     if gov_profile is None:
-        return await _run(seed, days, output, profile, gov_profile)
+        return await _run(seed, days, output, profile, gov_profile,
+                          ai_calls_per_step=ai_calls_per_step)
     patches = _install_gov_profile(gov_profile)
     with patches[0], patches[1]:
-        return await _run(seed, days, output, profile, gov_profile)
+        return await _run(seed, days, output, profile, gov_profile,
+                          ai_calls_per_step=ai_calls_per_step)
 
 
-async def _run(seed, days, output, profile, gov_profile):
-    world = create_medieval_world(seed)
-    if gov_profile is not None:
+async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
+               ai_calls_per_step=8):
+    world = create_medieval_world(seed, bootstrap_household_income=True)
+    if gov_profile is not None or real_provider:
         # Consulted for real: enabled, with enough same-day budget that every
         # polity's monthly turn (plus any daily recourse turn sharing the same
         # boundary day) gets answered, and no artificial monthly ceiling.
-        world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8})
+        world.config = world.config.model_copy(update={"ai_enabled": True,
+                                                       "ai_calls_per_step": ai_calls_per_step})
     initial_resources = resource_totals(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
     elapsed, jumps, boundary, net_resources, metrics = time.perf_counter(), 0, 0, Counter(), []
     print(json.dumps({"phase": "start", "gov_profile": gov_profile, "seed": seed, "days": days,
                       "initial_population": world.society.total_population, "initial_money": initial_money,
-                      "ai_enabled": world.config.ai_enabled, "policy": world.config.decision_policy}), flush=True)
+                      "ai_enabled": world.config.ai_enabled, "policy": world.config.decision_policy,
+                      "real_provider": real_provider}), flush=True)
     while world.clock.absolute_day < days:
         start = len(world.events)
         await MedievalSimulator(world).step()
@@ -342,7 +455,8 @@ async def _run(seed, days, output, profile, gov_profile):
             "health": {key: n.health for key, n in world.economy.needs.items()},
             "balances": {key: a.balance for key, a in world.economy.accounts.items() if a.owner_ref.kind == "polity"},
             "food_conserved": True, "money_conserved": True, "all_resources_accounted": True,
-             "save_load_equivalent": True, "real_ai_calls": 0,
+             "save_load_equivalent": True,
+             "real_ai_calls": (ai_decider.spent_calls(world) if real_provider else 0),
             "policy": world.config.decision_policy, "elapsed_s": round(time.perf_counter()-elapsed, 2),
             "save": str(output.resolve())}
 
@@ -355,8 +469,13 @@ if __name__ == "__main__":
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--gov-profile", choices=GOV_PROFILES,
                         help="Decisor roteirizado instalado no lugar do provider; omitido = nenhum ator (mundo sem governo).")
+    parser.add_argument("--real-provider", action="store_true",
+                        help="Usa o provider real configurado; falha explicitamente se ele não estiver disponível.")
+    parser.add_argument("--ai-calls-per-step", type=int, default=8,
+                        help="Limite diário de consultas no modo --real-provider (padrão: 8).")
     args = parser.parse_args()
     if args.days <= 0 or args.days % 30:
         parser.error("days must be a positive multiple of 30")
-    print(json.dumps(asyncio.run(run(args.seed, args.days, args.output, args.profile, args.gov_profile)),
+    print(json.dumps(asyncio.run(run(args.seed, args.days, args.output, args.profile, args.gov_profile,
+                                   args.real_provider, args.ai_calls_per_step)),
                      ensure_ascii=False, indent=2), flush=True)

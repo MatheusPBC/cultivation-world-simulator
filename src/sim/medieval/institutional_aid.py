@@ -320,9 +320,11 @@ def respond_institutional_aid(world, provider, option_id, decision_event_id):
                                               if request_item.id == request.id)
         event = record_event(candidate, "institutional_aid_rejected", "Ajuda institucional recusada.",
                              fact_kind=FactKind.STATE_TRANSITION,
-                             deltas=(_delta("aid_request", f"aid-request:{request.id}", "status", "requested", "rejected"),),
+                             deltas=(_delta("aid_request", f"aid-request:{request.id}", "status", "requested", "rejected"),
+                                     *memory_creation_deltas(candidate, (request_option.actor_ref,))),
                              cause_ids=(decision.id, request.id))
         _response_notice(candidate, request, request_option, event, "rejected", request_notice.requested_food)
+        apply_memory_creation(candidate, (request_option.actor_ref,), event)
         candidate.knowledge.validate(candidate)
         candidate.relations.validate(candidate)
         world.__dict__.update(candidate.__dict__)
@@ -420,11 +422,15 @@ def fulfill_institutional_aid(world, provider, option_id, decision_event_id):
     receipt = record_event(candidate, "institutional_aid_fulfilled", "Remessa de ajuda institucional preparada.",
                            fact_kind=FactKind.STATE_TRANSITION,
                            deltas=(_delta("obligation", obligation.id, "status", "active", "fulfilled"),
-                                   _delta("obligation", obligation.id, "material_event_id", None, opened.last_event_id)),
+                                   _delta("obligation", obligation.id, "material_event_id", None, opened.last_event_id),
+                                   *memory_creation_deltas(candidate, (proposal.proposer_ref,
+                                                                        proposal.counterparty_ref))),
                            cause_ids=(decision.id, obligation.last_event_id, opened.last_event_id))
     candidate.relations.obligations[obligation.id] = obligation.model_copy(
         update={"status": "fulfilled", "material_event_id": opened.last_event_id, "last_event_id": receipt.id})
     candidate.agenda.cancel(obligation.id)
+    apply_memory_creation(candidate, (proposal.proposer_ref, proposal.counterparty_ref), receipt)
+    disclose(candidate, proposal, receipt)
     candidate.relations.validate(candidate)
     world.__dict__.update(candidate.__dict__)
     return opened

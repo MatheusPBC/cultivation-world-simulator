@@ -35,6 +35,8 @@ DECISION_EVENT_TYPE = "institutional_decision_turn_decided"
 # the consultation receipt. A technical failure (never actually asked) must
 # never reach this: see ``was_askable`` below.
 DECLINED_DECISION_EVENT_TYPE = "institutional_decision_turn_declined"
+NO_AFFORDANCE_EVENT_TYPE = "institutional_decision_no_affordance"
+STALE_AFFORDANCE_EVENT_TYPE = "institutional_decision_stale_affordance"
 
 
 @dataclass(frozen=True)
@@ -128,13 +130,26 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
     """
     by_id = _by_id(world, actor, adapters)
     if not by_id:
+        # A material menu did not exist.  Keep this deterministic receipt so
+        # observability can distinguish "nothing was possible" from a provider
+        # failure or an actor's deliberate NO_ACTION.  It is never a decision,
+        # carries no delta, and does not call the provider.
+        record_event(
+            world,
+            NO_AFFORDANCE_EVENT_TYPE,
+            f"Nenhuma affordance material estava disponível para {actor.kind}:{actor.id}.",
+            fact_kind=FactKind.OCCURRENCE,
+        )
         return {}, False
     was_askable = ai_decider.consultable(world, actor)
     situation = (situation_fn(world, actor, [option for _, option in by_id.values()])
                  if situation_fn is not None else _composed_situation(world, actor, by_id))
     choices = [{"id": option_id, "label": adapter.label_fn(option)}
                for option_id, (adapter, option) in sorted(by_id.items())]
-    causes = tuple(sorted({cause for adapter, option in by_id.values() for cause in adapter.causes_fn(world, option)}))
+    # Adapters may have no canonical evidence for an optional context field;
+    # ``None`` is not a causal link and must never reach sorting or the event.
+    causes = tuple(sorted({cause for adapter, option in by_id.values()
+                           for cause in adapter.causes_fn(world, option) if cause}))
     selected = await ai_decider.select_option(world, actor, situation, choices, causes=causes)
     if selected is None and not was_askable:
         return {}, False
@@ -161,6 +176,10 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
     # point unless it is still present in a freshly recomposed menu.
     fresh = _by_id(world, actor, adapters)
     if selected not in fresh:
+        record_event(
+            world, STALE_AFFORDANCE_EVENT_TYPE,
+            "A opção escolhida deixou de existir antes da revalidação; nenhuma mutação material foi aplicada.",
+            fact_kind=FactKind.OCCURRENCE, cause_ids=causes)
         return claims, True
     adapter, option = fresh[selected]
     decision = record_event(
@@ -173,6 +192,10 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
     except ValueError:
         # The decision remains factual history; a stale affordance never
         # becomes a material mutation.
+        record_event(
+            world, STALE_AFFORDANCE_EVENT_TYPE,
+            "O owner rejeitou a opção durante a execução; nenhuma mutação material foi aplicada.",
+            fact_kind=FactKind.OCCURRENCE, cause_ids=(decision.id, *causes))
         pass
     return claims, True
 

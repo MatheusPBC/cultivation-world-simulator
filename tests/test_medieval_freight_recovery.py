@@ -9,6 +9,9 @@ from src.sim.medieval.economy import _delta
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.freight_recovery import (execute_freight_recovery, freight_recovery_options)
+from src.sim.medieval.concurrent_civil_decision import (
+    concurrent_civil_options, review_concurrent_civil_decision_with_provider)
+from src.sim.medieval import ai_decider
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from tests.test_medieval_logistics import DEST, ROAD, SOURCE, cargo_world, ship, total_food
@@ -61,6 +64,28 @@ async def test_a_blocked_order_offers_only_waiting_or_a_successor_over_another_r
             assert option.quantity == order.quantity
     # Another owner reconstructs nothing from this cargo.
     assert freight_recovery_options(world, EntityRef("polity", "valedouro")) == ()
+
+
+@pytest.mark.asyncio
+async def test_blocked_freight_recovery_is_available_in_the_single_civil_menu(monkeypatch):
+    world, _order = await blocked_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 5})
+    options = concurrent_civil_options(world, OWNER)
+    recovery = next(item for item in options if item.decision()["action"] == "recover_blocked_freight"
+                    and item.kind == "successor")
+
+    async def choose(prompt, *args, **kwargs):
+        return {"selected_id": recovery.id}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose)
+    await review_concurrent_civil_decision_with_provider(world)
+
+    assert any(event.event_type == "institutional_decision_turn_decided"
+               and event.decision == recovery.decision() for event in world.events)
+    assert any(order.decision_ids[-1].startswith("event:")
+               for order in world.economy.freight_orders.values()
+               if order.id != recovery.order_id)
 
 
 async def test_waiting_changes_nothing_material():

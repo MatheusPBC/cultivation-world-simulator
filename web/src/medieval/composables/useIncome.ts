@@ -28,8 +28,14 @@ export function useIncome() {
       name: data.value.map.sites.find(s => s.id === (research?.site_id ?? facility?.site_id))?.name ?? p.id,
       workers: Object.values(p.workers_by_group).reduce((sum, count) => sum + count, 0), net: p.gross - p.tax }
   }))
+  const employmentContracts = computed(() => data.value.economy.employment_contracts.map(contract => ({
+    ...contract,
+    employer: entityName(data.value, contract.employer_ref),
+    cohort: data.value.society.population_groups.find(group => group.id === contract.cohort_id),
+    workSite: data.value.map.sites.find(site => site.id === contract.work_site_id)?.name ?? contract.work_site_id,
+  })))
   const policies = computed(() => data.value.governance.tax_policies.map(p => ({ ...p,
     name: entityName(data.value, { kind: 'polity', id: p.id }) })))
   const source = (id: string | null) => { if (id) store.focusEventId = id }
-  return { savings, totalSavings, payrolls, policies, source }
+  return { savings, totalSavings, payrolls, employmentContracts, policies, source }
 }

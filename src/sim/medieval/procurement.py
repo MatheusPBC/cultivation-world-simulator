@@ -18,6 +18,7 @@ from .demand import objective_target
 from .tariffs import export_fee
 
 SUPPLY_OBJECTIVE_ACTION = "execute_supply_objective"
+MARKET_PURCHASE_ACTION = "purchase_market_offer"
 
 
 def _account(world, actor_ref):
@@ -101,16 +102,21 @@ def _offers(world, objective, inventory, reasons):
             reasons.append("sem rota conhecida até a origem")
             evidence.extend(consulted)
             continue
-        route_option = route_options[0]
         rate = (0 if report.export_collector_ref is not None
                 and report.export_collector_ref.id == world.society.settlements[objective.settlement_id].administrator_id
                 else report.export_rate_permille)
         price = 0 if source.owner_ref == objective.actor_ref else report.unit_price
-        # Compare the buyer's known all-in marginal quote, retaining base price
-        # separately for the material executor's one-order ceiling calculation.
-        result.append((price * (1000 + rate) + route_option.estimated_customs_fee * 1000,
-                       len(route_option.route_ids), report.stock_id, amount, route_option, report))
-    return sorted(result, key=lambda value: value[:3]), tuple(dict.fromkeys(evidence))
+        # Keep every currently known fiscal path.  The actor-facing menu may
+        # choose among them; the monthly policy will still take the first
+        # sorted candidate deterministically.  Route cost is part of the
+        # engine-owned ordering, never a provider-supplied term.
+        for route_option in route_options:
+            # Compare the buyer's known all-in marginal quote, retaining base
+            # price separately for the material executor's one-order ceiling.
+            result.append((price * (1000 + rate) + route_option.estimated_customs_fee * 1000,
+                           len(route_option.route_ids), report.stock_id,
+                           tuple(route_option.route_ids), amount, route_option, report))
+    return sorted(result, key=lambda value: value[:4]), tuple(dict.fromkeys(evidence))
 
 
 def _review_objective(world, objective):
@@ -136,7 +142,7 @@ def _review_objective(world, objective):
     plan = _set_plan(world, objective, "acquire", order_ids=[o.id for o in pending], causes=(inventory.event_id,))
     order_ids, reasons, response_causes = list(plan.order_ids), [], []
     offers, closed_routes = _offers(world, objective, inventory, reasons)
-    for _, _, source_id, available, _, report in offers:
+    for _, _, source_id, _route_key, available, offered_route, report in offers:
         if missing <= 0:
             break
         quantity = min(missing, available)
@@ -147,11 +153,15 @@ def _review_objective(world, objective):
             quantity = min(quantity, max(0, source.goods.get(resource_id, 0) - reserve_quantity(world, source_id, resource_id)))
             if quantity <= 0:
                 continue
-            route_option = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
-            if not route_option:
+            route_options = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
+            if not route_options:
                 reasons.append("sem rota conhecida até a origem")
                 continue
-            route_option = route_option[0]
+            route_option = next((item for item in route_options
+                                 if item.route_ids == offered_route.route_ids), None)
+            if route_option is None:
+                reasons.append("rota observada deixou de ser válida")
+                continue
             path, evidence = route_option.route_ids, _route_evidence(route_option)
             decision_terms = {"action": "freight", "actor_ref": actor.to_dict(), "source_id": source_id,
                               "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
@@ -181,11 +191,20 @@ def _review_objective(world, objective):
             if quantity <= 0:
                 reasons.append("saldo insuficiente")
                 continue
-            route_option = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
-            if not route_option:
+            route_options = fiscal_route_options(world, actor, source_id, stock.id, resource_id, quantity)
+            if not route_options:
                 reasons.append("sem rota conhecida até a origem")
                 continue
-            route_option = route_option[0]
+            # Keep the route that made this offer visible.  The fallback may
+            # see several legal paths, but silently replacing the selected
+            # route with the first recomposed path could ignore the dated
+            # fiscal evidence used to rank the offer and produce a different
+            # material choice than the actor-facing menu.
+            route_option = next((item for item in route_options
+                                 if item.route_ids == offered_route.route_ids), None)
+            if route_option is None:
+                reasons.append("rota observada deixou de ser válida")
+                continue
             path, evidence = route_option.route_ids, _route_evidence(route_option)
             fee = export_fee(quantity, price, quote["export_rate_permille"])
             terms = {"source_id": source_id, "destination_id": stock.id, "resource_id": resource_id, "quantity": quantity,
@@ -213,16 +232,18 @@ def _review_objective(world, objective):
                       *(world.economy.freight_orders[oid].last_event_id for oid in order_ids)])
 
 
-def review_supply(world, *, exclude_objective_ids=()):
+def review_supply(world, *, exclude_objective_ids=(), excluded_actors=()):
     """Monthly policy boundary; no RNG, LLM calls or required quota of conflicts.
 
     ``exclude_objective_ids`` lets a concurrent, actor-facing review claim an
     objective for this same boundary; the automatic pass then leaves it alone
     instead of silently executing behind a menu the actor already saw.
     """
+    excluded = set(excluded_actors)
     for objective in sorted((item for item in world.strategy.objectives.values()
                              if item.kind != "defend_occupied_settlement"
-                             and item.id not in exclude_objective_ids),
+                             and item.id not in exclude_objective_ids
+                             and item.actor_ref not in excluded),
                             key=lambda o: (o.kind != "maintain_food_reserve", o.id)):
         _review_objective(world, objective)
 
@@ -242,7 +263,152 @@ class SupplyObjectiveOption:
 
     def decision(self):
         return {"action": SUPPLY_OBJECTIVE_ACTION, "actor_ref": self.actor_ref.to_dict(),
-                "objective_id": self.objective_id}
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class MarketPurchaseOption:
+    """One explicit, transient purchase selected from a current market quote.
+
+    The option contains the engine-owned terms so the executor can revalidate
+    them, but its decision deliberately carries only the selected ID.  A
+    caller may present this menu to an actor without granting it authority to
+    invent a supplier, quantity, price or route.
+    """
+
+    id: Identity
+    actor_ref: EntityRef
+    objective_id: Identity
+    offer_id: Identity
+    source_id: Identity
+    destination_id: Identity
+    resource_id: Identity
+    quantity: int
+    unit_price: int
+    quote_day: int
+    route_ids: tuple[Identity, ...]
+    route_option_id: Identity | None
+    buyer_account_id: Identity
+    seller_account_id: Identity
+    export_rate_permille: int
+    export_policy_event_id: Identity | None
+    export_collector_ref: dict | None
+    total_price: int
+
+    def decision(self):
+        return {"action": MARKET_PURCHASE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+def market_purchase_options(world, actor):
+    """Enumerate external offers that can close one real current objective.
+
+    This is intentionally a read-only menu.  It is not called by the monthly
+    policy and it does not choose on behalf of an actor; execution is an
+    explicit decision followed by the ordinary bilateral market executor.
+    """
+    if (not isinstance(actor, EntityRef) or actor.kind != "polity"
+            or not can_actor_act_for(world, actor, actor, "supply")
+            or not can_actor_act_for(world, actor, actor, "trade")):
+        return ()
+    result = []
+    for objective in sorted(world.strategy.objectives.values(), key=lambda item: item.id):
+        if objective.actor_ref != actor:
+            continue
+        inventory = next((report for report in world.knowledge.for_actor(actor)
+                          if report.kind == "inventory" and report.stock_id == objective.stock_id
+                          and report.resource_id == objective.resource_id
+                          and report.observed_day == world.clock.absolute_day), None)
+        if inventory is None:
+            continue
+        pending = sum(order.quantity - order.delivered_quantity
+                      for order in _pending_orders(world, objective.stock_id, objective.resource_id))
+        missing = max(0, objective_target(world, objective) - inventory.quantity - pending)
+        if missing <= 0:
+            continue
+        buyer = _account(world, actor)
+        if buyer is None or buyer.balance <= 0:
+            continue
+        offers, _ = _offers(world, objective, inventory, [])
+        for _, _, source_id, _route_key, available, offered_route, report in offers:
+            source = world.economy.stocks[source_id]
+            if source.owner_ref == actor:
+                continue
+            seller = _account(world, source.owner_ref)
+            if seller is None:
+                continue
+            quote = {"export_rate_permille": report.export_rate_permille,
+                     "export_policy_event_id": report.export_policy_event_id,
+                     "export_collector_ref": (report.export_collector_ref.to_dict()
+                                              if report.export_collector_ref is not None else None)}
+            destination_admin = world.society.settlements[inventory.stock_id.split(":", 1)[1]].administrator_id
+            if quote["export_collector_ref"] is not None and quote["export_collector_ref"]["id"] == destination_admin:
+                quote = {"export_rate_permille": 0, "export_policy_event_id": None,
+                         "export_collector_ref": None}
+            quantity = min(missing, available,
+                           buyer.balance * 1000 // (report.unit_price * (1000 + quote["export_rate_permille"])))
+            if quantity <= 0:
+                continue
+            route_options = fiscal_route_options(world, actor, source_id, objective.stock_id,
+                                                 objective.resource_id, quantity)
+            route_option = next((item for item in route_options
+                                 if item.route_ids == offered_route.route_ids), None)
+            if route_option is None:
+                continue
+            fee = export_fee(quantity, report.unit_price, quote["export_rate_permille"])
+            total = quantity * report.unit_price + fee
+            route_option_id = route_option.id if route_option.fiscal_route_report_ids else None
+            basis = f"{report.id}:{report.event_id}:{route_option.id}:{inventory.event_id}"
+            result.append(MarketPurchaseOption(
+                id=f"market-purchase:{actor.id}:{objective.id}:{source_id}:{objective.resource_id}:{quantity}:{basis}",
+                actor_ref=actor, objective_id=objective.id, offer_id=report.id, source_id=source_id,
+                destination_id=objective.stock_id, resource_id=objective.resource_id, quantity=quantity,
+                unit_price=report.unit_price, quote_day=report.quote_day, route_ids=route_option.route_ids,
+                route_option_id=route_option_id, buyer_account_id=buyer.id, seller_account_id=seller.id,
+                **quote, total_price=total))
+    return tuple(sorted(result, key=lambda item: item.id))
+
+
+def execute_market_purchase_option(world, actor, option_id, decision_event_id):
+    """Execute one selected market option; no monthly or narrative fallback."""
+    decision = next((event for event in world.events if event.id == decision_event_id), None)
+    option = next((item for item in market_purchase_options(world, actor) if item.id == option_id), None)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+        raise ValueError("market purchase option is stale or unknown")
+    offer = world.knowledge.reports.get(option.offer_id)
+    if offer is None or offer.event_id is None:
+        raise ValueError("market purchase option lacks current offer evidence")
+    route_causes = []
+    for route_id in option.route_ids:
+        physical = world.knowledge.route_report(actor, route_id)
+        fiscal = world.knowledge.fiscal_route_report(actor, route_id)
+        route_causes.extend(item.event_id for item in (physical, fiscal) if item is not None)
+    terms = {"source_id": option.source_id, "destination_id": option.destination_id,
+             "resource_id": option.resource_id, "quantity": option.quantity,
+             "unit_price": option.unit_price, "quote_day": option.quote_day,
+             "route_ids": list(option.route_ids), "seller_account_id": option.seller_account_id,
+             "buyer_account_id": option.buyer_account_id,
+             "export_rate_permille": option.export_rate_permille,
+             "export_policy_event_id": option.export_policy_event_id,
+             "export_collector_ref": option.export_collector_ref,
+             "total_price": option.total_price}
+    if option.route_option_id is not None:
+        terms["route_option_id"] = option.route_option_id
+    buy_decision = record_event(
+        world, "buy_decided", "O ator aceitou uma oferta de mercado enumerada pelo engine.",
+        fact_kind=FactKind.DECISION,
+        decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},
+        cause_ids=_causes(decision.id, offer.event_id, *route_causes))
+    seller_decision_id = consider_sale(world, terms, buy_decision.id)
+    if seller_decision_id is None:
+        return None
+    order = purchase(world, buy_decision.id, seller_decision_id)
+    objective = world.strategy.objectives[option.objective_id]
+    previous = world.strategy.plans.get(f"plan:{objective.id}")
+    _set_plan(world, objective, "await_delivery", order_ids=(*((previous.order_ids if previous else ())), order.id),
+              causes=(order.last_event_id,))
+    return order
 
 
 def _would_open_an_order(world, objective_id):

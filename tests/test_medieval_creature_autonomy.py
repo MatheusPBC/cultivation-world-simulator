@@ -8,7 +8,7 @@ from src.sim.medieval.creature_policy import REVIEW_KIND
 from src.sim.medieval.creatures import creature_options, tribute_options
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from src.run.medieval_creatures import DRAKE_ID, ROUTE_ID
+from src.run.medieval_creatures import DRAKE_ECHO_ID, DRAKE_ID, ROUTE_ID
 from tests.test_medieval_creatures import buy_across_the_river, crossed_world
 from tests.test_medieval_logistics import total_food
 
@@ -37,15 +37,21 @@ def provider(monkeypatch, decide):
 
 
 def choose(kind_marker):
-    """Pick the first offered choice whose label matches, else do nothing."""
+    """Pick the primary drake's choice; leave the second individual independent."""
     def decide(prompt):
         import json
         payload = json.loads(prompt[prompt.index("{"):])
+        if payload.get("you_are", {}).get("id") == DRAKE_ECHO_ID:
+            return {"selected_id": "NO_ACTION"}
         for choice in payload["choices"]:
             if kind_marker in choice["label"]:
                 return {"selected_id": choice["id"]}
         return {"selected_id": "NO_ACTION"}
     return decide
+
+
+def primary_creature_prompts(prompts):
+    return [prompt for prompt in prompts if f'"id": "{DRAKE_ID}"' in prompt]
 
 
 async def hungry_world():
@@ -162,7 +168,8 @@ async def test_many_real_crossings_do_not_fan_out_reviews_while_demand_is_open(m
                 and not any(item["kind"] == REVIEW_KIND for item in world.agenda.to_dict())):
             break
 
-    creature_prompts = [prompt for prompt in prompts if '"crossings_you_saw"' in prompt]
+    creature_prompts = [prompt for prompt in primary_creature_prompts(prompts)
+                        if '"crossings_you_saw"' in prompt]
     assert world.creatures.creatures[DRAKE_ID].perceived_crossings > crossings_before
     assert len(creature_prompts) == 1, "only the bounded deadline can offer retaliation"
     assert not any(item["kind"] == REVIEW_KIND for item in world.agenda.to_dict())
@@ -181,7 +188,8 @@ async def test_ignored_expired_demand_stops_reviews_and_keeps_route_open(monkeyp
 
     while world.clock.absolute_day < demand.due_day:
         await engine.step()
-    creature_calls = len([prompt for prompt in prompts if '"crossings_you_saw"' in prompt])
+    creature_calls = len([prompt for prompt in primary_creature_prompts(prompts)
+                          if '"crossings_you_saw"' in prompt])
     assert demand.stage == "open" and demand.due_day <= world.clock.absolute_day
     assert world.map.routes[ROUTE_ID].enabled
 
@@ -190,6 +198,7 @@ async def test_ignored_expired_demand_stops_reviews_and_keeps_route_open(monkeyp
     for _ in range(10):
         await engine.step()
 
-    assert len([prompt for prompt in prompts if '"crossings_you_saw"' in prompt]) == creature_calls
+    assert len([prompt for prompt in primary_creature_prompts(prompts)
+                if '"crossings_you_saw"' in prompt]) == creature_calls
     assert not any(item["kind"] == REVIEW_KIND for item in world.agenda.to_dict())
     assert world.map.routes[ROUTE_ID].enabled

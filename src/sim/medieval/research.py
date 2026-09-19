@@ -72,9 +72,13 @@ def learn_technology(world, owner, technology_id, channel, causes):
         return
     key = f'technology:{owner.kind}:{owner.id}:{technology_id}'
     technology = world.research.technologies[technology_id]
+    if any(not world.knowledge.knows(owner, prerequisite) for prerequisite in technology.prerequisites):
+        raise ValueError("technology prerequisites are not known by the learner")
     event = record_event(world, {'research': 'technology_discovered', 'teaching': 'technology_taught',
                                  'apprenticeship': 'technology_apprenticed',
-                                 'copied': 'technique_copy_completed'}[channel],
+                                 'copied': 'technique_copy_completed',
+                                 'sale': 'technology_sold',
+                                 'stolen': 'technology_stolen'}[channel],
         f'{technology.name}: conhecimento adquirido; instalações e equipamentos não foram criados.',
         fact_kind=FactKind.STATE_TRANSITION, cause_ids=causes,
         deltas=(_delta('technical_knowledge', key, 'technology_id', None, technology_id),))

@@ -15,7 +15,24 @@
       "capacity_gain": 0,
       "required_technology_id": "irrigation",
       "from_recipe_id": "harvest",
-      "to_recipe_id": "irrigated_harvest"
+      "to_recipe_id": "irrigated_harvest",
+      "required_site_capabilities": ["water_management"]
+    },
+    {
+      "id": "crop-rotation-works",
+      "name": "Talhões em rotação",
+      "inputs": {
+        "wood": 2,
+        "tools": 1
+      },
+      "workers_per_unit": 2,
+      "wage_per_worker": 2,
+      "required_units": 10,
+      "monthly_units": 5,
+      "capacity_gain": 0,
+      "required_technology_id": "crop_rotation",
+      "from_recipe_id": "irrigated_harvest",
+      "to_recipe_id": "rotated_harvest"
     },
     {
       "id": "efficient-furnaces",
@@ -196,98 +213,112 @@
       "name": "Alimentos",
       "unit": "ração pessoa/mês",
       "bulk": 1,
-      "base_price": 4
+      "base_price": 4,
+      "trade_class": "ordinary"
     },
     {
       "id": "wood",
       "name": "Madeira",
       "unit": "feixe",
       "bulk": 2,
-      "base_price": 6
+      "base_price": 6,
+      "trade_class": "ordinary"
     },
     {
       "id": "stone",
       "name": "Pedra",
       "unit": "bloco",
       "bulk": 3,
-      "base_price": 5
+      "base_price": 5,
+      "trade_class": "ordinary"
     },
     {
       "id": "iron",
       "name": "Ferro",
       "unit": "lingote",
       "bulk": 2,
-      "base_price": 12
+      "base_price": 12,
+      "trade_class": "ordinary"
     },
     {
       "id": "tools",
       "name": "Ferramentas",
       "unit": "conjunto",
       "bulk": 2,
-      "base_price": 40
+      "base_price": 40,
+      "trade_class": "ordinary"
     },
     {
       "id": "weapons",
       "name": "Armamentos",
       "unit": "conjunto",
       "bulk": 3,
-      "base_price": 60
+      "base_price": 60,
+      "trade_class": "contraband"
     },
     {
       "id": "medicine",
       "name": "Medicamentos",
       "unit": "dose",
       "bulk": 1,
-      "base_price": 15
+      "base_price": 15,
+      "trade_class": "ordinary"
     },
     {
       "id": "reagents",
       "name": "Reagentes",
       "unit": "frasco",
       "bulk": 1,
-      "base_price": 20
+      "base_price": 20,
+      "trade_class": "ordinary"
     },
     {
       "id": "crystals",
       "name": "Cristais mágicos",
       "unit": "cristal",
       "bulk": 1,
-      "base_price": 80
+      "base_price": 80,
+      "trade_class": "ordinary"
     },
     {
       "id": "coal",
       "name": "Carvão",
       "unit": "saco",
       "bulk": 2,
-      "base_price": 8
+      "base_price": 8,
+      "trade_class": "ordinary"
     },
     {
       "id": "sulfur",
       "name": "Enxofre",
       "unit": "saco",
       "bulk": 1,
-      "base_price": 18
+      "base_price": 18,
+      "trade_class": "contraband"
     },
     {
       "id": "saltpeter",
       "name": "Salitre",
       "unit": "saco",
       "bulk": 1,
-      "base_price": 18
+      "base_price": 18,
+      "trade_class": "contraband"
     },
     {
       "id": "steel",
       "name": "Aço",
       "unit": "lingote",
       "bulk": 2,
-      "base_price": 36
+      "base_price": 36,
+      "trade_class": "ordinary"
     },
     {
       "id": "steam_engines",
       "name": "Motores a vapor",
       "unit": "máquina",
       "bulk": 15,
-      "base_price": 240
+      "base_price": 240,
+      "trade_class": "ordinary"
     }
   ],
   "recipes": [
@@ -299,6 +330,16 @@
       "inputs": {},
       "outputs": {
         "food": 120
+      }
+    },
+    {
+      "id": "rotated_harvest",
+      "capability_id": "food_production",
+      "occupation": "farmer",
+      "workers": 10,
+      "inputs": {},
+      "outputs": {
+        "food": 150
       }
     },
     {
@@ -424,7 +465,70 @@
       "recipe_id": "harvest",
       "max_batches": 140,
       "payroll_account_id": "treasury:auren",
-      "wage_per_worker": 1
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-pedra-clara",
+      "site_id": "campos-de-pedra-clara",
+      "stock_id": "stock:pedraclara",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:auren",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-ferroalto",
+      "site_id": "campos-de-ferroalto",
+      "stock_id": "stock:ferroalto",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:escarlia",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-pontenegro",
+      "site_id": "campos-de-pontenegro",
+      "stock_id": "stock:pontenegro",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:auren",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-salgueiro",
+      "site_id": "campos-de-salgueiro",
+      "stock_id": "stock:salgueiro",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:valedouro",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-portovelho",
+      "site_id": "campos-de-portovelho",
+      "stock_id": "stock:portovelho",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:valedouro",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-cinzaverde",
+      "site_id": "campos-de-cinzaverde",
+      "stock_id": "stock:cinzaverde",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:escarlia",
+      "wage_per_worker": 4
+    },
+    {
+      "id": "works:campos-de-brumafria",
+      "site_id": "campos-de-brumafria",
+      "stock_id": "stock:brumafria",
+      "recipe_id": "harvest",
+      "max_batches": 120,
+      "payroll_account_id": "treasury:escarlia",
+      "wage_per_worker": 4
     },
     {
       "id": "works:bosques-de-salgueiro",

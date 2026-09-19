@@ -46,6 +46,18 @@ def test_families_pay_only_whole_received_rations_and_unpaid_demand_stays_missin
     assert all(not e.deltas for e in decisions)
     final = next(e for e in world.events if e.id == world.economy.needs["pedraclara"].last_event_id)
     assert purchase.id in {c.cause_event_id for c in final.causal_links}
+    assert final.causal_payload["subsistence"] == {
+        "settlement_id": "pedraclara",
+        "required": 2400,
+        "public_required": 2400,
+        "domestic_quantity": 0,
+        "purchased_quantity": 2,
+        "missing_food": 2398,
+        "household_group_ids": sorted(
+            group.id for group in world.society.population.values()
+            if group.settlement_id == "pedraclara"
+        ),
+    }
 
 
 def test_empty_granary_cannot_charge_savings():
@@ -106,7 +118,10 @@ async def test_income_consumption_finances_next_production_month_and_resumes(tmp
     resumed = load_world(path)
     await MedievalSimulator(world).step()
     await MedievalSimulator(resumed).step()
-    assert world.clock.absolute_day == 60
+    # The monthly institutional turn may leave a dated diplomacy review for
+    # the next day; save/load must preserve that real deadline instead of
+    # skipping to the next month boundary.
+    assert world.clock.absolute_day == 31
     assert world.economy.facilities[farm_id].last_batches == 2
     assert world.economy.payrolls[farm_id].gross == 40
     assert total_money(world) == before

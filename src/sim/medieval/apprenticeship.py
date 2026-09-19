@@ -40,6 +40,7 @@ class ApprenticeshipOfferOption:
     technology_id: Identity
     settlement_id: Identity
     site_id: Identity
+    source_event_ids: tuple[Identity, ...] = ()
 
     def decision(self):
         return {"action": OFFER_ACTION, "actor_ref": EntityRef("character", self.specialist_id).to_dict(),
@@ -98,16 +99,64 @@ def _residence(world, character):
 
 
 def _has_migrated(world, character, settlement_id):
-    """A completed journey moved this person here; residence alone is not enough."""
-    return any(delta.owner_kind == "character" and delta.owner_id == character.id
-               and delta.aspect == "location_id" and delta.after == settlement_id
-               and delta.before != settlement_id
-               for event in world.events for delta in event.deltas)
+    """A completed material journey moved this person here.
+
+    Residence or an arbitrary relocation receipt is not enough to unlock
+    migration-based diffusion.  The evidence must come from the migration
+    owner, which is the only owner allowed to emit an arrival/return receipt
+    for this channel.
+    """
+    return any(event.event_type in {"migration_arrived", "migration_returned"}
+               and any(delta.owner_kind == "character" and delta.owner_id == character.id
+                       and delta.aspect == "location_id" and delta.after == settlement_id
+                       and delta.before != settlement_id for delta in event.deltas)
+               for event in world.events)
+
+
+def _migration_source(world, character, settlement_id):
+    """Return the dated move and the institution the specialist left."""
+    for event in reversed(world.events):
+        if event.event_type not in {"migration_arrived", "migration_returned"}:
+            continue
+        moved = next((delta for delta in event.deltas
+                      if delta.owner_kind == "character" and delta.owner_id == character.id
+                      and delta.aspect == "location_id" and delta.after == settlement_id
+                      and delta.before != settlement_id), None)
+        if moved is None:
+            continue
+        group_delta = next((delta for delta in event.deltas
+                            if delta.owner_kind == "character" and delta.owner_id == character.id
+                            and delta.aspect == "population_group_id"), None)
+        source_group = world.society.population.get(group_delta.before) if group_delta else None
+        source_settlement = (world.society.settlements.get(source_group.settlement_id)
+                             if source_group is not None else None)
+        source_owner = (EntityRef("polity", source_settlement.administrator_id)
+                        if source_settlement is not None and source_settlement.administrator_id else None)
+        return event, source_owner
+    return None, None
 
 
 def _took_part(world, specialist_id, technology_id):
     return any(project.researcher_id == specialist_id and project.technology_id == technology_id
                and project.stage == "completed" for project in world.research.projects.values())
+
+
+def _source_evidence(world, character, technology_id, settlement_id):
+    """Evidence that a moved specialist can carry a known technique."""
+    migration_event, source_owner = _migration_source(world, character, settlement_id)
+    if migration_event is None or source_owner is None:
+        return ()
+    source_knowledge = next((item for item in world.knowledge.technologies.values()
+                             if item.owner_ref == source_owner and item.technology_id == technology_id), None)
+    if source_knowledge is None:
+        return ()
+    knowledge_event = _event(world, source_knowledge.event_id)
+    if knowledge_event is None or knowledge_event.day > migration_event.day:
+        return ()
+    # A resident with the required, current skill can carry institutional
+    # practice even when another named researcher completed the source project;
+    # skill is the material gate, not a narrative occupation label.
+    return (migration_event.id, source_knowledge.event_id)
 
 
 def _busy(world, specialist_id):
@@ -133,7 +182,8 @@ def specialist_offer_options(world, specialist_id):
     day = world.clock.absolute_day
     options = []
     for technology_id, technology in sorted(world.research.technologies.items()):
-        if (world.knowledge.knows(host, technology_id) or not _took_part(world, specialist_id, technology_id)
+        source_event_ids = _source_evidence(world, character, technology_id, settlement.id)
+        if (world.knowledge.knows(host, technology_id) or not source_event_ids
                 or getattr(character.skills, technology.skill) < technology.min_skill
                 or any(not world.knowledge.knows(host, other) for other in technology.prerequisites)):
             continue
@@ -143,7 +193,7 @@ def specialist_offer_options(world, specialist_id):
         options.append(ApprenticeshipOfferOption(
             id=f"apprenticeship-offer:{specialist_id}:{host.id}:{technology_id}:{settlement.id}:{site.id}:{day}",
             specialist_id=specialist_id, host_ref=host, technology_id=technology_id,
-            settlement_id=settlement.id, site_id=site.id))
+            settlement_id=settlement.id, site_id=site.id, source_event_ids=source_event_ids))
     return tuple(options)
 
 
@@ -156,7 +206,8 @@ def record_apprenticeship_offer(world, specialist_id, option_id):
         raise ValueError("apprenticeship offer decision already exists")
     return record_event(world, "apprenticeship_offered",
                         "Um especialista residente ofereceu instruir a instituição local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        cause_ids=option.source_event_ids)
 
 
 def _sponsored(world, offer_event_id):

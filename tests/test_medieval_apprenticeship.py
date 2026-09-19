@@ -8,7 +8,7 @@ from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.apprenticeship import (apprenticeship_sponsor_options, record_apprenticeship_offer,
-                                             resolve_apprenticeships, specialist_offer_options,
+                                             _has_migrated, resolve_apprenticeships, specialist_offer_options,
                                              sponsor_apprenticeship)
 from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.events import record_event
@@ -59,14 +59,14 @@ def hosting_world():
     world, lead = trained_specialist_world()
     site = world.map.infrastructure_sites["bosques-de-salgueiro"]
     world.map.infrastructure_sites[site.id] = replace(
-        site, capability_ids=(*site.capability_ids, "food_production"))
+        site, capability_ids=(*site.capability_ids, "food_production", "water_management"))
     farm = world.economy.facilities["works:campos-do-lume"]
     world.economy.facilities["works:salgueiro-farm"] = farm.model_copy(update={
         "id": "works:salgueiro-farm", "site_id": "bosques-de-salgueiro", "stock_id": "stock:salgueiro",
         "payroll_account_id": "treasury:valedouro", "last_event_id": None, "last_batches": 0,
         "last_limitations": ()})
     group = world.society.population[lead.population_group_id]
-    record_event(world, "specialist_relocated", "Um especialista mudou de residência.",
+    record_event(world, "migration_arrived", "Um especialista chegou por uma jornada material.",
                  fact_kind=FactKind.STATE_TRANSITION,
                  deltas=(_delta("character", lead.id, "location_id", lead.location_id, "salgueiro"),
                          _delta("character", lead.id, "population_group_id", lead.population_group_id,
@@ -74,6 +74,14 @@ def hosting_world():
     world.society.transfer_people(group.id, "salgueiro", group.occupation, 1, character_ids=(lead.id,))
     world.economy.validate(world)
     return world, world.society.characters[lead.id]
+
+
+def test_arbitrary_relocation_receipt_does_not_count_as_migration():
+    world, lead = trained_specialist_world()
+    record_event(world, "specialist_relocated", "Um especialista mudou de residência.",
+                 fact_kind=FactKind.STATE_TRANSITION,
+                 deltas=(_delta("character", lead.id, "location_id", lead.location_id, "salgueiro"),))
+    assert not _has_migrated(world, lead, "salgueiro")
 
 
 def contracted(world, specialist):
@@ -132,6 +140,20 @@ def test_a_migrated_specialist_instructs_for_real_wages_before_any_technique_exi
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
 
+def test_irrigation_application_requires_authored_water_management_capacity():
+    world, specialist = hosting_world()
+    offer, sponsor_option, contract = contracted(world, specialist)
+    world.clock = world.clock.advance(30)
+    resolve_apprenticeships(world, world.agenda.pop_due(world.clock.absolute_day))
+    site = world.map.infrastructure_sites["bosques-de-salgueiro"]
+    world.map.infrastructure_sites[site.id] = replace(
+        site, capability_ids=tuple(capability for capability in site.capability_ids
+                                   if capability != "water_management"))
+
+    with pytest.raises(ValueError, match="site capabilities|capable site"):
+        expand(world)
+
+
 def test_no_shortcut_grants_the_technique():
     world, specialist = hosting_world()
     offer_option = next(item for item in specialist_offer_options(world, specialist.id)
@@ -176,3 +198,25 @@ def test_no_shortcut_grants_the_technique():
     assert world.research.apprenticeships[contract.id].stage == "failed"
     assert not world.knowledge.knows(HOST, TECHNOLOGY)
     assert contract.id not in world.economy.payrolls
+
+
+def test_migrated_artisan_can_carry_source_institution_knowledge_without_research_credit():
+    world, lead = hosting_world()
+    artisan = next(character for character in world.society.characters.values()
+                   if character.id != lead.id and character.location_id == "campomanso"
+                   and character.death_day is None)
+    artisan = artisan.model_copy(update={"skills": artisan.skills.model_copy(update={"craftsmanship": 40})})
+    world.society.characters[artisan.id] = artisan
+    source_group = world.society.population[artisan.population_group_id]
+    record_event(world, "migration_arrived", "Um artesão chegou com prática da instituição de origem.",
+                 fact_kind=FactKind.STATE_TRANSITION,
+                 deltas=(_delta("character", artisan.id, "location_id", artisan.location_id, "salgueiro"),
+                         _delta("character", artisan.id, "population_group_id", artisan.population_group_id,
+                                f"pop:salgueiro:{source_group.people}:{source_group.occupation}")))
+    world.society.transfer_people(source_group.id, "salgueiro", source_group.occupation, 1,
+                                  character_ids=(artisan.id,))
+    option = next(item for item in specialist_offer_options(world, artisan.id)
+                  if item.technology_id == TECHNOLOGY)
+    assert option.source_event_ids
+    offer = record_apprenticeship_offer(world, artisan.id, option.id)
+    assert {link.cause_event_id for link in offer.causal_links} == set(option.source_event_ids)

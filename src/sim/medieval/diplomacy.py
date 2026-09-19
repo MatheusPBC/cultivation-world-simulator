@@ -23,7 +23,8 @@ def disclose(world, proposal, event):
 
 
 def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, *, decision_event_id,
-                   parent_id=None, intent=None, proposal_kind='negotiated', request_affordance_id=None):
+                   parent_id=None, intent=None, proposal_kind='negotiated', request_affordance_id=None,
+                   extra_cause_ids=()):
     """``intent`` lets a vertical authorize the offer with its own affordance
     decision shape; the decision still has to be this actor's exact current one."""
     world.relations.validate(world)
@@ -50,7 +51,10 @@ def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, 
         changes.append(_delta('diplomacy', parent.id, 'status', 'offered', 'superseded'))
     event = record_event(world, 'diplomatic_offer_delivered', 'Condições diplomáticas entregues à contraparte.',
         fact_kind=FactKind.STATE_TRANSITION, deltas=changes,
-        cause_ids=(decision_event_id, parent.last_event_id) if parent else (decision_event_id,))
+        cause_ids=tuple(dict.fromkeys(
+            ((decision_event_id, parent.last_event_id) if parent else (decision_event_id,))
+            + tuple(extra_cause_ids)
+        )))
     p = p.model_copy(update={'last_event_id': event.id})
     if parent:
         world.relations.proposals[parent.id] = parent.model_copy(update={'status':'superseded', 'last_event_id':event.id})

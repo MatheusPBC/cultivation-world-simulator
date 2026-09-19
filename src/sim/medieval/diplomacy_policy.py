@@ -1,14 +1,19 @@
 """Conservative teaching bargains; separate actors decide from their own context."""
 from dataclasses import dataclass
+from copy import deepcopy
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.diplomacy import PaymentClause, TeachingClause, offer_intent
 from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 from .events import record_event
-from .diplomacy import offer_proposal, respond_proposal
+from .diplomacy import disclose, offer_proposal, respond_proposal
 from .diplomacy_context import diplomatic_context
 from .commitments import fulfill_obligation, repudiate_obligation
+from .economy import _delta, transfer_money
+from .institutional_memory import (apply_memory_creation, apply_reinforcement,
+                                   memory_creation_deltas, memories_of, reinforcement_deltas)
 from . import ai_decider
 from .ai_decider import NO_ACTION, select_option
 from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
@@ -20,10 +25,17 @@ from .technology_sighting import (DISCLOSE_TECHNOLOGY_ACTION, disclosure_options
 OFFER_ACTION = 'offer_teaching_bargain'
 REQUEST_ACTION = 'request_teaching_bargain'
 RESPONSE_ACTION = 'respond_teaching_bargain'
+BARGAIN_ATTEMPT_EVENT_TYPE = 'diplomatic_bargain_attempted'
 PAY_ACTION = 'fulfill_teaching_payment'
 TEACH_ACTION = 'fulfill_promised_teaching'
 LEARN_ACTION = 'accept_promised_teaching'
 REPUDIATE_ACTION = 'repudiate_obligation'
+RENEGOTIATE_ACTION = 'renegotiate_breached_obligation'
+REMEDIATE_PAYMENT_ACTION = 'remediate_payment_obligation'
+REMEDIATE_TEACHING_ACTION = 'remediate_teaching_obligation'
+RENEGOTIATION_DAYS = 45
+RENEGOTIATION_EXPIRES_DAYS = 30
+PERSUADE_ACTION = 'persuade_proposal'
 
 
 @dataclass(frozen=True)
@@ -49,6 +61,70 @@ class TeachingDiplomacyOption:
         return (self.evidence_event_id,) if self.evidence_event_id else ()
 
 
+@dataclass(frozen=True)
+class RenegotiationOption:
+    """A creditor's one bounded attempt to reopen a breached payment term.
+
+    The original obligation is terminal history.  Accepting this new offer,
+    if the debtor chooses to do so later, creates a separate obligation.
+    """
+    id: str
+    actor_ref: EntityRef
+    obligation_id: str
+    proposal_id: str
+    counterparty_ref: EntityRef
+    clause: PaymentClause | TeachingClause
+    expires_day: int
+    breach_event_id: str
+
+    def decision(self):
+        return {'action': RENEGOTIATE_ACTION, 'actor_ref': self.actor_ref.to_dict(),
+                'selected_affordance_id': self.id}
+
+    def causes(self):
+        return (self.breach_event_id,)
+
+
+@dataclass(frozen=True)
+class PaymentRemediationOption:
+    """A debtor's bounded, material answer to a known payment breach."""
+    id: str
+    actor_ref: EntityRef
+    obligation_id: str
+    source_account_id: str
+    target_account_id: str
+    amount: int
+    breach_event_id: str
+
+    def decision(self):
+        return {'action': REMEDIATE_PAYMENT_ACTION, 'actor_ref': self.actor_ref.to_dict(),
+                'selected_affordance_id': self.id}
+
+    def causes(self):
+        return (self.breach_event_id,)
+
+
+@dataclass(frozen=True)
+class PersuasionOption:
+    """A dated attempt to keep an open proposal salient for its counterparty."""
+    id: str
+    actor_ref: EntityRef
+    proposal_id: str
+    counterparty_ref: EntityRef
+    proposal_event_id: str
+
+    @property
+    def action(self):
+        return PERSUADE_ACTION
+
+    def decision(self):
+        return {'action': PERSUADE_ACTION, 'actor_ref': self.actor_ref.to_dict(),
+                'selected_affordance_id': self.id}
+
+    def causes(self):
+        return (self.proposal_event_id,)
+
+
 def schedule_review(world):
     day = world.clock.absolute_day + 1
     identity = f'diplomatic-review:{day}'
@@ -72,9 +148,37 @@ def teaching_bargain(proposal):
     return payment, lesson
 
 
+def teaching_only_term(proposal):
+    """Return the standalone teaching term used by a remediation proposal."""
+    if (proposal.proposal_kind == 'renegotiation' and len(proposal.clauses) == 1
+            and proposal.clauses[0].kind == 'teaching' and not proposal.clauses[0].depends_on):
+        return proposal.clauses[0]
+    return None
+
+
 def respond(world, ctx, proposal):
     bargain = teaching_bargain(proposal)
-    if bargain is None or not {'diplomacy','research','trade'} <= ctx.authority:
+    remediation = teaching_only_term(proposal)
+    if bargain is None and remediation is None:
+        return
+    if remediation is not None:
+        if not {'diplomacy', 'research'} <= ctx.authority:
+            return
+        tech = world.research.technologies[remediation.technology_id]
+        response = ('accept' if ctx.actor == remediation.creditor_ref
+                    and tech.id not in ctx.techniques
+                    and tech.capability_id in ctx.capabilities
+                    and set(tech.prerequisites) <= ctx.techniques else 'reject')
+        event = decision(world, {'action': 'respond_proposal', 'actor_ref': ctx.actor.to_dict(),
+                                 'proposal_id': proposal.id, 'response': response},
+                         'Responder à remediação de ensino.', (proposal.last_event_id,))
+        if 'diplomacy' not in diplomatic_context(world, proposal.proposer_ref).authority:
+            return
+        respond_proposal(world, proposal.id, response, decision_event_id=event.id)
+        if response == 'accept':
+            schedule_review(world)
+        return
+    if not {'diplomacy','research','trade'} <= ctx.authority:
         return
     payment, lesson = bargain
     cost = dict(ctx.research_costs)[lesson.technology_id]
@@ -90,8 +194,16 @@ def respond(world, ctx, proposal):
             terms = (payment.model_copy(update={'amount':budget}), lesson)
             event = decision(world,offer_intent(ctx.actor,proposal.proposer_ref,terms,proposal.expires_day,proposal.id),
                 'Contrapropor preço compatível com o custo local e o caixa livre.',(proposal.last_event_id,))
+            attempt = record_event(
+                world, BARGAIN_ATTEMPT_EVENT_TYPE,
+                'Uma contraproposta foi tentada sobre uma proposta diplomática aberta.',
+                fact_kind=FactKind.OCCURRENCE,
+                causal_origin=CausalOrigin.ACTOR_DECISION,
+                cause_ids=(event.id, proposal.last_event_id),
+            )
             offer_proposal(world,ctx.actor,proposal.proposer_ref,terms,proposal.expires_day,
-                           decision_event_id=event.id,parent_id=proposal.id)
+                           decision_event_id=event.id,parent_id=proposal.id,
+                           extra_cause_ids=(attempt.id,))
             schedule_review(world)
             return
     elif lesson.technology_id in ctx.techniques and payment.amount >= max(1,cost*60//100):
@@ -108,7 +220,9 @@ def respond(world, ctx, proposal):
 
 def fulfill(world, ctx, proposal):
     bargain = teaching_bargain(proposal)
-    if bargain is None: return
+    remediation = teaching_only_term(proposal)
+    if bargain is None and remediation is None:
+        return
     day = world.clock.absolute_day
     events = {e.id:e for e in world.events}
     for index, clause in enumerate(proposal.clauses):
@@ -290,7 +404,7 @@ def teaching_initiation_options(world, actor):
 def _proposal_response_options(world, actor):
     """The responder's actual alternatives for a known open teaching bargain."""
     ctx = diplomatic_context(world, actor)
-    if not {'diplomacy', 'research', 'trade'} <= ctx.authority:
+    if not {'diplomacy', 'research'} <= ctx.authority:
         return ()
     day, costs = world.clock.absolute_day, dict(ctx.research_costs)
     options = []
@@ -299,9 +413,13 @@ def _proposal_response_options(world, actor):
                 or not proposal.offered_day < day < proposal.expires_day):
             continue
         bargain = teaching_bargain(proposal)
-        if bargain is None:
+        remediation = teaching_only_term(proposal)
+        if bargain is None and remediation is None:
             continue
-        payment, lesson = bargain
+        if bargain is not None and 'trade' not in ctx.authority:
+            continue
+        payment = bargain[0] if bargain is not None else None
+        lesson = bargain[1] if bargain is not None else remediation
         base = f'teaching-response:{proposal.id}:{proposal.last_event_id}'
         # A refusal has no material precondition.  Acceptance is enumerated
         # only when the actor can presently bind the exact promise.
@@ -312,14 +430,14 @@ def _proposal_response_options(world, actor):
             useful = (tech.id not in ctx.techniques and tech.capability_id in ctx.capabilities
                       and set(tech.prerequisites) <= ctx.techniques)
             budget = min(ctx.budget, costs[tech.id] * 80 // 100) if useful else 0
-            if budget >= payment.amount:
+            if payment is None or budget >= payment.amount:
                 options.append(TeachingDiplomacyOption(f'{base}:accept', actor, RESPONSE_ACTION,
                                                        proposal_id=proposal.id, response='accept'))
             elif budget > 0 and proposal.parent_id is None:
                 options.append(TeachingDiplomacyOption(f'{base}:counter:{budget}', actor, RESPONSE_ACTION,
                                                        proposal_id=proposal.id, response='counter', amount=budget,
                                                        parent_id=proposal.id))
-        elif (lesson.technology_id in ctx.techniques
+        elif (payment is not None and lesson.technology_id in ctx.techniques
               and payment.amount >= max(1, costs[lesson.technology_id] * 60 // 100)):
             options.append(TeachingDiplomacyOption(f'{base}:accept', actor, RESPONSE_ACTION,
                                                    proposal_id=proposal.id, response='accept'))
@@ -380,6 +498,134 @@ def _repudiation_options(world, actor):
     return tuple(options)
 
 
+def _renegotiation_options(world, actor):
+    """Reopen one known, breached payment as a fresh dated offer.
+
+    This is intentionally narrower than general treaty editing: only the
+    creditor may ask for a new deadline, and only a payment clause is eligible.
+    A breach notice is required so the option cannot become an omniscient
+    strategic planner over another institution's private history.
+    """
+    ctx = diplomatic_context(world, actor)
+    if 'diplomacy' not in ctx.authority:
+        return ()
+    day = world.clock.absolute_day
+    result = []
+    notices = world.knowledge.notices.values()
+    for proposal in _known_proposals(world, ctx):
+        if proposal.status != 'accepted':
+            continue
+        for index, clause in enumerate(proposal.clauses):
+            if clause.kind == 'payment':
+                eligible = clause.creditor_ref == actor
+            elif clause.kind == 'teaching':
+                eligible = clause.debtor_ref == actor and clause.depends_on == (0,)
+            else:
+                eligible = False
+            if not eligible:
+                continue
+            obligation = world.relations.obligations.get(f'{proposal.id}:term:{index}')
+            if (obligation is None or obligation.status != 'breached'
+                    or obligation.breach_event_id is None
+                    or not any(notice.recipient_ref == actor and notice.event_id == obligation.breach_event_id
+                               for notice in notices)):
+                continue
+            marker = f'renegotiation:{obligation.id}:{obligation.breach_event_id}'
+            option_prefix = f'{marker}:'
+            if any(str(item.request_affordance_id).startswith(option_prefix)
+                   for item in world.relations.proposals.values()):
+                continue
+            if clause.kind == 'teaching':
+                payment = world.relations.obligations.get(f'{proposal.id}:term:{clause.depends_on[0]}')
+                learner = diplomatic_context(world, clause.creditor_ref)
+                if (payment is None or payment.status != 'fulfilled'
+                        or 'research' not in ctx.authority or 'research' not in learner.authority
+                        or clause.technology_id not in ctx.techniques
+                        or clause.technology_id in learner.techniques
+                        or not set(world.research.technologies[clause.technology_id].prerequisites) <= learner.techniques):
+                    continue
+            expires_day = day + RENEGOTIATION_EXPIRES_DAYS
+            revised = clause.model_copy(update={'due_day': day + RENEGOTIATION_DAYS,
+                                                'depends_on': ()})
+            result.append(RenegotiationOption(
+                id=f'{marker}:{proposal.last_event_id}', actor_ref=actor,
+                obligation_id=obligation.id, proposal_id=proposal.id,
+                counterparty_ref=(clause.debtor_ref if clause.kind == 'payment' else clause.creditor_ref), clause=revised,
+                expires_day=expires_day, breach_event_id=obligation.breach_event_id))
+    return tuple(sorted(result, key=lambda item: item.id))
+
+
+def _payment_remediation_options(world, actor):
+    """Recompose a debtor's material repair from its own current account.
+
+    A breach remains historical.  This option only exists when the debtor was
+    notified of its own concluded term, still controls the source account and
+    can pay the exact original amount today.
+    """
+    ctx = diplomatic_context(world, actor)
+    if 'trade' not in ctx.authority:
+        return ()
+    result = []
+    notices = world.knowledge.notices.values()
+    for proposal in _known_proposals(world, ctx):
+        if proposal.status != 'accepted':
+            continue
+        for index, clause in enumerate(proposal.clauses):
+            if clause.kind != 'payment' or clause.debtor_ref != actor:
+                continue
+            obligation = world.relations.obligations.get(f'{proposal.id}:term:{index}')
+            if (obligation is None or obligation.status != 'breached'
+                    or obligation.breach_event_id is None
+                    or not any(notice.recipient_ref == actor and notice.event_id == obligation.breach_event_id
+                               for notice in notices)):
+                continue
+            source = world.economy.accounts.get(clause.source_account_id)
+            target = world.economy.accounts.get(clause.target_account_id)
+            if (source is None or target is None or source.owner_ref != actor
+                    or source.balance < clause.amount):
+                continue
+            result.append(PaymentRemediationOption(
+                id=f'payment-remediation:{obligation.id}:{obligation.breach_event_id}:{source.id}:{source.last_event_id}',
+                actor_ref=actor, obligation_id=obligation.id,
+                source_account_id=source.id, target_account_id=target.id,
+                amount=clause.amount, breach_event_id=obligation.breach_event_id))
+    return tuple(sorted(result, key=lambda item: item.id))
+
+
+def _persuasion_options(world, actor):
+    """Enumerate one current, non-material follow-up per open proposal.
+
+    Either notified side may keep a live proposal salient.  This is an
+    actor-authored diplomatic act, not an acceptance: the proposal owner and
+    its clauses remain untouched until the other side makes its own response.
+    """
+    ctx = diplomatic_context(world, actor)
+    if 'diplomacy' not in ctx.authority:
+        return ()
+    day = world.clock.absolute_day
+    options = []
+    for proposal in _known_proposals(world, ctx):
+        if (actor not in {proposal.proposer_ref, proposal.counterparty_ref}
+                or proposal.status != 'offered'
+                or not proposal.offered_day < day < proposal.expires_day):
+            continue
+        already = any(event.event_type == 'diplomatic_persuasion_attempted'
+                      and event.day == day
+                      and event.decision is not None
+                      and event.decision.get('actor_ref') == actor.to_dict()
+                      and event.decision.get('proposal_id') == proposal.id
+                      for event in world.events)
+        if already:
+            continue
+        options.append(PersuasionOption(
+            id=f'persuade-proposal:{proposal.id}:{proposal.last_event_id}:{day}',
+            actor_ref=actor, proposal_id=proposal.id,
+            counterparty_ref=(proposal.counterparty_ref if actor == proposal.proposer_ref
+                              else proposal.proposer_ref),
+            proposal_event_id=proposal.last_event_id))
+    return tuple(sorted(options, key=lambda item: item.id))
+
+
 def _teaching_options(world, actor):
     ctx = diplomatic_context(world, actor)
     if 'research' not in ctx.authority:
@@ -389,9 +635,10 @@ def _teaching_options(world, actor):
         if proposal.status != 'accepted':
             continue
         bargain = teaching_bargain(proposal)
-        if bargain is None:
+        remediation = teaching_only_term(proposal)
+        if bargain is None and remediation is None:
             continue
-        _, lesson = bargain
+        lesson = bargain[1] if bargain is not None else remediation
         index = proposal.clauses.index(lesson)
         obligation = world.relations.obligations.get(f'{proposal.id}:term:{index}')
         learner = diplomatic_context(world, lesson.creditor_ref)
@@ -426,9 +673,10 @@ def _learning_options(world, actor):
         if proposal.status != 'accepted':
             continue
         bargain = teaching_bargain(proposal)
-        if bargain is None:
+        remediation = teaching_only_term(proposal)
+        if bargain is None and remediation is None:
             continue
-        _, lesson = bargain
+        lesson = bargain[1] if bargain is not None else remediation
         if lesson.creditor_ref != actor:
             continue
         for teacher_option in _teaching_options(world, lesson.debtor_ref):
@@ -448,6 +696,9 @@ def _choice(option):
     if option.action == DISCLOSE_TECHNOLOGY_ACTION:
         return {'id': option.id,
                 'label': f'Comunicar indício factual da técnica própria {option.technology_id}.'}
+    if option.action == PERSUADE_ACTION:
+        return {'id': option.id,
+                'label': 'Reforçar uma proposta aberta com uma tentativa diplomática explícita.'}
     return {'id': option.id, 'label': {
         OFFER_ACTION: f'Oferecer ensino de {option.technology_id} por pagamento já calculado.',
         REQUEST_ACTION: f'Pedir ensino de {option.technology_id} a partir de indício factual atual.',
@@ -456,6 +707,8 @@ def _choice(option):
         TEACH_ACTION: f'Oferecer o ensino prometido de {option.technology_id}.',
         LEARN_ACTION: f'Aceitar o ensino prometido de {option.technology_id}.',
         REPUDIATE_ACTION: 'Repudiar a obrigação ainda ativa, em vez de tentar cumpri-la a tempo.',
+        RENEGOTIATE_ACTION: 'Propor novo prazo para uma obrigação de pagamento quebrada.',
+        PERSUADE_ACTION: 'Reforçar uma proposta aberta com uma tentativa diplomática explícita.',
     }[option.action]}
 
 
@@ -488,10 +741,25 @@ def _execute_response(world, option, decision_event_id):
         return False
     proposal = world.relations.proposals[current.proposal_id]
     if current.response == 'counter':
-        payment, lesson = teaching_bargain(proposal)
+        # Keep the actor's attempt as its own causal receipt.  It carries no
+        # state delta: the existing proposal owner still creates and validates
+        # the successor terms below, while the counterpart remains free to
+        # accept or reject that new open proposal on its own turn.
+        attempt = record_event(
+            world, BARGAIN_ATTEMPT_EVENT_TYPE,
+            'A contraproposta foi tentada sobre uma proposta diplomática aberta.',
+            fact_kind=FactKind.OCCURRENCE,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            cause_ids=(decision_event_id, proposal.last_event_id),
+        )
+        bargain = teaching_bargain(proposal)
+        if bargain is None:
+            return False
+        payment, lesson = bargain
         terms = (payment.model_copy(update={'amount': current.amount}), lesson)
         offer_proposal(world, current.actor_ref, proposal.proposer_ref, terms, proposal.expires_day,
-                       decision_event_id=decision_event_id, parent_id=proposal.id, intent=current.decision())
+                       decision_event_id=decision_event_id, parent_id=proposal.id, intent=current.decision(),
+                       extra_cause_ids=(attempt.id,))
     else:
         respond_proposal(world, proposal.id, current.response, decision_event_id=decision_event_id,
                          intent=current.decision())
@@ -549,12 +817,99 @@ def _execute_repudiation(world, option, decision_event_id):
     return True
 
 
+def _execute_renegotiation(world, option, decision_event_id):
+    current = next((item for item in _renegotiation_options(world, option.actor_ref) if item.id == option.id), None)
+    if current is None:
+        return False
+    offer_proposal(
+        world, current.actor_ref, current.counterparty_ref, (current.clause,), current.expires_day,
+        decision_event_id=decision_event_id, intent=current.decision(), proposal_kind='renegotiation',
+        request_affordance_id=current.id,
+        extra_cause_ids=(current.breach_event_id,))
+    schedule_review(world)
+    return True
+
+
+def _execute_payment_remediation(world, option, decision_event_id):
+    current = next((item for item in _payment_remediation_options(world, option.actor_ref)
+                    if item.id == option.id), None)
+    if current is None:
+        return False
+    candidate = deepcopy(world)
+    current = next((item for item in _payment_remediation_options(candidate, option.actor_ref)
+                    if item.id == option.id), None)
+    if current is None:
+        return False
+    obligation = candidate.relations.obligations[current.obligation_id]
+    proposal = candidate.relations.proposals[obligation.proposal_id]
+    if obligation.breach_event_id != current.breach_event_id:
+        return False
+    transfer_money(candidate, current.source_account_id, current.target_account_id,
+                   current.amount, decision_event_id=decision_event_id,
+                   decision_intent=current.decision())
+    material = candidate.economy.payments[decision_event_id]
+    parties = (proposal.proposer_ref, proposal.counterparty_ref)
+    reinforced = tuple(memory for memory in
+                       (memories_of(candidate, party, current.breach_event_id) for party in parties)
+                       if memory is not None)
+    receipt = record_event(
+        candidate, 'payment_obligation_remediated',
+        'O pagamento material reparou uma obrigação anteriormente descumprida.',
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(
+            _delta('obligation', obligation.id, 'status', 'breached', 'remediated'),
+            _delta('obligation', obligation.id, 'remediation_material_event_id', None, material),
+            *memory_creation_deltas(candidate, parties),
+            *reinforcement_deltas(candidate, reinforced),
+        ),
+        cause_ids=(decision_event_id, current.breach_event_id, material),
+    )
+    candidate.relations.obligations[obligation.id] = obligation.model_copy(
+        update={'status': 'remediated', 'material_event_id': None,
+                'remediation_material_event_id': material, 'last_event_id': receipt.id})
+    apply_memory_creation(candidate, parties, receipt)
+    apply_reinforcement(candidate, reinforced, receipt)
+    disclose(candidate, proposal, receipt)
+    candidate.economy.validate(candidate)
+    candidate.relations.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    schedule_review(world)
+    return True
+
+
+def _execute_persuasion(world, option, decision_event_id):
+    current = next((item for item in _persuasion_options(world, option.actor_ref)
+                    if item.id == option.id), None)
+    if current is None:
+        return False
+    proposal = world.relations.proposals.get(current.proposal_id)
+    decision_event = _event(world, decision_event_id)
+    if (proposal is None or decision_event is None
+            or decision_event.decision != current.decision()
+            or proposal.last_event_id != current.proposal_event_id):
+        return False
+    attempt = record_event(
+        world, 'diplomatic_persuasion_attempted',
+        'A instituição reforçou uma proposta aberta sem alterar seus termos.',
+        fact_kind=FactKind.OCCURRENCE, causal_origin=CausalOrigin.ACTOR_DECISION,
+        cause_ids=(decision_event.id, current.proposal_event_id),
+    )
+    # The counterparty receives a fresh notice of the same proposal, but its
+    # status, clauses and obligations remain untouched until that actor answers.
+    disclose(world, proposal, attempt)
+    schedule_review(world)
+    return True
+
+
 def _execute_learning(world, option, decision_event_id):
     current = next((item for item in _learning_options(world, option.actor_ref) if item.id == option.id), None)
     if current is None:
         return False
     proposal = world.relations.proposals[current.proposal_id]
-    _, lesson = teaching_bargain(proposal)
+    bargain = teaching_bargain(proposal)
+    lesson = bargain[1] if bargain is not None else teaching_only_term(proposal)
+    if lesson is None:
+        return False
     teacher_options = [item for item in _teaching_options(world, lesson.debtor_ref)
                        if item.obligation_id == current.obligation_id]
     teacher = next(((item, _teacher_decision(world, item)) for item in teacher_options
@@ -657,12 +1012,20 @@ def _diplomacy_situation(world, actor, options):
     of, never a settlement report, objective or foreign holding. The
     counterparty breach history is likewise bounded to what this specific
     actor was itself notified of -- see ``_known_counterparty_breaches``."""
+    context = diplomatic_context(world, actor)
     return {
         "today": world.clock.absolute_day,
         "known_proposal_ids": sorted({option.proposal_id for option in options
                                       if getattr(option, "proposal_id", None)}),
         "own_obligation_ids": sorted({option.obligation_id for option in options
                                       if getattr(option, "obligation_id", None)}),
+        "known_institutional_views": tuple({
+            "counterparty": subject.to_dict(),
+            "value": value,
+            "evidence_event_ids": list(event_ids),
+        } for subject, value, event_ids in context.institutional_views),
+        "own_strategic_capacity": context.strategic_capacity,
+        "known_strategic_evidence": context.strategic_evidence,
         "known_counterparty_breaches": _known_counterparty_breaches(world, actor),
     }
 
@@ -707,6 +1070,19 @@ REPUDIATION_ADAPTER = _diplomacy_adapter(
     "obligation_repudiation", _repudiation_options,
     _adapter_execute(_repudiation_options, _execute_repudiation, "obligation repudiation"))
 
+RENEGOTIATION_ADAPTER = _diplomacy_adapter(
+    "breached_obligation_renegotiation", _renegotiation_options,
+    _adapter_execute(_renegotiation_options, _execute_renegotiation, "breached obligation renegotiation"))
+
+PAYMENT_REMEDIATION_ADAPTER = _diplomacy_adapter(
+    "payment_obligation_remediation", _payment_remediation_options,
+    _adapter_execute(_payment_remediation_options, _execute_payment_remediation,
+                     "payment obligation remediation"))
+
+PERSUASION_ADAPTER = _diplomacy_adapter(
+    "proposal_persuasion", _persuasion_options,
+    _adapter_execute(_persuasion_options, _execute_persuasion, "proposal persuasion"))
+
 OFFER_ADAPTER = _diplomacy_adapter(
     "teaching_initiation", teaching_initiation_options,
     _adapter_execute(teaching_initiation_options, _execute_offer, "teaching initiation"))
@@ -735,7 +1111,9 @@ def diplomacy_adapters(*, allow_offers=False):
     reason that has nothing to do with this bargain.
     """
     return (_authority_claim_adapter(), DISCLOSURE_ADAPTER, PROPOSAL_RESPONSE_ADAPTER, PAYMENT_ADAPTER,
-            REPUDIATION_ADAPTER, TEACHING_ADAPTER, *((OFFER_ADAPTER,) if allow_offers else ()))
+            REPUDIATION_ADAPTER, RENEGOTIATION_ADAPTER, PAYMENT_REMEDIATION_ADAPTER,
+            PERSUASION_ADAPTER, TEACHING_ADAPTER,
+            *((OFFER_ADAPTER,) if allow_offers else ()))
 
 
 async def review_promised_teaching_turns(world, *, consulted=(), actors=None):

@@ -11,6 +11,12 @@ Snapshot documental: **12/09/2026**, código-base **`896c0359`**, branch `main`.
 3. [Estado e pendências](estado-e-pendencias.md): cobertura, limitações, evidências e próxima sequência recomendada.
 4. [AGENTS.md](../../AGENTS.md): regras locais obrigatórias antes de implementar.
 
+Para a fila específica de conclusão do roadmap medieval, use o
+[plano geral restante](../../medieval-roadmap-general-remaining-plan.md). Ele
+separa as fatias já comprovadas das ondas ainda abertas, define dependências e
+critérios de aceite, e não deve ser interpretado como declaração de produto
+concluído.
+
 ## Fontes e precedência
 
 O [plano arquitetural original](../specs/actor-driven-emergent-world.md) continua sendo a referência normativa. O plano em português deste pacote o consolida para transferência de contexto; não cria um Plano 6 nem amplia o escopo.

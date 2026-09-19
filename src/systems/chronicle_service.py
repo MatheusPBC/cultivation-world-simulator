@@ -11,6 +11,7 @@ from src.classes.chronicle import ChronicleChapter, ChronicleParagraph, Chronicl
 from src.classes.event import Event
 from src.i18n.template_resolver import resolve_locale_template_path
 from src.run.log import get_logger
+from src.systems.time import get_date_str
 from src.utils.llm import call_llm_with_task_name
 from src.utils.llm.exceptions import LLMError, ProviderCallError
 
@@ -103,6 +104,10 @@ def _event_dict(event: Event) -> dict[str, Any]:
     return {
         "id": event.id,
         "month_stamp": int(event.month_stamp),
+        # The numeric stamp is an internal cursor, not a human calendar year.
+        # Give the narrator the canonical rendered date so it cannot mistake
+        # e.g. month stamp 1200 for year 1200.
+        "date": get_date_str(int(event.month_stamp)),
         "content": event.content,
         "is_major": bool(event.is_major),
         "is_story": bool(event.is_story),
@@ -481,6 +486,8 @@ class ChronicleService:
         infos = {
             "start_month_stamp": start,
             "end_month_stamp": end,
+            "start_date": get_date_str(start),
+            "end_date": get_date_str(end),
             "trigger": trigger,
             "events": [_event_dict(event) for event in candidates],
             "entities": self._world_entities(world),

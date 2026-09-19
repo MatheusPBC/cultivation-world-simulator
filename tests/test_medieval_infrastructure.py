@@ -10,7 +10,9 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event, validate_history
-from src.sim.medieval.infrastructure import damage_site, progress_repairs, review_maintenance
+from src.sim.medieval.infrastructure import (damage_site, execute_site_reactivation,
+                                              progress_repairs, review_maintenance,
+                                              site_reactivation_options)
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.site_services import service_options, set_site_service
@@ -214,6 +216,41 @@ def test_repair_restores_integrity_without_lifting_an_interdiction():
     assert world.map.infrastructure_sites[SITE].enabled is False
 
 
+def test_recovered_interdiction_requires_an_explicit_maintainer_decision():
+    world = create_medieval_world(73)
+    provisioned(world)
+    site = world.map.infrastructure_sites[SITE]
+    route_id = site.route_ids[0]
+    intact = world.map.get_route_operational_capacity(route_id)
+    fact = record_event(
+        world, "storm_damaged_site", "Docas interditadas pela tempestade.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("site", SITE, "integrity", site.integrity, 0.8),
+                _delta("site", SITE, "enabled", site.enabled, False)),
+    )
+    damage_site(world, SITE, event_id=fact.id)
+    refresh_reports(world)
+    review_maintenance(world)
+    month(world)
+    month(world)
+
+    assert world.map.infrastructure_sites[SITE].integrity == 1.0
+    assert world.map.infrastructure_sites[SITE].enabled is False
+    refresh_reports(world)
+    maintainer = site.maintainer_ref
+    options = site_reactivation_options(world, maintainer)
+    assert len(options) == 1
+    option = options[0]
+    decision = record_event(
+        world, "site_reactivation_decided", "O maintainer decidiu reabrir a instalação recuperada.",
+        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(option.report_event_id,),
+    )
+    event = execute_site_reactivation(world, maintainer, option.id, decision.id)
+    assert event.event_type == "site_reactivated"
+    assert world.map.infrastructure_sites[SITE].enabled is True
+    assert world.map.get_route_operational_capacity(route_id) == intact
+
+
 def test_an_active_repair_cannot_invent_demand_without_its_typed_observation():
     from src.sim.medieval.demand import repair_demand
 
@@ -319,6 +356,14 @@ def importing_world():
     for key, stock in list(world.economy.stocks.items()):
         if stock.owner_ref == EntityRef("polity", "valedouro"):
             world.economy.stocks[key] = stock.model_copy(update={"goods": {**stock.goods, "food": 0}})
+    # The authored world now gives every settlement a harvest line. Keep this
+    # fixture focused on the river crossing by capping Cinzaverde's local line;
+    # otherwise a newly available road shipment can satisfy the same shortage
+    # before the crossing under test is created.
+    for key, facility in list(world.economy.facilities.items()):
+        stock = world.economy.stocks[facility.stock_id]
+        if stock.location_id == "cinzaverde" and facility.recipe_id == "harvest":
+            world.economy.facilities[key] = facility.model_copy(update={"max_batches": 1})
     return world
 
 

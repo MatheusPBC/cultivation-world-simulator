@@ -9,7 +9,7 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.intelligence import refresh_reports
-from src.sim.medieval.migration import consume_travel_provisions, recover_migration, start_migration
+from src.sim.medieval.migration import _resolve, consume_travel_provisions, recover_migration, start_migration
 from src.sim.medieval.migration_policy import migration_options, recovery_options, review_migration
 from src.sim.medieval.persistence import load_world, restore_snapshot, save_world, world_snapshot
 from src.systems.calendar_agenda import ScheduledSituation
@@ -85,6 +85,33 @@ async def test_known_pressure_moves_household_with_its_own_cash_and_rations(tmp_
     assert sum(account.balance for account in resumed.economy.accounts.values()) == total_money
 
 
+@pytest.mark.asyncio
+async def test_arrival_transfers_observed_social_pressure_without_erasing_its_cause():
+    world, group, _ = pressured_household()
+    source_need = world.economy.needs[group.settlement_id]
+    world.economy.needs[source_need.id] = source_need.model_copy(update={"unrest": 600})
+    option = migration_options(world, group.id)[0]
+    journey = start_migration(world, option.id, decision_event_id=decide(world, option).id)
+    simulator = MedievalSimulator(world)
+    for _ in range(30):
+        if journey.id not in world.society.migrations:
+            break
+        await simulator.step()
+
+    assert journey.id not in world.society.migrations
+    source_after = world.economy.needs[group.settlement_id]
+    destination_after = world.economy.needs[option.destination_id]
+    assert source_after.unrest < 600
+    assert destination_after.unrest > 0
+    arrival = next(event for event in world.events if event.event_type == "migration_arrived"
+                   and any(delta.owner_kind == "migration" and delta.owner_id == journey.id
+                           for delta in event.deltas))
+    assert any(delta.owner_kind == "subsistence" and delta.owner_id == group.settlement_id
+               and delta.aspect == "unrest" and delta.before == "600"
+               for delta in arrival.deltas)
+    assert any(link.cause_event_id == journey.last_event_id for link in arrival.causal_links)
+
+
 def test_migration_option_expires_without_mutating_the_household():
     world, group, _ = pressured_household()
     option = migration_options(world, group.id)[0]
@@ -107,10 +134,35 @@ def test_travel_rations_are_not_consumed_twice_on_one_monthly_boundary():
     provision = world.economy.migration_provisions[journey.provision_id]
     consume_travel_provisions(world)
     once = world.economy.migration_provisions[provision.id]
-    intervening = record_event(world, "migration_return_started", "Recibo intermediário.", fact_kind=FactKind.STATE_TRANSITION)
+    intervening = record_event(world, "migration_return_note", "Recibo intermediário.", fact_kind=FactKind.OCCURRENCE)
     world.economy.migration_provisions[provision.id] = once.model_copy(update={"last_event_id": intervening.id})
     consume_travel_provisions(world)
     assert world.economy.migration_provisions[provision.id].food == once.food
+
+
+def test_repeated_route_blockage_adds_bounded_origin_pressure_with_causal_delta():
+    world, group, _ = pressured_household()
+    option = min(migration_options(world, group.id), key=lambda item: (len(item.route_ids), item.id))
+    journey = start_migration(world, option.id, decision_event_id=decide(world, option).id)
+    route = world.map.routes[journey.route_ids[0]]
+    route.quality = 0
+    need = world.economy.needs[group.settlement_id]
+    before = need.unrest
+
+    for _ in range(7):
+        journey = world.society.migrations[journey.id]
+        world.clock = type(world.clock)(journey.due_day)
+        world.agenda.cancel(journey.id)
+        _resolve(world, journey)
+
+    delays = [event for event in world.events if event.event_type == "migration_delayed"
+              and any(delta.owner_kind == "migration" and delta.owner_id == journey.id for delta in event.deltas)]
+    pressure = delays[-1]
+    assert len(delays) == 7
+    assert world.economy.needs[group.settlement_id].unrest == before + 5
+    assert any(delta.owner_kind == "subsistence" and delta.owner_id == group.settlement_id
+               and delta.aspect == "unrest" and delta.after == str(before + 5)
+               for delta in pressure.deltas)
 
 
 @pytest.mark.asyncio
@@ -129,6 +181,11 @@ async def test_stranded_household_can_return_over_real_routes():
         await simulator.step()
     stranded = world.society.migrations[journey.id]
     assert stranded.stage == "stranded"
+    from src.server.medieval.queries import campaign_view
+    threat = next(item for item in campaign_view(world).threats
+                  if item.id == f"migration-blocked:{journey.id}")
+    assert threat.kind == "migration_blocked" and threat.status == "blocked"
+    assert threat.settlement_id == journey.destination_id
     option = next(item for item in recovery_options(world, journey.id) if item.action == "return_migration")
     recover_migration(world, option.id, decision_event_id=decide_recovery(world, stranded, option).id)
     for _ in range(20):
@@ -139,6 +196,64 @@ async def test_stranded_household_can_return_over_real_routes():
     assert world.society.available_count(group.id) == group.count
     assert world.economy.accounts[source_account.id].balance == 10_000
     assert world.economy.stocks[f"household-stock:{group.id}"].capacity == source_capacity
+
+
+@pytest.mark.asyncio
+async def test_blocked_arrival_adds_bounded_destination_pressure_without_forcing_action():
+    world, group, _ = pressured_household()
+    option = min(migration_options(world, group.id), key=lambda item: (len(item.route_ids), item.id))
+    journey = start_migration(world, option.id, decision_event_id=decide(world, option).id)
+    destination = world.society.settlements[option.destination_id]
+    world.society.settlements[destination.id] = destination.model_copy(
+        update={"housing_capacity": world.society.population_at(destination.id)})
+    before = world.economy.needs[destination.id].unrest
+    simulator = MedievalSimulator(world)
+    for _ in range(12):
+        if world.society.migrations[journey.id].stage == "stranded":
+            break
+        await simulator.step()
+
+    assert world.society.migrations[journey.id].stage == "stranded"
+    after = world.economy.needs[destination.id].unrest
+    assert after > before
+    assert after <= before + 40
+    blocked = next(event for event in world.events if event.event_type == "migration_arrival_blocked")
+    assert any(delta.owner_kind == "subsistence" and delta.owner_id == destination.id
+               and delta.aspect == "unrest" and delta.after == str(after)
+               for delta in blocked.deltas)
+    assert not any(event.event_type in {"civic_tumult_occurred", "civic_movement_formed"}
+                   and any(link.cause_event_id == blocked.id for link in event.causal_links)
+                   for event in world.events)
+
+
+@pytest.mark.asyncio
+async def test_stranded_household_can_choose_a_second_known_destination():
+    world, group, _ = pressured_household()
+    initial = min(migration_options(world, group.id), key=lambda item: (len(item.route_ids), item.id))
+    journey = start_migration(world, initial.id, decision_event_id=decide(world, initial).id)
+    blocked_destination = world.society.settlements[initial.destination_id]
+    world.society.settlements[blocked_destination.id] = blocked_destination.model_copy(
+        update={"housing_capacity": world.society.population_at(blocked_destination.id)})
+    simulator = MedievalSimulator(world)
+    for _ in range(12):
+        if world.society.migrations[journey.id].stage == "stranded":
+            break
+        await simulator.step()
+    stranded = world.society.migrations[journey.id]
+    reroute = next(item for item in recovery_options(world, journey.id) if item.action == "reroute_migration")
+    assert reroute.destination_id not in {group.settlement_id, initial.destination_id}
+    before_population = world.society.present_population_at(reroute.destination_id)
+    event = recover_migration(world, reroute.id, decision_event_id=decide_recovery(world, stranded, reroute).id)
+    assert event.event_type == "migration_reroute_started"
+    assert world.society.migrations[journey.id].destination_id == reroute.destination_id
+    assert world.society.present_population_at(reroute.destination_id) == before_population
+    evidence = {world.knowledge.settlement_reports[item].event_id
+                if item in world.knowledge.settlement_reports
+                else world.knowledge.route_reports[item].event_id
+                for item in reroute.report_ids}
+    assert {link.cause_event_id for link in event.causal_links} == evidence | {stranded.last_event_id,
+                                                                                next(item.id for item in world.events
+                                                                                     if item.event_type == "migration_recovery_decided")}
 
 
 @pytest.mark.asyncio

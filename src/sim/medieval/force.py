@@ -11,10 +11,12 @@ fact and the survivors return to a cohort where they actually are.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.economy.models import MoneyAccount
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment, ForcePosition, ForceStandoff
+from src.classes.society.force import Garrison
 from src.classes.governance.knowledge import force_contact_notice_id
 from src.classes.governance.models import ForceContactNotice
 from src.classes.society.models import Identity
@@ -37,6 +39,7 @@ WITHDRAW_ACTION = "withdraw_detachment"
 PREPARE_POSITION_ACTION = "prepare_force_position"
 RATIONS_PER_SOLDIER_DAY = 1
 WAGE_PER_SOLDIER = 2
+GARRISON_WAGE_PER_SOLDIER_DAY = 1
 POSITION_PREPARATION_DAYS = 3
 
 
@@ -65,8 +68,55 @@ class ForceOption:
     kind: str
 
     def decision(self):
-        return {"action": {"march": MARCH_ACTION, "occupy": OCCUPY_ACTION, "disband": DISBAND_ACTION}[self.kind],
+        return {"action": {"march": MARCH_ACTION, "occupy": OCCUPY_ACTION, "garrison": GARRISON_ACTION,
+                             "disband": DISBAND_ACTION}[self.kind],
                 "actor_ref": self.actor_ref.to_dict(), "selected_affordance_id": self.id}
+
+
+GARRISON_ACTION = "establish_garrison"
+WITHDRAW_GARRISON_ACTION = "withdraw_garrison"
+ROTATE_GARRISON_ACTION = "rotate_garrison"
+
+
+@dataclass(frozen=True)
+class GarrisonOption:
+    id: Identity
+    actor_ref: EntityRef
+    detachment_id: Identity
+    settlement_id: Identity
+    account_id: Identity
+    daily_wage: int
+    kind: str = "garrison"
+
+    def decision(self):
+        action = GARRISON_ACTION if self.kind == "garrison" else WITHDRAW_GARRISON_ACTION
+        return {"action": action, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class GarrisonRotationOption:
+    """Replace one active duty with another supplied column already present.
+
+    Rotation changes only the military duty.  The physical columns, occupation,
+    administration and territorial control remain separate canonical facts.
+    """
+    id: Identity
+    actor_ref: EntityRef
+    current_detachment_id: Identity
+    replacement_detachment_id: Identity
+    settlement_id: Identity
+    account_id: Identity
+    daily_wage: int
+    kind: str = "rotate"
+
+    @property
+    def detachment_id(self):
+        return self.current_detachment_id
+
+    def decision(self):
+        return {"action": ROTATE_GARRISON_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 @dataclass(frozen=True)
@@ -451,6 +501,57 @@ def force_options(world, actor):
                 and report is not None and report.settlement_id == detachment.location_id
                 and report.occupier_id is None):
             options.append(ForceOption(f"{base}:occupy", actor, detachment.id, "occupy"))
+    return tuple(sorted((*options, *garrison_options(world, actor)), key=lambda item: item.id))
+
+
+def garrison_options(world, actor):
+    """A supplied occupation may become a durable duty by explicit choice.
+
+    The choice does not grant occupation: the settlement must already be
+    occupied by this column.  Food is the column's current ration reserve and
+    money is the owner's current account; both are checked again by the owner.
+    """
+    if not _commands(world, actor):
+        return ()
+    options = []
+    for detachment in sorted(world.society.detachments.values(), key=lambda item: item.id):
+        if detachment.owner_ref != actor or detachment.stage != "present":
+            continue
+        settlement = world.society.settlements[detachment.location_id]
+        existing = world.society.garrisons.get(f"garrison:{detachment.id}")
+        if (existing is not None and existing.stage == "active"
+                and existing.settlement_id == settlement.id):
+            options.append(GarrisonOption(
+                id=f"garrison-withdraw:{detachment.id}:{existing.last_event_id}",
+                actor_ref=actor, detachment_id=detachment.id, settlement_id=settlement.id,
+                account_id=existing.account_id, daily_wage=0, kind="withdraw"))
+            account = world.economy.accounts.get(existing.account_id)
+            if account is not None and account.owner_ref == actor:
+                for replacement in sorted(world.society.detachments.values(), key=lambda item: item.id):
+                    if (replacement.id == detachment.id or replacement.owner_ref != actor
+                            or replacement.stage != "present" or replacement.location_id != settlement.id
+                            or replacement.provisions < replacement.count
+                            or world.society.garrisons.get(f"garrison:{replacement.id}") is not None):
+                        continue
+                    wage = replacement.count * GARRISON_WAGE_PER_SOLDIER_DAY
+                    if account.balance < wage:
+                        continue
+                    options.append(GarrisonRotationOption(
+                        id=f"garrison-rotate:{detachment.id}:{replacement.id}:{existing.last_event_id}:"
+                           f"{replacement.last_event_id}:{account.id}",
+                        actor_ref=actor, current_detachment_id=detachment.id,
+                        replacement_detachment_id=replacement.id, settlement_id=settlement.id,
+                        account_id=account.id, daily_wage=wage))
+            continue
+        account = _own_account(world, actor)
+        if (settlement.occupier_id != actor.id or detachment.provisions < detachment.count
+                or account is None or account.balance < detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY
+                or existing is not None):
+            continue
+        options.append(GarrisonOption(
+            id=f"garrison:{detachment.id}:{detachment.last_event_id}:{account.id}",
+            actor_ref=actor, detachment_id=detachment.id, settlement_id=settlement.id,
+            account_id=account.id, daily_wage=detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY))
     return tuple(options)
 
 
@@ -473,22 +574,29 @@ def _route_is_current(world, origin_id, destination_id, route_ids):
     return region == target
 
 
-def withdrawal_options(world, actor, *, detachment_id=None):
+def withdrawal_options(world, actor, *, detachment_id=None, allow_open_campaign_supply=False,
+                       campaign_authorized=False):
     """Only own present columns may choose a reported route to own government.
 
     The composition intentionally does not consult any foreign detachment,
     inventory, route plan or authority.  A real pending campaign shipment
     makes the option absent rather than relocating its cargo.
     """
-    if not _commands(world, actor):
+    # A persisted siege is already an institutionally authorized campaign;
+    # its owner may choose to end that campaign even when no named commander
+    # was appointed. Ordinary force withdrawal still requires a command.
+    if not _commands(world, actor) and not campaign_authorized:
         return ()
-    from .campaign_supply import campaign_baggage_ready_for_departure
+    from .campaign_supply import campaign_baggage_ready_for_departure, campaign_stock_id
 
     options = []
     for _, detachment in sorted(world.society.detachments.items()):
         if (detachment.owner_ref != actor or detachment.stage != "present" or detachment.provisions <= 0
                 or (detachment_id is not None and detachment.id != detachment_id)
-                or not campaign_baggage_ready_for_departure(world, detachment)):
+                or (not campaign_baggage_ready_for_departure(world, detachment)
+                    and not (allow_open_campaign_supply and not any(
+                        world.economy.freight_orders[parcel.order_id].destination_id == campaign_stock_id(detachment.id)
+                        for parcel in world.economy.parcels.values())))):
             continue
         for destination_id, settlement in sorted(world.society.settlements.items()):
             if destination_id == detachment.location_id or settlement.administrator_id != actor.id:
@@ -684,12 +792,135 @@ def _clear_occupation(world, detachment):
     settlement = world.society.settlements[detachment.location_id]
     if settlement.occupier_id != detachment.owner_ref.id:
         return ()
+    from .territorial_control import lapse_territorial_control
+    lapse_territorial_control(
+        world, settlement.id,
+        cause_ids=(detachment.last_event_id,),
+        reason="O controle territorial cessou quando a coluna deixou de sustentar a ocupação.",
+    )
     world.society.set_occupation(settlement.id, None)
     return (_delta("settlement", settlement.id, "occupier_id", detachment.owner_ref.id, None),)
 
 
+def _lapse_garrison(world, detachment, *, reason, cause_ids=()):
+    """End a garrison only through a dated material failure."""
+    identity = f"garrison:{detachment.id}"
+    garrison = world.society.garrisons.get(identity)
+    if garrison is None or garrison.stage != "active":
+        return None
+    deltas = [_delta("garrison", identity, "stage", "active", "lapsed")]
+    deltas.extend(_clear_occupation(world, detachment))
+    event = record_event(
+        world, "garrison_lapsed", reason, fact_kind=FactKind.STATE_TRANSITION,
+        deltas=tuple(deltas), cause_ids=_causes(garrison.last_event_id, detachment.last_event_id, *cause_ids))
+    world.society.garrisons[identity] = garrison.model_copy(update={"stage": "lapsed", "last_event_id": event.id})
+    from .territorial_control import lapse_territorial_control
+    lapse_territorial_control(world, garrison.settlement_id, cause_ids=(event.id,),
+                              reason="O controle territorial cessou com a perda material da guarnição.")
+    return event
+
+
+def collapse_garrison_for_siege(world, garrison_id, *, campaign_event_id):
+    """End only the defensive duty after a recorded material breach.
+
+    A siege does not move the defender's people, assign the attacker as
+    occupier, or transfer administration.  The detachment consequently stays
+    in place for a later owner decision; this owner changes just the real
+    garrison lifecycle and records the breach fact that caused it.
+    """
+    garrison = world.society.garrisons.get(garrison_id)
+    if garrison is None or garrison.stage != "active":
+        raise ValueError("siege can collapse only its current active garrison")
+    detachment = world.society.detachments.get(garrison.detachment_id)
+    if (detachment is None or detachment.stage != "present"
+            or detachment.location_id != garrison.settlement_id):
+        raise ValueError("siege garrison no longer has its physical detachment")
+    event = record_event(
+        world, "garrison_collapsed",
+        "A guarnição colapsou após a brecha material registrada pelo cerco; nenhuma administração mudou.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("garrison", garrison.id, "stage", "active", "collapsed"),),
+        cause_ids=_causes(campaign_event_id, garrison.last_event_id, detachment.last_event_id))
+    world.society.garrisons[garrison.id] = garrison.model_copy(
+        update={"stage": "collapsed", "last_event_id": event.id})
+    from .territorial_control import lapse_territorial_control
+    lapse_territorial_control(world, garrison.settlement_id, cause_ids=(event.id,),
+                              reason="O controle territorial cessou quando a guarnição colapsou.")
+    return event
+
+
+def _maintain_garrison(world, detachment):
+    """Charge one dated payroll after the column consumed today's ration."""
+    identity = f"garrison:{detachment.id}"
+    garrison = world.society.garrisons.get(identity)
+    if garrison is None or garrison.stage != "active":
+        return None
+    settlement = world.society.settlements.get(garrison.settlement_id)
+    account = world.economy.accounts.get(garrison.account_id)
+    source_group = world.society.population.get(detachment.source_group_id)
+    wage = detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY
+    if (settlement is None or settlement.occupier_id != detachment.owner_ref.id
+            or detachment.stage != "present" or detachment.location_id != settlement.id
+            or account is None or account.owner_ref != detachment.owner_ref or account.balance < wage
+            or source_group is None):
+        return _lapse_garrison(world, detachment,
+                                reason="A guarnição cessou porque sua manutenção monetária deixou de ser possível.")
+    household_id = f"household:{source_group.id}"
+    household = world.economy.accounts.get(household_id)
+    if household is not None and household.owner_ref != EntityRef("population_group", source_group.id):
+        return _lapse_garrison(world, detachment,
+                                reason="A guarnição cessou porque a conta salarial de sua coorte era inválida.")
+    if household is None:
+        household = MoneyAccount(id=household_id,
+                                 owner_ref=EntityRef("population_group", source_group.id), balance=0)
+        world.economy.accounts[household.id] = household
+    event = record_event(
+        world, "garrison_maintained", "A guarnição pagou a manutenção diária com o tesouro de seu proprietário.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("account", account.id, "balance", account.balance, account.balance - wage),
+                _delta("account", household.id, "balance", household.balance, household.balance + wage),
+                _delta("garrison", identity, "maintenance", 0, wage)),
+        cause_ids=_causes(garrison.last_event_id, detachment.last_event_id, account.last_event_id,
+                          source_group.last_event_id, household.last_event_id))
+    world.economy.accounts[account.id] = account.model_copy(
+        update={"balance": account.balance - wage, "last_event_id": event.id})
+    world.economy.accounts[household.id] = household.model_copy(
+        update={"balance": household.balance + wage, "last_event_id": event.id})
+    world.society.garrisons[identity] = garrison.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def _withdraw_garrison(world, actor, option, decision):
+    """End only the military duty by an explicit owner decision."""
+    identity = f"garrison:{option.detachment_id}"
+    garrison = world.society.garrisons.get(identity)
+    detachment = world.society.detachments.get(option.detachment_id)
+    if (garrison is None or garrison.stage != "active" or detachment is None
+            or detachment.owner_ref != actor or detachment.stage != "present"
+            or detachment.location_id != garrison.settlement_id):
+        raise ValueError("garrison withdrawal is no longer possible")
+    event = record_event(
+        world, "garrison_withdrawn",
+        "A instituição retirou voluntariamente o dever da guarnição; a coluna permaneceu no local.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("garrison", identity, "stage", "active", "withdrawn"),),
+        cause_ids=_causes(decision.id, garrison.last_event_id, detachment.last_event_id),
+    )
+    world.society.garrisons[identity] = garrison.model_copy(update={
+        "stage": "withdrawn", "last_event_id": event.id})
+    from .territorial_control import lapse_territorial_control
+    lapse_territorial_control(
+        world, garrison.settlement_id, cause_ids=(event.id,),
+        reason="O controle territorial cessou quando a instituição retirou a guarnição.",
+    )
+    return event
+
+
 def _dissolve(world, detachment, event_type, content, causes=()):
     """One fact: occupation clears, people land, the duty ends."""
+    garrison_event = _lapse_garrison(world, detachment,
+                                      reason="A guarnição cessou quando a coluna perdeu sua sustentação física.",
+                                      cause_ids=causes)
     deltas = (*_clear_occupation(world, detachment),)
     # People move before the receipt so the delta states the real counts.
     moved = _return_home(world, detachment)
@@ -698,7 +929,7 @@ def _dissolve(world, detachment, event_type, content, causes=()):
     event = _record(world, detachment, ended, event_type, content,
                     deltas=(*deltas, *moved,
                             _delta("detachment", detachment.id, "stage", detachment.stage, "disbanded")),
-                    causes=causes)
+                    causes=_causes(*causes, *( (garrison_event.id,) if garrison_event else ())))
     # A campaign bag is an Economy stock, never a hidden field on a force.
     # Dispose of anything already co-located before this physical presence is
     # forgotten; later cargo is handled by the same campaign owner.
@@ -718,7 +949,67 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
         raise ValueError("force option is stale or unknown")
     require_authority(candidate, actor, "military")
     detachment = candidate.society.detachments[option.detachment_id]
-    if option.kind == "occupy":
+    if option.kind == "rotate":
+        if action != ROTATE_GARRISON_ACTION:
+            raise ValueError("garrison rotation action mismatch")
+        current = candidate.society.detachments.get(option.current_detachment_id)
+        replacement = candidate.society.detachments.get(option.replacement_detachment_id)
+        current_garrison = candidate.society.garrisons.get(f"garrison:{option.current_detachment_id}")
+        replacement_garrison = candidate.society.garrisons.get(f"garrison:{option.replacement_detachment_id}")
+        account = candidate.economy.accounts.get(option.account_id)
+        if (current is None or replacement is None or current_garrison is None
+                or current_garrison.stage != "active" or replacement_garrison is not None
+                or current.owner_ref != actor or replacement.owner_ref != actor
+                or current.stage != "present" or replacement.stage != "present"
+                or current.location_id != option.settlement_id or replacement.location_id != option.settlement_id
+                or replacement.provisions < replacement.count or account is None
+                or account.owner_ref != actor or account.balance < option.daily_wage):
+            raise ValueError("garrison rotation is no longer materially possible")
+        new_identity = f"garrison:{replacement.id}"
+        event = record_event(
+            candidate, "garrison_rotated",
+            "A instituição substituiu a coluna da guarnição por outra presença abastecida; o controle permaneceu.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            deltas=(_delta("garrison", current_garrison.id, "stage", "active", "withdrawn"),
+                    _delta("garrison", new_identity, "stage", None, "active"),
+                    _delta("garrison", new_identity, "detachment_id", None, replacement.id),
+                    _delta("garrison", new_identity, "settlement_id", None, option.settlement_id)),
+            cause_ids=_causes(decision.id, current_garrison.last_event_id,
+                              current.last_event_id, replacement.last_event_id))
+        candidate.society.garrisons[current_garrison.id] = current_garrison.model_copy(
+            update={"stage": "withdrawn", "last_event_id": event.id})
+        candidate.society.garrisons[new_identity] = Garrison(
+            id=new_identity, detachment_id=replacement.id, settlement_id=option.settlement_id,
+            account_id=account.id, decision_event_id=decision.id,
+            started_day=candidate.clock.absolute_day, last_event_id=event.id)
+    elif option.kind == "garrison":
+        if action != GARRISON_ACTION:
+            raise ValueError("garrison action mismatch")
+        settlement = candidate.society.settlements[detachment.location_id]
+        account = candidate.economy.accounts.get(option.account_id)
+        if (settlement.occupier_id != actor.id or detachment.stage != "present"
+                or detachment.location_id != option.settlement_id
+                or detachment.provisions < detachment.count or account is None
+                or account.owner_ref != actor
+                or account.balance < option.daily_wage):
+            raise ValueError("garrison is no longer supplied or funded")
+        identity = f"garrison:{detachment.id}"
+        garrison = Garrison(id=identity, detachment_id=detachment.id, settlement_id=settlement.id,
+                            account_id=account.id, decision_event_id=decision.id,
+                            started_day=candidate.clock.absolute_day, last_event_id="pending")
+        event = record_event(
+            candidate, "garrison_established", "A coluna estabeleceu uma guarnição material no assentamento ocupado.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            deltas=(_delta("garrison", identity, "stage", None, "active"),
+                    _delta("garrison", identity, "settlement_id", None, settlement.id),
+                    _delta("garrison", identity, "detachment_id", None, detachment.id)),
+            cause_ids=_causes(decision.id, detachment.last_event_id))
+        candidate.society.garrisons[identity] = garrison.model_copy(update={"last_event_id": event.id})
+    elif option.kind == "withdraw":
+        if action != WITHDRAW_GARRISON_ACTION:
+            raise ValueError("garrison withdrawal action mismatch")
+        _withdraw_garrison(candidate, actor, option, decision)
+    elif option.kind == "occupy":
         settlement = candidate.society.settlements[detachment.location_id]
         # The owner revalidates the physical fact the actor cannot see; the
         # refusal states nothing about who else is standing there.
@@ -737,6 +1028,18 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
     candidate.economy.validate(candidate)
     world.__dict__.update(candidate.__dict__)
     return world.society.detachments.get(option.detachment_id)
+
+
+def establish_garrison(world, actor, option_id, decision_event_id):
+    return execute_force_option(world, actor, option_id, decision_event_id, GARRISON_ACTION)
+
+
+def withdraw_garrison(world, actor, option_id, decision_event_id):
+    return execute_force_option(world, actor, option_id, decision_event_id, WITHDRAW_GARRISON_ACTION)
+
+
+def rotate_garrison(world, actor, option_id, decision_event_id):
+    return execute_force_option(world, actor, option_id, decision_event_id, ROTATE_GARRISON_ACTION)
 
 
 def occupy_settlement(world, actor, option_id, decision_event_id):
@@ -878,6 +1181,7 @@ def resolve_forces(world, situations):
         if current.stage == "marching":
             _advance(world, current)
         elif current.stage == "present":
+            _maintain_garrison(world, current)
             # A persisted physical contact remains a fact even when both
             # columns were loaded or arrived in a different resolver order.
             detect_force_standoffs(world, current.id)

@@ -35,7 +35,8 @@ class PurchaseRecoveryRequestOption(SocietyValue):
     quantity: Count
 
     def decision(self):
-        return {"action": REQUEST_ACTION, "actor_ref": self.actor_ref.to_dict(), "option_id": self.id}
+        return {"action": REQUEST_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 class PurchaseRecoveryResponseOption(SocietyValue):
@@ -48,7 +49,8 @@ class PurchaseRecoveryResponseOption(SocietyValue):
     route_ids: tuple[Identity, ...] = ()
 
     def decision(self):
-        return {"action": RESPONSE_ACTION, "actor_ref": self.actor_ref.to_dict(), "option_id": self.id}
+        return {"action": RESPONSE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 def _event(world, event_id):
@@ -183,7 +185,8 @@ def _decision(world, event_id, action):
     event = _event(world, event_id)
     if (event is None or event.fact_kind != FactKind.DECISION or event.causal_origin == CausalOrigin.LLM_INTERPRETATION
             or event.day != world.clock.absolute_day or event.decision is None
-            or event.decision.get("action") != action or set(event.decision) != {"action", "actor_ref", "option_id"}):
+            or event.decision.get("action") != action
+            or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("purchase recovery requires a current actor decision")
     try:
         actor = EntityRef.from_dict(event.decision["actor_ref"])

@@ -18,7 +18,7 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.society.civic import CivicProtest
 from src.systems.calendar_agenda import ScheduledSituation
 
-from .economy import _causes, _delta
+from .economy import _causes, _delta, apply_civic_refusal_pressure, apply_civic_resolution_relief
 from .events import record_event
 
 
@@ -27,6 +27,8 @@ DISSOLVE_ACTION = "dissolve_civic_protest"
 REFUSE_ACTION = "refuse_civic_demand"
 PROTEST_DAYS = 3
 PROTEST_QUORUM = 5
+STRIKE_MIN_UNREST = 650
+STRIKE_MIN_PARTICIPANTS = 10
 HEALTH_FLOOR = 700
 FOOD_DEMAND_CAP = 20
 
@@ -41,6 +43,7 @@ class CivicProtestOption:
     site_id: str | None
     site_integrity_before: float | None
     report_event_id: str
+    participants: int = PROTEST_QUORUM
 
     def decision(self):
         return {"action": OPEN_ACTION,
@@ -111,17 +114,27 @@ def civic_protest_options(world, group_id):
     if current is None:
         return ()
     group, report = current
-    if (report.missing_food <= 0 or (report.unrest < 300 and report.health > HEALTH_FLOOR)
+    if ((report.missing_food <= 0 and report.unrest < 300 and report.health > HEALTH_FLOOR)
             or world.society.available_count(group.id) < PROTEST_QUORUM
             or any(item.stage == "open" and item.settlement_id == group.settlement_id
                    for item in world.society.civic_protests.values())):
         return ()
-    food = min(FOOD_DEMAND_CAP, report.missing_food)
-    options = [CivicProtestOption(
-        id=f"civic-protest-open:{group.id}:{report.event_id}:food_relief:{food}",
-        group_id=group.id, settlement_id=group.settlement_id, demand_kind="food_relief",
-        food_quantity=food, site_id=None, site_integrity_before=None, report_event_id=report.event_id)]
+    options = []
+    if report.missing_food > 0:
+        food = min(FOOD_DEMAND_CAP, report.missing_food)
+        options.append(CivicProtestOption(
+            id=f"civic-protest-open:{group.id}:{report.event_id}:food_relief:{food}",
+            group_id=group.id, settlement_id=group.settlement_id, demand_kind="food_relief",
+            food_quantity=food, site_id=None, site_integrity_before=None, report_event_id=report.event_id))
     options.extend(_damaged_site_options(world, group, report))
+    available = world.society.available_count(group.id)
+    if report.unrest >= STRIKE_MIN_UNREST and available >= STRIKE_MIN_PARTICIPANTS:
+        participants = min(available, max(STRIKE_MIN_PARTICIPANTS, group.count // 10))
+        options.append(CivicProtestOption(
+            id=f"civic-protest-open:{group.id}:{report.event_id}:organized_strike:{participants}",
+            group_id=group.id, settlement_id=group.settlement_id, demand_kind="organized_strike",
+            food_quantity=0, site_id=None, site_integrity_before=None, report_event_id=report.event_id,
+            participants=participants))
     return tuple(sorted(options, key=lambda item: item.id))
 
 
@@ -181,7 +194,7 @@ def open_civic_protest(world, group_id, option_id, decision_event_id):
     protest = CivicProtest(
         id=f"civic-protest:{decision.id}", group_id=group.id, settlement_id=group.settlement_id,
         demand_kind=option.demand_kind, food_quantity=option.food_quantity, site_id=option.site_id,
-        site_integrity_before=option.site_integrity_before, participants=PROTEST_QUORUM,
+        site_integrity_before=option.site_integrity_before, participants=option.participants,
         started_day=candidate.clock.absolute_day, due_day=candidate.clock.absolute_day + PROTEST_DAYS,
         report_event_id=option.report_event_id, decision_event_id=decision.id, last_event_id="pending")
     event = record_event(
@@ -248,9 +261,13 @@ def refuse_civic_demand(world, actor, option_id, decision_event_id):
     decision, decided_by = _decision(candidate, decision_event_id, REFUSE_ACTION)
     if decided_by != actor or decision.decision != option.decision():
         raise ValueError("civic protest has the wrong refusal decision")
+    settlement_id = candidate.society.civic_protests[option.protest_id].settlement_id
     _close(candidate, candidate.society.civic_protests[option.protest_id], "refused", cause_ids=(decision.id,),
            content="A administração recusou a demanda cívica local.")
+    refusal_event_id = candidate.society.civic_protests[option.protest_id].last_event_id
+    apply_civic_refusal_pressure(candidate, settlement_id, refusal_event_id=refusal_event_id)
     candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)
     world.__dict__.update(candidate.__dict__)
     return world.society.civic_protests[option.protest_id]
@@ -291,9 +308,12 @@ def resolve_civic_protests(world, situations):
                 or protest.due_day != world.clock.absolute_day):
             raise ValueError("unknown or inconsistent civic protest")
         receipt = _food_receipt(world, protest) if protest.demand_kind == "food_relief" else _repair_receipt(world, protest)
-        _close(world, protest, "answered" if receipt else "lapsed", cause_ids=(receipt,) if receipt else (),
-               content=("Uma entrega material respondeu à demanda cívica local."
-                        if receipt else "A demanda cívica local expirou sem a entrega material exigida."))
+        closed = _close(world, protest, "answered" if receipt else "lapsed", cause_ids=(receipt,) if receipt else (),
+                        content=("Uma entrega material respondeu à demanda cívica local."
+                                 if receipt else "A demanda cívica local expirou sem a entrega material exigida."))
+        if receipt:
+            apply_civic_resolution_relief(world, protest.settlement_id,
+                                          resolution_event_id=closed.last_event_id)
 
 
 __all__ = ["CivicProtestOption", "CivicTerminalOption", "OPEN_ACTION", "DISSOLVE_ACTION", "REFUSE_ACTION",

@@ -50,6 +50,7 @@ def _identifiers(values: Any, field_name: str) -> tuple[str, ...]:
 
 class HazardImpactEffect(StrEnum):
     REDUCE_INTEGRITY = "reduce_integrity"
+    REDUCE_POPULATION = "reduce_population"
 
 
 @dataclass(frozen=True, slots=True)

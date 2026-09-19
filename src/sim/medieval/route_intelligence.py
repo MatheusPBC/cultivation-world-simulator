@@ -36,7 +36,9 @@ def _runtime(world, route_id):
     route = world.map.routes[route_id]
     capacity = float(world.map.get_route_operational_capacity(route_id))
     passable = capacity > 0 and route.mode in {"road", "river"} and route.quality > 0
-    return capacity, route_duration(world, route_id) if passable else None
+    flow = world.economy.route_flows.get(route_id)
+    daily_flow_bulk = flow.bulk if flow is not None and flow.day == world.clock.absolute_day else 0
+    return capacity, route_duration(world, route_id) if passable else None, daily_flow_bulk
 
 
 def _describe(world, route_id, travel_days):
@@ -65,11 +67,12 @@ def _fiscal_describe(world, route_id, checkpoint_id, fee_per_bulk):
 def _observe(world, actor, route_id, day, causes):
     key = route_report_id(actor, route_id)
     previous = world.knowledge.route_reports.get(key)
-    capacity, travel_days = _runtime(world, route_id)
+    capacity, travel_days, daily_flow_bulk = _runtime(world, route_id)
     if (previous is not None and previous.observed_day == day and previous.recipient_ref == previous.publisher_ref
-            and previous.operational_capacity == capacity and previous.travel_days == travel_days):
+            and previous.operational_capacity == capacity and previous.travel_days == travel_days
+            and previous.daily_flow_bulk == daily_flow_bulk):
         return previous
-    observation = route_observation(route_id, actor, day, capacity, travel_days)
+    observation = route_observation(route_id, actor, day, capacity, travel_days, daily_flow_bulk)
     event = record_event(world, "route_observed", _describe(world, route_id, travel_days),
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("route_report", key, "observation",
@@ -77,6 +80,7 @@ def _observe(world, actor, route_id, day, causes):
                          cause_ids=_causes(*causes))
     report = RouteReport(id=key, recipient_ref=actor, publisher_ref=actor, route_id=route_id, observed_day=day,
                          operational_capacity=capacity, travel_days=travel_days,
+                         daily_flow_bulk=daily_flow_bulk,
                          channel="administrative_route_report", event_id=event.id)
     world.knowledge.route_reports[key] = report
     return report
@@ -135,7 +139,8 @@ def _publish(world, report, recipients, day, channels):
     def same_reading(previous):
         return (previous is not None and previous.observed_day == report.observed_day
                 and previous.operational_capacity == report.operational_capacity
-                and previous.travel_days == report.travel_days)
+                and previous.travel_days == report.travel_days
+                and previous.daily_flow_bulk == report.daily_flow_bulk)
 
     targets = [r for r in recipients if r != publisher
                and (world.knowledge.route_report(r, report.route_id) is None
@@ -225,6 +230,18 @@ def _local_site_observers(world, site):
         settlement = world.society.settlements.get(detachment.location_id)
         if detachment.stage == "present" and settlement is not None and settlement.region_id in site.region_ids:
             observers.add(detachment.owner_ref)
+    # An institution's named office-holder is also a material observer when
+    # that person is physically resident at the site.  This is the narrow
+    # presence channel used by investigation/theft; it does not disclose
+    # private inventory or grant authority beyond the existing office.
+    for office in world.authority.offices.values():
+        if office.holder_ref.kind != "character" or office.holder_ref.id not in world.society.characters:
+            continue
+        holder = world.society.characters[office.holder_ref.id]
+        settlement = world.society.settlements.get(holder.location_id)
+        if (settlement is not None and settlement.region_id in site.region_ids
+                and "diplomacy" in office.scopes):
+            observers.add(office.institution_ref)
     for payroll in world.economy.payrolls.values():
         if payroll.day != world.clock.absolute_day:
             continue

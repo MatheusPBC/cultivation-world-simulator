@@ -83,7 +83,8 @@ class MedievalRuntime:
             if self.world is not None and not request.replace:
                 raise RuntimeProblem("WORLD_EXISTS", "Já existe um mundo. Confirme a substituição para criar outro.")
             try:
-                candidate = create_medieval_world(request.seed, character_count=request.character_count)
+                candidate = create_medieval_world(request.seed, character_count=request.character_count,
+                                                   bootstrap_household_income=True)
                 self._activate(candidate)
             except Exception as exc:
                 raise self._fail("CREATE_FAILED", "Não foi possível criar e salvar o mundo.", exc) from exc

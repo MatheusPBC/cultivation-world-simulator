@@ -113,7 +113,7 @@ def validate_logistics(economy, world=None):
             raise ValueError("missing freight decision")
         if order.resolution_event_id is not None:
             resolution = events.get(order.resolution_event_id)
-            if (resolution is None or resolution.event_type != "purchase_recovery_completed"
+            if (resolution is None or resolution.event_type not in {"purchase_recovery_completed", "contraband_returned", "contraband_seized"}
                     or not any(delta.owner_kind == "freight" and delta.owner_id == order.id
                                and delta.aspect == "resolved_quantity"
                                and delta.after == str(order.resolved_quantity)

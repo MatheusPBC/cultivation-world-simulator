@@ -50,6 +50,13 @@ class WithdrawalClause(ClauseBase):
     detachment_id: Identity
 
 
+class CampaignWithdrawalClause(ClauseBase):
+    """A campaign ceasefire term; Society still owns the physical withdrawal."""
+    kind: Literal['campaign_withdrawal'] = 'campaign_withdrawal'
+    campaign_id: Identity
+    detachment_id: Identity
+
+
 class AdministrationTransferClause(ClauseBase):
     """A current administrator's promise to cede administration of one settlement.
 
@@ -61,6 +68,7 @@ class AdministrationTransferClause(ClauseBase):
 
 
 Clause = Annotated[PaymentClause | TeachingClause | ResourceTransferClause | WithdrawalClause
+                   | CampaignWithdrawalClause
                    | AdministrationTransferClause,
                    Field(discriminator='kind')]
 
@@ -77,7 +85,7 @@ class DiplomaticProposal(SocietyValue):
     status: Literal['offered', 'accepted', 'rejected', 'superseded', 'expired'] = 'offered'
     last_event_id: Identity
     proposal_kind: Literal['negotiated', 'institutional_aid', 'reciprocal_supply', 'force_deescalation',
-                           'administration_concession'] = 'negotiated'
+                           'campaign_ceasefire', 'administration_concession', 'bribery', 'renegotiation'] = 'negotiated'
     request_affordance_id: Identity | None = None
 
     @model_validator(mode='after')
@@ -154,6 +162,15 @@ def validate_clause_assets(world, proposal):
             if (standoff is None or detachment is None or clause.detachment_id not in standoff.detachment_ids
                     or detachment.owner_ref != clause.debtor_ref):
                 raise ValueError('withdrawal obligation requires its own known detachment and contact')
+        elif clause.kind == 'campaign_withdrawal':
+            campaign = world.society.siege_campaigns.get(clause.campaign_id)
+            detachment = world.society.detachments.get(clause.detachment_id)
+            if campaign is None or detachment is None or campaign.phase not in {'sieging', 'breached', 'withdrawn'}:
+                raise ValueError('campaign withdrawal requires an active campaign')
+            garrison = world.society.garrisons.get(campaign.defender_garrison_id)
+            expected = {campaign.attacker_detachment_id, garrison.detachment_id if garrison else None}
+            if clause.detachment_id not in expected or detachment.owner_ref != clause.debtor_ref:
+                raise ValueError('campaign withdrawal requires a current campaign participant')
         elif clause.kind == 'administration_transfer':
             settlement = world.society.settlements.get(clause.settlement_id)
             if settlement is None:
@@ -188,6 +205,16 @@ def force_deescalation_response_intent(responder, selected_affordance_id):
             'selected_affordance_id': selected_affordance_id}
 
 
+def campaign_ceasefire_intent(proposer, selected_affordance_id):
+    return {'action': 'offer_campaign_ceasefire', 'actor_ref': proposer.to_dict(),
+            'selected_affordance_id': selected_affordance_id}
+
+
+def campaign_ceasefire_response_intent(responder, selected_affordance_id):
+    return {'action': 'respond_campaign_ceasefire', 'actor_ref': responder.to_dict(),
+            'selected_affordance_id': selected_affordance_id}
+
+
 def administration_concession_intent(proposer, selected_affordance_id):
     return {'action': 'offer_administration_concession', 'actor_ref': proposer.to_dict(),
             'selected_affordance_id': selected_affordance_id}
@@ -195,6 +222,21 @@ def administration_concession_intent(proposer, selected_affordance_id):
 
 def administration_concession_response_intent(responder, selected_affordance_id):
     return {'action': 'respond_administration_concession', 'actor_ref': responder.to_dict(),
+            'selected_affordance_id': selected_affordance_id}
+
+
+def bribery_offer_intent(proposer, selected_affordance_id):
+    return {'action': 'offer_bribery', 'actor_ref': proposer.to_dict(),
+            'selected_affordance_id': selected_affordance_id}
+
+
+def bribery_response_intent(responder, selected_affordance_id):
+    return {'action': 'respond_bribery', 'actor_ref': responder.to_dict(),
+            'selected_affordance_id': selected_affordance_id}
+
+
+def renegotiation_intent(proposer, selected_affordance_id):
+    return {'action': 'renegotiate_breached_obligation', 'actor_ref': proposer.to_dict(),
             'selected_affordance_id': selected_affordance_id}
 
 
@@ -267,6 +309,9 @@ class RelationsState(RegistrySerialization):
             decision = events.get(p.decision_event_id)
             is_aid = p.proposal_kind == 'institutional_aid'
             is_concession = p.proposal_kind == 'administration_concession'
+            is_bribery = p.proposal_kind == 'bribery'
+            is_renegotiation = p.proposal_kind == 'renegotiation'
+            is_campaign_ceasefire = p.proposal_kind == 'campaign_ceasefire'
             provider_teaching_offer = (decision is not None and decision.decision is not None
                                        and set(decision.decision) == {'action', 'actor_ref', 'selected_affordance_id'}
                                        and decision.decision.get('actor_ref') == p.proposer_ref.to_dict())
@@ -286,8 +331,14 @@ class RelationsState(RegistrySerialization):
                                  if is_aid and p.request_affordance_id is not None else
                                  force_deescalation_intent(p.proposer_ref, p.request_affordance_id)
                                  if p.proposal_kind == 'force_deescalation' and p.request_affordance_id is not None else
+                                 campaign_ceasefire_intent(p.proposer_ref, p.request_affordance_id)
+                                 if is_campaign_ceasefire and p.request_affordance_id is not None else
                                  administration_concession_intent(p.proposer_ref, p.request_affordance_id)
                                  if is_concession and p.request_affordance_id is not None else
+                                 bribery_offer_intent(p.proposer_ref, p.request_affordance_id)
+                                 if is_bribery and p.request_affordance_id is not None else
+                                 renegotiation_intent(p.proposer_ref, p.request_affordance_id)
+                                 if is_renegotiation and p.request_affordance_id is not None else
                                  decision.decision if p.proposal_kind == 'reciprocal_supply' and decision is not None else
                                  offer_intent(p.proposer_ref, p.counterparty_ref, p.clauses, p.expires_day, p.parent_id))
             if is_aid and (p.request_affordance_id is None or any(clause.kind != 'resource_transfer' for clause in p.clauses)):
@@ -295,6 +346,36 @@ class RelationsState(RegistrySerialization):
             if p.proposal_kind == 'force_deescalation' and (
                     p.request_affordance_id is None or any(clause.kind != 'withdrawal' for clause in p.clauses)):
                 raise ValueError('force deescalation requires withdrawal clauses')
+            if is_campaign_ceasefire:
+                if (p.request_affordance_id is None or len(p.clauses) not in {1, 2}
+                        or any(clause.kind != 'campaign_withdrawal' for clause in p.clauses)):
+                    raise ValueError('campaign ceasefire requires one or two withdrawal terms')
+                campaigns = {clause.campaign_id for clause in p.clauses}
+                if len(campaigns) != 1:
+                    raise ValueError('campaign ceasefire terms require one campaign')
+                own_terms = [clause for clause in p.clauses
+                             if clause.debtor_ref == p.proposer_ref and clause.creditor_ref == p.counterparty_ref]
+                counterpart_terms = [clause for clause in p.clauses
+                                     if clause.debtor_ref == p.counterparty_ref and clause.creditor_ref == p.proposer_ref]
+                if len(own_terms) != 1 or len(counterpart_terms) != len(p.clauses) - 1:
+                    raise ValueError('campaign ceasefire cannot obligate only the counterparty')
+            if is_bribery:
+                if (p.request_affordance_id is None or len(p.clauses) != 1
+                        or p.clauses[0].kind != 'payment'
+                        or p.clauses[0].debtor_ref != p.proposer_ref
+                        or p.clauses[0].creditor_ref != p.counterparty_ref):
+                    raise ValueError('bribery requires one payment from the proposer to the counterparty')
+            if is_renegotiation:
+                if p.request_affordance_id is None or len(p.clauses) != 1:
+                    raise ValueError('renegotiation requires its selected current term')
+                clause = p.clauses[0]
+                payment_ok = clause.kind == 'payment' and clause.creditor_ref == p.proposer_ref
+                teaching_ok = (clause.kind == 'teaching'
+                               and clause.debtor_ref == p.proposer_ref
+                               and clause.creditor_ref == p.counterparty_ref
+                               and not clause.depends_on)
+                if not (payment_ok or teaching_ok):
+                    raise ValueError('renegotiation has an invalid payment or teaching term')
             if p.proposal_kind == 'force_deescalation':
                 # This is deliberately not a general treaty language.  A
                 # contact offer can bind only the proposer, or one column of
@@ -314,14 +395,22 @@ class RelationsState(RegistrySerialization):
                 if len(own_terms) != 1 or len(counterpart_terms) != len(withdrawals) - 1:
                     raise ValueError('force deescalation cannot obligate only the counterparty')
             if is_concession:
-                if p.request_affordance_id is None or len(p.clauses) != 2:
+                if p.request_affordance_id is None or len(p.clauses) not in {1, 2}:
                     raise ValueError('administration concession requires its selected current terms')
-                transfer, withdrawal = p.clauses
-                if (transfer.kind != 'administration_transfer' or withdrawal.kind != 'withdrawal'
-                        or transfer.debtor_ref != p.counterparty_ref or transfer.creditor_ref != p.proposer_ref
-                        or withdrawal.debtor_ref != p.proposer_ref or withdrawal.creditor_ref != p.counterparty_ref
-                        or transfer.depends_on or withdrawal.depends_on != (0,)):
-                    raise ValueError('administration concession requires transfer before withdrawal')
+                transfer = p.clauses[0]
+                if len(p.clauses) == 1:
+                    if (transfer.kind != 'administration_transfer'
+                            or transfer.debtor_ref != p.counterparty_ref
+                            or transfer.creditor_ref != p.proposer_ref
+                            or transfer.depends_on):
+                        raise ValueError('postwar administration concession requires a direct transfer')
+                else:
+                    _transfer, withdrawal = p.clauses
+                    if (transfer.kind != 'administration_transfer' or withdrawal.kind != 'withdrawal'
+                            or transfer.debtor_ref != p.counterparty_ref or transfer.creditor_ref != p.proposer_ref
+                            or withdrawal.debtor_ref != p.proposer_ref or withdrawal.creditor_ref != p.counterparty_ref
+                            or transfer.depends_on or withdrawal.depends_on != (0,)):
+                        raise ValueError('administration concession requires transfer before withdrawal')
                 settlement = world.society.settlements[transfer.settlement_id]
                 transfer_obligation = self.obligations.get(f'{p.id}:term:0')
                 if ((transfer_obligation is None and p.status == 'offered')
@@ -362,6 +451,19 @@ class RelationsState(RegistrySerialization):
                                 ':accept' if p.status == 'accepted' else ':reject')]
                 if len(matching) != 1:
                     raise ValueError('force deescalation response requires its exact decision')
+            if is_campaign_ceasefire and p.status in {'accepted', 'rejected'}:
+                response = events[p.last_event_id]
+                matching = [events.get(link.cause_event_id) for link in response.causal_links]
+                matching = [item for item in matching if item is not None and item.fact_kind.name == 'DECISION'
+                            and item.decision
+                            and item.decision.get('action') == 'respond_campaign_ceasefire'
+                            and item.decision.get('actor_ref') == p.counterparty_ref.to_dict()
+                            and str(item.decision.get('selected_affordance_id', '')).startswith(
+                                f'campaign-ceasefire-response:{p.id}:')
+                            and str(item.decision.get('selected_affordance_id', '')).endswith(
+                                ':accept' if p.status == 'accepted' else ':reject')]
+                if len(matching) != 1:
+                    raise ValueError('campaign ceasefire response requires its exact decision')
             if is_concession and p.status in {'accepted', 'rejected'}:
                 response = events[p.last_event_id]
                 matching = [events.get(link.cause_event_id) for link in response.causal_links]
@@ -375,6 +477,19 @@ class RelationsState(RegistrySerialization):
                                 ':accept' if p.status == 'accepted' else ':reject')]
                 if len(matching) != 1:
                     raise ValueError('administration concession response requires its exact decision')
+            if is_bribery and p.status in {'accepted', 'rejected'}:
+                response = events[p.last_event_id]
+                matching = [events.get(link.cause_event_id) for link in response.causal_links]
+                matching = [item for item in matching if item is not None and item.fact_kind.name == 'DECISION'
+                            and item.decision
+                            and item.decision.get('action') == 'respond_bribery'
+                            and item.decision.get('actor_ref') == p.counterparty_ref.to_dict()
+                            and str(item.decision.get('selected_affordance_id', '')).startswith(
+                                f'bribery-response:{p.id}:')
+                            and str(item.decision.get('selected_affordance_id', '')).endswith(
+                                ':accept' if p.status == 'accepted' else ':reject')]
+                if len(matching) != 1:
+                    raise ValueError('bribery response requires its exact decision')
             if p.status == 'offered':
                 deadline(p.id, p.expires_day)
             if p.parent_id:
@@ -416,14 +531,19 @@ class RelationsState(RegistrySerialization):
                 breach = events.get(obligation.breach_event_id)
                 material = events.get(obligation.remediation_material_event_id)
                 final = events.get(obligation.last_event_id)
+                clause = p.clauses[obligation.clause_index]
+                material_ok = (material is not None and (
+                    (clause.kind == 'resource_transfer' and material.event_type == 'freight_opened')
+                    or (clause.kind == 'payment' and material.event_type == 'payment_completed')))
                 if (breach is None or breach.event_type != 'commitment_breached'
-                        or material is None or material.event_type != 'freight_opened'
-                        or final is None or final.event_type != 'institutional_aid_remediated'
+                        or not material_ok
+                        or final is None or final.event_type not in {
+                            'institutional_aid_remediated', 'payment_obligation_remediated'}
                         or obligation.breach_event_id not in {link.cause_event_id for link in final.causal_links}
                         or obligation.remediation_material_event_id not in {link.cause_event_id for link in final.causal_links}
                         or not any(d.owner_kind == 'obligation' and d.owner_id == obligation.id
                                    and d.aspect == 'status' and d.after == 'remediated' for d in final.deltas)):
-                    raise ValueError('remediation requires a receipt linked to breach and freight')
+                    raise ValueError('remediation requires a receipt linked to breach and material execution')
             elif (obligation.material_event_id is not None or obligation.breach_event_id is not None
                   or obligation.remediation_material_event_id is not None):
                 raise ValueError('non-concluded obligation cannot retain material provenance')
@@ -503,14 +623,26 @@ class RelationsState(RegistrySerialization):
                     raise ValueError('remediation material receipt cannot be reused')
                 used.add(material_id)
                 clause = p.clauses[obligation.clause_index]
-                if clause.kind != 'resource_transfer':
-                    raise ValueError('only resource transfers can be remediated')
                 material = events[material_id]
-                decisions = [event for event in events.values()
+                if clause.kind == 'payment':
+                    if (material.event_type != 'payment_completed' or not any(
+                            delta.owner_kind == 'account' and delta.owner_id == clause.source_account_id
+                            and delta.aspect == 'balance'
+                            and int(delta.after) - int(delta.before) == -clause.amount
+                            for delta in material.deltas)
+                            or not any(delta.owner_kind == 'account' and delta.owner_id == clause.target_account_id
+                                        and delta.aspect == 'balance'
+                                        and int(delta.after) - int(delta.before) == clause.amount
+                                        for delta in material.deltas)):
+                        raise ValueError('remediation requires the negotiated payment receipt')
+                elif clause.kind != 'resource_transfer':
+                    raise ValueError('only payment or resource transfers can be remediated')
+                else:
+                    decisions = [event for event in events.values()
                              if event.fact_kind.name == 'DECISION'
                              and event.decision and event.decision.get('action') == 'remediate_institutional_aid'
                              and event.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
-                freight = [order for order in world.economy.freight_orders.values()
+                    freight = [order for order in world.economy.freight_orders.values()
                            if (order.destination_id == clause.destination_stock_id
                                and order.resource_id == clause.resource_id
                                and order.quantity == clause.quantity
@@ -518,12 +650,12 @@ class RelationsState(RegistrySerialization):
                                and any(decision.id in order.decision_ids for decision in decisions)
                                and material.id == f"event:{order.id.split(':', 1)[1]}"
                                )]
-                if (len(freight) != 1
+                    if (len(freight) != 1
                         or not any(delta.owner_kind == 'stock' and delta.owner_id == freight[0].source_id
                                    and delta.aspect == clause.resource_id
                                    and int(delta.after) - int(delta.before) == -clause.quantity
                                    for delta in material.deltas)):
-                    raise ValueError('remediation requires the negotiated freight receipt')
+                        raise ValueError('remediation requires the negotiated freight receipt')
         for memory in self.memories.values():
             self._validate_memory(world, events, memory)
 
@@ -545,6 +677,12 @@ class RelationsState(RegistrySerialization):
         knows_fact = knows_fact or any(
             finding.recipient_ref == memory.institution_ref and finding.event_id == memory.event_id
             for finding in world.knowledge.investigation_findings.values())
+        # Some material responses use a specialized notice registry rather
+        # than the broad diplomatic-notice index.  Those notices are still
+        # the actor's canonical knowledge boundary and may anchor memory.
+        knows_fact = knows_fact or any(
+            notice.recipient_ref == memory.institution_ref and notice.event_id == memory.event_id
+            for notice in world.knowledge.institutional_aid_notices.values())
         if not knows_fact:
             raise ValueError('institutional memory requires the knowledge notice of that fact')
         if memory.last_reinforced_day != memory.recorded_day and not any(

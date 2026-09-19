@@ -50,7 +50,7 @@ class TechnicalKnowledge(SocietyValue):
     owner_ref: EntityRef
     technology_id: Identity
     learned_day: Count
-    channel: Literal['research', 'teaching', 'apprenticeship', 'copied']
+    channel: Literal['research', 'teaching', 'apprenticeship', 'copied', 'sale', 'stolen']
     event_id: Identity
 
 
@@ -76,17 +76,59 @@ class RiteBlueprint(SocietyValue):
     reach: Literal['local', 'adjacent'] = 'local'
     kind: Literal['restoration', 'ward'] = 'restoration'
     ward_days: int = Field(strict=True, ge=0, le=360, default=0)
+    resistance_capability_id: Identity | None = None
 
     @model_validator(mode='after')
     def valid_rite(self):
         if self.skill not in Skills.model_fields or not self.inputs:
             raise ValueError('rite requires a known skill and real materials')
         if self.kind == 'ward':
-            if self.reach != 'local' or self.ward_days <= 0 or self.health_gain_permille:
+            if (self.reach != 'local' or self.ward_days <= 0 or self.health_gain_permille
+                    or not self.resistance_capability_id):
                 raise ValueError('a ward protects its own place for a real term and heals nobody')
-        elif self.ward_days or self.health_gain_permille < 1:
+        elif self.ward_days or self.health_gain_permille < 1 or self.resistance_capability_id is not None:
             raise ValueError('a restoration gives bounded relief and no protection')
         return self
+
+    @property
+    def school(self) -> Literal['restoration', 'protection', 'countermeasure']:
+        """Engine-owned school; authored kind remains the canonical source.
+
+        Countermeasure profiles are still wards materially, but are exposed as
+        a distinct school so observers can distinguish a standing barrier from
+        a hazard-specific response without introducing a spell registry.
+        """
+        if self.kind != 'ward':
+            return 'restoration'
+        return 'protection' if self.resistance_capability_id == 'standing_ward' else 'countermeasure'
+
+    @property
+    def cost(self) -> dict[Identity, Positive]:
+        """Material cost owned by the blueprint, never by narrative text."""
+        return dict(self.inputs)
+
+    @property
+    def range(self) -> Literal['local', 'adjacent']:
+        """Engine-enumerated geographic reach of the working."""
+        return self.reach
+
+    @property
+    def duration_days(self) -> Positive:
+        """The one applicable duration: working time or ward term."""
+        return self.ward_days if self.kind == 'ward' else self.days
+
+
+class RiteBlueprintMetadata(SocietyValue):
+    """Transient canonical observability of one authored rite blueprint.
+
+    This is a read model, not a second registry or persisted spell state.
+    Every value is derived from :class:`RiteBlueprint` by the engine.
+    """
+    id: Identity
+    school: Literal['restoration', 'protection', 'countermeasure']
+    cost: dict[Identity, Positive]
+    range: Literal['local', 'adjacent']
+    duration_days: Positive
 
 
 class Rite(SocietyValue):
@@ -169,6 +211,7 @@ class Ward(SocietyValue):
     rite_id: Identity
     started_day: Count
     until_day: Count
+    resistance_capability_id: Identity = 'standing_ward'
     last_event_id: Identity
 
     @model_validator(mode='after')

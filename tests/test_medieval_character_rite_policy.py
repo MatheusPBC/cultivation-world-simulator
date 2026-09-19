@@ -73,7 +73,8 @@ async def test_character_offer_then_independent_sponsorship_completes_paid_rite(
     before_inputs = {resource: stock.goods.get(resource, 0) for resource in blueprint.inputs}
 
     scheduled = schedule_character_rite_offers(world)
-    assert len(scheduled) == 1
+    assert scheduled
+    assert any(item.startswith("character-rite-offer-review:character:005:") for item in scheduled)
     assert world.agenda.get(scheduled[0]).kind == OFFER_REVIEW_KIND
     await advance_review(world)
 

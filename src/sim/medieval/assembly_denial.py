@@ -19,6 +19,7 @@ from src.systems.calendar_agenda import ScheduledSituation
 
 from .economy import _causes, _delta
 from .events import record_event
+from .institutional_decision_turn import DiscretionaryAdapter
 
 
 DENY_ACTION = "deny_rite_assembly"
@@ -144,6 +145,19 @@ def _deny(world, option, decision):
         deltas=(_delta("assembly_denial", denial.id, "detachment_id", None, detachment.id),
                 _delta("assembly_denial", denial.id, "settlement_id", None, denial.settlement_id)),
         cause_ids=_causes(decision.id, observation.event_id, detachment.last_event_id, position.last_event_id))
+    # The material act is still a Society denial, but the canonical payload
+    # lets observability classify its social meaning without using prose as a
+    # cause.  Economy receives the later pressure transition separately.
+    event = event.model_copy(update={"causal_payload": {
+        "social_conflict": {
+            "kind": "religious_persecution",
+            "actor_ref": option.actor_ref.to_dict(),
+            "site_id": option.site_id,
+            "settlement_id": option.settlement_id,
+            "rite_observation_id": observation.id,
+        }
+    }})
+    world.events[-1] = event
     world.society.assembly_denials[denial.id] = denial.model_copy(update={"last_event_id": event.id})
     world.agenda.schedule(ScheduledSituation(denial.id, "rite_interruption", world.clock.absolute_day + 1))
     return world.society.assembly_denials[denial.id]
@@ -172,5 +186,60 @@ def revoke_assembly_denials_for(world, detachment, *, cause_ids=()):
     return tuple(lifted)
 
 
+def _institutional_causes(world, option):
+    """Expose only canonical observations and local force evidence."""
+    causes = []
+    if option.observation_id is not None:
+        observation = world.knowledge.rite_observations.get(option.observation_id)
+        if observation is not None and observation.event_id:
+            causes.append(observation.event_id)
+    detachment = world.society.detachments.get(option.detachment_id)
+    if detachment is not None:
+        causes.append(detachment.last_event_id)
+        position = world.society.force_positions.get(f"force-position:{detachment.id}")
+        if position is not None:
+            causes.append(position.last_event_id)
+    denial = world.society.assembly_denials.get(option.site_id)
+    if denial is not None:
+        causes.append(denial.last_event_id)
+    return tuple(dict.fromkeys(item for item in causes if item))
+
+
+def _institutional_situation(world, actor, options):
+    return {
+        "you_are": actor.to_dict(),
+        "today": world.clock.absolute_day,
+        "ritual_actions": [
+            {"id": option.id, "kind": option.kind, "site_id": option.site_id,
+             "settlement_id": option.settlement_id, "detachment_id": option.detachment_id,
+             "observation_id": option.observation_id}
+            for option in options
+        ],
+    }
+
+
+def assembly_denial_adapters():
+    """Expose local ritual denial/lift in the shared monthly institution turn.
+
+    The adapter does not invent a new policy or executor.  It only makes the
+    already material Society owner available when no force-contact notice is
+    present.  A denial still requires a fresh local observation and a prepared
+    supplied detachment; a lift is offered only for the current denial.
+    """
+    return (DiscretionaryAdapter(
+        name="religious_assembly", family="conflict",
+        options_fn=assembly_denial_options,
+        label_fn=lambda option: (
+            "Liberar a assembleia ritual atualmente impedida."
+            if option.kind == "lift" else
+            "Impedir materialmente a assembleia ritual observada."),
+        causes_fn=_institutional_causes,
+        situation_fn=_institutional_situation,
+        execute_fn=lambda world, actor, option_id, decision_event_id:
+            execute_assembly_denial_option(world, actor, option_id, decision_event_id),
+    ),)
+
+
 __all__ = ["DENY_ACTION", "LIFT_ACTION", "AssemblyDenialOption", "assembly_denial_options",
-           "execute_assembly_denial_option", "revoke_assembly_denials_for"]
+           "execute_assembly_denial_option", "revoke_assembly_denials_for",
+           "assembly_denial_adapters"]

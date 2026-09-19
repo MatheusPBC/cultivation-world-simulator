@@ -24,6 +24,7 @@ from .labor import settle_work
 
 OBSERVATION_DAYS = 30
 REPAIR_AUTHORIZATION_ACTION = "authorize_infrastructure_repair"
+REACTIVATE_ACTION = "reactivate_infrastructure_site"
 
 
 def _event(world, event_id):
@@ -262,6 +263,88 @@ class RepairAuthorizationOption:
                 "site_id": self.site_id}
 
 
+@dataclass(frozen=True)
+class SiteReactivationOption:
+    """Transient maintainer choice to reopen a physically recovered site.
+
+    Repair owns integrity and this action owns only the separate operability
+    flag. A completed repair (or a narrative receipt) cannot silently reopen
+    an installation.
+    """
+
+    id: Identity
+    actor_ref: EntityRef
+    site_id: Identity
+    report_event_id: Identity
+
+    def decision(self):
+        return {"action": REACTIVATE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+def site_reactivation_options(world, actor):
+    """Enumerate recovered, still-interdicted sites of the maintainer."""
+    if not isinstance(actor, EntityRef) or not can_actor_act_for(world, actor, actor, "supply"):
+        return ()
+    options = []
+    for site in sorted(world.map.infrastructure_sites.values(), key=lambda item: item.id):
+        if site.maintainer_ref != actor or site.enabled or site.integrity < 1.0:
+            continue
+        if any(project.site_id == site.id and project.stage != "completed"
+               for project in world.economy.repairs.values()):
+            continue
+        report = current_observation(world, actor, site.id)
+        if (report is None or report.enabled or report.integrity < 1.0
+                or report.service_suspended != site.service_suspended):
+            continue
+        stock, account = local_holdings(world, actor, site)
+        if stock is None or account is None:
+            continue
+        options.append(SiteReactivationOption(
+            id=f"site-reactivation:{actor.kind}:{actor.id}:{site.id}:{site.last_event_id}:{report.event_id}",
+            actor_ref=actor, site_id=site.id, report_event_id=report.event_id))
+    return tuple(options)
+
+
+def execute_site_reactivation(world, actor, option_id, decision_event_id):
+    """Revalidate the current owner decision and reopen only the site flag."""
+    option = next((item for item in site_reactivation_options(world, actor) if item.id == option_id), None)
+    decision = _event(world, decision_event_id)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+        raise ValueError("site reactivation option is stale or unknown")
+    site = world.map.infrastructure_sites.get(option.site_id)
+    report = current_observation(world, actor, option.site_id)
+    if (site is None or site.maintainer_ref != actor or site.enabled or site.integrity < 1.0
+            or report is None or report.event_id != option.report_event_id or report.enabled
+            or report.integrity < 1.0):
+        raise ValueError("site reactivation is no longer possible")
+    require_authority(world, actor, "supply")
+    event = record_event(
+        world, "site_reactivated",
+        f"{site.name}: o maintainer retomou a operação após a recuperação física.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("site", site.id, "enabled", False, True),),
+        cause_ids=_causes(decision.id, report.event_id, site.last_event_id),
+    )
+    world.map.update_infrastructure_site_runtime(site.id, enabled=True, last_event_id=event.id)
+    from .route_intelligence import refresh_site_reports
+    refresh_site_reports(world, site_ids=(site.id,))
+    return event
+
+
+def site_reactivation_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    return (DiscretionaryAdapter(
+        name="site_reactivation", family="infrastructure",
+        options_fn=site_reactivation_options,
+        label_fn=lambda option: f"Reativar a instalação recuperada {option.site_id}.",
+        causes_fn=lambda _world, option: (option.report_event_id,),
+        execute_fn=execute_site_reactivation,
+    ),)
+
+
 def repair_authorization_options(world, actor):
     """Sites this maintainer could authorize a fresh repair for right now.
 
@@ -315,15 +398,17 @@ def execute_repair_authorization_option(world, actor, option_id, decision_event_
     return _authorize_repair(world, actor, option, cause_ids=(decision_event_id,))
 
 
-def review_maintenance(world, *, exclude_site_ids=()):
+def review_maintenance(world, *, exclude_site_ids=(), excluded_actors=()):
     """Deterministic policy: a maintainer that saw its own damage may authorize work.
 
     ``exclude_site_ids`` lets a concurrent, actor-facing review claim a site for
     this same boundary; the automatic pass then leaves it alone instead of
     silently authorizing behind a menu the maintainer already saw.
     """
+    excluded = set(excluded_actors)
     maintainers = sorted({site.maintainer_ref for site in world.map.infrastructure_sites.values()
-                          if site.maintainer_ref is not None}, key=lambda ref: (ref.kind, ref.id))
+                          if site.maintainer_ref is not None and site.maintainer_ref not in excluded},
+                         key=lambda ref: (ref.kind, ref.id))
     options_by_site = {option.site_id: (maintainer, option) for maintainer in maintainers
                        for option in repair_authorization_options(world, maintainer)}
     for site_id in sorted(world.map.infrastructure_sites):

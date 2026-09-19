@@ -108,6 +108,7 @@ def produce_monthly(world, available=None) -> None:
 
 def consume_monthly(world) -> None:
     from .consumption import purchase_monthly_rations
+    from .logistics import _route_causes
     from .migration import consume_travel_provisions
     economy = world.economy
     economy.validate(world)
@@ -137,17 +138,183 @@ def consume_monthly(world) -> None:
         deltas = tuple(_delta("subsistence", need.id, field, getattr(need, field), getattr(updated, field))
                        for field in ("health", "unrest", "missing_food") if getattr(need, field) != getattr(updated, field))
         settlement = world.society.settlements[need.id]
+        # A blocked food order already carries the cargo-delay receipt, but the
+        # settlement's dated scarcity fact should also name the current Map
+        # interruption directly.  This keeps the causal chain navigable from
+        # route -> missing food/health/unrest -> dated institutional reading
+        # without making the route owner mutate Economy or creating aid.
+        interrupted_route_causes = tuple(
+            cause
+            for order in economy.freight_orders.values()
+            if (order.destination_id == stock.id and order.resource_id == "food"
+                and order.delivered_quantity < order.quantity)
+            for route_id in order.route_ids
+            if world.map.get_route_operational_capacity(route_id) <= 0
+            for cause in _route_causes(world, (route_id,)).get(route_id, ())
+        )
         event = _apply_stock(world, stock, stock.goods, "subsistence_resolved",
                              f"{settlement.name}: {domestic + paid}/{required} rações atendidas; {domestic} domésticas, {paid} compradas; "
                              f"déficit de {missing}.",
                              extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"),
                                   *domestic_receipts, *receipts,
+                                  *interrupted_route_causes,
                                   *(group.last_event_id for group in groups),
                                  *(f.last_event_id for f in economy.facilities.values() if f.stock_id == stock.id
                                    and "food" in economy.recipes[f.recipe_id].outputs),
                                  *(o.last_event_id for o in economy.freight_orders.values() if o.destination_id == stock.id
                                    and o.resource_id == "food" and o.delivered_quantity < o.quantity)))
+        # The scalar deltas preserve the canonical state transition.  This
+        # structured reading makes the affordability bottleneck explainable
+        # without parsing prose or exposing household balances to decision
+        # contexts that do not already know them.
+        event = event.model_copy(update={"causal_payload": {
+            "subsistence": {
+                "settlement_id": need.id,
+                "required": required,
+                "public_required": public_required,
+                "domestic_quantity": domestic,
+                "purchased_quantity": paid,
+                "missing_food": missing,
+                "household_group_ids": sorted(required_by_group),
+            }
+        }})
+        world.events[-1] = event
         economy.needs[need.id] = updated.model_copy(update={"last_event_id": event.id})
+
+
+def apply_civic_refusal_pressure(world, settlement_id, *, refusal_event_id, pressure=50):
+    """Apply a bounded unrest consequence to a materially refused demand.
+
+    Economy remains the owner of subsistence condition.  A civic executor may
+    name the refusal as a cause, but it cannot mutate ``SettlementNeeds``
+    directly or manufacture a later protest/rebellion.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(pressure) is not int or pressure <= 0:
+        raise ValueError("civic refusal pressure requires a settlement and positive pressure")
+    updated = need.model_copy(update={"unrest": min(1000, need.unrest + pressure)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "civic_refusal_pressure",
+        "A recusa administrativa agravou a tensão material registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(refusal_event_id, need.last_event_id))
+    world.economy.needs[settlement_id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def apply_civic_resolution_relief(world, settlement_id, *, resolution_event_id, relief=40):
+    """Apply bounded unrest relief only after a material civic response.
+
+    The protest owner supplies the factual closure and the material receipt;
+    Economy owns the subsistence condition and records the derived transition.
+    This never creates food or repairs and cannot erase more unrest than exists.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(relief) is not int or relief <= 0:
+        raise ValueError("civic resolution relief requires a settlement and positive relief")
+    updated = need.model_copy(update={"unrest": max(0, need.unrest - relief)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "civic_resolution_relief",
+        "Uma resposta material reduziu a tensão registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(resolution_event_id, need.last_event_id))
+    world.economy.needs[settlement_id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def apply_rite_persecution_pressure(world, settlement_id, *, interruption_event_id, pressure=60):
+    """Record bounded social pressure caused by a material rite interruption.
+
+    Society owns the denial and Research owns the interrupted rite.  Economy
+    remains the only owner allowed to change the settlement's subsistence
+    condition.  This is deliberately pressure, not an automatic protest or
+    persecution campaign: later civic affordances must still be recomposed
+    from the resulting report and selected by an actor.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(pressure) is not int or pressure <= 0:
+        raise ValueError("rite interruption pressure requires a settlement and positive pressure")
+    updated = need.model_copy(update={"unrest": min(1000, need.unrest + pressure)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "rite_interruption_pressure",
+        "A interrupção material de um rito agravou a tensão registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(interruption_event_id, need.last_event_id))
+    world.economy.needs[need.id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def apply_civic_rebellion_pressure(world, settlement_id, *, rebellion_event_id, pressure=100):
+    """Record bounded subsistence pressure from an explicitly declared uprising.
+
+    Society owns the declaration and its participants; Economy owns the
+    settlement condition.  This does not transfer administration or create a
+    military outcome.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(pressure) is not int or pressure <= 0:
+        raise ValueError("civic rebellion pressure requires a settlement and positive pressure")
+    updated = need.model_copy(update={"unrest": min(1000, need.unrest + pressure)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "civic_rebellion_pressure",
+        "A declaração de rebelião agravou a pressão social registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(rebellion_event_id, need.last_event_id))
+    world.economy.needs[settlement_id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def apply_civic_suppression_pressure(world, settlement_id, *, suppression_event_id, pressure=120):
+    """Record bounded social pressure caused by material repression.
+
+    Society owns the suppression and participant release; Economy owns the
+    settlement condition.  This never creates a successor movement or changes
+    administration, so future civic action still requires a fresh decision.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(pressure) is not int or pressure <= 0:
+        raise ValueError("civic suppression pressure requires a settlement and positive pressure")
+    updated = need.model_copy(update={"unrest": min(1000, need.unrest + pressure)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "civic_suppression_pressure",
+        "A repressão material agravou a pressão social registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(suppression_event_id, need.last_event_id))
+    world.economy.needs[settlement_id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
+
+
+def apply_civic_revolution_pressure(world, settlement_id, *, revolution_event_id, pressure=150):
+    """Record the bounded additional pressure of an explicitly chosen revolution."""
+    need = world.economy.needs.get(settlement_id)
+    if need is None or type(pressure) is not int or pressure <= 0:
+        raise ValueError("civic revolution pressure requires a settlement and positive pressure")
+    updated = need.model_copy(update={"unrest": min(1000, need.unrest + pressure)})
+    if updated.unrest == need.unrest:
+        return None
+    event = record_event(
+        world, "civic_revolution_pressure",
+        "A revolução declarada agravou a pressão social registrada no assentamento.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
+        cause_ids=_causes(revolution_event_id, need.last_event_id))
+    world.economy.needs[settlement_id] = updated.model_copy(update={"last_event_id": event.id})
+    return event
 
 
 def _consume_household_food(world, settlement_id, requirements):

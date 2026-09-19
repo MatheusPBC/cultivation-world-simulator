@@ -13,6 +13,7 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !Array.isArray(data.diplomacy?.proposals) || !Array.isArray(data.diplomacy?.obligations)
       || !Array.isArray(data.diplomacy?.notices) || !Array.isArray(data.diplomacy?.aid_notices)
       || !Array.isArray(data.diplomacy?.memories) || !Array.isArray(data.diplomacy?.aid_readings)
+      || !Array.isArray(data.diplomacy?.strategic_evidence)
       || !Array.isArray(data.governance?.objectives) || !Array.isArray(data.governance?.plans)
       || !Array.isArray(data.governance?.route_reports) || !Array.isArray(data.governance?.fiscal_route_reports)
       || !Array.isArray(data.governance?.site_reports)
@@ -20,7 +21,17 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !Array.isArray(data.governance?.customs_notices)
       || !Array.isArray(data.governance?.workforce_demand_reports)
       || !Array.isArray(data.governance?.workforce_offer_notices)
-      || !Array.isArray(data.society?.workforce_transitions)) {
+      || !Array.isArray(data.society?.workforce_transitions)
+      || !Array.isArray(data.society?.civic_protests)
+      || !Array.isArray(data.society?.civic_movements)
+      || !Array.isArray(data.society?.civic_strikes)
+      || !Array.isArray(data.society?.civic_amnesties)
+      || !Array.isArray(data.economy?.employment_contracts)
+      || !Array.isArray(data.campaigns?.territorial_controls)
+      || !Array.isArray(data.campaigns?.occupations)
+      || !Array.isArray(data.campaigns?.siege_campaigns)
+      || !Array.isArray(data.campaigns?.political_settlements)
+      || !Array.isArray(data.campaigns?.threats)) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato do mundo está incompleto.')
   }
   if (data.governance.tax_policies.some(p => !Number.isInteger(p.export_rate_permille)
@@ -75,9 +86,10 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
         || typeof notice.recipient_ref.kind !== 'string' || typeof notice.recipient_ref.id !== 'string' || !notice.recipient_ref.id
         || typeof notice.resource_id !== 'string' || !notice.resource_id
         || typeof notice.quantity !== 'number' || !Number.isFinite(notice.quantity) || notice.quantity <= 0
+        || !['ordinary', 'contraband'].includes(notice.classification)
         || (notice.fee !== null && (typeof notice.fee !== 'number' || !Number.isFinite(notice.fee) || notice.fee <= 0))
         || !Number.isInteger(notice.learned_day) || notice.learned_day < 0
-        || !['presented', 'fee_due', 'detected', 'cleared', 'evaded_undetected'].includes(notice.state)
+        || !['presented', 'fee_due', 'detected', 'cleared', 'evaded_undetected', 'returned', 'seized'].includes(notice.state)
         || typeof notice.event_id !== 'string' || !notice.event_id
         || typeof notice.state_event_id !== 'string' || !notice.state_event_id
         || (notice.manifest_id !== null && (typeof notice.manifest_id !== 'string' || !notice.manifest_id))
@@ -152,6 +164,25 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
         || typeof transition.decision_event_id !== 'string' || !transition.decision_event_id
         || typeof transition.last_event_id !== 'string' || !transition.last_event_id)) {
     throw new ApiError('INVALID_RESPONSE', 'O retrato da força de trabalho está incompleto.')
+  }
+  if (data.society.civic_protests.some(protest =>
+      typeof protest.id !== 'string' || !protest.id
+      || typeof protest.group_id !== 'string' || !protest.group_id
+      || typeof protest.settlement_id !== 'string' || !protest.settlement_id
+      || !['food_relief', 'site_repair', 'organized_strike'].includes(protest.demand_kind)
+      || !Number.isInteger(protest.food_quantity) || protest.food_quantity < 0
+      || (protest.site_id !== null && (typeof protest.site_id !== 'string' || !protest.site_id))
+      || (protest.site_integrity_before !== null
+        && (typeof protest.site_integrity_before !== 'number' || !Number.isFinite(protest.site_integrity_before)
+          || protest.site_integrity_before < 0 || protest.site_integrity_before > 1))
+      || !Number.isInteger(protest.participants) || protest.participants <= 0
+      || !Number.isInteger(protest.started_day) || protest.started_day < 0
+      || !Number.isInteger(protest.due_day) || protest.due_day < protest.started_day
+      || !['open', 'answered', 'refused', 'lapsed', 'dissolved'].includes(protest.stage)
+      || typeof protest.report_event_id !== 'string' || !protest.report_event_id
+      || typeof protest.decision_event_id !== 'string' || !protest.decision_event_id
+      || typeof protest.last_event_id !== 'string' || !protest.last_event_id)) {
+    throw new ApiError('INVALID_RESPONSE', 'O estado do protesto cívico está incompleto.')
   }
   const stocks = new Set(data.economy.stocks.map(s => s.id))
   const resources = new Set(data.economy.resources.map(r => r.id))

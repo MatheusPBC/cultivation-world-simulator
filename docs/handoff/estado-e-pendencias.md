@@ -2,6 +2,19 @@
 
 Base inspecionada em 12/09/2026: `896c0359`, `main`, sem WIP anterior a este pacote documental. Não houve nova execução de testes ou inspeção da VPS para escrever este handoff. Evidências de execução abaixo são históricas, não validação nova.
 
+## Atualização do checkpoint causal
+
+O quadro acima é histórico e não deve ser lido como estado atual do fork. Desde
+então, espionagem, suborno, sabotagem, persuasão, cerco persistente, ocupação,
+guarnição, controle territorial, concessão administrativa, drake e contramedidas
+de ward receberam fatias causais próprias. Portanto, “economia/diplomacia/
+conflitos” não está restrito à primeira fatia, e “campanhas, magia e criaturas”
+não está intocado; ambos continuam incompletos em escopo amplo.
+
+O dossier privado também passou a expor `causal_depth` para os elos conhecidos
+entre decisões próprias e fatos observados. Isso é somente projeção: não revela
+causas que o ator não conhece nem cria um segundo dono de conhecimento.
+
 ## Veredito
 
 **O plano inteiro não está concluído.** A infraestrutura causal/institucional e a vertical de ajuda existem; várias composições sociais têm somente recortes funcionais. Não usar quantidade de commits ou testes como porcentagem de conclusão.
@@ -16,7 +29,7 @@ Base inspecionada em 12/09/2026: `896c0359`, `main`, sem WIP anterior a este pac
 | Comércio | Troca recíproca entre cidades sob escassez, dois termos independentes, rota/estoque reais. | Não é comércio geral, mercado de preços ou cadeia logística profunda. |
 | Guerra | Agressão auditada, resposta independente, declaração institucional e negociação de paz; fase autônoma de batalhas removida. | Não é um sistema completo de campanhas ou guerra territorial. |
 | Religião | Ritos e patrocínio causal, audiência e reação de testemunhas têm caminhos verificados. | Não entrega genericamente perseguições, inquisições ou todo conflito religioso desejado. |
-| Desordem civil | Petição, paralisação de um ciclo, tumulto, endosso de residente e resposta independente do governo. | Greve geral, violência coletiva distinta, movimento organizado, rebelião e revolução ainda ausentes. |
+| Desordem civil | Petição, paralisação de um ciclo, greve organizada local limitada, recusa que aumenta unrest, tumulto material limitado, endosso de residente e resposta independente do governo. | Greve geral, violência coletiva distinta, movimento organizado, rebelião e revolução ainda ausentes; as fatias de greve/tumulto não criam escalada automática. |
 | Onda 11 | Condicionada à evidência das simulações. | Intriga, conspiração e ameaças míticas não iniciadas. |
 
 ## Problemas observados no último mundo — não corrigidos neste pacote

@@ -3,6 +3,7 @@ import pytest
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.events import record_event
+from src.sim.medieval.institutional_memory import memories_of
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 from tests.test_medieval_research import prepared, authorize, work
 
@@ -137,9 +138,15 @@ def test_material_owners_fulfill_payment_then_teaching_once(tmp_path):
     before = world.economy.accounts['treasury:auren'].balance
     pay(world, payment)
     assert world.economy.accounts['treasury:auren'].balance == before - 80
+    payment_receipt = world.relations.obligations[payment].last_event_id
+    assert memories_of(world, SELLER, payment_receipt) is not None
+    assert memories_of(world, BUYER, payment_receipt) is not None
     assert not world.knowledge.knows(BUYER, 'metallurgy')
     teach(world, lesson)
     assert world.knowledge.knows(BUYER, 'metallurgy')
+    teaching_receipt = world.relations.obligations[lesson].last_event_id
+    assert memories_of(world, SELLER, teaching_receipt) is not None
+    assert memories_of(world, BUYER, teaching_receipt) is not None
     assert world.economy.facilities['works:minas-de-ferroalto'].recipe_id == 'ironworking'
     assert sum(a.balance for a in world.economy.accounts.values()) == 76000
     assert all(o.status == 'fulfilled' for o in world.relations.obligations.values())

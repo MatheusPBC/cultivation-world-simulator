@@ -29,6 +29,33 @@ RECEIPT_EVENTS = frozenset({INTERPRETED_EVENT, DECLINED_EVENT, FAILED_EVENT})
 MAX_LABEL = 160
 
 
+def _contains_private_identifier(value: str) -> bool:
+    """Whether an affordance ID embeds owner-only material identifiers.
+
+    Affordance IDs remain canonical engine handles, but they are not all safe
+    to disclose to a provider.  Keep this check at the single prompt boundary
+    instead of teaching every domain adapter how to redact its own IDs.
+    """
+    return any(marker in value for marker in (
+        "stock:", "treasury:", "account:", "payroll:", "household-stock:",
+    ))
+
+
+def _prompt_choices(choices):
+    """Return provider-safe choices and a token-to-canonical-ID map."""
+    safe = []
+    aliases = {}
+    for index, item in enumerate(choices):
+        option_id = item["id"]
+        if _contains_private_identifier(option_id):
+            token = f"choice:{index}"
+            aliases[token] = option_id
+            safe.append({"id": token, "label": item["label"]})
+        else:
+            safe.append(item)
+    return safe, aliases
+
+
 def provider_available() -> bool:
     """A real key and model must exist outside the save for this to be true."""
     from src.utils.llm.runtime_mode import is_test_mode_enabled
@@ -126,8 +153,9 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     # monthly ceiling counts attempts, not successes.
     _consume_monthly_slot(world, actor)
     from src.utils.llm.client import call_llm_json
+    prompt_choices, aliases = _prompt_choices(choices)
     try:
-        answer = await call_llm_json(_prompt(actor, situation, choices))
+        answer = await call_llm_json(_prompt(actor, situation, prompt_choices))
     except Exception:
         # Provider errors, timeouts and parse failures are all the same to the
         # world: no interpretation happened and nothing material changed.
@@ -138,6 +166,8 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     if selected == NO_ACTION:
         _receipt(world, DECLINED_EVENT, "O provedor optou por não agir.", causes=causes)
         return NO_ACTION
+    if not isinstance(selected, str) or selected not in known:
+        selected = aliases.get(selected, selected)
     if not isinstance(selected, str) or selected not in known:
         _receipt(world, FAILED_EVENT, "O provedor devolveu uma escolha inexistente; nenhuma ação material foi tomada.",
                  causes=causes)

@@ -46,7 +46,8 @@ class FreightRecoveryOption(SocietyValue):
     route_ids: tuple[Identity, ...] = ()
 
     def decision(self):
-        return {"action": RECOVERY_ACTION, "actor_ref": self.actor_ref.to_dict(), "option_id": self.id}
+        return {"action": RECOVERY_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 def blocking_routes(world, order):

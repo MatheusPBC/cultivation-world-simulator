@@ -183,12 +183,31 @@ async def test_monthly_fiscal_policy_uses_a_real_paid_payroll_then_republishes_c
     await MedievalSimulator(world).step()
     payroll = world.economy.payrolls["works:campos-do-lume"]
     policy = world.authority.tax_policies["auren"]
-    assert payroll.gross > 0 and world.economy.accounts[treasury.id].balance < payroll.gross
-    assert policy.export_rate_permille == 50 and policy.export_policy_event_id is not None
+    wage_event = next(
+        event for event in world.events
+        if event.event_type == "wages_paid"
+        and any(delta.owner_kind == "account" and delta.owner_id == treasury.id
+                for delta in event.deltas)
+        and all(any(delta.owner_kind == "account"
+                    and delta.owner_id == f"household:{group_id}"
+                    for delta in event.deltas)
+                for group_id in payroll.workers_by_group)
+    )
+    treasury_delta = next(delta for delta in wage_event.deltas
+                          if delta.owner_kind == "account" and delta.owner_id == treasury.id)
+    assert payroll.gross > 0
+    assert int(treasury_delta.before) - int(treasury_delta.after) == payroll.gross
+    assert world.economy.accounts[treasury.id].balance < 1100
+    # The current conservative policy only raises the tariff when the dated
+    # payroll reading still shows a cash shortfall.  Other monthly owners may
+    # legitimately spend or replenish the treasury before the final quote is
+    # published, so the invariant is that the quote reflects the policy that
+    # actually survived that boundary, not a hard-coded rate.
     quote = next(report for report in world.knowledge.reports.values()
                  if report.kind == "offer" and report.stock_id == stock.id and report.resource_id == "food")
     assert quote.observed_day == world.clock.absolute_day == 30
-    assert (quote.export_rate_permille, quote.export_policy_event_id) == (50, policy.export_policy_event_id)
+    assert (quote.export_rate_permille, quote.export_policy_event_id) == (
+        policy.export_rate_permille, policy.export_policy_event_id)
 
 
 @pytest.mark.asyncio

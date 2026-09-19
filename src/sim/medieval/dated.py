@@ -11,9 +11,11 @@ from .rites import resolve_rites
 from .campaign_supply import load_campaign_baggage, observe_campaign_supply_needs
 from .field_engagement import resolve_field_engagements
 from .settlement_investment import revoke_invalid_settlement_investments
+from .siege_campaign import resolve_siege_campaigns
 from .sabotage import resolve_investigations
 from .force_command import revoke_invalid_detachment_commands
 from .civic_protest import resolve_civic_protests
+from .civic_strike import resolve_civic_strikes
 from .demography import resolve_generation_maturity
 from .technique_copy import resolve_technique_copies
 
@@ -25,7 +27,8 @@ def resolve_dated(world, situations):
                           "force_contact_review",
                           "strategy_response_review",
                           "campaign_supply_review", "field_engagement", "field_aftermath_review", "diplomacy",
-                          "diplomatic_review", "investigation", "civic_protest", "generation_maturity", "technique_copy"}
+                          "diplomatic_review", "investigation", "civic_protest", "generation_maturity", "technique_copy",
+                          "siege_campaign", "civic_general_strike"}
            for s in situations):
         raise ValueError("unknown dated situation")
     resolve_dated_activities(world, [s for s in situations if s.kind == "activity"])
@@ -34,6 +37,7 @@ def resolve_dated(world, situations):
     revoke_invalid_detachment_commands(world)
     resolve_parcels(world, [s for s in situations if s.kind == "cargo"])
     resolve_civic_protests(world, [s for s in situations if s.kind == "civic_protest"])
+    resolve_civic_strikes(world, [s for s in situations if s.kind == "civic_general_strike"])
     # A generation reaches working age before the day's other work reads the
     # cohorts, and moves only whoever actually remained.
     resolve_generation_maturity(world, [s for s in situations if s.kind == "generation_maturity"])
@@ -48,6 +52,7 @@ def resolve_dated(world, situations):
     resolve_technique_copies(world, [s for s in situations if s.kind == "technique_copy"])
     resolve_forces(world, [s for s in situations if s.kind == "force"])
     revoke_invalid_settlement_investments(world)
+    resolve_siege_campaigns(world, [s for s in situations if s.kind == "siege_campaign"])
     resolve_force_positions(world, [s for s in situations if s.kind == "force_preparation"])
     resolve_field_engagements(world, [s for s in situations if s.kind == "field_engagement"])
     observe_campaign_supply_needs(world)

@@ -6,7 +6,8 @@ from .models import (KnowledgeReport, DiplomaticNotice, AuthorityClaimNotice, Fi
                      CustomsNotice, WorkforceDemandReport, WorkforceOfferNotice, InstitutionalAidNotice,
                      CreatureTributeNotice, CreatureDamageNotice, ForceContactNotice, FieldEngagementOfferNotice,
                      FieldEngagementOutcomeNotice, CampaignSupplyNotice, SettlementPressureNotice,
-                     RiteObservation, InvestigationFinding, CivicDemandNotice, TechnologySighting)
+                     RiteObservation, InvestigationFinding, InvestigationAccusationNotice, EspionageFinding, TechnologyTheftFinding,
+                     CivicDemandNotice, TechnologySighting)
 from .serialization import RegistrySerialization, validate_actor
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
@@ -81,6 +82,10 @@ def civic_demand_notice_id(protest_id, recipient_ref):
     return f"civic_demand_notice:{protest_id}:{recipient_ref.kind}:{recipient_ref.id}"
 
 
+def investigation_accusation_notice_id(investigation_id, recipient_ref):
+    return f"investigation_accusation:{investigation_id}:{recipient_ref.kind}:{recipient_ref.id}"
+
+
 def technology_sighting_id(recipient_ref, holder_ref, technology_id):
     return (f"technology_sighting:{recipient_ref.kind}:{recipient_ref.id}:"
             f"{holder_ref.kind}:{holder_ref.id}:{technology_id}")
@@ -88,7 +93,7 @@ def technology_sighting_id(recipient_ref, holder_ref, technology_id):
 
 @dataclass
 class KnowledgeState(RegistrySerialization):
-    schema_version = 5
+    schema_version = 8
     reports: dict[str, KnowledgeReport] = field(default_factory=dict)
     technologies: dict[str, TechnicalKnowledge] = field(default_factory=dict)
     notices: dict[str, DiplomaticNotice] = field(default_factory=dict)
@@ -110,6 +115,9 @@ class KnowledgeState(RegistrySerialization):
     settlement_pressure_notices: dict[str, SettlementPressureNotice] = field(default_factory=dict)
     rite_observations: dict[str, RiteObservation] = field(default_factory=dict)
     investigation_findings: dict[str, InvestigationFinding] = field(default_factory=dict)
+    investigation_accusation_notices: dict[str, InvestigationAccusationNotice] = field(default_factory=dict)
+    espionage_findings: dict[str, EspionageFinding] = field(default_factory=dict)
+    technology_theft_findings: dict[str, TechnologyTheftFinding] = field(default_factory=dict)
     civic_demand_notices: dict[str, CivicDemandNotice] = field(default_factory=dict)
     technology_sightings: dict[str, TechnologySighting] = field(default_factory=dict)
     registries = {"reports": KnowledgeReport, "technologies": TechnicalKnowledge, "notices": DiplomaticNotice,
@@ -129,6 +137,9 @@ class KnowledgeState(RegistrySerialization):
     registries["settlement_pressure_notices"] = SettlementPressureNotice
     registries["rite_observations"] = RiteObservation
     registries["investigation_findings"] = InvestigationFinding
+    registries["investigation_accusation_notices"] = InvestigationAccusationNotice
+    registries["espionage_findings"] = EspionageFinding
+    registries["technology_theft_findings"] = TechnologyTheftFinding
     registries["civic_demand_notices"] = CivicDemandNotice
     registries["technology_sightings"] = TechnologySighting
 
@@ -210,6 +221,18 @@ class KnowledgeState(RegistrySerialization):
         item = self.investigation_findings.get(f"investigation_finding:{investigation_id}")
         return item if item is not None and item.recipient_ref == actor_ref else None
 
+    def investigation_accusations_for_actor(self, actor_ref):
+        return tuple(item for _, item in sorted(self.investigation_accusation_notices.items())
+                     if item.recipient_ref == actor_ref)
+
+    def espionage_findings_for_actor(self, actor_ref):
+        return tuple(item for _, item in sorted(self.espionage_findings.items())
+                     if item.recipient_ref == actor_ref)
+
+    def technology_theft_findings_for_actor(self, actor_ref):
+        return tuple(item for _, item in sorted(self.technology_theft_findings.items())
+                     if item.recipient_ref == actor_ref)
+
     def civic_demands_for_actor(self, actor_ref):
         return tuple(item for _, item in sorted(self.civic_demand_notices.items())
                      if item.recipient_ref == actor_ref)
@@ -260,7 +283,9 @@ class KnowledgeState(RegistrySerialization):
                     or item.learned_day > world.clock.absolute_day or event.day != item.learned_day
                     or event.event_type != {'research': 'technology_discovered', 'teaching': 'technology_taught',
                                             'apprenticeship': 'technology_apprenticed',
-                                            'copied': 'technique_copy_completed'}[item.channel]
+                                            'copied': 'technique_copy_completed',
+                                            'sale': 'technology_sold',
+                                            'stolen': 'technology_stolen'}[item.channel]
                     or not any(d.owner_kind == 'technical_knowledge' and d.owner_id == item.id
                                and d.aspect == 'technology_id' and d.before == 'None' and d.after == item.technology_id
                                for d in event.deltas)):
@@ -377,6 +402,12 @@ class KnowledgeState(RegistrySerialization):
             self._validate_rite_observation(world, events, observation)
         for finding in self.investigation_findings.values():
             self._validate_investigation_finding(world, events, finding)
+        for notice in self.investigation_accusation_notices.values():
+            self._validate_investigation_accusation(world, events, notice)
+        for finding in self.espionage_findings.values():
+            self._validate_espionage_finding(world, events, finding)
+        for finding in self.technology_theft_findings.values():
+            self._validate_technology_theft_finding(world, events, finding)
         for notice in self.civic_demand_notices.values():
             validate_actor(world, notice.recipient_ref)
             protest = world.society.civic_protests.get(notice.protest_id)
@@ -406,6 +437,114 @@ class KnowledgeState(RegistrySerialization):
             raise ValueError("invalid investigation finding provenance")
         if finding.result == "attributed":
             validate_actor(world, finding.subject_ref)
+
+    @staticmethod
+    def _validate_investigation_accusation(world, events, notice):
+        validate_actor(world, notice.recipient_ref)
+        validate_actor(world, notice.accuser_ref)
+        validate_actor(world, notice.subject_ref)
+        investigation = world.economy.investigations.get(notice.investigation_id)
+        finding = world.knowledge.investigation_findings.get(
+            f"investigation_finding:{notice.investigation_id}")
+        event = events.get(notice.event_id)
+        finding_event = events.get(notice.finding_event_id)
+        if (notice.id != investigation_accusation_notice_id(notice.investigation_id, notice.recipient_ref)
+                or investigation is None or investigation.stage != "attributed"
+                or finding is None or finding.result != "attributed"
+                or finding.recipient_ref != notice.accuser_ref
+                or finding.subject_ref != notice.subject_ref
+                or finding.event_id != notice.finding_event_id
+                or investigation.site_id != notice.site_id
+                or event is None or finding_event is None
+                or notice.learned_day != event.day or notice.learned_day > world.clock.absolute_day
+                or event.event_type != "investigation_accusation"
+                or event.fact_kind != FactKind.STATE_TRANSITION
+                or notice.finding_event_id not in {link.cause_event_id for link in event.causal_links}
+                or not any(delta.owner_kind == "investigation_accusation_notice"
+                           and delta.owner_id == notice.id and delta.aspect == "finding_event_id"
+                           and delta.after == notice.finding_event_id for delta in event.deltas)):
+            raise ValueError("invalid investigation accusation provenance")
+
+    @staticmethod
+    def _validate_espionage_finding(world, events, finding):
+        validate_actor(world, finding.recipient_ref)
+        validate_actor(world, finding.agent_ref)
+        target = world.society.settlements.get(finding.target_ref.id)
+        decision = events.get(finding.decision_event_id)
+        event = events.get(finding.event_id)
+        evidence = events.get(finding.evidence_event_id) if finding.evidence_event_id else None
+        if (target is None or finding.target_owner_ref.kind != "polity"
+                or finding.target_owner_ref.id != target.administrator_id
+                or decision is None or decision.fact_kind != FactKind.DECISION
+                or decision.decision != {"action": "espionage_mission",
+                                         "actor_ref": finding.recipient_ref.to_dict(),
+                                         "selected_affordance_id": finding.mission_id}
+                or event is None or event.event_type != "espionage_resolved"
+                or finding.learned_day != event.day or finding.learned_day > world.clock.absolute_day
+                or finding.decision_event_id not in {link.cause_event_id for link in event.causal_links}
+                or not any(delta.owner_kind == "espionage_finding" and delta.owner_id == finding.id
+                           and delta.aspect == "result" and delta.after == finding.result for delta in event.deltas)):
+            raise ValueError("invalid espionage finding provenance")
+        if finding.result == "success":
+            if (evidence is None or evidence.event_type != "settlement_observed"
+                    or finding.evidence_event_id not in {link.cause_event_id for link in event.causal_links}
+                    or not any(delta.owner_kind == "espionage_finding" and delta.owner_id == finding.id
+                               and delta.aspect == "evidence_event_id" and delta.after == finding.evidence_event_id
+                               for delta in event.deltas)):
+                raise ValueError("successful espionage requires canonical evidence")
+
+    @staticmethod
+    def _validate_technology_theft_finding(world, events, finding):
+        validate_actor(world, finding.recipient_ref)
+        validate_actor(world, finding.agent_ref)
+        validate_actor(world, finding.target_owner_ref)
+        site = world.map.infrastructure_sites.get(finding.site_id)
+        decision = events.get(finding.decision_event_id)
+        receipt = events.get(finding.event_id)
+        observation = events.get(finding.observation_event_id)
+        if (site is None or site.owner_ref != finding.target_owner_ref
+                or finding.technology_id not in world.research.technologies
+                or decision is None or decision.fact_kind != FactKind.DECISION
+                or decision.decision != {"action": "steal_technology",
+                                         "actor_ref": finding.recipient_ref.to_dict(),
+                                         "selected_affordance_id": finding.mission_id}
+                or receipt is None or receipt.event_type != "technology_theft_resolved"
+                or finding.learned_day != receipt.day or finding.learned_day > world.clock.absolute_day
+                or finding.decision_event_id not in {link.cause_event_id for link in receipt.causal_links}
+                or observation is None or observation.event_type != "site_observed"
+                or observation.fact_kind != FactKind.STATE_TRANSITION
+                or not any(delta.owner_kind == "site_report"
+                           and delta.owner_id == site_report_id(finding.recipient_ref, finding.site_id)
+                           and delta.aspect == "observation" for delta in observation.deltas)
+                or finding.observation_event_id not in {link.cause_event_id for link in receipt.causal_links}
+                or not any(delta.owner_kind == "technology_theft_finding" and delta.owner_id == finding.id
+                           and delta.aspect == "result" and delta.after == finding.result
+                           for delta in receipt.deltas)):
+            raise ValueError("invalid technology theft finding provenance")
+        if finding.result != "success":
+            return
+        source = events.get(finding.source_knowledge_event_id)
+        learned = events.get(finding.learned_knowledge_event_id)
+        source_knowledge = next((item for item in world.knowledge.technologies.values()
+                                 if item.owner_ref == finding.target_owner_ref
+                                 and item.technology_id == finding.technology_id
+                                 and item.event_id == finding.source_knowledge_event_id), None)
+        learned_knowledge = next((item for item in world.knowledge.technologies.values()
+                                  if item.owner_ref == finding.recipient_ref
+                                  and item.technology_id == finding.technology_id
+                                  and item.event_id == finding.learned_knowledge_event_id), None)
+        if (source is None or learned is None or source_knowledge is None or learned_knowledge is None
+                or source.id not in {link.cause_event_id for link in receipt.causal_links}
+                or learned.id not in {link.cause_event_id for link in receipt.causal_links}
+                or learned.event_type != "technology_stolen"
+                or learned_knowledge.channel != "stolen"
+                or not any(delta.owner_kind == "technology_theft_finding" and delta.owner_id == finding.id
+                           and delta.aspect == "source_knowledge_event_id"
+                           and delta.after == finding.source_knowledge_event_id for delta in receipt.deltas)
+                or not any(delta.owner_kind == "technology_theft_finding" and delta.owner_id == finding.id
+                           and delta.aspect == "learned_knowledge_event_id"
+                           and delta.after == finding.learned_knowledge_event_id for delta in receipt.deltas)):
+            raise ValueError("successful technology theft requires canonical knowledge provenance")
 
     @staticmethod
     def _validate_rite_observation(world, events, observation):
@@ -653,15 +792,24 @@ class KnowledgeState(RegistrySerialization):
                            and delta.aspect == "observation" and delta.after == observation for delta in receipt.deltas)):
             raise ValueError("invalid workforce demand provenance")
         def shortfall(owner_kind):
-            """Typed, quantified labour signal; the report may never exceed it."""
+            """Typed, quantified labour signal from the source work receipt."""
             values = [int(delta.after) for delta in source.deltas
                       if delta.owner_kind == owner_kind and delta.owner_id == report.work_id
                       and delta.aspect == "labor_shortfall" and delta.after.isdecimal()]
             return max(values) if values else 0
 
+        def expanded_demand():
+            """Engine-owned scaling receipt for a pressure-sized farmer demand."""
+            values = [int(delta.after) for delta in receipt.deltas
+                      if delta.owner_kind == "workforce_demand" and delta.owner_id == report.id
+                      and delta.aspect == "count" and delta.after.isdecimal()]
+            return max(values) if values else 0
+
         if report.work_kind == "facility":
             if (source.event_type not in {"production_completed", "production_limited"}
-                    or report.target_occupation != "artisan" or not 0 < report.count <= shortfall("production")):
+                    or report.target_occupation not in {"farmer", "artisan"}
+                    or not 0 < report.count <= shortfall("production")
+                    and report.count != expanded_demand()):
                 raise ValueError("workforce facility demand lacks a material labour receipt")
             return
         if report.work_kind == "repair":
@@ -700,25 +848,33 @@ class KnowledgeState(RegistrySerialization):
         event = events.get(notice.event_id)
         transition = events.get(notice.state_event_id)
         manifest = world.economy.cargo_manifests.get(notice.manifest_id) if notice.manifest_id else None
+        resource = world.economy.resources.get(notice.resource_id)
         if (checkpoint is None or order is None or notice.id != f"customs_notice:{notice.parcel_id}"
                 or notice.recipient_ref != order.owner_ref or notice.learned_day > world.clock.absolute_day
                 or event is None or event.day != notice.learned_day
                 or notice.resource_id != order.resource_id
+                or resource is None or notice.classification != resource.trade_class
                 or event.event_type != "customs_presented" or event.fact_kind != FactKind.STATE_TRANSITION
                 or not any(delta.owner_kind == "customs_notice" and delta.owner_id == notice.id
                            and delta.aspect == "state" and delta.before == "None" and delta.after == "presented"
                            for delta in event.deltas)
+                or not any(delta.owner_kind == "customs_notice" and delta.owner_id == notice.id
+                           and delta.aspect == "classification" and delta.before == "None"
+                           and delta.after == notice.classification for delta in event.deltas)
                 or transition is None
                 or (notice.state == "presented" and (notice.state_event_id != notice.event_id or notice.fee is not None or notice.manifest_id is not None))
                 or (notice.state in {"fee_due", "cleared"} and (manifest is None or manifest.parcel_id != notice.parcel_id
                     or manifest.order_id != notice.order_id or manifest.resource_id != notice.resource_id
                     or manifest.quantity != notice.quantity or notice.fee is None))
-                or (notice.state in {"detected", "evaded_undetected"} and (notice.manifest_id is not None or notice.fee is not None))
+                or (notice.state in {"detected", "evaded_undetected", "returned", "seized"}
+                    and (notice.manifest_id is not None or notice.fee is not None))
                 or (notice.state != "presented" and notice.event_id not in {link.cause_event_id for link in transition.causal_links})
                 or (notice.state == "fee_due" and transition.event_type != "cargo_manifest_declared")
                 or (notice.state == "detected" and transition.event_type != "customs_fee_evasion_detected")
                 or (notice.state == "evaded_undetected" and transition.event_type != "customs_fee_evaded")
                 or (notice.state == "cleared" and transition.event_type != "customs_fee_paid")
+                or (notice.state == "returned" and transition.event_type != "contraband_returned")
+                or (notice.state == "seized" and transition.event_type != "contraband_seized")
                 or (notice.state != "presented" and not any(delta.owner_kind == "customs_notice"
                     and delta.owner_id == notice.id and delta.aspect == "state" and delta.after == notice.state
                     for delta in transition.deltas))

@@ -3,6 +3,7 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import App from '../ObserverApp.vue'
 import { medievalI18n } from '../i18n'
+import { useObserverStore } from '../stores/world'
 import fixture from './world.json'
 
 let wrapper: VueWrapper | undefined
@@ -54,6 +55,68 @@ it('opens a settlement from the accessible map list and shows material state', a
   expect(app.get('[data-testid="inspector"]').text()).toContain('Pedraclara')
   expect(app.get('[data-testid="inspector"]').text()).toContain('2.400')
   expect(app.get('[data-testid="inspector"]').text()).toContain('Saúde')
+})
+it('exposes the canonical campaign layer in the atlas', async () => {
+  ready = true
+  const app = await open()
+  expect(app.text()).toContain('Campanhas')
+})
+it('shows active canonical threats with a navigable source', async () => {
+  ready = true
+  data.campaigns.threats = [{ id: 'siege:1', kind: 'siege', settlement_id: 'pedraclara', route_id: null, site_id: null,
+    severity: 'high', status: 'breached', source_event_id: 'event:88' }]
+  const app = await open()
+  expect(app.get('[aria-label="Ameaças ativas"]').text()).toContain('Cerco')
+  expect(app.get('[data-threat="siege:1"]').text()).toContain('Alta urgência')
+  expect(app.get('[data-threat="siege:1"]').text()).toContain('Pedraclara')
+  await app.get('[data-threat="siege:1"] button').trigger('click')
+  expect(useObserverStore().focusEventId).toBe('event:88')
+})
+it('shows live political settlements with their canonical source', async () => {
+  ready = true
+  data.campaigns.political_settlements = [{ id: 'proposal:concession', proposal_kind: 'administration_concession',
+    settlement_id: 'pedraclara',
+    proposer_ref: { kind: 'polity', id: 'escarlia' }, counterparty_ref: { kind: 'polity', id: 'auren' },
+    status: 'accepted', offered_day: 30, expires_day: 33, clause_kinds: ['administration_transfer', 'withdrawal'],
+    decision_event_id: 'event:90', last_event_id: 'event:91' }]
+  const app = await open()
+  const row = app.get('[data-political-settlement="proposal:concession"]')
+  expect(row.text()).toContain('Concessão administrativa')
+  expect(row.text()).toContain('Aceita; aguardando execução')
+  await row.get('button').trigger('click')
+  expect(useObserverStore().focusEventId).toBe('event:91')
+})
+it('shows institutional capacity as a derived Dao read model', async () => {
+  ready = true
+  ;(data.governance as any).strategic_capacity = [{
+    actor_ref: { kind: 'polity', id: 'auren' },
+    dimensions: {
+      diplomatic_bandwidth: { status: 'committed', objective_ids: [], plan_ids: [], source_ids: ['proposal:1'] },
+      logistics_capacity: { status: 'unavailable', objective_ids: [], plan_ids: [], source_ids: [] },
+    },
+  }]
+  const app = await open()
+  expect(app.text()).toContain('Capacidades em curso')
+  expect(app.text()).toContain('Diplomacia')
+  expect(app.text()).toContain('em curso')
+})
+it('keeps provider outcomes, missing affordances and stale affordances visibly distinct', async () => {
+  ready = true
+  data.world.decision_sources = {
+    provider_consultations: 2,
+    provider_declines: 3,
+    provider_failures: 4,
+    no_affordance_receipts: 5,
+    stale_affordance_receipts: 6,
+    ai_enabled: false,
+  }
+  const app = await open()
+  const strip = app.get('[aria-label="Rastro das decisões"]')
+  expect(strip.text()).toContain('2 consultas concluídas')
+  expect(strip.text()).toContain('3 recusas')
+  expect(strip.text()).toContain('4 falhas técnicas')
+  expect(strip.text()).toContain('5 sem affordance')
+  expect(strip.text()).toContain('6 affordances obsoletas')
 })
 it('loads the saved date through the real save panel workflow', async () => {
   ready = true

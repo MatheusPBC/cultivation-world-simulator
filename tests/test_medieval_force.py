@@ -4,11 +4,14 @@ import pytest
 
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
+from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
+from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import (disband_detachment, force_options, occupy_settlement, raise_detachment,
-                                    raise_options)
+from src.sim.medieval.force import (disband_detachment, establish_garrison, force_options, garrison_options,
+                                    occupy_settlement, raise_detachment, raise_options, rotate_garrison,
+                                    withdraw_garrison)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
@@ -175,3 +178,103 @@ def test_presence_without_means_or_mandate_takes_nothing():
     assert any(item.event_type == "detachment_lapsed" for item in world.events)
     assert not any(item.event_type in {"battle_resolved", "casualties_taken"} for item in world.events)
     assert world.society.available_count(option.group_id) >= 0
+
+
+def test_supplied_occupation_can_establish_and_lose_garrison_for_lack_of_treasury(tmp_path):
+    world = soldier_world()
+    option, detachment = raised(world)
+    while world.society.detachments[detachment.id].stage == "marching":
+        tick(world)
+    occupy = next(item for item in force_options(world, OWNER) if item.kind == "occupy")
+    occupy_settlement(world, OWNER, occupy.id, decide(world, occupy).id)
+
+    garrison = next(item for item in garrison_options(world, OWNER))
+    account = world.economy.accounts[garrison.account_id]
+    balance = account.balance
+    household_before = world.economy.accounts.get(
+        f"household:{detachment.source_group_id}",
+    ).balance
+    establish_garrison(world, OWNER, garrison.id, decide(world, garrison).id)
+    garrison_id = f"garrison:{detachment.id}"
+    assert world.society.garrisons[garrison_id].stage == "active"
+
+    tick(world)
+    assert world.society.garrisons[garrison_id].stage == "active"
+    assert world.economy.accounts[garrison.account_id].balance == balance - garrison.daily_wage
+    household = world.economy.accounts[f"household:{detachment.source_group_id}"]
+    assert household.balance == household_before + garrison.daily_wage
+    assert any(item.event_type == "garrison_maintained" for item in world.events)
+
+    world.economy.accounts[garrison.account_id] = world.economy.accounts[garrison.account_id].model_copy(update={"balance": 0})
+    tick(world)
+    assert world.society.garrisons[garrison_id].stage == "lapsed"
+    assert world.society.settlements[TARGET].occupier_id is None
+    assert world.society.detachments[detachment.id].stage == "present"
+    assert any(item.event_type == "garrison_lapsed" for item in world.events)
+
+    path = tmp_path / "garrison.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_actor_can_withdraw_garrison_without_moving_column_or_administration():
+    world = soldier_world()
+    option, detachment = raised(world)
+    while world.society.detachments[detachment.id].stage == "marching":
+        tick(world)
+    current = world.society.detachments[detachment.id]
+    occupy = next(item for item in force_options(world, OWNER) if item.kind == "occupy")
+    occupy_settlement(world, OWNER, occupy.id, decide(world, occupy).id)
+    garrison = next(item for item in garrison_options(world, OWNER) if item.kind == "garrison")
+    establish_garrison(world, OWNER, garrison.id, decide(world, garrison).id)
+    withdrawal = next(item for item in garrison_options(world, OWNER) if item.kind == "withdraw")
+    administrator = world.society.settlements[current.location_id].administrator_id
+    withdraw_garrison(world, OWNER, withdrawal.id, decide(world, withdrawal).id)
+
+    assert world.society.garrisons[f"garrison:{detachment.id}"].stage == "withdrawn"
+    assert world.society.detachments[detachment.id].stage == "present"
+    assert world.society.settlements[current.location_id].occupier_id == OWNER.id
+    assert world.society.settlements[current.location_id].administrator_id == administrator
+    assert any(item.event_type == "garrison_withdrawn" for item in world.events)
+
+
+def test_actor_can_rotate_a_paid_garrison_without_changing_control(tmp_path):
+    world = soldier_world()
+    option, current = raised(world)
+    while world.society.detachments[current.id].stage == "marching":
+        tick(world)
+    occupy = next(item for item in force_options(world, OWNER) if item.kind == "occupy")
+    occupy_settlement(world, OWNER, occupy.id, decide(world, occupy).id)
+    establish = next(item for item in garrison_options(world, OWNER) if item.kind == "garrison")
+    establish_garrison(world, OWNER, establish.id, decide(world, establish).id)
+
+    group = next(item for item in world.society.population.values()
+                 if item.settlement_id == HOME and item.occupation == "soldier")
+    replacement_group = group.model_copy(update={"id": "pop:campomanso:rotation:soldier", "people": "orc", "count": 5})
+    world.society.population[replacement_group.id] = replacement_group
+    arrival = record_event(world, "rotation_column_present", "Fixture de uma coluna de rotação abastecida.",
+                           fact_kind=FactKind.STATE_TRANSITION,
+                           deltas=(_delta("detachment", "detachment:rotation", "stage", None, "present"),))
+    replacement = Detachment(
+        id="detachment:rotation", owner_ref=OWNER, source_group_id=replacement_group.id,
+        count=5, location_id=TARGET, destination_id=TARGET, provisions=5, stage="present",
+        started_day=world.clock.absolute_day, due_day=world.clock.absolute_day + 1,
+        decision_event_id=arrival.id, last_event_id=arrival.id)
+    world.society.detachments[replacement.id] = replacement
+
+    rotation = next(item for item in garrison_options(world, OWNER) if item.kind == "rotate")
+    old_control = world.society.territorial_controls.get(f"territorial-control:{TARGET}")
+    rotate_garrison(world, OWNER, rotation.id, decide(world, rotation).id)
+
+    assert world.society.garrisons[f"garrison:{current.id}"].stage == "withdrawn"
+    assert world.society.garrisons[f"garrison:{replacement.id}"].stage == "active"
+    assert world.society.settlements[TARGET].occupier_id == OWNER.id
+    assert world.society.territorial_controls.get(f"territorial-control:{TARGET}") == old_control
+    event = next(item for item in reversed(world.events) if item.event_type == "garrison_rotated")
+    assert any(delta.owner_id == f"garrison:{current.id}" and delta.after == "withdrawn"
+               for delta in event.deltas)
+    assert any(delta.owner_id == f"garrison:{replacement.id}" and delta.after == "active"
+               for delta in event.deltas)
+    path = tmp_path / "garrison-rotation.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)

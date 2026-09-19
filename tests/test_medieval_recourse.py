@@ -119,7 +119,13 @@ async def test_a_breach_earns_a_turn_that_a_provider_can_answer_with_a_real_colu
     assert world.knowledge.settlement_report(AUREN, TARGET) is not None
     held = world.society.settlements[TARGET]
     assert held.administrator_id == target.administrator_id and held.claimant_ids == target.claimant_ids
-    assert {key: item.owner_ref for key, item in world.economy.stocks.items()} == owners
+    # Occupation creates one explicit, owner-bound campaign bag for the
+    # present column. Existing stocks keep their owners; the new bag is not a
+    # hidden transfer of the occupied settlement's inventory.
+    assert {key: item.owner_ref for key, item in world.economy.stocks.items()
+            if key in owners} == owners
+    camp_stock = world.economy.stocks[f"stock:camp:{detachment.id}"]
+    assert camp_stock.owner_ref == detachment.owner_ref and camp_stock.location_id == TARGET
     assert {key: (item.owner_ref, item.maintainer_ref) for key, item in world.map.infrastructure_sites.items()} == sites
     assert {key: (item.account_id, item.income_rate) for key, item in world.authority.tax_policies.items()} == taxes
     assert total_money(world) == money and people_total(world) == people

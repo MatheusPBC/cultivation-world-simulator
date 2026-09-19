@@ -4,6 +4,7 @@ import sqlite3
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
@@ -28,6 +29,24 @@ def test_save_restores_society_map_agenda_rng_and_causal_history(tmp_path):
     assert loaded.rng.random() == world.rng.random()
     assert not loaded.map.routes[route.id].enabled
     assert loaded.map.regions[801].society is loaded.society
+
+
+def test_save_load_preserves_structured_causal_payload(tmp_path):
+    world = create_medieval_world(73)
+    event = record_event(
+        world,
+        "observed_route_pressure",
+        "A leitura física registrou pressão na rota.",
+        causal_payload={"ecology": {"species": "river_drake", "habitat_stress": 3}},
+    )
+    assert event.model_dump(mode="json")["causal_payload"] == {
+        "ecology": {"species": "river_drake", "habitat_stress": 3}
+    }
+    path = tmp_path / "causal-payload.mws"
+    save_world(world, path)
+    loaded = load_world(path)
+    assert loaded.events[0].causal_payload == event.causal_payload
+    assert loaded.events[0].model_dump(mode="json") == event.model_dump(mode="json")
 
 
 def test_failed_save_keeps_previous_snapshot_and_events(tmp_path):
@@ -64,6 +83,19 @@ def test_decision_cannot_apply_material_deltas():
     with pytest.raises(ValueError, match="decision"):
         record_event(world, "choice", "Uma escolha.", fact_kind=FactKind.DECISION,
             deltas=(StateDelta(owner_kind="world", owner_id="world", aspect="people", before="1", after="0"),))
+    assert world.events == []
+
+
+def test_llm_interpretation_cannot_hide_state_deltas_in_causal_payload():
+    world = create_medieval_world(73)
+    with pytest.raises(ValueError, match="causal payload"):
+        record_event(
+            world,
+            "ai_decision_interpreted",
+            "A IA interpretou as opções.",
+            causal_origin=CausalOrigin.LLM_INTERPRETATION,
+            causal_payload={"deltas": [{"owner_kind": "route", "owner_id": "r", "aspect": "enabled"}]},
+        )
     assert world.events == []
 
 

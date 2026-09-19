@@ -78,6 +78,35 @@ def test_recovery_is_communicated_by_a_later_observation():
     assert known_supply_path(world, actor, *ENDS) == (ROUTE,)
 
 
+async def test_route_report_exposes_only_aggregate_daily_traffic(tmp_path):
+    """Traffic is a public route reading, never a cargo or owner disclosure."""
+    from src.classes.event import FactKind
+    from src.sim.medieval.events import record_event
+    from src.sim.medieval.logistics import queue_freight
+
+    world = create_medieval_world(73)
+    world.economy.facilities.clear()
+    source, destination = "stock:campomanso", "stock:pedraclara"
+    decision = record_event(
+        world, "freight_decided", "Remessa autorizada.", fact_kind=FactKind.DECISION,
+        decision={"action": "freight", "source_id": source, "destination_id": destination,
+                  "resource_id": "food", "quantity": 100, "route_ids": [ROUTE],
+                  "actor_ref": world.economy.stocks[source].owner_ref.to_dict()},
+    )
+    queue_freight(world, source, destination, "food", 100, (ROUTE,), decision_event_id=decision.id)
+    await MedievalSimulator(world).step()
+    refresh_reports(world)
+    actor = observer(world)
+    report = world.knowledge.route_report(actor, ROUTE)
+    assert report.daily_flow_bulk > 0
+    payload = report.observation()
+    assert "daily_flow_bulk" in payload
+    assert "freight:" not in payload and "stock:" not in payload
+    path = tmp_path / "traffic.mws"
+    save_world(world, path)
+    assert load_world(path).knowledge.route_report(actor, ROUTE).daily_flow_bulk == report.daily_flow_bulk
+
+
 def local_and_remote_case(world):
     """A route whose endpoints host another institution, plus a disconnected one."""
     places = objective_places(world)

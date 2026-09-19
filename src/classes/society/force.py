@@ -16,6 +16,14 @@ from .models import Count, Identity, SocietyValue
 
 PositiveCount = Annotated[int, Field(strict=True, gt=0)]
 
+# A bounded campaign reading, not a general morale system.  A siege starts
+# against an intact garrison; only its existing material conditions can reduce
+# this value.
+SIEGE_GARRISON_ENDURANCE = 12
+# A known fortification doctrine adds a bounded defensive step; the default
+# remains 12 so existing campaigns and worlds do not gain power implicitly.
+MAX_SIEGE_GARRISON_ENDURANCE = 14
+
 
 class Detachment(SocietyValue):
     id: Identity
@@ -82,6 +90,69 @@ class ForcePosition(SocietyValue):
     def valid_timing(self):
         if self.id != f"force-position:{self.detachment_id}" or self.ready_day != self.started_day + 3:
             raise ValueError("force position identity or preparation time is inconsistent")
+        return self
+
+
+class Garrison(SocietyValue):
+    """A persisted military duty attached to an occupied settlement.
+
+    The detachment remains the physical presence and continues to consume its
+    own rations.  This record only makes the owner's decision to hold the
+    occupation durable, so a later lack of money can end that duty without
+    inventing administration or territory.
+    """
+    id: Identity
+    detachment_id: Identity
+    settlement_id: Identity
+    account_id: Identity
+    decision_event_id: Identity
+    started_day: Count
+    # ``collapsed`` is distinct from a maintenance lapse: a siege can break
+    # the duty while the defending column remains physically present.  It does
+    # not imply that either side gained administration or territorial control.
+    stage: Literal["active", "lapsed", "collapsed", "withdrawn"] = "active"
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_shape(self):
+        if self.id != f"garrison:{self.detachment_id}":
+            raise ValueError("garrison identity must name its detachment")
+        return self
+
+
+class SiegeCampaign(SocietyValue):
+    """One bounded siege sustained by existing force, pressure and rations.
+
+    The campaign owns neither the settlement nor the garrison.  It records a
+    material attempt to breach that already-existing defence while its own
+    prepared column maintains the existing all-exit investment.  Its history
+    lives in the causal ledger; this record retains only the current phase and
+    the next dated material check.
+    """
+    id: Identity
+    attacker_ref: EntityRef
+    attacker_detachment_id: Identity
+    defender_garrison_id: Identity
+    settlement_id: Identity
+    investment_id: Identity
+    decision_event_id: Identity
+    started_day: Count
+    progress_days: Count = 0
+    garrison_endurance: Count = SIEGE_GARRISON_ENDURANCE
+    next_progress_day: Count | None
+    phase: Literal["sieging", "breached", "lapsed", "withdrawn"] = "sieging"
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_shape(self):
+        if (self.id != f"siege-campaign:{self.decision_event_id}"
+                or (self.phase == "sieging") != (self.next_progress_day is not None)
+                or self.progress_days < 0
+                or self.garrison_endurance > MAX_SIEGE_GARRISON_ENDURANCE
+                or (self.phase == "breached" and self.garrison_endurance != 0)):
+            raise ValueError("siege campaign identity or lifecycle is inconsistent")
+        if self.next_progress_day is not None and self.next_progress_day <= self.started_day:
+            raise ValueError("siege campaign progress must be scheduled after its start")
         return self
 
 

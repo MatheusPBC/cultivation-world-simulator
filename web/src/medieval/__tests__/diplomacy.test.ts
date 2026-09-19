@@ -24,7 +24,7 @@ function negotiation() {
       breach_event_id: null, remediation_material_event_id: null, last_event_id: 'event:3' },
   ], notices: [seller, buyer].flatMap(ref => ['event:3', 'event:5'].map(event_id => ({
     id: `notice:${event_id}:${ref.id}`, proposal_id: p.id, recipient_ref: ref, event_id, learned_day: 90, channel: 'direct_diplomacy' as const,
-  }))), aid_notices: [], memories: [], aid_readings: [] }
+  }))), aid_notices: [], memories: [], aid_readings: [], strategic_evidence: [] }
   return data
 }
 
@@ -128,6 +128,27 @@ it('reads the aid trail, remembered facts and the directional institutional read
   const trail = panel.get('#aid-trail-title').element.parentElement!.textContent!
   expect(trail).not.toContain('stock:portovelho')
   expect(trail).not.toContain('river-pedraclara-portovelho')
+  panel.unmount()
+})
+
+it('shows strategic findings and keeps their causal event navigable', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore(), data = negotiation()
+  data.diplomacy.strategic_evidence = [{
+    kind: 'espionage', finding_id: 'finding:espionage:1', result: 'success', event_id: 'event:77',
+    recipient_ref: { kind: 'polity', id: 'escarlia' },
+    target_ref: { kind: 'settlement', id: 'portovelho' },
+    target_owner_ref: { kind: 'polity', id: 'escarlia' }, evidence_event_id: 'event:76',
+  }]
+  store.snapshot = data
+  const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
+  await panel.findAll('nav button').find(b => b.text() === 'Diplomacia')!.trigger('click')
+  const finding = panel.get('[data-finding="finding:espionage:1"]')
+  expect(finding.text()).toContain('Espionagem')
+  expect(finding.text()).toContain('Conselho de Escárlia')
+  expect(finding.text()).toContain('event:77')
+  await finding.get('button').trigger('click')
+  expect(store.focusEventId).toBe('event:77')
   panel.unmount()
 })
 

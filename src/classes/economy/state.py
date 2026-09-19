@@ -6,8 +6,8 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 
-from .models import (FreightRecoveryCase, Market, MoneyAccount, Payroll, ProductionFacility, Recipe, Resource,
-                     SettlementNeeds, Stock)
+from .models import (FreightRecoveryCase, Market, MoneyAccount, Payroll, PermanentEmploymentContract,
+                     ProductionFacility, Recipe, Resource, SettlementNeeds, Stock)
 from .serialization import EconomySerialization, REGISTRIES
 from .logistics import CargoParcel, FreightOrder, RouteFlow, validate_logistics
 from .expansion import ExpansionBlueprint, ExpansionProject, validate_expansions
@@ -40,6 +40,7 @@ class EconomyState(EconomySerialization):
     cargo_manifests: dict[str, CargoManifest] = field(default_factory=dict)
     freight_recovery_cases: dict[str, FreightRecoveryCase] = field(default_factory=dict)
     investigations: dict[str, Investigation] = field(default_factory=dict)
+    employment_contracts: dict[str, PermanentEmploymentContract] = field(default_factory=dict)
 
     def used_capacity(self, stock: Stock) -> int:
         return sum(self.resources[rid].bulk * amount for rid, amount in stock.goods.items())
@@ -67,6 +68,10 @@ class EconomyState(EconomySerialization):
             if any(not (self.resources[r].base_price + 3) // 4 <= price <= self.resources[r].base_price * 4
                    for r, price in market.prices.items()):
                 raise ValueError("market price outside allowed bounds")
+            for reading in (market.observed_supply, market.observed_demand):
+                if (set(reading) - set(self.resources)
+                        or any(type(amount) is not int or amount < 0 for amount in reading.values())):
+                    raise ValueError("market readings must use non-negative catalog resources")
         for stock in self.stocks.values():
             if (set(stock.goods) | set(stock.last_event_ids)) - set(self.resources):
                 raise ValueError("unknown stock resource")
@@ -78,6 +83,21 @@ class EconomyState(EconomySerialization):
             account = self.accounts.get(facility.payroll_account_id)
             if account is None or account.owner_ref != self.stocks[facility.stock_id].owner_ref:
                 raise ValueError("payroll requires the employer's account")
+        if len({contract.cohort_id for contract in self.employment_contracts.values()}) != len(self.employment_contracts):
+            raise ValueError("a cohort cannot hold multiple permanent employment contracts")
+        for contract in self.employment_contracts.values():
+            account = self.accounts.get(contract.account_id)
+            stock = self.stocks.get(contract.stock_id)
+            site = world.map.infrastructure_sites.get(contract.work_site_id) if world is not None else None
+            local_site = (site is not None and world is not None
+                          and contract.settlement_id in {
+                              settlement.id for settlement in world.society.settlements.values()
+                              if settlement.region_id in site.region_ids
+                          })
+            if (account is None or stock is None or account.owner_ref != contract.employer_ref
+                    or stock.owner_ref != contract.employer_ref or stock.location_id != contract.settlement_id
+                    or (world is not None and (site is None or site.owner_ref != contract.employer_ref or not local_site))):
+                raise ValueError("employment contract requires local employer site, stock and account")
         if len({need.stock_id for need in self.needs.values()}) != len(self.needs):
             raise ValueError("settlements cannot share a subsistence stock")
         for need in self.needs.values():
@@ -149,7 +169,8 @@ class EconomyState(EconomySerialization):
             if (payroll.id not in {*self.facilities, *self.expansions, *self.repairs, *self.investigations, *world.research.projects,
                                    *world.research.apprenticeships, *world.research.rites,
                                    *world.research.technique_copies,
-                                   *world.society.detachments, *self.customs_checkpoints}
+                                   *world.society.detachments, *self.customs_checkpoints,
+                                   *self.employment_contracts}
                     or payroll.day > world.clock.absolute_day
                     or payroll.last_event_id not in events
                     or set(payroll.workers_by_group) - set(world.society.population)):
@@ -162,6 +183,28 @@ class EconomyState(EconomySerialization):
                                "repair_progressed", "investigation_completed", "rite_completed"})
             if event.day != payroll.day or event.event_type not in expected_types:
                 raise ValueError("invalid payroll event type or date")
+        for contract in self.employment_contracts.values():
+            group = world.society.population.get(contract.cohort_id)
+            created = events.get(contract.created_event_id)
+            decision = events.get(contract.decision_event_id)
+            last = events.get(contract.last_event_id)
+            expected_decision = {"action": "create_permanent_employment",
+                                 "actor_ref": contract.employer_ref.to_dict(),
+                                 "selected_affordance_id": contract.selected_affordance_id}
+            if (group is None or contract.settlement_id not in world.society.settlements
+                    or contract.created_day > world.clock.absolute_day
+                    or contract.last_reviewed_day > world.clock.absolute_day
+                    or created is None or decision is None or last is None
+                    or decision.fact_kind != FactKind.DECISION or decision.decision != expected_decision
+                    or created.event_type != "permanent_employment_created"
+                    or created.day != contract.created_day
+                    or contract.decision_event_id not in {link.cause_event_id for link in created.causal_links}
+                    or not any(delta.owner_kind == "employment_contract" and delta.owner_id == contract.id
+                               and delta.aspect == "created" and delta.before == "False" and delta.after == "True"
+                               for delta in created.deltas)
+                    or last.event_type not in {"permanent_employment_created", "permanent_employment_settled",
+                                               "permanent_employment_unpaid"}):
+                raise ValueError("invalid permanent employment contract provenance")
         for stock in self.stocks.values():
             if stock.location_id not in world.society.settlements:
                 raise ValueError("unknown stock location")
@@ -256,7 +299,8 @@ class EconomyState(EconomySerialization):
             payment = events.get(case.payment_event_id)
             opened = events.get(case.original_freight_event_id)
             expected_request = {"action": "request_paid_purchase_recovery",
-                                "actor_ref": case.buyer_ref.to_dict(), "option_id": case.requested_option_id}
+                                "actor_ref": case.buyer_ref.to_dict(),
+                                "selected_affordance_id": case.requested_option_id}
             if (buy is None or sell is None or payment is None or opened is None
                     or buy.fact_kind != FactKind.DECISION or sell.fact_kind != FactKind.DECISION
                     or (buy.decision or {}).get("action") != "buy"
@@ -295,6 +339,6 @@ class EconomyState(EconomySerialization):
                         or response.decision.get("action") != "respond_paid_purchase_recovery"
                         or successor.id == order.id or successor.quantity != case.quantity
                         or order.resolved_quantity != case.quantity or order.resolution_event_id != resolution.id
-                        or parcel or resolution.event_type != "purchase_recovery_completed"
+                        or parcel or resolution.event_type not in {"purchase_recovery_completed", "contraband_returned"}
                         or last.event_type != "purchase_recovery_completed"):
                     raise ValueError("completed freight recovery case has invalid resolution")

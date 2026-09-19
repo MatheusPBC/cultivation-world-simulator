@@ -27,16 +27,22 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
                            for protest in world.society.civic_protests.values())
     warded = any(ward.settlement_id == settlement_id and ward.until_day > day
                  for ward in world.research.wards.values())
+    settlement = world.society.settlements[settlement_id]
+    need = world.economy.needs[settlement_id]
+    population = world.society.population_at(settlement_id)
+    present_population = world.society.present_population_at(settlement_id)
     if (previous is not None and previous.observed_day == day
             and previous.recipient_ref == actor and previous.publisher_ref == actor
+            and previous.population == population and previous.present_population == present_population
+            and previous.housing_capacity == settlement.housing_capacity
+            and previous.health == need.health and previous.missing_food == need.missing_food
+            and previous.unrest == need.unrest and previous.occupier_id == settlement.occupier_id
             and previous.rite_underway == rite_underway and previous.protest_underway == protest_underway
             and previous.warded == warded):
         return previous
-    settlement = world.society.settlements[settlement_id]
-    need = world.economy.needs[settlement_id]
     report = SettlementReport(id=key, recipient_ref=actor, publisher_ref=actor, settlement_id=settlement_id,
-                              observed_day=day, population=world.society.population_at(settlement_id),
-                              present_population=world.society.present_population_at(settlement_id),
+                              observed_day=day, population=population,
+                              present_population=present_population,
                               housing_capacity=settlement.housing_capacity, health=need.health,
                               missing_food=need.missing_food, unrest=need.unrest,
                               occupier_id=settlement.occupier_id,

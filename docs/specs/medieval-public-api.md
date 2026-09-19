@@ -22,7 +22,7 @@ Velocidade significa saltos por segundo real, nunca mudança na duração simula
 
 Configuração persistente medieval contém seed, contagem inicial de personagens
 (padrão12, 1–60), locale pt-BR e política determinística; não finge IA integrada.
-Saves usam schema19 (Society2/Economy10); schemas 18 e abaixo são rejeitados e preservados, sem
+Saves usam schema60; schemas anteriores são rejeitados e preservados, sem
 sobrescrita ou migração. IDs de
 sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras
@@ -47,8 +47,23 @@ das receitas e capacidades das instalações no estoque. Relatórios nomeiam o
 recurso observado. DTOs não persistem nem possuem quantidades materiais.
 
 - GET query/status: mundo disponível, pausa, erro, dia, sessão e velocidade.
-- GET query/observatory: status, world, society, economy, map, governance, research e diplomacy do mesmo
-  instante, serializados sob uma única trava/revisão; evita misturar meses no observatório.
+- GET query/observatory: status, world, society, economy, map, governance, research, diplomacy, creatures e
+  campaigns do mesmo instante, serializados sob uma única trava/revisão; evita misturar meses no observatório.
+  `research.technology_sales` reúne apenas vendas concluídas e seus recibos de pedido, aceite, pagamento e
+  aprendizado para navegação pelo Why. `campaigns.siege_campaigns` projeta o estado canônico de cada cerco,
+  incluindo a endurance da guarnição e o colapso defensivo quando ela chega a zero,
+  sem transferir automaticamente controle territorial ou administração. Uma
+  guarnição também pode terminar por retirada voluntária (`withdrawn`), mantendo
+  a coluna e a ocupação física separadas do dever militar.
+  `campaigns.territorial_controls` projeta controles persistidos somente após
+  decisão explícita e guarnição material, separados de `occupations` e da
+  administração do assentamento. `creatures.hazard_impacts` expõe o impacto engine-owned registrado
+  (origem, alvo, magnitude, exposição e resistência), inclusive alvos
+  `population_group` quando uma criatura ataca uma coorte anônima; isso não
+  publica automaticamente esse fato como conhecimento dos atores.
+  `campaigns.political_settlements` projeta apenas propostas vivas de
+  desescalada e concessão administrativa, com termos, estado e eventos-fonte;
+  a projeção não executa transferência, retirada ou controle.
 - GET query/options: configuração inicial e mapa disponíveis nesta versão.
 - GET query/world: resumo do mundo e configuração persistente.
 - GET query/society: personagens, povos, governos, organizações e povoados.
@@ -56,20 +71,34 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
   (residentes) e `present_population` são distintos.
 - GET query/economy: catálogo, estoques, contas, produção, últimas folhas salariais, necessidades, mercados,
   ordens pendentes, cargas, `customs_checkpoints` e `cargo_manifests`; ordens concluídas permanecem rastreáveis por eventos.
-  O catálogo inclui `repair_blueprints`, `repairs`, postos civis de alfândega e manifestos (economia schema 10); custos
-  são definidos pelo engine, não pelo cliente.
+  O catálogo inclui `repair_blueprints`, `repairs`, contratos `employment_contracts`, postos civis de alfândega e manifestos
+  (economia schema 13); custos, limites de trabalhadores e salários são definidos pelo engine, não pelo cliente.
+  Cada contrato também expõe o `work_site_id` próprio do empregador, a coorte,
+  o resultado do último ciclo e os recibos causais; a projeção não cria nem
+  renova vínculos.
 - `EconomyView.migration_provisions` expõe provisões e seu `MoneyAccount`; o
   observador apenas projeta a transferência bilateral e não controla famílias.
 - GET query/map: geografia, território, rotas e instalações canônicas.
+- `research.rite_blueprints` expõe apenas metadados derivados de cada blueprint
+  (`school`, `cost`, `range`, `duration_days`); o cliente não registra nem executa
+  uma árvore de feitiços.
 - GET query/governance: cargos, políticas tributárias, objetivos, planos, relatórios de
-  suprimento, `SiteReport`, `customs_notices` privados e relatórios datados de rotas por ator. Relatórios e
+  suprimento, `SiteReport`, `customs_notices` privados e relatórios datados de rotas por ator. Cada aviso alfandegário
+  também expõe a `classification` engine-owned (`ordinary` ou `contraband`), derivada do catálogo do recurso e
+  preservada no receipt de apresentação; o proprietário pode escolher o retorno
+  (`returned`) quando a rota original e a capacidade de origem ainda forem válidas;
+  o operador também pode registrar uma apreensão explícita (`seized`) para
+  contrabando classificado, desde que possua autoridade e estoque local; isso
+  não executa confisco ou rerroteamento automático. Relatórios e
   ofertas de estoque incluem a cotação histórica de exportação da origem (taxa,
   fato de política e coletor), nunca saldo da conta coletora; `SiteReport`
   registra a presença local do mantenedor e permanece privado, não sendo
   broadcast automático; consulta
   onisciente do observador, não contexto permitido de um ator do mundo. Um
   relatório de rota ausente ou com 30 dias ou mais não é inferido do mapa
-  canônico; ver medieval-autonomy.md.
+  canônico; ver medieval-autonomy.md. Cada leitura também expõe
+  `daily_flow_bulk`, o volume agregado observado no dia, sem identidade de
+  carga, estoque, conta ou proprietário.
 - A mesma projeção expõe `fiscal_route_reports` recebidos pelo ator e seus recibos
   de publicação/entrega. O observatório pode ver todos os relatórios, mas essa
   visão não concede conhecimento a atores. Opções fiscais são recompostas pelo
@@ -86,6 +115,21 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
   chamada a query/observatory é atômica entre todos os seus campos. Consulta
   onisciente; não concede conhecimento a parte não notificada e não expõe
   comando material de barganha.
+- GET query/dossier/{actor_kind}/{actor_id}: perspectiva privada derivada do
+  conhecimento já entregue ao ator, incluindo notices/relatórios/finding com
+  `recipient_ref` correspondente, os receipts factuais conhecidos, conhecimento
+  técnico próprio, memórias institucionais e objetivos/planos próprios.
+  Inventário, plano e observação de outra instituição não são copiados. Cada
+  entrada factual pode listar `cause_event_ids`, mas somente quando o evento
+  causal também pertence ao conjunto conhecido pelo ator; a cadeia completa
+  segue navegável pelo endpoint causal do Dao.
+- `GET query/society` agora inclui `civic_protests`, `civic_movements` e
+  `civic_strikes`, com estágio, coorte,
+  participação reservada, demanda e receipts de decisão/relatório. A projeção é
+  somente leitura; não abre nem encerra paralisações.
+- O observatório também distingue receipts `institutional_decision_stale_affordance`:
+  uma escolha envelheceu antes da revalidação do owner, o que não é `NO_ACTION`
+  nem falha do provider.
 - GET query/events?after=0&limit=50: fatos em sequência, página máxima100.
 - GET query/causal/{event_id}: fato, causas diretas e efeitos diretos paginados.
 - GET query/saves: IDs dos arquivos, data/tamanho e metadados de compatibilidade.

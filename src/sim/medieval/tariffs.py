@@ -23,8 +23,7 @@ class ExportTariffOption(SocietyValue):
 
     def decision(self):
         return {"action": "set_export_tariff", "actor_ref": EntityRef("polity", self.polity_id).to_dict(),
-                "option_id": self.id, "polity_id": self.polity_id,
-                "export_rate_permille": self.export_rate_permille}
+                "selected_affordance_id": self.id}
 
 
 def _administrator(world, stock_id):
@@ -98,7 +97,12 @@ def _foreign_delivery_plan(world, actor):
 def set_export_tariff(world, option_id, *, decision_event_id):
     """Apply an exact, current fiscal decision without moving any money itself."""
     decision = next((event for event in world.events if event.id == decision_event_id), None)
-    polity_id = (decision.decision or {}).get("polity_id") if decision is not None else None
+    payload = decision.decision if decision is not None else None
+    try:
+        actor = EntityRef.from_dict(payload.get("actor_ref")) if isinstance(payload, dict) else None
+    except (KeyError, TypeError, ValueError):
+        actor = None
+    polity_id = actor.id if actor is not None and actor.kind == "polity" else None
     option = next((item for item in tariff_options(world, polity_id) if item.id == option_id), None)
     if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION or option is None
             or decision.decision != option.decision()):
@@ -126,8 +130,9 @@ def set_export_tariff(world, option_id, *, decision_event_id):
     return event
 
 
-def review_export_tariffs(world):
-    """A conservative engine policy may select, but never invent, an option."""
+def review_export_tariffs(world, *, excluded_actors=()):
+    """A conservative policy selects only for actors without a provider turn."""
+    excluded = set(excluded_actors)
     changed = False
     for polity_id in sorted(world.authority.tax_policies):
         options = tariff_options(world, polity_id)
@@ -136,6 +141,8 @@ def review_export_tariffs(world):
         policy = world.authority.tax_policies[polity_id]
         treasury = world.economy.accounts[policy.account_id]
         actor = EntityRef("polity", polity_id)
+        if actor in excluded:
+            continue
         payroll = _latest_own_payroll(world, policy)
         dependency = _foreign_delivery_plan(world, actor)
         report = world.knowledge.reports[options[0].inventory_report_id]
@@ -158,3 +165,26 @@ def review_export_tariffs(world):
         set_export_tariff(world, option.id, decision_event_id=event.id)
         changed = True
     return changed
+
+
+def tariff_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    def options(world, actor):
+        return tariff_options(world, actor.id) if isinstance(actor, EntityRef) and actor.kind == "polity" else ()
+
+    def causes(world, option):
+        report = world.knowledge.reports.get(option.inventory_report_id)
+        policy = world.authority.tax_policies.get(option.polity_id)
+        treasury = world.economy.accounts.get(option.account_id)
+        return tuple(item for item in (report.event_id if report else None,
+                                       policy.last_event_id if policy else None,
+                                       treasury.last_event_id if treasury else None) if item)
+
+    def execute(world, actor, option_id, decision_event_id):
+        return set_export_tariff(world, option_id, decision_event_id=decision_event_id)
+
+    return (DiscretionaryAdapter(
+        name="export_tariff", family="economy", options_fn=options,
+        label_fn=lambda option: f"Definir tarifa de exportação em {option.export_rate_permille}/1000.",
+        causes_fn=causes, execute_fn=execute),)

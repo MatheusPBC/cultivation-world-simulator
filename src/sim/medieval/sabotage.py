@@ -10,9 +10,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from src.classes.economy.investigation import Investigation
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
-from src.classes.governance.models import InvestigationFinding, SiteReport
+from src.classes.governance.models import InvestigationAccusationNotice, InvestigationFinding, SiteReport
+from src.classes.governance.knowledge import investigation_accusation_notice_id
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity
 from src.systems.calendar_agenda import ScheduledSituation
@@ -22,6 +24,7 @@ from .events import record_event
 from .infrastructure import current_observation
 from .institutional_memory import apply_memory_creation, memory_creation_deltas
 from .labor import settle_work
+from .institutional_decision_turn import DiscretionaryAdapter
 
 
 SABOTAGE_ACTION = "sabotage_site"
@@ -31,6 +34,8 @@ SABOTAGE_TOOLS = 2
 TOOLS_RESERVE = 1
 INVESTIGATION_WORKERS = 1
 INVESTIGATION_WAGE = 2
+ACCUSE_ACTION = "accuse_investigation_subject"
+ACCUSE_RESPONSE_ACTION = "respond_to_investigation_accusation"
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,33 @@ class InvestigationOption:
 
     def decision(self):
         return {"action": INVESTIGATE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class AccusationOption:
+    id: Identity
+    actor_ref: EntityRef
+    investigation_id: Identity
+    finding_event_id: Identity
+    subject_ref: EntityRef
+    site_id: Identity
+
+    def decision(self):
+        return {"action": ACCUSE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class AccusationResponseOption:
+    id: Identity
+    actor_ref: EntityRef
+    notice_id: Identity
+    accusation_event_id: Identity
+    response: str
+
+    def decision(self):
+        return {"action": ACCUSE_RESPONSE_ACTION, "actor_ref": self.actor_ref.to_dict(),
                 "selected_affordance_id": self.id}
 
 
@@ -109,7 +141,10 @@ def _work_presence(world, actor, site):
         if facility is not None and facility.site_id == site.id and world.economy.stocks[facility.stock_id].owner_ref == actor:
             return True
         project = world.economy.expansions.get(payroll.id)
-        if project is not None and project.site_id == site.id and project.owner_ref == actor:
+        expansion_facility = (world.economy.facilities.get(project.facility_id)
+                              if project is not None else None)
+        if (project is not None and expansion_facility is not None
+                and expansion_facility.site_id == site.id and project.owner_ref == actor):
             return True
         repair = world.economy.repairs.get(payroll.id)
         if repair is not None and repair.site_id == site.id and repair.maintainer_ref == actor:
@@ -223,10 +258,60 @@ def execute_sabotage_option(world, actor, option_id, decision_event_id):
     return world.map.infrastructure_sites[site.id]
 
 
+def sabotage_label(option):
+    """Provider-safe label for the monthly institutional menu."""
+    return "Danificar uma instalação estrangeira observada com meios próprios."
+
+
+def sabotage_adapters():
+    """Expose the existing sabotage owner to the shared monthly turn.
+
+    This does not create a second planner or executor.  Contact/aftermath
+    policies may still offer the same options; the adapter merely allows an
+    institution with a valid local presence and current site report to choose
+    sabotage during its ordinary monthly consultation.
+    """
+    return (
+        DiscretionaryAdapter(
+            name="site_sabotage", family="conflict", options_fn=sabotage_options,
+            label_fn=sabotage_label,
+            causes_fn=lambda _world, option: (option.report_event_id,),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                execute_sabotage_option(world, actor, option_id, decision_event_id),
+        ),
+        DiscretionaryAdapter(
+            name="site_investigation", family="conflict", options_fn=investigation_options,
+            label_fn=lambda _option: "Investigar a causa de um dano material observado.",
+            causes_fn=lambda _world, option: (option.damage_event_id, option.report_event_id),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                open_investigation(world, actor, option_id, decision_event_id),
+        ),
+        DiscretionaryAdapter(
+            name="investigation_accusation", family="conflict", options_fn=accusation_options,
+            label_fn=lambda option: f"Notificar {option.subject_ref.id} da acusação baseada na apuração.",
+            causes_fn=lambda _world, option: (option.finding_event_id,),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                execute_accusation(world, actor, option_id, decision_event_id),
+        ),
+        DiscretionaryAdapter(
+            name="investigation_accusation_response", family="conflict", options_fn=accusation_response_options,
+            label_fn=lambda option: "Negar a acusação recebida." if option.response == "deny"
+            else "Pedir revisão da acusação recebida.",
+            causes_fn=lambda _world, option: (option.accusation_event_id,),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                execute_accusation_response(world, actor, option_id, decision_event_id),
+        ),
+    )
+
+
 def _damage_event(world, site, report):
     event = _event(world, site.last_event_id)
-    if (event is None or event.event_type != "site_sabotaged" or event.day > world.clock.absolute_day
-            or event.id not in {link.cause_event_id for link in _event(world, report.event_id).causal_links}):
+    report_event = _event(world, report.event_id) if report is not None else None
+    if event is None or report_event is None or event.day > world.clock.absolute_day:
+        return None
+    if event.event_type not in {"site_sabotaged", "creature_damaged_site"}:
+        return None
+    if event.id not in {link.cause_event_id for link in report_event.causal_links}:
         return None
     return event
 
@@ -266,6 +351,112 @@ def investigation_options(world, actor):
             actor_ref=actor, site_id=site.id, damage_event_id=damage.id, report_event_id=report.event_id,
             stock_id=stock.id, account_id=account.id))
     return tuple(options)
+
+
+def accusation_options(world, actor):
+    """Expose only attributed private findings owned by the accuser."""
+    if (not isinstance(actor, EntityRef) or actor.kind not in {"polity", "organization"}
+            or not can_actor_act_for(world, actor, actor, "diplomacy")):
+        return ()
+    options = []
+    for investigation in sorted(world.economy.investigations.values(), key=lambda item: item.id):
+        if investigation.investigator_ref != actor or investigation.stage != "attributed":
+            continue
+        finding = world.knowledge.investigation_finding(actor, investigation.id)
+        if (finding is None or finding.result != "attributed" or finding.subject_ref is None
+                or finding.subject_ref == actor
+                or investigation_accusation_notice_id(investigation.id, finding.subject_ref)
+                in world.knowledge.investigation_accusation_notices):
+            continue
+        options.append(AccusationOption(
+            id=f"investigation-accusation:{actor.kind}:{actor.id}:{investigation.id}:{finding.event_id}",
+            actor_ref=actor, investigation_id=investigation.id, finding_event_id=finding.event_id,
+            subject_ref=finding.subject_ref, site_id=investigation.site_id))
+    return tuple(options)
+
+
+def accusation_response_options(world, actor):
+    """Offer the accused a bounded factual response to a live notice.
+
+    The response records agency for later interpretation; it neither proves
+    guilt nor clears the subject and never mutates material state.
+    """
+    if (not isinstance(actor, EntityRef) or actor.kind not in {"polity", "organization"}
+            or not can_actor_act_for(world, actor, actor, "diplomacy")):
+        return ()
+    options = []
+    for notice in sorted(world.knowledge.investigation_accusations_for_actor(actor), key=lambda item: item.id):
+        for response in ("deny", "request_review"):
+            if any(event.event_type == "investigation_accusation_response"
+                   and event.causal_payload
+                   and event.causal_payload.get("notice_id") == notice.id
+                   and event.causal_payload.get("response") == response
+                   for event in world.events):
+                continue
+            options.append(AccusationResponseOption(
+                id=f"investigation-accusation-response:{actor.kind}:{actor.id}:{notice.id}:{response}",
+                actor_ref=actor, notice_id=notice.id, accusation_event_id=notice.event_id,
+                response=response))
+    return tuple(options)
+
+
+def execute_accusation_response(world, actor, option_id, decision_event_id):
+    candidate = deepcopy(world)
+    option = next((item for item in accusation_response_options(candidate, actor) if item.id == option_id), None)
+    if option is None:
+        raise ValueError("accusation response option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, ACCUSE_RESPONSE_ACTION)
+    if decided_by != actor or decision.decision != option.decision():
+        raise ValueError("accusation response has the wrong decision")
+    require_authority(candidate, actor, "diplomacy")
+    notice = candidate.knowledge.investigation_accusation_notices.get(option.notice_id)
+    if (notice is None or notice.recipient_ref != actor or notice.event_id != option.accusation_event_id):
+        raise ValueError("accusation notice is no longer current")
+    event = record_event(
+        candidate, "investigation_accusation_response",
+        "O acusado respondeu a uma acusação privada sem alterar a realidade material.",
+        fact_kind=FactKind.OCCURRENCE, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"notice_id": notice.id, "actor_ref": actor.to_dict(), "response": option.response},
+        cause_ids=_causes(decision.id, notice.event_id),
+    )
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return event
+
+
+def execute_accusation(world, actor, option_id, decision_event_id):
+    candidate = deepcopy(world)
+    option = next((item for item in accusation_options(candidate, actor) if item.id == option_id), None)
+    if option is None:
+        raise ValueError("accusation option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, ACCUSE_ACTION)
+    if decided_by != actor or decision.decision != option.decision():
+        raise ValueError("accusation has the wrong decision")
+    require_authority(candidate, actor, "diplomacy")
+    finding = candidate.knowledge.investigation_finding(actor, option.investigation_id)
+    investigation = candidate.economy.investigations.get(option.investigation_id)
+    if (finding is None or investigation is None or investigation.stage != "attributed"
+            or finding.event_id != option.finding_event_id or finding.subject_ref != option.subject_ref):
+        raise ValueError("investigation finding is no longer attributable")
+    notice_id = investigation_accusation_notice_id(investigation.id, option.subject_ref)
+    if notice_id in candidate.knowledge.investigation_accusation_notices:
+        raise ValueError("investigation subject was already accused")
+    event = record_event(
+        candidate, "investigation_accusation",
+        "Uma instituição notificou o sujeito identificado por uma apuração privada.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("investigation_accusation_notice", notice_id, "finding_event_id",
+                        None, finding.event_id),),
+        cause_ids=_causes(decision.id, finding.event_id, investigation.last_event_id),
+    )
+    candidate.knowledge.investigation_accusation_notices[notice_id] = InvestigationAccusationNotice(
+        id=notice_id, recipient_ref=option.subject_ref, accuser_ref=actor,
+        investigation_id=investigation.id, site_id=investigation.site_id,
+        subject_ref=option.subject_ref, finding_event_id=finding.event_id,
+        event_id=event.id, learned_day=event.day)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.knowledge.investigation_accusation_notices[notice_id]
 
 
 def open_investigation(world, actor, option_id, decision_event_id):
@@ -319,7 +510,7 @@ def _sabotage_subject(world, investigation):
     the exact detachment encoded in the canonical sabotage fact.
     """
     damage = _event(world, investigation.damage_event_id)
-    if damage is None:
+    if damage is None or damage.event_type != "site_sabotaged":
         return None
     detachment_id = next((delta.after for delta in damage.deltas
                           if delta.owner_kind == "site_sabotage" and delta.aspect == "detachment_id"
@@ -421,6 +612,8 @@ def resolve_investigations(world, situations):
             _block_investigation(world, investigation, blocker)
 
 
-__all__ = ["SABOTAGE_ACTION", "INVESTIGATE_ACTION", "SabotageOption", "InvestigationOption",
+__all__ = ["SABOTAGE_ACTION", "INVESTIGATE_ACTION", "ACCUSE_ACTION", "ACCUSE_RESPONSE_ACTION",
+           "SabotageOption", "InvestigationOption", "AccusationOption", "AccusationResponseOption",
            "sabotage_options", "execute_sabotage_option", "investigation_options", "open_investigation",
-           "resolve_investigations"]
+           "accusation_options", "execute_accusation", "accusation_response_options",
+           "execute_accusation_response", "resolve_investigations"]

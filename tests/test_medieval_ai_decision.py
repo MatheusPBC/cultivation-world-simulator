@@ -97,6 +97,29 @@ async def test_provider_can_select_a_current_request_option(monkeypatch):
     assert decision.decision["selected_affordance_id"] == option.id
 
 
+async def test_private_affordance_handle_is_opaque_in_prompt_but_maps_back_to_canonical(monkeypatch):
+    world = enable(pressured_world())
+    actor = EntityRef("polity", "auren")
+    prompts = []
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        prompts.append(prompt)
+        payload = json.loads(prompt.rsplit("\n", 1)[1])
+        return {"selected_id": payload["choices"][0]["id"]}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    selected = await ai_decider.select_option(
+        world, actor, {"today": world.clock.absolute_day},
+        [{"id": "research:polity:auren:stock:ferroalto:treasury:auren:character:011",
+          "label": "Financiar pesquisa enumerada."}],
+    )
+
+    assert selected == "research:polity:auren:stock:ferroalto:treasury:auren:character:011"
+    assert "stock:ferroalto" not in prompts[0]
+    assert "treasury:auren" not in prompts[0]
+
+
 @pytest.mark.parametrize("answer", [RuntimeError("provider down"), {"selected_id": "forged:option"},
                                     {"selected_id": "NO_ACTION"}])
 async def test_a_failed_or_invalid_answer_does_not_fabricate_an_aid_action(answer, monkeypatch):

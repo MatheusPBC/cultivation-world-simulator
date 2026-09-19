@@ -33,6 +33,25 @@ it('opens real causal evidence and preserves before/after without interpreting i
   app.unmount();vi.unstubAllGlobals()
 })
 
+it('shows structured engine evidence in the causal detail', async () => {
+  vi.useRealTimers()
+  const pinia=createPinia(); setActivePinia(pinia)
+  const store=useObserverStore()
+  store.snapshot=structuredClone(fixture) as ObservatoryView
+  store.snapshot.world.events=1
+  const ecologyEvent = event({id:'event:ecology',sequence:1,event_type:'creature_ecology_tick',content:'O habitat perdeu capacidade.',causal_origin:'deterministic',causal_payload:{ ecology: { species: 'river_drake', habitat_stress: 3 } }})
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('/causal/')
+    ? new Response(JSON.stringify({ ok:true, revision:1, data: { event: ecologyEvent, causes: [], effects: [], next_after: 0, has_more: false } }), { headers: { 'content-type': 'application/json' } })
+    : new Response(JSON.stringify({ ok:true, revision:1, data: { items: [ecologyEvent], next_after: 1, has_more: false } }), { headers: { 'content-type': 'application/json' } })))
+  const app = mount(Chronicle,{attachTo:document.body,global:{plugins:[pinia,medievalI18n]}})
+  await flushPromises()
+  await app.get('[data-event="event:ecology"]').trigger('click')
+  await flushPromises()
+  expect(app.get('[data-testid="causal-detail"]').text()).toContain('Evidência estruturada do motor')
+  expect(app.get('[data-testid="causal-detail"]').text()).toContain('river_drake')
+  app.unmount(); vi.unstubAllGlobals()
+})
+
 it('separates actor choice, explicit refusal and technical failure and filters decision traces', async () => {
   vi.useRealTimers()
   const pinia=createPinia(); setActivePinia(pinia)

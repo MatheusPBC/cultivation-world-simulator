@@ -2,8 +2,9 @@
 
 An investigation does not grant surveillance or reconstruct a hidden action.
 It is only the Economy-owned work obligation that pays a local artisan to
-examine one already observed Map damage event.  Knowledge owns the eventual
-private finding.
+examine one already observed Map damage event, including the narrow damage
+fact produced by the River Lume drake.  Knowledge owns the eventual private
+finding.
 """
 
 from typing import Literal
@@ -62,7 +63,8 @@ def validate_investigations(economy, world=None):
         receipt = events.get(investigation.last_event_id)
         report_event = events.get(investigation.report_event_id)
         if (site is None or decision is None or receipt is None or investigation.opened_day > world.clock.absolute_day
-                or decision.event_type != "site_sabotaged" or decision.fact_kind != FactKind.STATE_TRANSITION
+                or decision.event_type not in {"site_sabotaged", "creature_damaged_site"}
+                or decision.fact_kind != FactKind.STATE_TRANSITION
                 or not any(delta.owner_kind == "site" and delta.owner_id == investigation.site_id
                            and delta.aspect == "integrity" and float(delta.after) < float(delta.before)
                            for delta in decision.deltas)

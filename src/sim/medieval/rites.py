@@ -527,7 +527,9 @@ def _complete(world, rite, available):
                                                rite.officiant_decision_id))
         world.research.wards[identity] = Ward(
             id=identity, settlement_id=rite.settlement_id, sponsor_ref=rite.sponsor_ref, rite_id=rite.id,
-            started_day=world.clock.absolute_day, until_day=ward_until, last_event_id=event.id)
+            started_day=world.clock.absolute_day, until_day=ward_until,
+            resistance_capability_id=blueprint.resistance_capability_id or "standing_ward",
+            last_event_id=event.id)
     else:
         need = world.economy.needs[rite.target_settlement_id or rite.settlement_id]
         health = min(MAX_HEALTH, need.health + blueprint.health_gain_permille)
@@ -571,9 +573,16 @@ def resolve_rites(world, situations):
                          if item.stage == "officiating" and item.site_id == denial.id
                          and item.settlement_id == denial.settlement_id), None)
             if rite is not None:
-                _forfeit(world, rite, "rite_interrupted",
+                interruption = _forfeit(world, rite, "rite_interrupted",
                          "A assembleia negada impediu a conclusão do rito; os reagentes comprometidos se perderam.",
                          stage="interrupted", causes=(denial.last_event_id,))
+                # The force's material denial is the cause of a bounded social
+                # consequence.  It does not create a movement or choose a
+                # response; Economy only records the pressure from which later
+                # civic affordances may be recomposed.
+                from .economy import apply_rite_persecution_pressure
+                apply_rite_persecution_pressure(
+                    world, denial.settlement_id, interruption_event_id=interruption.id)
             continue
         rite = world.research.rites.get(situation.id)
         if (situation.kind != "rite" or rite is None or rite.stage != "officiating"

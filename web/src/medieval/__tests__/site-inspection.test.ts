@@ -136,7 +136,7 @@ it('renders a held parcel and its notice without assuming a notice exists', asyn
   expect(wrapper.text()).toContain('Carga retida no posto')
   expect(wrapper.text()).toContain('checkpoint:portovelho')
   data.governance.customs_notices = [{ id: 'notice:held', parcel_id: 'parcel:held', checkpoint_id: 'checkpoint:portovelho',
-    order_id: 'order:held', recipient_ref: { kind: 'polity', id: 'auren' }, resource_id: 'food', quantity: 10,
+    order_id: 'order:held', recipient_ref: { kind: 'polity', id: 'auren' }, resource_id: 'food', quantity: 10, classification: 'ordinary',
     fee: 20, event_id: 'event:notice', state_event_id: 'event:notice', learned_day: 8, state: 'fee_due', manifest_id: 'cargo_manifest:parcel:held',
     channel: 'direct_customs_notice' }]
   store.snapshot = structuredClone(data)
@@ -158,7 +158,7 @@ it('requires the canonical cargo manifest collection in every snapshot', () => {
 it('rejects an evasion attempt as a transient state instead of a persisted notice state', () => {
   const data = structuredClone(fixture) as unknown as ObservatoryView
   data.governance.customs_notices = [{ id: 'notice:transient', parcel_id: 'parcel:held', checkpoint_id: 'checkpoint:portovelho',
-    order_id: 'order:held', recipient_ref: { kind: 'polity', id: 'auren' }, resource_id: 'food', quantity: 10,
+    order_id: 'order:held', recipient_ref: { kind: 'polity', id: 'auren' }, resource_id: 'food', quantity: 10, classification: 'ordinary',
     fee: 20, event_id: 'event:notice', learned_day: 8, state: 'evasion_attempted', cleared_event_id: null,
     channel: 'direct_customs_notice' } as never]
   expect(() => acceptSnapshot(data)).toThrow('fiscalização')

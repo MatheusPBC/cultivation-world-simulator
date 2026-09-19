@@ -188,20 +188,21 @@ def _remediate(world, actor):
 
 
 def _pressured_settlements(world, actor):
-    """Own food objectives whose own current report still shows real need.
+    """Own administered settlements whose current report shows real need.
 
-    A satisfied reserve plan does not mean a fed population: the reserve
-    target and the settlement's dated report are different quantities, so the
-    plan's stage is not a gate here.
+    A food objective may add useful context, but it is not a prerequisite for
+    asking for help.  The material trigger is the institution's own dated
+    settlement report; otherwise a polity could watch its population starve
+    simply because no strategic objective happened to mention that settlement.
     """
     day = world.clock.absolute_day
     settlements = []
-    for objective in sorted(world.strategy.objectives.values(), key=lambda item: item.id):
-        report = world.knowledge.settlement_report(actor, objective.settlement_id)
-        if (objective.actor_ref != actor or objective.resource_id != "food"
-                or report is None or report.observed_day != day or report.missing_food <= 0):
+    for settlement in sorted(world.society.settlements.values(), key=lambda item: item.id):
+        report = world.knowledge.settlement_report(actor, settlement.id)
+        if (settlement.administrator_id != actor.id or report is None
+                or report.observed_day != day or report.missing_food <= 0):
             continue
-        settlements.append(objective.settlement_id)
+        settlements.append(settlement.id)
     return tuple(dict.fromkeys(settlements))
 
 

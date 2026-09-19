@@ -89,6 +89,9 @@ contém a intenção e não aceita deltas; a mudança posterior do owner registr
 os deltas e aponta para a decisão. Causas inexistentes e sequências/datas
 inconsistentes são rejeitadas. Os executores são responsáveis por demonstrar
 que seus deltas correspondem ao efeito material; narrativa não aplica patches.
+O campo `causal_payload` é parte explícita do contrato persistido para leituras
+estruturadas do motor (ecologia, hazard e evidência de execução); ele não é um
+atributo transitório anexado após a criação do evento.
 
 A cópia transacional de eventos reconstrói valores pela forma serializada validada,
 sem compartilhar os dicionários, deltas ou parâmetros de vínculos com o mundo

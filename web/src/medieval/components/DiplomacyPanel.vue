@@ -3,7 +3,7 @@ import { useI18n } from 'vue-i18n'
 import { useDiplomacy } from '../composables/useDiplomacy'
 import { calendar, formatNumber } from '../mappers'
 const { t } = useI18n()
-const { proposals, aidTrail, memories, readings, source } = useDiplomacy()
+const { proposals, aidTrail, memories, readings, strategicEvidence, source } = useDiplomacy()
 </script>
 
 <template>
@@ -66,7 +66,8 @@ const { proposals, aidTrail, memories, readings, source } = useDiplomacy()
     <ul v-else class="diplomacy-trail">
       <li v-for="memory in memories" :key="memory.id" :data-memory="memory.id">
         <strong>{{ memory.institution }}</strong>
-        <p class="muted">{{ t('recordedOn') }}: {{ calendar(memory.recorded_day) }}<br>
+        <p class="muted">{{ t('memoryKinds.' + (memory.kind ?? 'unknown')) }}<br>
+          {{ t('recordedOn') }}: {{ calendar(memory.recorded_day) }}<br>
           {{ t('reinforcedOn') }}: {{ calendar(memory.last_reinforced_day) }}<br>
           {{ t('effectiveSalience') }}: {{ formatNumber(memory.effective_salience) }}</p>
         <button @click="source(memory.event_id)">{{ t('rememberedEvidence') }}</button>
@@ -83,6 +84,17 @@ const { proposals, aidTrail, memories, readings, source } = useDiplomacy()
         <div class="diplomacy-actions">
           <button v-for="eventId in reading.evidence_event_ids" :key="eventId" @click="source(eventId)">{{ t('readingEvidence') }}</button>
         </div>
+      </li>
+    </ul>
+
+    <h3 id="evidence-title">{{ t('strategicEvidence') }}</h3>
+    <p class="muted">{{ t('strategicEvidenceHelp') }}</p>
+    <p v-if="!strategicEvidence.length" class="muted">{{ t('noStrategicEvidence') }}</p>
+    <ul v-else class="diplomacy-trail">
+      <li v-for="item in strategicEvidence" :key="item.finding_id || item.notice_id" :data-finding="item.finding_id || item.notice_id">
+        <strong>{{ t('strategicEvidenceKinds.' + item.kind) }} · {{ item.result }}</strong>
+        <p class="muted">{{ t('recipient') }}: {{ item.recipient }}<br>{{ t('recordedOn') }}: {{ item.event_id }}</p>
+        <button @click="source(item.event_id)">{{ t('source') }}</button>
       </li>
     </ul>
   </section>

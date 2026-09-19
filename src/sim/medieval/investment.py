@@ -21,6 +21,12 @@ def review_investment(world):
                 or not site.enabled or site.integrity < 1
                 or any(not can_actor_act_for(world, owner, owner, scope) for scope in ('trade', 'supply'))):
             continue
+        # With the institutional provider enabled, expansion is an explicit
+        # affordance in the composed monthly menu.  The deterministic path is
+        # retained only for worlds that explicitly run without an actor/provider
+        # so test-mode and offline fixtures remain conservative and auditable.
+        if world.config.ai_enabled:
+            continue
         # Do not expand an idle plant or a full store; no foreign stock is inspected.
         if all(stock.goods.get(r, 0) >= amount * facility.max_batches * 2 for r, amount in recipe.outputs.items()):
             continue

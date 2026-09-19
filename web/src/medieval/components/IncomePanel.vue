@@ -4,7 +4,7 @@ import { useIncome } from '../composables/useIncome'
 import { formatNumber as n } from '../mappers'
 import ExpansionPanel from './ExpansionPanel.vue'
 const { t } = useI18n()
-const { savings, totalSavings, payrolls, policies, source } = useIncome()
+const { savings, totalSavings, payrolls, employmentContracts, policies, source } = useIncome()
 </script>
 <template>
   <section aria-labelledby="income-title">
@@ -26,6 +26,14 @@ const { savings, totalSavings, payrolls, policies, source } = useIncome()
         <dt>{{ t('incomeTax') }}</dt><dd data-testid="tax">{{ n(p.tax) }}</dd>
         <dt>{{ t('netWages') }}</dt><dd data-testid="net">{{ n(p.net) }}</dd></dl>
       <button @click="source(p.last_event_id)">{{ t('source') }}</button>
+    </article>
+    <h3>{{ t('employmentContracts') }}</h3>
+    <p v-if="!employmentContracts.length" class="muted">{{ t('noEmploymentContracts') }}</p>
+    <article v-for="contract in employmentContracts" :key="contract.id" class="stock-card" :data-employment="contract.id">
+      <h4>{{ contract.employer }} · {{ contract.cohort?.id ?? contract.cohort_id }}</h4>
+      <p class="muted">{{ contract.workSite }} · {{ contract.workforce_limit }} {{ t('workers') }} · {{ n(contract.wage_per_worker) }} / {{ t('perPerson') }}</p>
+      <p>{{ t('employmentOutcomes.' + contract.last_outcome) }}</p>
+      <button @click="source(contract.last_event_id)">{{ t('source') }}</button>
     </article>
     <h3>{{ t('taxPolicies') }}</h3><p class="muted">{{ t('taxPoliciesHelp') }}</p>
     <article v-for="p in policies" :key="p.id" class="stock-card">

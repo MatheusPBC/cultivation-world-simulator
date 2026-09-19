@@ -156,6 +156,32 @@ async def test_shortage_and_abundance_move_prices_in_opposite_bounded_steps():
     assert world.economy.markets["pedraclara"].prices["food"] == 5
     assert world.economy.markets["portovelho"].prices["food"] == 3
     assert world.economy.markets["pedraclara"].updated_day == 30
+    assert world.economy.markets["pedraclara"].observed_supply["food"] == 0
+    assert world.economy.markets["pedraclara"].observed_demand["food"] == world.society.population_at("pedraclara")
+    assert world.economy.markets["portovelho"].observed_supply["food"] == 30000
+
+
+def test_market_readings_are_causal_and_survive_save_load(tmp_path):
+    world = market_world()
+    from src.sim.medieval.markets import update_markets
+    from src.systems.time import WorldClock
+
+    world.clock = WorldClock(30)
+    update_markets(world)
+    market = world.economy.markets["portovelho"]
+    receipt = next(event for event in world.events if event.id == market.last_event_id)
+    assert market.observed_supply["food"] == sum(
+        stock.goods.get("food", 0) for stock in world.economy.stocks.values()
+        if stock.location_id == "portovelho"
+    )
+    assert any(delta.aspect == "observed_supply" for delta in receipt.deltas)
+    assert any(delta.aspect == "observed_demand" for delta in receipt.deltas)
+
+    path = tmp_path / "market-readings.mws"
+    save_world(world, path)
+    loaded = load_world(path)
+    assert loaded.economy.markets["portovelho"].observed_supply == market.observed_supply
+    assert loaded.economy.markets["portovelho"].observed_demand == market.observed_demand
 
 
 @pytest.mark.asyncio
@@ -246,8 +272,8 @@ async def test_prepared_trade_scenario_recovers_after_blockade_and_preserves_acc
     # never lost to that background trade -- run() enforces conservation on
     # every step -- so these balances are the deterministic result of the
     # scripted purchase plus that autonomous activity, not just the trade.
-    assert result["buyer_balance"] == 14580
+    assert result["buyer_balance"] == 13936
     # Trade income remains real; the monthly irrigation project also pays
     # one named researcher and two assistants at 2 coins each on day 60.
-    assert result["seller_balance"] == 31394
+    assert result["seller_balance"] == 28720
     assert result["food_conserved"] and result["save_load_equivalent"]

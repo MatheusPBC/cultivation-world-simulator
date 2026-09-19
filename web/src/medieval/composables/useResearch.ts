@@ -23,6 +23,7 @@ export function useResearch() {
   const catalog = computed(() => data.value.research.technologies.map(tech => ({ ...tech,
     requirements: tech.prerequisites.map(id => technologies.value.get(id)?.name ?? id).join(', '),
   })))
+  const rites = computed(() => data.value.research.rite_blueprints)
   const source = (id: string) => { store.focusEventId = id }
-  return { projects, knowledge, catalog, source }
+  return { projects, knowledge, catalog, rites, source }
 }

@@ -11,7 +11,9 @@ from . import ai_decider
 from .events import record_event
 from .force import (STAND_DOWN_ACTION, WITHDRAW_ACTION, stand_down_from_standoff,
                     standoff_options, withdraw_detachment, withdrawal_options,
-                    PREPARE_POSITION_ACTION, force_position_options, prepare_force_position)
+                    PREPARE_POSITION_ACTION, force_position_options, prepare_force_position,
+                    GARRISON_ACTION, WITHDRAW_GARRISON_ACTION, ROTATE_GARRISON_ACTION, garrison_options,
+                    establish_garrison, withdraw_garrison, rotate_garrison)
 from .force_deescalation import (FULFILL_ACTION, OFFER_ACTION, RESPONSE_ACTION,
                                  force_deescalation_offer_options,
                                  force_deescalation_response_options,
@@ -25,6 +27,11 @@ from .administration_concession import (
     administration_concession_offer_options, administration_concession_response_options,
     administration_transfer_fulfillment_options, fulfill_administration_transfer,
     offer_administration_concession, respond_administration_concession)
+from .siege_campaign import (OCCUPY_AFTER_BREACH_ACTION, occupy_after_siege_breach,
+                              siege_occupation_options)
+from .territorial_control import (CONTROL_ACTION, WITHDRAW_CONTROL_ACTION,
+                                  establish_territorial_control, territorial_control_options,
+                                  withdraw_territorial_control)
 from .field_engagement import (JOIN_ACTION, OFFER_ACTION as FIELD_ENGAGEMENT_OFFER_ACTION,
                                field_engagement_join_options, field_engagement_offer_options,
                                join_field_engagement, offer_field_engagement)
@@ -118,6 +125,12 @@ async def _contact_turn(world, notice_id):
         withdraw = withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id)
         offers = force_deescalation_offer_options(world, notice.recipient_ref, notice_id=notice.id)
         concessions = administration_concession_offer_options(world, notice.recipient_ref, notice_id=notice.id)
+        siege_occupations = tuple(option for option in siege_occupation_options(world, notice.recipient_ref)
+                                  if option.settlement_id == notice.settlement_id)
+        controls = tuple(option for option in territorial_control_options(world, notice.recipient_ref)
+                         if option.settlement_id == notice.settlement_id)
+        garrisons = tuple(option for option in garrison_options(world, notice.recipient_ref)
+                           if option.settlement_id == notice.settlement_id)
         positions = force_position_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id)
         engagements = field_engagement_offer_options(world, notice.recipient_ref, notice_id=notice.id)
         interdictions = route_interdiction_options(world, notice.recipient_ref,
@@ -128,7 +141,7 @@ async def _contact_turn(world, notice_id):
                                           detachment_id=notice.own_detachment_id)
         commands = detachment_command_options(world, notice.recipient_ref,
                                                detachment_id=notice.own_detachment_id)
-        options = (*stand_down, *withdraw, *offers, *concessions, *positions, *engagements, *interdictions, *investments, *denials,
+        options = (*stand_down, *withdraw, *offers, *concessions, *siege_occupations, *controls, *garrisons, *positions, *engagements, *interdictions, *investments, *denials,
                    *commands,
                    *sabotage_options(world, notice.recipient_ref))
     if not options:
@@ -179,6 +192,18 @@ async def _contact_turn(world, notice_id):
             respond_administration_concession(world, notice.recipient_ref, option.id, decision.id)
         elif action == ADMINISTRATION_TRANSFER_FULFILL_ACTION:
             fulfill_administration_transfer(world, notice.recipient_ref, option.id, decision.id)
+        elif action == OCCUPY_AFTER_BREACH_ACTION:
+            occupy_after_siege_breach(world, notice.recipient_ref, option.id, decision.id)
+        elif action == GARRISON_ACTION:
+            establish_garrison(world, notice.recipient_ref, option.id, decision.id)
+        elif action == WITHDRAW_GARRISON_ACTION:
+            withdraw_garrison(world, notice.recipient_ref, option.id, decision.id)
+        elif action == ROTATE_GARRISON_ACTION:
+            rotate_garrison(world, notice.recipient_ref, option.id, decision.id)
+        elif action == CONTROL_ACTION:
+            establish_territorial_control(world, notice.recipient_ref, option.id, decision.id)
+        elif action == WITHDRAW_CONTROL_ACTION:
+            withdraw_territorial_control(world, notice.recipient_ref, option.id, decision.id)
         elif action == PREPARE_POSITION_ACTION:
             prepare_force_position(world, notice.recipient_ref, option.id, decision.id)
         elif action == FIELD_ENGAGEMENT_OFFER_ACTION:
@@ -234,6 +259,12 @@ def _current_options(world, notice):
             *withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id),
             *force_deescalation_offer_options(world, notice.recipient_ref, notice_id=notice.id),
             *administration_concession_offer_options(world, notice.recipient_ref, notice_id=notice.id),
+            *(option for option in siege_occupation_options(world, notice.recipient_ref)
+              if option.settlement_id == notice.settlement_id),
+            *(option for option in territorial_control_options(world, notice.recipient_ref)
+              if option.settlement_id == notice.settlement_id),
+            *(option for option in garrison_options(world, notice.recipient_ref)
+              if option.settlement_id == notice.settlement_id),
             *force_position_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id),
             *field_engagement_offer_options(world, notice.recipient_ref, notice_id=notice.id),
             *route_interdiction_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id),
@@ -267,6 +298,18 @@ def _label(option):
                 if option.response == "accept" else "Recusar a proposta de cessão administrativa.")
     if action == ADMINISTRATION_TRANSFER_FULFILL_ACTION:
         return "Ceder a administração do assentamento conforme a obrigação aceita."
+    if action == OCCUPY_AFTER_BREACH_ACTION:
+        return "Ocupar o assentamento após a brecha da guarnição; a administração ficará separada."
+    if action == GARRISON_ACTION:
+        return "Estabelecer uma guarnição paga para sustentar a ocupação atual."
+    if action == WITHDRAW_GARRISON_ACTION:
+        return "Retirar voluntariamente o dever da guarnição sem mover a coluna."
+    if action == ROTATE_GARRISON_ACTION:
+        return "Substituir a coluna da guarnição por outra presença abastecida no mesmo assentamento."
+    if action == CONTROL_ACTION:
+        return "Formalizar controle territorial enquanto a guarnição sustenta a ocupação."
+    if action == WITHDRAW_CONTROL_ACTION:
+        return "Retirar o mandato de controle territorial sem mover automaticamente a coluna."
     if action == PREPARE_POSITION_ACTION:
         return "Preparar uma posição no assentamento atual por três dias."
     if action == FIELD_ENGAGEMENT_OFFER_ACTION:

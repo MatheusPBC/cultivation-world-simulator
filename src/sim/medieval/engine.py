@@ -1,7 +1,6 @@
 """Hybrid-calendar phase runner: prepare a candidate, commit it, then publish it."""
 
 import asyncio
-import copy
 from pathlib import Path
 
 from src.systems.calendar_scheduler import CalendarScheduler
@@ -11,6 +10,7 @@ from .persistence import save_world
 from .phases import advance_monthly_practice
 from .dated import resolve_dated
 from .economy import produce_monthly, consume_monthly, monthly_workforce
+from .permanent_employment import review_permanent_employment_fallback, settle_permanent_employment
 from .expansion import progress_expansions, review_expansions
 from .research import progress_research
 from .research_policy import review_research
@@ -30,9 +30,10 @@ from .infrastructure_wear import apply_monthly_infrastructure_wear
 from .demography import apply_monthly_births
 from .mortality import apply_monthly_mortality
 from .regional_overflow import apply_monthly_regional_overflow
-from .workforce import refresh_workforce_notices
+from .workforce import refresh_workforce_notices, review_workforce_transition_fallback
 from .institutional_aid_policy import review_institutional_aid_with_provider
 from .creature_policy import review_creatures
+from .creatures import apply_monthly_creature_ecology
 from .recourse_policy import review_recourse
 from .character_rite_policy import review_character_rites, schedule_character_rite_offers
 from .character_travel import review_character_travel, schedule_character_travel_reviews
@@ -58,14 +59,21 @@ class MedievalSimulator:
             # A command may have become invalid because its office ended or its
             # real person died since the preceding dated tick.  Release it in
             # the isolated candidate before strict cross-owner validation.
-            candidate = copy.deepcopy(self.world)
+            candidate = self.world.transaction_copy()
+            history_start = len(candidate.events) + 1
             revoke_invalid_detachment_commands(candidate)
             validate_activities(candidate)
             candidate.society.validate(set(candidate.map.regions), candidate)
             candidate.economy.validate(candidate)
             candidate.authority.validate(candidate)
             candidate.strategy.validate(candidate)
-            candidate.knowledge.validate(candidate)
+            # Knowledge is validated on every committed candidate below.  The
+            # published world entering this transaction was already validated
+            # by the previous commit, and no pre-step operation mutates its
+            # knowledge registries.  Repeating the full historical-provenance
+            # walk here made long horizons superlinear without adding a new
+            # safety boundary; a tampered candidate still fails before save or
+            # publication at the final validation below.
             candidate.research.validate(candidate)
             candidate.relations.validate(candidate)
             if any(day <= candidate.clock.absolute_day for day in candidate.agenda.due_days):
@@ -104,6 +112,10 @@ class MedievalSimulator:
             if jump.monthly_boundary:
                 advance_monthly_practice(candidate)
                 available = monthly_workforce(candidate)
+                # Standing employment is an Economy-owned obligation, not
+                # created income. It must reserve/pay its named people before
+                # other monthly work competes for the same local labour.
+                settle_permanent_employment(candidate, available)
                 staff_customs_checkpoints(candidate, available)
                 progress_research(candidate, available)
                 progress_expansions(candidate, available)
@@ -124,27 +136,27 @@ class MedievalSimulator:
                 # water-exposed Map site.  It runs after wear but before local
                 # observations, never creates weather knowledge for actors.
                 apply_monthly_regional_overflow(candidate)
+                apply_monthly_creature_ecology(candidate)
                 review_research(candidate)
                 review_expansions(candidate)
                 update_markets(candidate)
                 refresh_reports(candidate)
                 schedule_character_rite_offers(candidate)
                 schedule_character_travel_reviews(candidate)
-                if review_export_tariffs(candidate):
-                    # A changed policy republishes only affected market quotes;
-                    # route/site/settlement observations remain single receipts.
-                    refresh_trade_reports(candidate, replace_today=True)
-                changed_service_sites = review_site_services(candidate)
-                if changed_service_sites:
-                    # Service changes are material state, so owners and connected
-                    # recipients receive a new dated route/site observation today.
-                    refresh_site_reports(candidate, site_ids=changed_service_sites)
-                    refresh_route_reports(
-                        candidate,
-                        route_ids=tuple(sorted({route_id for site_id in changed_service_sites
-                                                for route_id in candidate.map.infrastructure_sites[site_id].route_ids})),
-                    )
-                review_household_provisions(candidate)
+                if not candidate.config.ai_enabled:
+                    # In the fully offline mode there is no composed provider
+                    # turn to defer to, so retain the historical policy order.
+                    if review_export_tariffs(candidate):
+                        refresh_trade_reports(candidate, replace_today=True)
+                    changed_service_sites = review_site_services(candidate)
+                    if changed_service_sites:
+                        refresh_site_reports(candidate, site_ids=changed_service_sites)
+                        refresh_route_reports(
+                            candidate,
+                            route_ids=tuple(sorted({route_id for site_id in changed_service_sites
+                                                    for route_id in candidate.map.infrastructure_sites[site_id].route_ids})),
+                        )
+                    review_household_provisions(candidate)
                 progress_repairs(candidate, available)
                 # Production and repair have now recorded their actual labour
                 # limitations.  Only then may the affected sponsor receive a
@@ -157,19 +169,57 @@ class MedievalSimulator:
                 # covered actors then skip their own pass below, so nothing
                 # second-guesses the single menu the actor already saw.
                 claims, covered = await review_monthly_institutional_turn(candidate)
+                # These deterministic policies run only after the composed
+                # consultation.  A provider may have been available while a
+                # particular actor had no budget slot; ``covered`` tells the
+                # owners exactly who must not be asked a second time.
+                if candidate.config.ai_enabled and review_export_tariffs(candidate, excluded_actors=covered):
+                    # A changed policy republishes only affected market quotes;
+                    # route/site/settlement observations remain single receipts.
+                    refresh_trade_reports(candidate, replace_today=True)
+                changed_service_sites = (review_site_services(candidate, excluded_actors=covered)
+                                         if candidate.config.ai_enabled else ())
+                if changed_service_sites:
+                    # Service changes are material state, so owners and connected
+                    # recipients receive a new dated route/site observation today.
+                    refresh_site_reports(candidate, site_ids=changed_service_sites)
+                    refresh_route_reports(
+                        candidate,
+                        route_ids=tuple(sorted({route_id for site_id in changed_service_sites
+                                                for route_id in candidate.map.infrastructure_sites[site_id].route_ids})),
+                    )
+                if candidate.config.ai_enabled:
+                    review_household_provisions(candidate, excluded_actors=covered)
+                # Offline/test mode still uses the actor-facing employment
+                # affordance, but selects conservatively from public pressure
+                # when no real provider turn occurred.  The owner then
+                # revalidates the same option and creates the normal contract.
+                review_permanent_employment_fallback(candidate, excluded_actors=covered)
+                # Offline mode may accept one already-published transition when
+                # observed pressure and a real labour shortfall make it useful.
+                # The workforce owner still revalidates the selected terms.
+                review_workforce_transition_fallback(candidate, excluded_actors=covered)
                 # Relief has no deterministic fallback: without a discretionary
                 # decision this boundary, no food moves as aid at all.
-                review_maintenance(candidate, exclude_site_ids=claims.get("site", set()))
-                review_supply(candidate, exclude_objective_ids=claims.get("objective", set()))
+                review_maintenance(candidate, exclude_site_ids=claims.get("site", set()),
+                                   excluded_actors=covered)
+                review_supply(candidate, exclude_objective_ids=claims.get("objective", set()),
+                              excluded_actors=covered)
                 if candidate.config.ai_enabled:
                     # The learner's acceptance keeps its own ordered turn for
                     # whoever the composed menu left untouched.
                     await review_promised_teaching_turns(candidate, consulted=covered)
                 else:
                     review_diplomacy(candidate, allow_offers=True)
-                await review_institutional_aid_with_provider(candidate, allow_requests=True,
-                                                             excluded_requesters=covered)
-                review_migration(candidate)
+                # In provider mode, requests and the existing aid lifecycle
+                # (response, fulfillment, remediation) are already part of
+                # the single composed monthly menu.  Keeping this pass here
+                # would ask the same polity again for the same boundary and
+                # violate the one-consultation contract.  Dated reviews still
+                # call the aid owner above when a real deadline is due.
+                if not candidate.config.ai_enabled:
+                    await review_institutional_aid_with_provider(candidate, allow_requests=True)
+                review_migration(candidate, excluded_actors=covered)
                 lapse_invalid_claims(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")
             # 4. Validate and durably commit the candidate before publishing any change.
@@ -183,7 +233,8 @@ class MedievalSimulator:
             candidate.regional_overflow.validate(candidate)
             validate_infrastructure(candidate)
             validate_activities(candidate)
-            validate_history(candidate.events, candidate.clock.absolute_day)
+            validate_history(candidate.events, candidate.clock.absolute_day,
+                             from_sequence=history_start)
             if self.save_path is not None:
                 save_world(candidate, self.save_path)
             self.world.__dict__.update(candidate.__dict__)

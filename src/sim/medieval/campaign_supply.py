@@ -36,6 +36,7 @@ RATIONS_PER_SOLDIER_DAY = 1
 LOW_SUPPLY_DAYS = 6
 LOAD_SUPPLY_DAYS = 10
 MAX_BAG_DAYS = 20
+FIELD_LOGISTICS_BONUS_DAYS = 5
 _PREFIX = "campaign-supply-review:"
 
 
@@ -82,11 +83,15 @@ def campaign_baggage_ready_for_departure(world, detachment):
 
 
 def _bag_capacity(world, detachment):
-    return detachment.count * MAX_BAG_DAYS * world.economy.resources["food"].bulk
+    days = MAX_BAG_DAYS + (FIELD_LOGISTICS_BONUS_DAYS
+                           if world.knowledge.knows(detachment.owner_ref, "field_logistics") else 0)
+    return detachment.count * days * world.economy.resources["food"].bulk
 
 
-def _provision_capacity(detachment):
-    return detachment.count * LOAD_SUPPLY_DAYS * RATIONS_PER_SOLDIER_DAY
+def _provision_capacity(world, detachment):
+    days = LOAD_SUPPLY_DAYS + (FIELD_LOGISTICS_BONUS_DAYS
+                               if world.knowledge.knows(detachment.owner_ref, "field_logistics") else 0)
+    return detachment.count * days * RATIONS_PER_SOLDIER_DAY
 
 
 def _threshold(detachment):
@@ -313,7 +318,7 @@ def load_campaign_baggage(world):
         if stock is None or stock.location_id != detachment.location_id or stock.owner_ref != detachment.owner_ref:
             continue
         available = stock.goods.get("food", 0)
-        amount = min(available, max(0, _provision_capacity(detachment) - detachment.provisions))
+        amount = min(available, max(0, _provision_capacity(world, detachment) - detachment.provisions))
         if amount <= 0:
             continue
         updated = detachment.model_copy(update={"provisions": detachment.provisions + amount})

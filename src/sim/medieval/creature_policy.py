@@ -19,14 +19,15 @@ from .events import record_event
 REVIEW_KIND = "creature_review"
 
 
-def review_id(day):
-    return f"creature-review:{day}"
+def review_id(creature_id, day):
+    return f"creature-review:{creature_id}:{day}"
 
 
-def schedule_review(world, day):
-    """One concrete dated review; deadlines themselves decide nothing."""
-    if day > world.clock.absolute_day and world.agenda.get(review_id(day)) is None:
-        world.agenda.schedule(ScheduledSituation(review_id(day), REVIEW_KIND, day))
+def schedule_review(world, creature_id, day):
+    """One concrete dated review for one creature; deadlines decide nothing."""
+    identity = review_id(creature_id, day)
+    if day > world.clock.absolute_day and world.agenda.get(identity) is None:
+        world.agenda.schedule(ScheduledSituation(identity, REVIEW_KIND, day))
 
 
 def _decide(world, option, event_type, content, *, cause_ids):
@@ -42,6 +43,7 @@ _CREATURE_LABELS = {
     "restrict": "Fechar a passagem até ser atendido.",
     "withdraw": "Recuar e reabrir a passagem.",
     "damage": "Danificar a instalação aquática ligada à passagem.",
+    "attack_population": "Atacar uma coorte anônima ligada à passagem.",
 }
 
 
@@ -51,14 +53,24 @@ async def _creature_turn(world, creature_id):
     if creature is None or len(options) <= 1:
         return False
     # The drake knows its own body and what crossed its river; nothing else.
+    events = {event.id: event for event in world.events}
+    remembered = [{"event_id": event.id, "event_type": event.event_type, "day": event.day}
+                  for event_id in creature.memory_event_ids
+                  if (event := events.get(event_id)) is not None]
     situation = {"you_are": creature.name, "condition": creature.condition,
                  "crossings_you_saw": creature.perceived_crossings,
-                 "your_open_demands": [{"route_id": item.route_id, "food": item.food, "due_day": item.due_day}
+                 "recent_memory": remembered,
+                 "your_open_demands": [{"route_id": item.route_id,
+                                        "food_remaining": item.food - item.food_received,
+                                        "due_day": item.due_day}
                                        for item in world.creatures.open_demands(creature_id)],
                  "expired_demands": [{"route_id": item.route_id, "due_day": item.due_day}
                                      for item in world.creatures.demands.values()
                                      if item.creature_id == creature_id and item.stage == "open"
                                      and item.due_day < world.clock.absolute_day],
+                 "population_targets": [{"group_id": item.population_group_id,
+                                         "affected_count": item.population_count}
+                                        for item in options if item.kind == "attack_population"],
                  "today": world.clock.absolute_day}
     choices = [{"id": item.id, "label": _CREATURE_LABELS[item.kind]} for item in options]
     selected = await select_option(world, EntityRef("creature", creature_id), situation, choices,
@@ -79,8 +91,8 @@ async def _creature_turn(world, creature_id):
     if chosen.kind == "request":
         demand = next(item for item in world.creatures.open_demands(creature_id)
                       if item.route_id == chosen.route_id)
-        schedule_review(world, world.clock.absolute_day + 1)
-        schedule_review(world, demand.due_day)
+        schedule_review(world, creature_id, world.clock.absolute_day + 1)
+        schedule_review(world, creature_id, demand.due_day)
     if chosen.kind in {"restrict", "withdraw"}:
         # Administrations learn the passage changed, as a route fact only.
         from .route_intelligence import refresh_route_reports
@@ -97,7 +109,8 @@ async def _tribute_turn(world, actor):
     # institution's answer.
     situation = {"you_are": actor.to_dict(), "today": world.clock.absolute_day,
                  "demands_delivered_to_you": [{"route_id": notices[item.demand_id].route_id,
-                                               "food": notices[item.demand_id].food,
+                                               "food_remaining": world.creatures.demands[item.demand_id].food
+                                               - world.creatures.demands[item.demand_id].food_received,
                                                "due_day": notices[item.demand_id].due_day}
                                               for item in options if item.demand_id in notices]}
     choices = [{"id": item.id, "label": f"Entregar {item.food} de alimento do próprio estoque."}
@@ -118,11 +131,15 @@ async def _tribute_turn(world, actor):
 
 async def review_creatures(world, situations):
     """Run only on a concrete dated review; institutions answer before the drake."""
-    if not any(item.kind == REVIEW_KIND for item in situations):
+    creature_ids = tuple(sorted({
+        item.id.removeprefix("creature-review:").rsplit(":", 1)[0]
+        for item in situations if item.kind == REVIEW_KIND
+    }))
+    if not creature_ids:
         return
     for identity in sorted(world.society.polities):
         await _tribute_turn(world, EntityRef("polity", identity))
-    for creature_id in sorted(world.creatures.creatures):
+    for creature_id in creature_ids:
         await _creature_turn(world, creature_id)
 
 
@@ -134,4 +151,4 @@ def note_perception(world, creature):
     # the final post-deadline opportunity; ignored demands stay historical but
     # never reopen a review loop from later cargo.
     if creature.condition < creature.hunger_threshold and not world.creatures.open_demands(creature.id):
-        schedule_review(world, world.clock.absolute_day + 1)
+        schedule_review(world, creature.id, world.clock.absolute_day + 1)

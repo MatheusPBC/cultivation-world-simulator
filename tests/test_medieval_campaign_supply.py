@@ -9,7 +9,9 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import force_options, occupy_settlement, raise_detachment, raise_options
-from src.sim.medieval.campaign_supply import (campaign_stock_id, review_campaign_supplies)
+from src.sim.medieval.campaign_supply import (campaign_stock_id, review_campaign_supplies,
+                                               _provision_capacity)
+from src.sim.medieval.research import learn_technology
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
@@ -82,6 +84,23 @@ async def make_low(world, detachment_id):
     # early warning (home freight needs longer than the remaining field bag).
     return next(item for item in world.knowledge.campaign_supply_notices.values()
                 if item.detachment_id == detachment_id and item.state == "open")
+
+
+async def test_field_logistics_expands_only_the_known_owner_column_supply_capacity():
+    world, detachment_id = await campaign_world()
+    detachment = world.society.detachments[detachment_id]
+    before = _provision_capacity(world, detachment)
+    first = record_event(world, "field_logistics_prerequisite", "Ensino da doutrina de exercício.",
+                         fact_kind=FactKind.DECISION,
+                         decision={"action": "research", "actor_ref": OWNER.to_dict(),
+                                   "technology_id": "field_drill"})
+    learn_technology(world, OWNER, "field_drill", "teaching", (first.id,))
+    second = record_event(world, "field_logistics_decided", "Ensino da logística de campanha.",
+                          fact_kind=FactKind.DECISION,
+                          decision={"action": "research", "actor_ref": OWNER.to_dict(),
+                                    "technology_id": "field_logistics"})
+    learn_technology(world, OWNER, "field_logistics", "teaching", (second.id, first.id))
+    assert _provision_capacity(world, detachment) == before + detachment.count * 5
 
 
 async def test_campaign_supply_freight_arrives_loads_bag_and_round_trips(tmp_path, monkeypatch):

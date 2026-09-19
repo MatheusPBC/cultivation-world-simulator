@@ -14,7 +14,7 @@ class CivicProtest(SocietyValue):
     id: Identity
     group_id: Identity
     settlement_id: Identity
-    demand_kind: Literal["food_relief", "site_repair"]
+    demand_kind: Literal["food_relief", "site_repair", "organized_strike"]
     food_quantity: Count = 0
     site_id: Identity | None = None
     site_integrity_before: float | None = Field(default=None, ge=0, le=1)
@@ -32,6 +32,8 @@ class CivicProtest(SocietyValue):
                 or (self.demand_kind == "food_relief") != (self.food_quantity > 0 and self.site_id is None
                                                             and self.site_integrity_before is None)
                 or (self.demand_kind == "site_repair") != (self.food_quantity == 0 and self.site_id is not None
-                                                            and self.site_integrity_before is not None)):
+                                                            and self.site_integrity_before is not None)
+                or (self.demand_kind == "organized_strike") != (self.food_quantity == 0 and self.site_id is None
+                                                                  and self.site_integrity_before is None)):
             raise ValueError("civic protest identity, timing or demand is inconsistent")
         return self

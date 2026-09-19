@@ -7,7 +7,11 @@ from src.classes.economy.models import Stock
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
-from src.sim.medieval.household_provisioning import buy_household_provisions, household_stock_id, review_household_provisions
+from src.sim.medieval.household_provisioning import (buy_household_provisions, household_provision_adapters,
+                                                     household_provision_options, household_provision_sale_options,
+                                                     household_stock_id, review_household_provisions)
+from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+from src.sim.medieval import ai_decider
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.persistence import load_world, save_world
 from src.sim.medieval.migration_policy import review_migration
@@ -157,3 +161,32 @@ def test_public_food_purchase_can_materially_enable_a_pressure_migration():
     carried = sum(provision.food for provision in world.economy.migration_provisions.values())
     assert sum(stock.goods.get("food", 0) for stock in world.economy.stocks.values()) + carried == before_food
     assert sum(account.balance for account in world.economy.accounts.values()) == before_money
+
+
+@pytest.mark.asyncio
+async def test_provider_household_choice_requires_independent_seller_acceptance(monkeypatch):
+    world, group, _, seller = prepared_offer()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
+                                                    "ai_max_calls": 20})
+    buyer = EntityRef("population_group", group.id)
+    purchase = household_provision_options(world, buyer)[0]
+    answers = {"buyer": purchase.id}
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        import json
+        payload = json.loads(prompt[prompt.index("{"):])
+        if payload["you_are"]["kind"] == "population_group":
+            return {"selected_id": answers["buyer"]}
+        return {"selected_id": payload["choices"][0]["id"]}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    await review_institutional_decision_turn(world, buyer, household_provision_adapters())
+    assert household_stock_id(group.id) not in world.economy.stocks
+
+    sale_options = household_provision_sale_options(world, seller.owner_ref)
+    assert {option.response for option in sale_options} == {"accept", "decline"}
+    await review_institutional_decision_turn(world, seller.owner_ref, household_provision_adapters())
+    assert world.economy.stocks[household_stock_id(group.id)].goods["food"] == purchase.quantity
+    assert any(event.event_type == "household_provisions_purchased" for event in world.events)
+    assert household_provision_sale_options(world, seller.owner_ref) == ()

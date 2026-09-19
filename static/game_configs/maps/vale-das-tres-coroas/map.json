@@ -1465,7 +1465,8 @@
         803
       ],
       "capability_ids": [
-        "transport"
+        "transport",
+        "military_training"
       ],
       "owner_ref": {
         "kind": "polity",
@@ -1497,7 +1498,8 @@
         804
       ],
       "capability_ids": [
-        "food_production"
+        "food_production",
+        "water_management"
       ],
       "owner_ref": {
         "kind": "polity",
@@ -1692,6 +1694,111 @@
         "kind": "organization",
         "id": "ordem-da-aurora"
       },
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-pedra-clara",
+      "name": "Campos de Pedra Clara",
+      "kind": "farm",
+      "cell_refs": [[6, 0]],
+      "region_ids": [801],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "auren"},
+      "maintainer_ref": {"kind": "polity", "id": "auren"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-ferroalto",
+      "name": "Campos de Ferroalto",
+      "kind": "farm",
+      "cell_refs": [[18, 0]],
+      "region_ids": [803],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "escarlia"},
+      "maintainer_ref": {"kind": "polity", "id": "escarlia"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-pontenegro",
+      "name": "Campos de Pontenegro",
+      "kind": "farm",
+      "cell_refs": [[12, 0]],
+      "region_ids": [806],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "auren"},
+      "maintainer_ref": {"kind": "polity", "id": "auren"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-salgueiro",
+      "name": "Campos de Salgueiro",
+      "kind": "farm",
+      "cell_refs": [[1, 8]],
+      "region_ids": [805],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "valedouro"},
+      "maintainer_ref": {"kind": "polity", "id": "valedouro"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-portovelho",
+      "name": "Campos de Portovelho",
+      "kind": "farm",
+      "cell_refs": [[6, 8]],
+      "region_ids": [802],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "valedouro"},
+      "maintainer_ref": {"kind": "polity", "id": "valedouro"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-cinzaverde",
+      "name": "Campos de Cinzaverde",
+      "kind": "farm",
+      "cell_refs": [[12, 8]],
+      "region_ids": [808],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "escarlia"},
+      "maintainer_ref": {"kind": "polity", "id": "escarlia"},
+      "route_ids": [],
+      "water_body_ids": [],
+      "integrity": 1,
+      "enabled": true,
+      "last_event_id": null
+    },
+    {
+      "id": "campos-de-brumafria",
+      "name": "Campos de Brumafria",
+      "kind": "farm",
+      "cell_refs": [[18, 8]],
+      "region_ids": [807],
+      "capability_ids": ["food_production"],
+      "owner_ref": {"kind": "polity", "id": "escarlia"},
+      "maintainer_ref": {"kind": "polity", "id": "escarlia"},
       "route_ids": [],
       "water_body_ids": [],
       "integrity": 1,

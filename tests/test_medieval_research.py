@@ -116,7 +116,7 @@ def apply_metallurgy(world):
 
 
 def test_discovery_requires_material_adaptation_before_better_production():
-    from src.sim.medieval.expansion import progress_expansions
+    from src.sim.medieval.expansion import progress_expansions, start_expansion
     from src.sim.medieval.economy import monthly_workforce, produce_monthly
     world = prepared()
     with pytest.raises(ValueError):
@@ -137,6 +137,106 @@ def test_discovery_requires_material_adaptation_before_better_production():
     produce_monthly(world)
     assert world.economy.stocks['stock:ferroalto'].goods['iron'] - before == 420
     assert world.economy.expansions[project.id].stage == 'completed'
+
+
+def test_offline_technology_application_skips_incompatible_authored_site():
+    """The deterministic fallback must not create a project it cannot start."""
+    from src.sim.medieval.research_policy import _apply_known_techniques
+
+    world = prepared()
+    authorize(world)
+    for day in (30, 60, 90):
+        work(world, day)
+
+    blueprint = world.economy.expansion_blueprints['efficient-furnaces']
+    world.economy.expansion_blueprints[blueprint.id] = blueprint.model_copy(
+        update={'required_site_capabilities': ('unavailable_capability',)})
+    _apply_known_techniques(world)
+
+    assert not any(project.blueprint_id == blueprint.id
+                   for project in world.economy.expansions.values())
+
+
+def test_crop_rotation_requires_its_research_and_changes_food_output():
+    """A second authored technology must cross research and production owners."""
+    from src.sim.medieval.expansion import progress_expansions, start_expansion
+    from src.sim.medieval.research import progress_research, start_research
+    from src.sim.medieval.economy import monthly_workforce, produce_monthly
+
+    world = create_medieval_world(73)
+    lead = world.society.characters['character:002']
+    world.society.characters[lead.id] = lead.model_copy(
+        update={'skills': lead.skills.model_copy(update={'craftsmanship': 40})})
+
+    def authorize_at(technology_id, day):
+        terms = {'technology_id': technology_id, 'site_id': 'campos-do-lume',
+                 'stock_id': 'stock:campomanso', 'account_id': 'treasury:auren',
+                 'researcher_id': 'character:002'}
+        sponsor = record_event(world, 'research_decided', 'Financiar pesquisa agrícola.',
+            fact_kind=FactKind.DECISION,
+            decision={**terms, 'action': 'research', 'actor_ref': EntityRef('polity', 'auren').to_dict()})
+        accepted = record_event(world, 'research_accepted', 'Aceitar pesquisa agrícola.',
+            fact_kind=FactKind.DECISION,
+            decision={**terms, 'action': 'research_work',
+                      'actor_ref': EntityRef('character', 'character:002').to_dict()},
+            cause_ids=(sponsor.id,))
+        world.clock = WorldClock(day)
+        return start_research(world, **terms, sponsor_decision_id=sponsor.id,
+                              researcher_decision_id=accepted.id)
+
+    irrigation = authorize_at('irrigation', 0)
+    for day in (30, 60, 90):
+        world.clock = WorldClock(day)
+        progress_research(world, monthly_workforce(world))
+    assert world.knowledge.knows(EntityRef('polity', 'auren'), 'irrigation')
+
+    world.clock = WorldClock(90)
+    expansion_decision = record_event(
+        world, 'expansion_decided', 'Aplicar irrigação aos campos.', fact_kind=FactKind.DECISION,
+        decision={'action': 'expand', 'actor_ref': EntityRef('polity', 'auren').to_dict(),
+                  'facility_id': 'works:campos-do-lume', 'blueprint_id': 'irrigation-works'})
+    irrigation_project = start_expansion(world, 'works:campos-do-lume', 'irrigation-works',
+                                         decision_event_id=expansion_decision.id)
+    # The authored facility is fully occupied by harvest in the normal monthly
+    # budget; this test supplies the construction owner with an actual artisan
+    # allocation instead of granting free progress.
+    artisan = next(group for group in world.society.population.values()
+                   if group.settlement_id == 'campomanso' and group.occupation == 'farmer'
+                   and group.id != lead.population_group_id)
+    world.society.population[artisan.id] = artisan.model_copy(update={'occupation': 'artisan'})
+    for day in (120, 150):
+        world.clock = WorldClock(day)
+        progress_expansions(world, {group.id: group.count for group in world.society.population.values()})
+    assert world.economy.expansions[irrigation_project.id].stage == 'completed'
+    assert world.economy.facilities['works:campos-do-lume'].recipe_id == 'irrigated_harvest'
+
+    # The fixture supplies a bounded authored tool reserve for the second
+    # adaptation; research still consumes it and cannot progress for free.
+    stock = world.economy.stocks['stock:campomanso']
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={'goods': {**stock.goods, 'tools': stock.goods.get('tools', 0) + 20}})
+    crop_rotation = authorize_at('crop_rotation', 150)
+    for day in (180, 210, 240):
+        world.clock = WorldClock(day)
+        progress_research(world, monthly_workforce(world))
+    assert world.knowledge.knows(EntityRef('polity', 'auren'), 'crop_rotation')
+
+    world.clock = WorldClock(240)
+    adaptation_decision = record_event(
+        world, 'expansion_decided', 'Aplicar rotação de culturas.', fact_kind=FactKind.DECISION,
+        decision={'action': 'expand', 'actor_ref': EntityRef('polity', 'auren').to_dict(),
+                  'facility_id': 'works:campos-do-lume', 'blueprint_id': 'crop-rotation-works'})
+    project = start_expansion(world, 'works:campos-do-lume', 'crop-rotation-works',
+                              decision_event_id=adaptation_decision.id)
+    for day in (270, 300, 330):
+        world.clock = WorldClock(day)
+        progress_expansions(world, {group.id: group.count for group in world.society.population.values()})
+    assert world.economy.expansions[project.id].stage == 'completed'
+    assert world.economy.facilities['works:campos-do-lume'].recipe_id == 'rotated_harvest'
+    before = world.economy.stocks['stock:campomanso'].goods['food']
+    produce_monthly(world)
+    assert world.economy.stocks['stock:campomanso'].goods['food'] > before
+    assert world.economy.expansions[project.id].last_event_id
 
 
 def teach(world, teacher, student, technology_id):
@@ -200,7 +300,15 @@ async def test_natural_monthly_policy_starts_feasible_projects_without_daily_ai(
     from src.sim.medieval.engine import MedievalSimulator
     world = create_medieval_world(73)
     await MedievalSimulator(world).step()
-    assert {p.technology_id for p in world.research.projects.values()} == {'irrigation', 'metallurgy'}
+    # The authored map now has a food-production site in each polity, so the
+    # deterministic offline policy may select more than the original two
+    # projects.  Its invariant is conservative ownership: every started
+    # project was feasible and an institution does not sponsor two concurrent
+    # experiments through this fallback.
+    assert world.research.projects
+    assert all(project.stage == 'waiting' for project in world.research.projects.values())
+    owners = [project.owner_ref for project in world.research.projects.values()]
+    assert len(owners) == len(set(owners))
     assert all(p.completed_units == 0 for p in world.research.projects.values())
     contracts = len([e for e in world.events if e.event_type == 'research_started'])
     await MedievalSimulator(world).step()

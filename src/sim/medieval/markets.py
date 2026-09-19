@@ -31,6 +31,12 @@ def update_markets(world):
             if economy.stocks[facility.stock_id].location_id == market.id:
                 for rid, amount in economy.recipes[facility.recipe_id].inputs.items():
                     demand[rid] += amount * facility.max_batches
+        # Freeze the readings as sorted dictionaries.  The price is a bounded
+        # response to these readings; the readings themselves are useful
+        # evidence for an actor deciding whether to trade, produce or request
+        # relief, so they must survive the event and save/load boundary.
+        observed_supply = {rid: supply[rid] for rid in sorted(economy.resources)}
+        observed_demand = {rid: demand[rid] for rid in sorted(economy.resources)}
         prices = {}
         from .demand import construction_demand, repair_demand, research_demand
         for stock in economy.stocks.values():
@@ -54,11 +60,19 @@ def update_markets(world):
             prices[rid] = min(old + step, desired) if desired >= old else max(old - step, desired)
         changes = tuple(_delta("market", market.id, rid, market.prices[rid], prices[rid])
                         for rid in sorted(prices) if market.prices[rid] != prices[rid])
+        if market.observed_supply != observed_supply:
+            changes += (_delta("market", market.id, "observed_supply", market.observed_supply, observed_supply),)
+        if market.observed_demand != observed_demand:
+            changes += (_delta("market", market.id, "observed_demand", market.observed_demand, observed_demand),)
         event = record_event(world, "market_updated", f"Preços de {world.society.settlements[market.id].name} revisados.",
                              fact_kind=FactKind.STATE_TRANSITION,
                              deltas=(*changes, _delta("market", market.id, "updated_day", market.updated_day, day)),
                              cause_ids=_causes(*causes))
-        economy.markets[market.id] = market.model_copy(update={"prices": prices, "updated_day": day, "last_event_id": event.id})
+        economy.markets[market.id] = market.model_copy(update={
+            "prices": prices, "observed_supply": observed_supply,
+            "observed_demand": observed_demand, "updated_day": day,
+            "last_event_id": event.id,
+        })
 
 
 def _purchase_terms(world, buy_id, sell_id):

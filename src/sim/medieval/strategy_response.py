@@ -16,9 +16,11 @@ from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
+from .actor_dossier import provider_strategic_capacity
 from .economy import _causes, _delta
 from .events import record_event
-from .force import RAISE_ACTION, raise_detachment, raise_options
+from .force import raise_detachment, raise_options
+from .institutional_memory import institutional_views
 from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
                                           review_institutional_decision_turn_with_provider)
 
@@ -168,7 +170,12 @@ def _review_plan_id(situation):
 def _adoption_situation(world, actor, options):
     return {"you_are": actor.to_dict(), "occupied_settlements": [
         {"settlement_id": option.settlement_id, "report_event_id": option.report_event_id}
-        for option in options], "today": world.clock.absolute_day}
+        for option in options], "strategic_capacity": provider_strategic_capacity(world, actor),
+        "known_institutional_views": [
+            {"subject_ref": subject.to_dict(), "reading": value, "evidence_event_ids": list(event_ids)}
+            for subject, value, event_ids in institutional_views(world, actor)
+        ],
+        "today": world.clock.absolute_day}
 
 
 def strategy_adoption_actors(world):

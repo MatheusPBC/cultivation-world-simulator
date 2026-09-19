@@ -39,11 +39,80 @@ REGIONAL_FLOOD_SITE_INTERACTION = HazardInteractionDefinition(
     curve_slope=0.50,
 )
 
+# The first creature/magic interaction is deliberately narrow: a standing
+# ward can blunt the River Lume drake's one material retaliation against a
+# site on the warded settlement's ground.  The creature executor consumes this
+# registered law directly; it does not get a second damage rule of its own.
+DRAKE_SITE_DAMAGE_INTERACTION = HazardInteractionDefinition(
+    hazard_kind="river_drake",
+    target_kind="infrastructure_site",
+    threshold=0.10,
+    resistance_weights=(("standing_ward", 0.89), ("river_countermeasure", 0.74)),
+    effect=HazardImpactEffect.REDUCE_INTEGRITY,
+    minimum_magnitude=0.04,
+    maximum_magnitude=0.10,
+    curve_slope=0.20,
+)
+
+# A creature may also threaten people who actually live at one of the route's
+# observed endpoints.  The effect is bounded and still requires a current
+# actor decision; it is not a generic disaster or a population scheduler.
+DRAKE_POPULATION_DAMAGE_INTERACTION = HazardInteractionDefinition(
+    hazard_kind="river_drake",
+    target_kind="population_group",
+    threshold=0.10,
+    resistance_weights=(("standing_ward", 0.89), ("river_countermeasure", 0.74)),
+    effect=HazardImpactEffect.REDUCE_POPULATION,
+    minimum_magnitude=0.01,
+    maximum_magnitude=0.08,
+    curve_slope=0.10,
+)
+
+SERPENT_SITE_DAMAGE_INTERACTION = HazardInteractionDefinition(
+    hazard_kind="river_serpent",
+    target_kind="infrastructure_site",
+    threshold=0.10,
+    resistance_weights=(("standing_ward", 0.70), ("river_countermeasure", 0.55),
+                        ("serpent_countermeasure", 0.95), ("flood_control", 0.45)),
+    effect=HazardImpactEffect.REDUCE_INTEGRITY,
+    minimum_magnitude=0.025,
+    maximum_magnitude=0.07,
+    curve_slope=0.16,
+)
+
+SERPENT_POPULATION_DAMAGE_INTERACTION = HazardInteractionDefinition(
+    hazard_kind="river_serpent",
+    target_kind="population_group",
+    threshold=0.10,
+    resistance_weights=(("standing_ward", 0.70), ("river_countermeasure", 0.55),
+                        ("serpent_countermeasure", 0.95)),
+    effect=HazardImpactEffect.REDUCE_POPULATION,
+    minimum_magnitude=0.005,
+    maximum_magnitude=0.05,
+    curve_slope=0.08,
+)
+
 HAZARD_INTERACTIONS: dict[tuple[str, str], HazardInteractionDefinition] = {
     (
         REGIONAL_FLOOD_SITE_INTERACTION.hazard_kind,
         REGIONAL_FLOOD_SITE_INTERACTION.target_kind,
-    ): REGIONAL_FLOOD_SITE_INTERACTION
+    ): REGIONAL_FLOOD_SITE_INTERACTION,
+    (
+        DRAKE_SITE_DAMAGE_INTERACTION.hazard_kind,
+        DRAKE_SITE_DAMAGE_INTERACTION.target_kind,
+    ): DRAKE_SITE_DAMAGE_INTERACTION,
+    (
+        DRAKE_POPULATION_DAMAGE_INTERACTION.hazard_kind,
+        DRAKE_POPULATION_DAMAGE_INTERACTION.target_kind,
+    ): DRAKE_POPULATION_DAMAGE_INTERACTION,
+    (
+        SERPENT_SITE_DAMAGE_INTERACTION.hazard_kind,
+        SERPENT_SITE_DAMAGE_INTERACTION.target_kind,
+    ): SERPENT_SITE_DAMAGE_INTERACTION,
+    (
+        SERPENT_POPULATION_DAMAGE_INTERACTION.hazard_kind,
+        SERPENT_POPULATION_DAMAGE_INTERACTION.target_kind,
+    ): SERPENT_POPULATION_DAMAGE_INTERACTION,
 }
 HAZARD_EXPOSURE_PROJECTORS: dict[str, Callable[[Any, Any], list[HazardExposure]]] = {}
 HAZARD_OCCURRENCE_RESOLVERS: dict[str, Callable[[Any, Event], Any | None]] = {}
@@ -195,7 +264,7 @@ def propose_hazard_impacts(
             target = world.map.infrastructure_sites.get(exposure.target_ref.id)
             if target is None:
                 continue
-            capabilities = tuple(target.capability_ids)
+            capabilities = tuple(target.capability_ids) + ward_resistance_capabilities(world, target)
         magnitude = definition.magnitude(exposure.exposure, capabilities)
         if magnitude is None:
             continue
@@ -235,6 +304,84 @@ register_hazard_interaction(
     occurrence_resolver=_regional_flood_occurrence,
     exposure_projector=project_flood_site_exposures,
 )
+
+
+def ward_resistance_capabilities(world: Any, site: Any) -> tuple[str, ...]:
+    """Return current engine-owned resistance profiles covering a site."""
+    settlements = getattr(getattr(world, "society", None), "settlements", {})
+    wards = getattr(getattr(world, "research", None), "wards", {})
+    day = world.clock.absolute_day
+    return tuple(sorted({ward.resistance_capability_id for ward in wards.values()
+        if ward.until_day > day
+        and (settlement := settlements.get(ward.settlement_id)) is not None
+        and settlement.region_id in site.region_ids}))
+
+
+def site_has_standing_ward(world: Any, site: Any) -> bool:
+    """Return whether a current canonical ward covers any site region."""
+    return bool(ward_resistance_capabilities(world, site))
+
+
+def settlement_ward_resistance_capabilities(world: Any, settlement_id: str) -> tuple[str, ...]:
+    wards = getattr(getattr(world, "research", None), "wards", {})
+    day = world.clock.absolute_day
+    return tuple(sorted({ward.resistance_capability_id for ward in wards.values()
+        if ward.until_day > day
+        and ward.settlement_id == settlement_id}))
+
+
+def drake_site_damage_magnitude(world: Any, site_id: str) -> float | None:
+    """Evaluate the engine-owned drake law against one canonical site.
+
+    Exposure is intentionally fixed at one: the drake's retaliation already
+    selected a physically exposed site.  Only a current ward contributes a
+    resistance capability, keeping the interaction material and bounded.
+    """
+    site = world.map.infrastructure_sites.get(site_id)
+    if site is None or site.integrity <= 0.0:
+        return None
+    capabilities = ward_resistance_capabilities(world, site)
+    return DRAKE_SITE_DAMAGE_INTERACTION.magnitude(1.0, capabilities)
+
+
+def creature_site_damage_magnitude(world: Any, species: str, site_id: str) -> float | None:
+    """Evaluate the registered site law for one authored creature species."""
+    site = world.map.infrastructure_sites.get(site_id)
+    if site is None or site.integrity <= 0.0:
+        return None
+    definition = HAZARD_INTERACTIONS.get((species, "infrastructure_site"))
+    if definition is None:
+        return None
+    capabilities = tuple(site.capability_ids) + ward_resistance_capabilities(world, site)
+    return definition.magnitude(1.0, capabilities)
+
+
+def drake_population_damage_magnitude(world: Any, group_id: str) -> float | None:
+    """Evaluate the bounded population effect for one current cohort."""
+    group = world.society.population.get(group_id)
+    if group is None or group.count <= 0:
+        return None
+    settlement = world.society.settlements.get(group.settlement_id)
+    if settlement is None:
+        return None
+    capabilities = settlement_ward_resistance_capabilities(world, settlement.id)
+    return DRAKE_POPULATION_DAMAGE_INTERACTION.magnitude(
+        1.0, capabilities
+    )
+
+
+def creature_population_damage_magnitude(world: Any, species: str, group_id: str) -> float | None:
+    """Evaluate the registered population law for one authored species."""
+    group = world.society.population.get(group_id)
+    if group is None or group.count <= 0:
+        return None
+    settlement = world.society.settlements.get(group.settlement_id)
+    if settlement is None:
+        return None
+    definition = HAZARD_INTERACTIONS.get((species, "population_group"))
+    if definition is None:
+        return None
+    return definition.magnitude(1.0, settlement_ward_resistance_capabilities(world, settlement.id))
 
 
 def _validated_proposal(
@@ -361,6 +508,8 @@ def process_material_hazard_impacts(
 
 
 __all__ = [
+    "DRAKE_POPULATION_DAMAGE_INTERACTION",
+    "DRAKE_SITE_DAMAGE_INTERACTION",
     "FLOOD_SITE_IMPACT_EXPOSURE",
     "HAZARD_EXPOSURE_PROJECTORS",
     "HAZARD_INTERACTIONS",
@@ -371,4 +520,11 @@ __all__ = [
     "process_material_hazard_impacts",
     "project_flood_site_exposures",
     "propose_hazard_impacts",
+    "drake_site_damage_magnitude",
+    "drake_population_damage_magnitude",
+    "creature_site_damage_magnitude",
+    "creature_population_damage_magnitude",
+    "site_has_standing_ward",
+    "ward_resistance_capabilities",
+    "settlement_ward_resistance_capabilities",
 ]

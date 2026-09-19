@@ -97,6 +97,11 @@ def test_query_exposes_derived_input_target_not_city_population():
     facility = world.economy.facilities["works:oficinas-da-serra"]
     world.economy.facilities[facility.id] = facility.model_copy(update={"max_batches": 40})
     assert governance_view(world).model_dump(mode="json")["objectives"][0]["target_quantity"] == 160
+    capacities = governance_view(world).model_dump(mode="json")["strategic_capacity"]
+    assert capacities and {
+        "administrative_bandwidth", "diplomatic_bandwidth", "military_command",
+        "project_capacity", "logistics_capacity",
+    } <= set(capacities[0]["dimensions"])
 
 
 def test_previous_save_without_resource_targets_is_rejected_and_preserved(tmp_path):

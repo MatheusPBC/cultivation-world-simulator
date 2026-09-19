@@ -4,7 +4,8 @@ The application entrypoint is migrated separately; this is the target world
 model for the fork, not a second user-selectable ruleset.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
+import copy
 import random
 from typing import TYPE_CHECKING
 
@@ -57,3 +58,107 @@ class MedievalWorld:
         self.creatures.validate(self)
         validate_infrastructure(self)
         MedievalRunConfig.model_validate(self.config.model_dump())
+
+    def transaction_copy(self) -> "MedievalWorld":
+        """Copy mutable world state while sharing the validated event prefix.
+
+        Medieval events are append-only facts: transactional code appends a new
+        event or replaces the just-created event in its own list when attaching
+        derived causal payload.  It never edits a previously committed event in
+        place.  Copying thousands of already validated Pydantic events for every
+        dated step made long-horizon verification superlinear in practice, so a
+        candidate gets its own event *list* while retaining the immutable prefix
+        objects.  All domain registries, RNG state and agenda entries remain
+        deep-copied and therefore rollback-safe.
+
+        Registry containers are copied without invoking Python's generic
+        deepcopy machinery for every frozen Pydantic value.  Domain owners
+        replace registry entries rather than mutating them in place; copying
+        the value's own mutable containers still keeps rollback safe for the
+        few authored models that contain dictionaries or lists.
+
+        The world-level ``__deepcopy__`` delegates here as well.  The event
+        objects themselves remain independently deep-copyable when a caller
+        explicitly copies ``world.events``; only a transactional world clone
+        uses the append-only prefix sharing described above.
+        """
+        candidate = copy.copy(self)
+        for name in self.__dataclass_fields__:
+            if name == "events":
+                setattr(candidate, name, list(self.events))
+            elif name == "map":
+                setattr(candidate, name, self.map.transaction_copy())
+            elif name in {
+                "society", "economy", "authority", "strategy", "research",
+                "relations", "knowledge", "regional_overflow", "creatures",
+            }:
+                setattr(candidate, name, _copy_transaction_container(getattr(self, name)))
+            elif name == "activities":
+                setattr(candidate, name, dict(self.activities))
+            elif name == "agenda":
+                agenda = copy.copy(self.agenda)
+                agenda._situations = dict(self.agenda._situations)
+                setattr(candidate, name, agenda)
+            elif name == "clock":
+                # WorldClock is frozen and contains only an integer.
+                setattr(candidate, name, self.clock)
+            elif name in {"rng", "config"}:
+                # RNG state and the config's monthly budget ledger are mutable
+                # and must never be shared between candidate and publication.
+                setattr(candidate, name, copy.deepcopy(getattr(self, name)))
+            else:
+                setattr(candidate, name, copy.deepcopy(getattr(self, name)))
+        return candidate
+
+    def __deepcopy__(self, memo):
+        """Use the transactional clone for the medieval world's atomic forks."""
+        candidate = self.transaction_copy()
+        memo[id(self)] = candidate
+        return candidate
+
+
+def _copy_transaction_container(value):
+    """Copy a domain state and its registries without validation/serialization.
+
+    Registry values are immutable at the model boundary.  Their nested
+    containers are copied recursively so an accidental in-place mutation in a
+    candidate cannot alter the published world, while avoiding the much more
+    expensive generic ``deepcopy`` path used for every monthly transaction.
+    """
+    if not is_dataclass(value):
+        return copy.deepcopy(value)
+    result = copy.copy(value)
+    for item in fields(value):
+        current = getattr(value, item.name)
+        setattr(result, item.name, _copy_transaction_value(current))
+    return result
+
+
+def _copy_transaction_value(value):
+    if isinstance(value, dict):
+        return {key: _copy_transaction_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_copy_transaction_value(item) for item in value]
+    if isinstance(value, set):
+        return {_copy_transaction_value(item) for item in value}
+    if isinstance(value, tuple):
+        # Most authored tuple fields are identity/enum scalars.  They are
+        # immutable, so keep the tuple object instead of recursively visiting
+        # every scalar on every transactional fork.  Tuples containing a
+        # mutable/model value still take the isolated path below.
+        if all(isinstance(item, (str, int, float, bool, type(None), bytes)) for item in value):
+            return value
+        return tuple(_copy_transaction_value(item) for item in value)
+    if isinstance(value, frozenset):
+        if all(isinstance(item, (str, int, float, bool, type(None), bytes)) for item in value):
+            return value
+        return frozenset(_copy_transaction_value(item) for item in value)
+    # Frozen Pydantic values are replaced by owners, but their dictionaries
+    # and lists are not deep-frozen by Pydantic.  Clone those fields without
+    # re-validating every value during a transaction fork.
+    if hasattr(value, "__pydantic_fields__") and hasattr(value, "__dict__"):
+        result = copy.copy(value)
+        for key, item in value.__dict__.items():
+            object.__setattr__(result, key, _copy_transaction_value(item))
+        return result
+    return value

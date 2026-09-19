@@ -14,6 +14,7 @@ from src.classes.event import FactKind
 from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
+from src.sim.medieval.economy import transfer_money
 from src.sim.medieval.events import record_event
 from src.sim.medieval.markets import purchase
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -49,7 +50,7 @@ def assert_conservation(world, initial_food, initial_money):
 
 
 async def run(seed: int, output: Path) -> dict:
-    world = create_medieval_world(seed)
+    world = create_medieval_world(seed, bootstrap_household_income=True)
     # Prepared initial conditions are not commands available to the observer.
     world.economy.facilities.clear()
     destination = world.economy.stocks["stock:portovelho"]
@@ -65,6 +66,18 @@ async def run(seed: int, output: Path) -> dict:
             continue
         account = world.economy.accounts[f"household:{group.id}"]
         world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price * 10})
+    # The prepared buyer treasury must be solvent for the exact prepaid cargo
+    # while household balances remain available for the later local purchase.
+    # Make that premise an explicit, audited payment instead of minting money
+    # by mutating the account directly.
+    funding_terms = {"action": "pay", "source_id": "treasury:escarlia",
+                     "target_id": "treasury:valedouro", "amount": 1600,
+                     "actor_ref": {"kind": "polity", "id": "escarlia"}}
+    funding = record_event(world, "prepared_treasury_funding",
+                           "A fixture fiscalizou o tesouro comprador antes da remessa preparada.",
+                           fact_kind=FactKind.DECISION, decision=funding_terms)
+    transfer_money(world, funding_terms["source_id"], funding_terms["target_id"], funding_terms["amount"],
+                   decision_event_id=funding.id)
     initial_food = food_total(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
     closure = set_passage(world, False)

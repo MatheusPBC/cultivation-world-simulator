@@ -9,7 +9,7 @@ const terrainColors: Record<string, number> = { plain: 0x465244, grassland: 0x4b
 export const governmentColors: Record<string, number> = { auren: 0xd7b979, valedouro: 0x72bcb1, escarlia: 0xb598d7 }
 export function useAtlas(host: Ref<HTMLElement | null>) {
   const store = useObserverStore(), { width, height } = useElementSize(host)
-  const layer = ref<'terrain' | 'political' | 'food'>('political')
+  const layer = ref<'terrain' | 'political' | 'food' | 'campaign'>('political')
   const showRoutes = ref(true), showSites = ref(true), unavailable = ref(false), zoom = ref(1)
   const projection = computed(() => store.snapshot ? mapProjection(store.snapshot.map) : null)
   let app: Application | null = null, root: Container | null = null, cancelled = false
@@ -38,7 +38,11 @@ export function useAtlas(host: Ref<HTMLElement | null>) {
       const x = tile.x * cell, y = tile.y * cell, place = settlementByRegion.get(tile.regionId)
       ground.rect(x, y, cell, cell).fill(terrainColors[tile.terrain] ?? 0x465244)
       if (layer.value !== 'terrain' && tile.terrain !== 'water' && tile.terrain !== 'sea' && place) {
-        const color = layer.value === 'food' ? (place.missing_food ? 0xd87965 : 0x8ab890) : (governmentColors[place.administrator_id ?? ''] ?? 0x9caba6)
+        const control = snapshot.campaigns.territorial_controls.find(item => item.settlement_id === place.id && item.stage === 'active')
+        const occupation = snapshot.campaigns.occupations.find(item => item.settlement_id === place.id)
+        const color = layer.value === 'food' ? (place.missing_food ? 0xd87965 : 0x8ab890)
+          : layer.value === 'campaign' ? (control ? (governmentColors[control.controller_id] ?? 0xe8b86b) : occupation ? 0xe08a68 : 0x758b86)
+          : (governmentColors[place.administrator_id ?? ''] ?? 0x9caba6)
         ground.rect(x, y, cell, cell).fill({ color, alpha: .2 })
       }
       if (tile.terrain === 'mountain') {
@@ -50,9 +54,13 @@ export function useAtlas(host: Ref<HTMLElement | null>) {
       if (tile.x === 0 || rows[tile.y][tile.x - 1] !== tile.regionId) lines.moveTo(x,y).lineTo(x,y + cell).stroke({ color: 0xdbc8a1, width: 1, alpha: .35 })
       if (tile.y === 0 || rows[tile.y - 1][tile.x] !== tile.regionId) lines.moveTo(x,y).lineTo(x + cell,y).stroke({ color: 0xdbc8a1, width: 1, alpha: .35 })
     }
+    const interdictedRoutes = new Set(snapshot.campaigns.route_interdictions.filter(item => item.stage === 'active').map(item => item.route_id))
+    const creatureThreatRoutes = new Set(snapshot.creatures.demands.filter(item => item.stage === 'open').map(item => item.route_id))
     if (showRoutes.value) for (const route of p.routes) {
+      const interdicted = interdictedRoutes.has(route.id)
+      const creatureThreat = creatureThreatRoutes.has(route.id)
       lines.moveTo(route.from[0] * cell, route.from[1] * cell).lineTo(route.to[0] * cell, route.to[1] * cell)
-        .stroke({ color: route.capacity <= 0 ? 0xe87969 : route.mode === 'river' ? 0x96d8e2 : 0xdacba4, width: route.mode === 'river' ? 3 : 2, alpha: .7 })
+        .stroke({ color: interdicted ? 0xf08b68 : creatureThreat ? 0xf0b36a : route.capacity <= 0 ? 0xe87969 : route.mode === 'river' ? 0x96d8e2 : 0xdacba4, width: interdicted || creatureThreat ? 4 : route.mode === 'river' ? 3 : 2, alpha: .8 })
     }
     if (showSites.value) for (const site of snapshot.map.sites) {
       const [x,y] = site.cell_refs[0]
@@ -68,6 +76,55 @@ export function useAtlas(host: Ref<HTMLElement | null>) {
       const label = new pixi.Text({ text: s.name, style: { fontFamily: 'Georgia', fontSize: 16, fill: 0xf8edda,
         stroke: { color: 0x172722, width: 4 }, fontWeight: selected ? 'bold' : 'normal' } })
       label.anchor.set(.5,0); label.position.set(x,y+18); root.addChild(label)
+    }
+    if (layer.value === 'campaign') {
+      const centers = new Map(snapshot.society.settlements.map(item => [item.id, item.center]))
+      const plannedSettlements = new Set(snapshot.governance.objectives.map(item => item.settlement_id))
+      for (const objective of plannedSettlements) {
+        const center = centers.get(objective)
+        if (!center) continue
+        const x = (center[0] + .5) * cell, y = (center[1] + .5) * cell
+        markers.rect(x - 13, y + 7, 7, 7).fill(0xe8c875)
+      }
+      for (const siege of snapshot.campaigns.siege_campaigns.filter(item => item.phase === 'sieging' || item.phase === 'breached')) {
+        const center = centers.get(siege.settlement_id)
+        if (!center) continue
+        const x = (center[0] + .5) * cell, y = (center[1] + .5) * cell
+        markers.circle(x, y, 17).stroke({ color: siege.phase === 'breached' ? 0xf5d27d : 0xec8b72, width: 2, alpha: .9 })
+      }
+      for (const threat of snapshot.campaigns.threats.filter(item => item.settlement_id)) {
+        const center = centers.get(threat.settlement_id!)
+        if (!center) continue
+        const x = (center[0] + .5) * cell, y = (center[1] + .5) * cell
+        markers.circle(x, y, 21).stroke({
+          color: threat.severity === 'high' ? 0xf06e67 : 0xf0b36a, width: 2, alpha: .85,
+        })
+      }
+      for (const damage of snapshot.creatures.damaged_sites) {
+        const site = snapshot.map.sites.find(item => item.id === damage.site_id)
+        const cellRef = site?.cell_refs[0]
+        if (!cellRef) continue
+        const x = (cellRef[0] + .5) * cell, y = (cellRef[1] + .5) * cell
+        markers.moveTo(x - 6, y - 6).lineTo(x + 6, y + 6).moveTo(x + 6, y - 6).lineTo(x - 6, y + 6)
+          .stroke({ color: 0xf07b6c, width: 3, alpha: .9 })
+      }
+      for (const demand of snapshot.creatures.demands.filter(item => item.stage === 'open')) {
+        const route = p.routes.find(item => item.id === demand.route_id)
+        if (!route) continue
+        const x = (route.from[0] + route.to[0]) * cell / 2
+        const y = (route.from[1] + route.to[1]) * cell / 2
+        markers.circle(x, y, 8).fill({ color: 0x9e5c4d, alpha: .95 })
+        const marker = new pixi.Text({ text: '!', style: { fontFamily: 'Georgia', fontSize: 12, fill: 0xfff0d0, fontWeight: 'bold' } })
+        marker.anchor.set(.5); marker.position.set(x, y - 1); root.addChild(marker)
+      }
+      for (const detachment of snapshot.campaigns.detachments.filter(item => item.stage !== 'disbanded')) {
+        const center = centers.get(detachment.location_id)
+        if (!center) continue
+        const x = (center[0] + .5) * cell, y = (center[1] + .5) * cell
+        markers.circle(x + 12, y - 12, 6).fill(governmentColors[detachment.owner_ref.id] ?? 0xf2c078)
+        const count = new pixi.Text({ text: String(detachment.count), style: { fontFamily: 'Georgia', fontSize: 11, fill: 0xf8edda, fontWeight: 'bold' } })
+        count.anchor.set(.5); count.position.set(x + 12, y - 12); root.addChild(count)
+      }
     }
     transform()
   }

@@ -222,6 +222,21 @@ def test_breach_remediation_preserves_history_and_validates_after_parcel_progres
     assert world_snapshot(restored) == world_snapshot(world)
 
 
+def test_remediated_aid_cannot_erase_its_breach_provenance():
+    """Relations keeps the historical breach even after new freight repairs it."""
+    world, obligation_id = _breached_aid_world()
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    option = aid_remediation_options(world, PROVIDER)[0]
+    remediate_institutional_aid(world, PROVIDER, option.id, decision(world, option, "aid remediation").id)
+
+    remediated = world.relations.obligations[obligation_id]
+    world.relations.validate(world)
+    world.relations.obligations[obligation_id] = remediated.model_copy(update={"breach_event_id": None})
+
+    with pytest.raises(ValueError, match="remediation requires a breach"):
+        world.relations.validate(world)
+
+
 def test_request_is_visible_without_provider_surplus_but_response_only_rejects():
     world = prepared_world()
     for stock in tuple(world.economy.stocks.values()):

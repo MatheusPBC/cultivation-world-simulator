@@ -39,6 +39,7 @@ const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
         <ul class="declined-options"><li v-for="optionId in (causal.event.decision!.declined_option_ids as string[])" :key="optionId">{{optionId}}</li></ul>
       </template>
       <details v-if="causal.event.decision"><summary>{{t('decision')}}</summary><pre>{{JSON.stringify(causal.event.decision,null,2)}}</pre></details>
+      <details v-if="causal.event.causal_payload"><summary>{{t('engineEvidence')}}</summary><pre>{{JSON.stringify(causal.event.causal_payload,null,2)}}</pre></details>
       <h4>{{t('effects')}}</h4><p v-if="!causal.effects.length" class="muted">{{t('noEffects')}}</p>
       <button v-for="e in causal.effects" :key="e.id" class="link-row" @click="store.focusEventId=e.id">#{{e.sequence}} · {{e.content}} →</button>
       <button v-if="causal.has_more" @click="open(causal.event.id,true)">{{t('showMore')}}</button>

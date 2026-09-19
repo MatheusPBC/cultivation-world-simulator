@@ -40,6 +40,29 @@ def test_initial_households_have_accounts_without_creating_money_or_named_double
     assert money(world) == 76000
 
 
+def test_opted_in_opening_income_is_treasury_funded_causal_and_idempotent(tmp_path):
+    from src.sim.medieval.opening_income import allocate_opening_household_income
+
+    world = create_medieval_world(73, bootstrap_household_income=True)
+    total = money(world)
+    households = [account for account in world.economy.accounts.values()
+                  if account.owner_ref.kind == "population_group"]
+    event = world.events[-1]
+
+    assert event.event_type == "initial_household_income_allocated"
+    assert event.fact_kind.value == "state_transition"
+    assert household_money(world) == world.society.total_population * 4
+    assert sum(int(delta.after) - int(delta.before) for delta in event.deltas) == 0
+    assert {account.last_event_id for account in households} == {event.id}
+    assert allocate_opening_household_income(world).id == event.id
+    assert world.events == [event]
+
+    save_world(world, tmp_path / "opening-income.mws")
+    resumed = load_world(tmp_path / "opening-income.mws")
+    assert allocate_opening_household_income(resumed).id == event.id
+    assert money(resumed) == total
+
+
 def test_production_phase_pays_actual_work_and_taxes_only_that_income():
     world = prepared_farm()
     initial = money(world)

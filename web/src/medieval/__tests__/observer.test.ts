@@ -17,6 +17,12 @@ it.each(['stock', 'resource', 'target'])('rejects an invalid supply %s before pu
   expect(() => acceptSnapshot(data)).toThrow()
 })
 
+it('rejects a snapshot without the canonical campaign threat projection', () => {
+  const data = structuredClone(world) as ObservatoryView
+  Reflect.deleteProperty(data.campaigns, 'threats')
+  expect(() => acceptSnapshot(data)).toThrow('incompleto')
+})
+
 describe('observer transport', () => {
   it('returns typed failure instead of treating failed save as success', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({

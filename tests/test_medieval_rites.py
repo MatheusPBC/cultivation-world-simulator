@@ -1,5 +1,7 @@
 """A rite is paid work with witnesses: bounded relief, never created matter."""
 
+import json
+
 import pytest
 
 from src.classes.event import FactKind
@@ -152,6 +154,12 @@ def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(
     assert rite.site_id not in world.society.assembly_denials
     execute_assembly_denial_option(world, outsider, denial.id, denial_decision.id)
     assert rite.site_id in world.society.assembly_denials
+    from src.server.medieval.queries import campaign_view
+    persecution = next(item for item in campaign_view(world).threats
+                       if item.id == f"religious-persecution:{rite.site_id}")
+    assert persecution.kind == "religious_persecution"
+    assert persecution.settlement_id == PLACE
+    assert persecution.source_event_id == world.society.assembly_denials[rite.site_id].last_event_id
     assert world.research.rites[rite.id].stage == "officiating"
     tick_to(world, world.clock.absolute_day + 1)
 
@@ -169,8 +177,14 @@ def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(
     assert world.agenda.get(rite.id) is None
     assert any(item.event_type == "assembly_denied" for item in world.events)
     interrupted_event = next(item for item in world.events if item.event_type == "rite_interrupted")
+    pressure_event = next(item for item in world.events if item.event_type == "rite_interruption_pressure")
     denial_event = next(item for item in world.events if item.event_type == "assembly_denied")
+    assert denial_event.causal_payload["social_conflict"]["kind"] == "religious_persecution"
+    assert denial_event.causal_payload["social_conflict"]["rite_observation_id"] == observation.id
     assert denial_event.id in {link.cause_event_id for link in interrupted_event.causal_links}
+    assert interrupted_event.id in {link.cause_event_id for link in pressure_event.causal_links}
+    assert world.economy.needs[PLACE].unrest == 60
+    assert not world.society.civic_movements, "pressure does not start a movement automatically"
     path = tmp_path / "rite-denied.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
@@ -186,3 +200,51 @@ def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(
     assert any(item.event_type == "assembly_denial_lifted" for item in world.events)
     refresh_settlement_reports(world)
     assert world.knowledge.settlement_report(outsider, PLACE).rite_underway is False
+
+
+@pytest.mark.anyio
+async def test_religious_assembly_denial_is_a_monthly_institutional_choice(monkeypatch):
+    """The denial is not restricted to a force-contact callback."""
+    world, healer = ailing_world()
+    _, rite = started(world, healer)
+    outsider = EntityRef("polity", "auren")
+    from src.classes.society.force import Detachment
+    from src.sim.medieval.force import force_position_options, prepare_force_position
+    cohort = next(item for item in world.society.population.values() if item.settlement_id == PLACE)
+    soldiers = cohort.model_copy(update={"id": f"pop:{PLACE}:{cohort.people}:soldier",
+                                         "occupation": "soldier", "count": 5})
+    world.society.population[soldiers.id] = soldiers
+    world.society.detachments["detachment:monthly-denial"] = Detachment(
+        id="detachment:monthly-denial", owner_ref=outsider, source_group_id=soldiers.id,
+        count=5, location_id=PLACE, destination_id=PLACE, route_ids=(), route_index=0,
+        provisions=25, stage="present", started_day=world.clock.absolute_day,
+        due_day=world.clock.absolute_day + 1, decision_event_id=rite.sponsor_decision_id,
+        last_event_id=rite.last_event_id)
+    refresh_settlement_reports(world)
+    position_option = next(item for item in force_position_options(world, outsider)
+                           if item.detachment_id == "detachment:monthly-denial")
+    position_decision = record_event(world, "force_position_decided", "Preparar posição local.",
+                                     fact_kind=FactKind.DECISION, decision=position_option.decision())
+    position = prepare_force_position(world, outsider, position_option.id, position_decision.id)
+    tick_to(world, position.ready_day)
+
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8,
+                                                   "ai_max_calls": 20})
+    async def choose_denial(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        choice = next(item["id"] for item in payload["choices"]
+                      if item["id"].startswith("rite-assembly-deny:"))
+        return {"selected_id": choice}
+
+    from src.sim.medieval import ai_decider
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_denial)
+    from src.sim.medieval.institutional_agenda import monthly_adapters
+    from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+    _, covered = await review_institutional_decision_turn(world, outsider, monthly_adapters())
+
+    assert covered is True
+    assert rite.site_id in world.society.assembly_denials
+    denial_event = next(item for item in world.events if item.event_type == "assembly_denied")
+    assert denial_event.fact_kind == FactKind.STATE_TRANSITION
+    assert denial_event.causal_payload["social_conflict"]["kind"] == "religious_persecution"

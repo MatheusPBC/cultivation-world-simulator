@@ -17,6 +17,7 @@ class Resource(SocietyValue):
     unit: Identity
     bulk: Positive
     base_price: Positive
+    trade_class: Literal["ordinary", "contraband"]
 
 
 class Recipe(SocietyValue):
@@ -81,6 +82,42 @@ class Payroll(SocietyValue):
         return self
 
 
+class PermanentEmploymentContract(SocietyValue):
+    """A standing, local paid-work obligation owned by Economy.
+
+    This deliberately names one existing cohort rather than creating labour,
+    income, or a population transfer.  It is an obligation to attempt a real
+    payroll each monthly boundary; a missing account balance or unavailable
+    workers produces a factual non-payment receipt instead of money.
+    """
+
+    id: Identity
+    employer_ref: EntityRef
+    settlement_id: Identity
+    cohort_id: Identity
+    work_site_id: Identity
+    occupation: Occupation
+    stock_id: Identity
+    account_id: Identity
+    workforce_limit: Positive
+    wage_per_worker: Positive
+    created_day: Count
+    decision_event_id: Identity
+    selected_affordance_id: Identity
+    created_event_id: Identity
+    last_reviewed_day: Count
+    last_outcome: Literal["created", "paid", "unpaid_funds", "unpaid_labor", "unavailable"] = "created"
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def names_its_cohort(self):
+        if self.id != f"employment:{self.cohort_id}":
+            raise ValueError("employment contract ID must name its cohort")
+        if self.last_reviewed_day < self.created_day:
+            raise ValueError("employment contract review predates creation")
+        return self
+
+
 class SettlementNeeds(SocietyValue):
     id: Identity
     stock_id: Identity
@@ -93,6 +130,11 @@ class SettlementNeeds(SocietyValue):
 class Market(SocietyValue):
     id: Identity  # settlement ID
     prices: dict[Identity, Positive]
+    # Canonical, public readings used to derive the quote.  These are not
+    # hidden inventories: they describe the most recent local pressure that
+    # an actor may inspect before selecting a material affordance.
+    observed_supply: dict[Identity, Count] = Field(default_factory=dict)
+    observed_demand: dict[Identity, Count] = Field(default_factory=dict)
     updated_day: Count = 0
     last_event_id: Identity | None = None
 

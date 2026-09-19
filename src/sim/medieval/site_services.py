@@ -33,8 +33,7 @@ class SiteServiceOption(SocietyValue):
 
     def decision(self) -> dict:
         return {"action": self.action, "actor_ref": self.actor_ref.to_dict(),
-                "option_id": self.id, "site_id": self.site_id,
-                "report_id": self.report_id}
+                "selected_affordance_id": self.id}
 
 
 def _present_at_site(world, actor_ref, site) -> bool:
@@ -92,8 +91,8 @@ def set_site_service(world, option_id, *, decision_event_id):
         actor_ref = EntityRef.from_dict(payload.get("actor_ref")) if isinstance(payload, dict) else None
     except (KeyError, TypeError, ValueError):
         actor_ref = None
-    site_id = payload.get("site_id") if isinstance(payload, dict) else None
-    options = service_options(world, site_id, actor_ref) if actor_ref is not None else ()
+    options = tuple(option for site in world.map.infrastructure_sites.values()
+                    for option in service_options(world, site.id, actor_ref)) if actor_ref is not None else ()
     option = next((item for item in options if item.id == option_id), None)
     if (decision is None or decision.day != world.clock.absolute_day
             or decision.fact_kind != FactKind.DECISION or option is None
@@ -128,12 +127,13 @@ def set_site_service(world, option_id, *, decision_event_id):
     return event
 
 
-def review_site_services(world) -> tuple[str, ...]:
-    """Conservative owner policy: safety suspension, then physical recovery only."""
+def review_site_services(world, *, excluded_actors=()) -> tuple[str, ...]:
+    """Conservative owner policy for actors without a completed provider turn."""
+    excluded = set(excluded_actors)
     changed: list[str] = []
     for site in sorted(world.map.infrastructure_sites.values(), key=lambda item: item.id):
         owner = site.owner_ref
-        if owner is None:
+        if owner is None or owner in excluded:
             continue
         options = service_options(world, site.id, owner)
         if not options:
@@ -163,5 +163,29 @@ def review_site_services(world) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def service_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    def options(world, actor):
+        if not isinstance(actor, EntityRef):
+            return ()
+        return tuple(option for site in world.map.infrastructure_sites.values()
+                     for option in service_options(world, site.id, actor))
+
+    def causes(world, option):
+        report = current_observation(world, option.actor_ref, option.site_id)
+        return (report.event_id,) if report is not None else ()
+
+    def execute(world, actor, option_id, decision_event_id):
+        return set_site_service(world, option_id, decision_event_id=decision_event_id)
+
+    return (DiscretionaryAdapter(
+        name="site_service", family="infrastructure", options_fn=options,
+        label_fn=lambda option: ("Suspender" if option.action == "suspend_site_service" else "Retomar")
+        + f" o serviço de {option.site_id}.",
+        causes_fn=causes, execute_fn=execute),)
+
+
 __all__ = ["RESUME_THRESHOLD", "SERVICE_SITE_KINDS", "SUSPEND_THRESHOLD",
-           "SiteServiceOption", "review_site_services", "service_options", "set_site_service"]
+           "SiteServiceOption", "review_site_services", "service_options", "service_adapters",
+           "set_site_service"]

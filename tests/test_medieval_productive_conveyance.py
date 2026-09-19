@@ -16,7 +16,7 @@ from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.economy.expansion import ExpansionProject
 from src.run.medieval_world import create_medieval_world
-from src.sim.medieval.economy import produce_monthly
+from src.sim.medieval.economy import _delta, produce_monthly
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world
 from src.sim.medieval.productive_conveyance import (
@@ -45,6 +45,13 @@ def _staged_world():
     return world, seller_option, proposal, acceptance_option, acceptance
 
 
+def test_state_transition_without_delta_is_rejected_as_non_material():
+    world = create_medieval_world(73)
+    with pytest.raises(ValueError, match="material delta"):
+        record_event(world, "invalid_material_claim", "Texto sem mudança canônica.",
+                     fact_kind=FactKind.STATE_TRANSITION, deltas=())
+
+
 def test_buyer_reconstitutes_the_exact_seller_offer_without_a_knowledge_notice():
     world = create_medieval_world(73)
     seller_option = next(
@@ -64,7 +71,11 @@ def test_buyer_reconstitutes_the_exact_seller_offer_without_a_knowledge_notice()
     assert proposal.causal_origin is CausalOrigin.ACTOR_DECISION
     assert proposal.deltas == ()
     assert proposal.decision == seller_option.decision()
-    assert acceptance_option.decision()["proposal_event_id"] == proposal.id
+    assert acceptance_option.decision() == {
+        "action": "accept_productive_site_conveyance",
+        "actor_ref": BUYER.to_dict(),
+        "selected_affordance_id": acceptance_option.id,
+    }
     assert not hasattr(world.knowledge, "productive_site_conveyances")
 
 
@@ -220,7 +231,7 @@ def test_rejected_conveyance_is_atomic_for_stale_or_conflicting_current_state(mu
             "expansion_started",
             "Projeto concorrente em andamento.",
             fact_kind=FactKind.STATE_TRANSITION,
-            deltas=(),
+            deltas=(_delta("expansion", f"expansion:{decision.id}", "stage", None, "waiting"),),
             cause_ids=(decision.id,),
         )
         world.economy.expansions[f"expansion:{decision.id}"] = ExpansionProject(

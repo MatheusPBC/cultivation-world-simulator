@@ -81,7 +81,10 @@ def validate_customs(economy, world=None) -> None:
                                 and delta.aspect == "opened" and delta.before == "False" and delta.after == "True"
                                 for delta in event.deltas)), None)
         decision = next((events.get(link.cause_event_id) for link in opening.causal_links
-                         if events.get(link.cause_event_id) is not None and events[link.cause_event_id].fact_kind.name == "DECISION"), None) if opening else None
+                         if events.get(link.cause_event_id) is not None
+                         and events[link.cause_event_id].fact_kind.name == "DECISION"
+                         and isinstance(events[link.cause_event_id].decision, dict)
+                         and events[link.cause_event_id].decision.get("option_id") is not None), None) if opening else None
         expected = {"action": "open_customs_checkpoint", "actor_ref": checkpoint.operator_ref.to_dict(),
                     "site_id": checkpoint.site_id, "account_id": checkpoint.account_id,
                     "staff_count": checkpoint.staff_count, "fee_per_bulk": checkpoint.fee_per_bulk}

@@ -177,12 +177,18 @@ async def test_missing_tools_trigger_real_purchase_delivery_and_later_capacity()
     assert world.clock.absolute_day == 30
     assert world.economy.expansions[project.id].completed_units == 0
     orders = [o for o in world.economy.freight_orders.values() if o.resource_id == 'tools' and o.destination_id == stock.id]
-    assert len(orders) == 1 and orders[0].quantity == 10
+    assert len(orders) == 1
+    blueprint = world.economy.expansion_blueprints[project.blueprint_id]
+    required_tools = blueprint.inputs["tools"] * blueprint.required_units
+    # The same owner may replenish the active production reserve in this
+    # order; the construction obligation is the lower bound, not an exclusive
+    # quantity.
+    assert orders[0].quantity >= required_tools
     assert orders[0].source_id == 'stock:oficios-da-serra'
     assert world.economy.stocks[stock.id].goods['tools'] == 0
     await MedievalSimulator(world).step()
     assert world.clock.absolute_day == 31
-    assert world.economy.stocks[stock.id].goods['tools'] == 10
+    assert world.economy.stocks[stock.id].goods['tools'] == orders[0].quantity
     while world.clock.absolute_day < 90:
         await MedievalSimulator(world).step()
     assert world.economy.expansions[project.id].stage == 'completed'

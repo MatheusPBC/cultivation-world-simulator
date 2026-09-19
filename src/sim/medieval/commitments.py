@@ -19,9 +19,11 @@ def conclude_obligation(world, obligation, status, material_event_id=None, extra
     # A breached material delivery or withdrawal promise matters to both
     # parties. The same factual event declares their memories; Knowledge still
     # owns who learned the fact and no score is stored here.
+    # Every concluded bilateral term is a social fact known to both parties.
+    # Relations stores only relevance; the material owner still validates the
+    # payment, teaching, freight, withdrawal or administration transition.
     remembering = ((proposal.proposer_ref, proposal.counterparty_ref)
-                   if status == 'breached'
-                   and proposal.clauses[obligation.clause_index].kind in {'resource_transfer', 'withdrawal'} else ())
+                   if status in {'fulfilled', 'breached'} else ())
     event = record_event(world, 'commitment_' + status, text, fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta('obligation', obligation.id, 'status', obligation.status, status),
                 *memory_creation_deltas(world, remembering)), cause_ids=causes)

@@ -30,7 +30,25 @@ Descobrir cria conhecimento apenas para o patrocinador. Ensino exige dois novos
 consentimentos atuais, conhecimento do professor, pré-requisitos do aluno e mandatos
 de pesquisa; não cria instalações nem equipamentos. Atualmente é uma transferência
 institucional imediata, sem curso, deslocamento, preço ou política autônoma de ensino.
+Venda V1 é uma transferência bilateral paga: o comprador precisa de uma
+instalação própria capaz, pré-requisitos e saldo; o detentor recompõe e aceita a
+mesma affordance, e o pagamento econômico precede o recibo de conhecimento.
+O vendedor mantém seu conhecimento e a aplicação posterior ainda exige obra e
+materiais próprios.
+Roubo V1 é um caminho separado e material: a instituição precisa de um agente
+nomeado por ofício atual, presença física no assentamento, sighting vigente da
+técnica e relatório atual da instalação. O resultado engine-owned é `success`,
+`failure` ou `discovered`; somente `success` cria conhecimento `stolen` a partir
+do recibo canônico do detentor. Finding, observação e decisão ficam privados e
+persistidos; nenhum resultado inventa técnica, receita, capacidade ou efeito.
 Se ensinar torna conhecido um experimento ativo, ele é encerrado sem trabalho fictício.
+
+`field_drill` é a primeira aplicação defensiva da mesma regra: o catálogo
+engine-owned exige pesquisa, ensino ou aprendizado material em um site com
+`military_training`; quando o proprietário de uma coluna conhece essa técnica,
+`field_strength` recebe somente +1 por combatente. O efeito é bounded,
+determinístico e registrado pela cadeia de conhecimento, não por texto ou
+intenção narrativa.
 
 Aplicação exige uma obra própria: canais (alimento100→120 por lote) ou fornos
 (ferro5→7). Cada adaptação custa20madeiras,10ferramentas e40salários em duas etapas
@@ -100,7 +118,7 @@ adaptação150, depois produz420ferro (60lotes×7).
 ## Trabalho ainda necessário
 
 Conservação, pólvora, artilharia, barreiras e logística continuam no
-plano integral. Também faltam segredo, venda/roubo, difusão por migração, ensino com
+plano integral. Também faltam segredo, difusão por migração, ensino com
 tempo/custos e vínculos estratégicos com diplomacia/campanhas. O catálogo é finito
 por versão e expansível por conteúdo, sem inventar regras durante execução.
 Demografia, mobilidade de especialistas e calibração financeira seguem abertas.

@@ -5,6 +5,7 @@ import Controls from './components/Controls.vue'
 import Atlas from './components/Atlas.vue'
 import Inspector from './components/Inspector.vue'
 import Chronicle from './components/Chronicle.vue'
+import StrategicCapacity from './components/StrategicCapacity.vue'
 import SavePanel from './components/SavePanel.vue'
 import { formatNumber } from './mappers'
 const { t } = useI18n()
@@ -39,6 +40,14 @@ const { store, scene, overlay, seed, count, replace, create } = useAppShell()
             <div class="section-heading"><div><p class="eyebrow">{{ t('map') }}</p><h2>{{ store.snapshot.map.name }}</h2></div><span class="muted">{{ t('observatory') }}</span></div>
             <Atlas />
             <div class="world-strip"><span><strong>{{ formatNumber(store.snapshot.world.population) }}</strong> {{ t('inhabitants') }}</span><span><strong>{{ store.snapshot.world.living_characters }}</strong> {{ t('people') }}</span><span><strong>{{ store.snapshot.world.events }}</strong> {{ t('totalEvents') }}</span></div>
+            <div class="decision-strip" :aria-label="t('decisionTrace')">
+              <span><strong>{{ store.snapshot.world.decision_sources.provider_consultations }}</strong> {{ t('providerConsultations') }}</span>
+              <span><strong>{{ store.snapshot.world.decision_sources.provider_declines }}</strong> {{ t('providerDeclines') }}</span>
+              <span><strong>{{ store.snapshot.world.decision_sources.provider_failures }}</strong> {{ t('providerFailures') }}</span>
+              <span><strong>{{ store.snapshot.world.decision_sources.no_affordance_receipts }}</strong> {{ t('noAffordance') }}</span>
+              <span><strong>{{ store.snapshot.world.decision_sources.stale_affordance_receipts }}</strong> {{ t('staleAffordance') }}</span>
+            </div>
+            <StrategicCapacity />
             <Chronicle />
           </section>
           <Inspector />

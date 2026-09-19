@@ -22,8 +22,29 @@ class WorldEvent(SocietyValue):
     fact_kind: FactKind = FactKind.OCCURRENCE
     causal_origin: CausalOrigin = CausalOrigin.DETERMINISTIC
     decision: dict[str, Any] | None = None
+    # Structured engine evidence used by read models and Why navigation.  It
+    # is part of the canonical event contract, not a transient runtime
+    # attribute: otherwise model_dump/save-load silently discarded ecology,
+    # hazard and owner evidence attached after the event was created.
+    causal_payload: dict[str, Any] | None = None
     deltas: tuple[StateDelta, ...] = ()
     causal_links: tuple[CausalLink, ...] = ()
+
+    def __eq__(self, other):
+        """Compare event payloads by their JSON-shaped canonical values.
+
+        Decisions are deliberately open structured data.  An event created in
+        memory may contain tuples while the same event loaded from JSON must
+        contain lists; those are the same causal payload and must not make
+        save/load continuation look different.  Keep the original payload
+        shapes untouched for executors and normalize only at the equality
+        boundary used by history verification.
+        """
+        if not isinstance(other, WorldEvent):
+            return NotImplemented
+        return _canonical_value(self.model_dump(mode="python")) == _canonical_value(
+            other.model_dump(mode="python")
+        )
 
     def __deepcopy__(self, memo=None):
         # Frozen outer models still contain mutable dicts and dataclasses. Rebuild
@@ -48,8 +69,14 @@ class WorldEvent(SocietyValue):
             raise ValueError("only a decision may carry intent")
         if self.deltas and self.fact_kind != FactKind.STATE_TRANSITION:
             raise ValueError("only state transitions can carry material deltas")
+        if self.fact_kind == FactKind.STATE_TRANSITION and not self.deltas:
+            raise ValueError("a state transition requires at least one material delta")
         if self.deltas and self.causal_origin == CausalOrigin.LLM_INTERPRETATION:
             raise ValueError("an interpretation cannot carry a state change")
+        if self.causal_origin == CausalOrigin.LLM_INTERPRETATION:
+            payload_deltas = self.causal_payload.get("deltas") if self.causal_payload else None
+            if payload_deltas:
+                raise ValueError("an interpretation cannot carry state deltas in its causal payload")
         for index, delta in enumerate(self.deltas):
             if (delta.event_id != self.id or delta.id != f"{self.id}:delta:{index}"
                     or not delta.owner_kind or not delta.owner_id or not delta.aspect):
@@ -60,23 +87,46 @@ class WorldEvent(SocietyValue):
         return self
 
 
+def _canonical_value(value):
+    if isinstance(value, dict):
+        return tuple(sorted((key, _canonical_value(item)) for key, item in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_canonical_value(item) for item in value)
+    if isinstance(value, FactKind):
+        return value.value
+    if isinstance(value, CausalOrigin):
+        return value.value
+    if isinstance(value, float) and value == 0.0:
+        return 0.0
+    return value
+
+
 def _interprets(event) -> bool:
     return event.causal_origin == CausalOrigin.LLM_INTERPRETATION
 
 
-def validate_history(events, day: int) -> None:
-    known = {}
-    previous_day = 0
-    for index, event in enumerate(events, start=1):
+def validate_history(events, day: int, *, from_sequence: int = 1) -> None:
+    """Validate the ledger, optionally checking only an appended suffix.
+
+    Persistence and audit callers use the default full scan.  The transactional
+    engine may validate only events appended to its isolated candidate because
+    the prior prefix was validated at the previous commit.  Cause IDs still
+    resolve against the complete ledger, so causal and interpretation-origin
+    rules remain enforced for every new event.
+    """
+    if type(from_sequence) is not int or not 1 <= from_sequence <= len(events) + 1:
+        raise ValueError("event history suffix must start inside the ledger")
+    previous_day = events[from_sequence - 2].day if from_sequence > 1 else 0
+    for index, event in enumerate(events[from_sequence - 1:], start=from_sequence):
         event = WorldEvent.model_validate(event.model_dump(mode="json"))
         if event.sequence != index or not previous_day <= event.day <= day:
             raise ValueError("event sequence or date is inconsistent with world clock")
         causes = [link.cause_event_id for link in event.causal_links]
-        if len(set(causes)) != len(causes) or any(cause not in known for cause in causes):
+        if len(set(causes)) != len(causes) or any(not _is_recorded(events, cause) for cause in causes):
             raise ValueError("unknown or repeated event cause")
-        if event.deltas and any(_interprets(known[cause]) for cause in causes):
+        if event.deltas and any((_cause := _recorded_event(events, cause)) is not None
+                                and _interprets(_cause) for cause in causes):
             raise ValueError("a state change cannot be caused directly by an interpretation")
-        known[event.id] = event
         previous_day = event.day
 
 
@@ -92,8 +142,15 @@ def _is_recorded(events, cause_id) -> bool:
     return 1 <= position <= len(events) and events[position - 1].id == cause_id
 
 
+def _recorded_event(events, event_id):
+    if not _is_recorded(events, event_id):
+        return None
+    return events[int(event_id.partition(":")[2]) - 1]
+
+
 def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCCURRENCE,
-                 causal_origin=CausalOrigin.DETERMINISTIC, decision=None, deltas=(), cause_ids=()) -> WorldEvent:
+                 causal_origin=CausalOrigin.DETERMINISTIC, decision=None, causal_payload=None,
+                 deltas=(), cause_ids=()) -> WorldEvent:
     sequence = len(world.events) + 1
     event_id = f"event:{sequence}"
     if len(set(cause_ids)) != len(cause_ids) or any(not _is_recorded(world.events, cause) for cause in cause_ids):
@@ -103,7 +160,7 @@ def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCC
     event = WorldEvent(
         id=event_id, day=world.clock.absolute_day, sequence=sequence,
         event_type=event_type, content=content, fact_kind=fact_kind,
-        causal_origin=causal_origin, decision=decision,
+        causal_origin=causal_origin, decision=decision, causal_payload=causal_payload,
         deltas=tuple(replace(d, event_id=event_id, id=f"{event_id}:delta:{i}") for i, d in enumerate(deltas)),
         causal_links=tuple(CausalLink(id=f"{event_id}:cause:{i}", event_id=event_id,
                                     cause_event_id=cause, created_at=0.0)

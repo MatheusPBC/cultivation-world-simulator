@@ -15,8 +15,12 @@ from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
 from .institutional_decision_turn import DiscretionaryAdapter, review_institutional_decision_turn
-from .force import (DISBAND_ACTION, OCCUPY_ACTION, RAISE_ACTION, disband_detachment, force_options,
-                    occupy_settlement, raise_detachment, raise_options)
+from .force import (DISBAND_ACTION, GARRISON_ACTION, WITHDRAW_GARRISON_ACTION, ROTATE_GARRISON_ACTION, OCCUPY_ACTION,
+                    RAISE_ACTION, disband_detachment, establish_garrison, force_options,
+                    occupy_settlement, raise_detachment, raise_options, withdraw_garrison, rotate_garrison)
+from .territorial_control import (CONTROL_ACTION, WITHDRAW_CONTROL_ACTION,
+                                  establish_territorial_control, territorial_control_options,
+                                  withdraw_territorial_control)
 from .institutional_memory import institutional_view
 from .reciprocal_supply import OFFER_ACTION, offer_reciprocal_supply, reciprocal_supply_options
 
@@ -27,7 +31,10 @@ RECOURSE_WINDOW = 10
 REPORT_SPAN_DAYS = 30
 
 _EXECUTORS = {RAISE_ACTION: raise_detachment, OCCUPY_ACTION: occupy_settlement,
-              DISBAND_ACTION: disband_detachment, OFFER_ACTION: offer_reciprocal_supply}
+              DISBAND_ACTION: disband_detachment, OFFER_ACTION: offer_reciprocal_supply,
+              CONTROL_ACTION: establish_territorial_control, WITHDRAW_CONTROL_ACTION: withdraw_territorial_control,
+              GARRISON_ACTION: establish_garrison, WITHDRAW_GARRISON_ACTION: withdraw_garrison,
+              ROTATE_GARRISON_ACTION: rotate_garrison}
 
 
 def review_id(day):
@@ -111,9 +118,16 @@ def recourse_options(world, creditor, debtor=None):
         detachment = world.society.detachments[option.detachment_id]
         if option.kind == "occupy":
             menu.append((option, f"Ocupar {_name(world, detachment.location_id)} com a coluna já presente."))
+        elif option.kind == "withdraw":
+            menu.append((option, f"Retirar a guarnição de {_name(world, detachment.location_id)} sem mover a coluna."))
+        elif option.kind == "rotate":
+            menu.append((option, f"Rotacionar a guarnição de {_name(world, detachment.location_id)} por outra coluna abastecida."))
         else:
             menu.append((option, f"Dissolver a coluna em {_name(world, detachment.location_id)} "
                                  f"e devolver as pessoas a uma coorte local."))
+    for option in territorial_control_options(world, creditor):
+        menu.append((option, f"Formalizar o controle territorial de {_name(world, option.settlement_id)} "
+                             "sem alterar a administração vigente."))
     return tuple(menu)
 
 

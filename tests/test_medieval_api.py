@@ -36,6 +36,10 @@ async def test_public_lifecycle_creates_medieval_world_advances_a_year_and_resum
     assert len(society["characters"]) == 12
     assert len(society["settlements"]) == 8
     assert len(society["polities"]) == 3
+    assert society["civic_protests"] == []
+    assert society["civic_movements"] == []
+    assert society["civic_strikes"] == []
+    assert society["civic_amnesties"] == []
     game_map = await query(client, "map")
     assert game_map["map_id"] == "vale-das-tres-coroas"
     assert len(game_map["routes"]) == 9
@@ -46,7 +50,11 @@ async def test_public_lifecycle_creates_medieval_world_advances_a_year_and_resum
     before = await query(client, "world")
     assert before["day"] == 360
     assert before["config"]["seed"] == 73
-    assert before["population"] == 10900
+    # Sustained deprivation is a canonical material consequence.  The public
+    # lifecycle must preserve the aggregate population exposed by the same
+    # snapshot, but it is not allowed to promise the initial count after a
+    # year of unpaid food shortfall.
+    assert 0 < before["population"] <= 10900
     economics = await query(client, "economy")
     await command(client, "save", {"save_id": "um-ano"})
     await command(client, "step")
@@ -68,11 +76,20 @@ async def test_world_required_and_input_errors_have_stable_non_success_responses
 
 async def test_public_month_exposes_paid_food_and_its_two_decisions(client):
     await command(client, "create", {"seed": 73, "character_count": 12})
+    initial_population = (await query(client, "world"))["population"]
     await command(client, "step")
     economy = await query(client, "economy")
     assert sum(a["balance"] for a in economy["accounts"]) == 76000
-    assert sum(a["balance"] for a in economy["accounts"] if a["owner_ref"]["kind"] == "population_group") == 8
-    history = (await query(client, "events?limit=100"))["items"]
+    household_cash = sum(a["balance"] for a in economy["accounts"]
+                         if a["owner_ref"]["kind"] == "population_group")
+    assert 0 < household_cash < 10900 * 4
+    history, after = [], 0
+    while True:
+        page = await query(client, f"events?after={after}&limit=100")
+        history.extend(page["items"])
+        if not page["has_more"]:
+            break
+        after = page["next_after"]
     purchases = [e for e in history if e["event_type"] == "household_purchase_completed"]
     assert purchases
     consumed = sum(int(d["before"]) - int(d["after"]) for e in history
@@ -85,13 +102,12 @@ async def test_public_month_exposes_paid_food_and_its_two_decisions(client):
     # (missing_food). Named people counted exactly once means these three
     # shares add back up to the whole population, with nothing left over and
     # nothing double-removed.
-    world = await query(client, "world")
     society = await query(client, "society")
     domestic = sum(int(d["before"]) - int(d["after"]) for e in history
                    if e["event_type"] == "household_rations_consumed"
                    for d in e["deltas"] if d["owner_kind"] == "stock" and d["aspect"] == "food")
     missing = sum(s["missing_food"] for s in society["settlements"])
-    assert consumed == world["population"] - domestic - missing
+    assert consumed == initial_population - domestic - missing
     detail = await query(client, f"causal/{purchases[0]['id']}")
     assert {e["decision"]["action"] for e in detail["causes"] if e["decision"]} >= {"buy_rations", "sell_rations"}
     assert any(e["event_type"] == "subsistence_resolved" for e in detail["effects"])

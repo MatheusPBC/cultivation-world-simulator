@@ -22,6 +22,15 @@ The people moving together and the portion of household property accompanying
 them. Named people are included in its population, not added to it.
 _Avoid_: Additional population, newly created wealth.
 
+## Medieval world — technology diffusion
+
+**Technology sale**:
+A bilateral, paid transfer of one institution's known technique to another
+institution that already has a usable site for the technique and its
+prerequisites. Payment changes accounts; the seller keeps its knowledge, and
+the buyer still needs later material application work.
+_Avoid_: Free global unlock, transfer of an installation, automatic production.
+
 ## Current implementation ledger (2026-09-04)
 
 Sect annual administration now has its own `SECT_ADMINISTRATION` authority:

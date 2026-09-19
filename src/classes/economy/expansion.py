@@ -22,9 +22,14 @@ class ExpansionBlueprint(SocietyValue):
     to_recipe_id: Identity | None = None
     additional_recipe_id: Identity | None = None
     new_capacity: Positive | None = None
+    required_site_capabilities: tuple[Identity, ...] = ()
 
     @model_validator(mode='after')
     def valid_application(self):
+        if len(set(self.required_site_capabilities)) != len(self.required_site_capabilities):
+            raise ValueError('site capabilities must be unique')
+        if any(not capability.strip() for capability in self.required_site_capabilities):
+            raise ValueError('site capabilities must be non-empty')
         if bool(self.additional_recipe_id) != bool(self.new_capacity):
             raise ValueError('new line requires its recipe and positive capacity')
         if self.additional_recipe_id and (self.from_recipe_id or self.to_recipe_id or self.capacity_gain or not self.required_technology_id):

@@ -2,9 +2,123 @@
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.models import Objective
+from src.classes.society.models import SocietyValue
 from .economy import _causes
 from .events import record_event
 from .research import start_research, research_blocker
+
+
+class ResearchOption(SocietyValue):
+    """Transient sponsorship choice; the owner recomposes all terms on execute."""
+    id: str
+    actor_ref: EntityRef
+    technology_id: str
+    site_id: str
+    stock_id: str
+    account_id: str
+    researcher_id: str
+    site_event_id: str | None = None
+    account_event_id: str | None = None
+    stock_event_ids: tuple[str, ...] = ()
+
+    def decision(self):
+        return {"action": "research", "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+def research_options(world, actor):
+    """Enumerate one materially feasible research sponsorship per site/tech."""
+    if not isinstance(actor, EntityRef):
+        return ()
+    economy = world.economy
+    options = []
+    for site in sorted(world.map.infrastructure_sites.values(), key=lambda item: item.id):
+        if site.owner_ref != actor or not site.enabled or site.integrity <= 0:
+            continue
+        if any(project.owner_ref == actor and project.stage not in {"completed", "superseded"}
+               for project in world.research.projects.values()):
+            continue
+        accounts = sorted((account for account in economy.accounts.values()
+                           if account.owner_ref == actor), key=lambda item: item.id)
+        stocks = sorted((stock for stock in economy.stocks.values()
+                         if stock.owner_ref == actor
+                         and world.society.settlements[stock.location_id].region_id in site.region_ids),
+                        key=lambda item: item.id)
+        for account in accounts:
+            for stock in stocks:
+                for technology in sorted(world.research.technologies.values(), key=lambda item: item.id):
+                    if world.knowledge.knows(actor, technology.id) or technology.capability_id not in site.capability_ids:
+                        continue
+                    candidates = sorted(world.society.characters.values(),
+                                        key=lambda character: (-getattr(character.skills, technology.skill), character.id))
+                    lead = next((character for character in candidates
+                                 if character.personality.curiosity >= .25
+                                 and not any(project.researcher_id == character.id
+                                             and project.stage not in {"completed", "superseded"}
+                                             for project in world.research.projects.values())
+                                 and research_blocker(world, technology, site.id, stock.id,
+                                                      account.id, character.id, actor) is None), None)
+                    if lead is None:
+                        continue
+                    material_cost = sum(max(0, quantity * technology.required_units
+                                            - stock.goods.get(resource, 0))
+                                        * economy.markets[stock.location_id].prices[resource]
+                                        for resource, quantity in technology.inputs.items())
+                    wage_cost = technology.required_units * (1 + technology.assistants_per_unit) * technology.wage_per_worker
+                    if account.balance < material_cost + wage_cost:
+                        continue
+                    option_id = (f"research:{actor.kind}:{actor.id}:{technology.id}:{site.id}:"
+                                 f"{stock.id}:{account.id}:{lead.id}:{site.last_event_id}")
+                    options.append(ResearchOption(
+                        id=option_id, actor_ref=actor, technology_id=technology.id,
+                        site_id=site.id, stock_id=stock.id, account_id=account.id,
+                        researcher_id=lead.id, site_event_id=site.last_event_id,
+                        account_event_id=account.last_event_id,
+                        stock_event_ids=tuple(sorted(stock.last_event_ids.values()))))
+    return tuple(options)
+
+
+def _research_causes(world, option):
+    return _causes(option.site_event_id, option.account_event_id, *option.stock_event_ids)
+
+
+def execute_research_option(world, actor, option_id, decision_event_id):
+    option = next((item for item in research_options(world, actor) if item.id == option_id), None)
+    if option is None:
+        raise ValueError("research option is stale or unknown")
+    # The menu decision carries only the affordance ID.  The owner recomposes
+    # private terms into a separate dated authorization receipt before
+    # start_research validates and persists the project.
+    sponsor = record_event(
+        world, "research_authorized", "A instituição autorizou a pesquisa escolhida.",
+        fact_kind=FactKind.DECISION,
+        decision={
+            "action": "research", "actor_ref": actor.to_dict(),
+            "technology_id": option.technology_id, "site_id": option.site_id,
+            "stock_id": option.stock_id, "account_id": option.account_id,
+            "researcher_id": option.researcher_id,
+        },
+        cause_ids=(decision_event_id,))
+    accepted = record_event(
+        world, "research_accepted", "O pesquisador aceita participar da pesquisa.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "research_work", "actor_ref": EntityRef("character", option.researcher_id).to_dict(),
+                  "technology_id": option.technology_id, "site_id": option.site_id,
+                  "stock_id": option.stock_id, "account_id": option.account_id,
+                  "researcher_id": option.researcher_id},
+        cause_ids=(sponsor.id,))
+    start_research(
+        world, option.technology_id, option.site_id, option.stock_id, option.account_id,
+        option.researcher_id, sponsor_decision_id=sponsor.id,
+        researcher_decision_id=accepted.id)
+
+
+def research_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+    return (DiscretionaryAdapter(
+        name="research", family="production", options_fn=research_options,
+        label_fn=lambda option: f"Financiar pesquisa de {option.technology_id} com {option.researcher_id}.",
+        causes_fn=_research_causes, execute_fn=execute_research_option),)
 
 
 def review_research(world):
@@ -25,6 +139,8 @@ def review_research(world):
 
 
 def _propose_research(world):
+    if world.config.ai_enabled:
+        return
     economy = world.economy
     for site in sorted(world.map.infrastructure_sites.values(), key=lambda s: s.id):
         owner = site.owner_ref
@@ -64,6 +180,12 @@ def _propose_research(world):
 
 
 def _apply_known_techniques(world):
+    # In provider-enabled worlds, applying a known technique is offered as a
+    # production affordance in the composed civil menu.  Keep this fallback
+    # only for deterministic/offline worlds; otherwise it would bypass the
+    # actor's monthly choice and create a second technology planner.
+    if world.config.ai_enabled:
+        return
     from .expansion import start_expansion
     from .industrial_lines import line_exists_or_planned
     economy = world.economy
@@ -79,6 +201,8 @@ def _apply_known_techniques(world):
             target = blueprint.additional_recipe_id or blueprint.to_recipe_id
             site = world.map.infrastructure_sites[facility.site_id]
             if (not target or economy.recipes[target].capability_id not in site.capability_ids
+                    or any(capability not in site.capability_ids
+                           for capability in blueprint.required_site_capabilities)
                     or not site.enabled or site.integrity <= 0
                     or line_exists_or_planned(economy, facility, blueprint)):
                 continue

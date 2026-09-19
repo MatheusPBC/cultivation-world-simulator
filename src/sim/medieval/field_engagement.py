@@ -11,6 +11,7 @@ from src.classes.governance.models import FieldEngagementOfferNotice, FieldEngag
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import FieldEngagement
 from src.classes.society.models import Identity
+from src.classes.environment.tile import TileType
 from src.systems.calendar_agenda import ScheduledSituation
 
 from .economy import _causes, _delta
@@ -57,6 +58,17 @@ def _supplied(detachment):
 def _prepared(world, detachment):
     position = world.society.force_positions.get(_position_id(detachment.id))
     return position is not None and position.stage == "prepared"
+
+
+def _military_training_bonus(world, detachment):
+    """Return the bounded effect of a learned field-training technology."""
+    trained = sum(
+        knowledge.owner_ref == detachment.owner_ref
+        and (technology := world.research.technologies.get(knowledge.technology_id)) is not None
+        and technology.capability_id == "military_training"
+        for knowledge in world.knowledge.technologies.values()
+    )
+    return min(2, trained)
 
 
 def _sighting_current(world, notice):
@@ -179,7 +191,8 @@ def field_strength(world, detachment):
     doctrine = effective_doctrine(world, detachment.id)
     prepared_bonus = 2 if doctrine == "hold" else 0 if doctrine == "press" else 1
     supplied_bonus = 2 if doctrine == "press" else 0 if doctrine == "hold" else 1
-    return detachment.count * (2 + int(prepared) * prepared_bonus + int(supplied) * supplied_bonus), prepared, supplied
+    training_bonus = _military_training_bonus(world, detachment)
+    return detachment.count * (2 + training_bonus + int(prepared) * prepared_bonus + int(supplied) * supplied_bonus), prepared, supplied
 
 
 def _engagement_strength(world, detachment):
@@ -189,7 +202,56 @@ def _engagement_strength(world, detachment):
     if doctrine == "press" and prepared:
         prepared = False
         strength = detachment.count * (2 + 2 * int(supplied))
-    return strength, prepared, supplied, doctrine
+    terrain = _terrain_modifier(world, detachment.location_id, doctrine)
+    fatigue = _fatigue_level(world, detachment)
+    morale = _morale_level(prepared=prepared, supplied=supplied, fatigue=fatigue)
+    strength = max(1, strength + detachment.count * (terrain - fatigue + morale - 1))
+    return strength, prepared, supplied, doctrine, morale
+
+
+def _morale_level(*, prepared, supplied, fatigue):
+    """Bounded material morale reading used only by field resolution.
+
+    Morale is not a personality label and is never selected by a provider.  It
+    is the current tactical posture: a supplied, prepared column starts high;
+    missing provisions and prolonged deployment lower it.  The value is kept
+    deliberately small so it cannot become a hidden second combat system.
+    """
+    value = 1 + int(supplied) + int(prepared) - min(2, fatigue)
+    return max(0, min(2, value))
+
+
+def _terrain_modifier(world, settlement_id, doctrine):
+    """Bounded Map-owned reading of the physical ground under a clash.
+
+    It is deliberately derived from existing geography, never selected by an
+    actor or inferred from prose.  Plain/urban ground is neutral; forest,
+    mountain and marsh favour a prepared hold, while open grassland/farm
+    favours a prepared press.  A missing footprint is neutral rather than a
+    hidden assumption.
+    """
+    settlement = world.society.settlements.get(settlement_id)
+    if settlement is None:
+        return 0
+    coordinates = world.map._region_coordinates(settlement.region_id)
+    terrain = [world.map.get_terrain(*coordinate) for coordinate in coordinates]
+    terrain = [item for item in terrain if item is not None]
+    if not terrain:
+        return 0
+    difficult = sum(item in {TileType.FOREST, TileType.MOUNTAIN, TileType.SWAMP, TileType.MARSH}
+                    for item in terrain)
+    open_ground = sum(item in {TileType.PLAIN, TileType.GRASSLAND, TileType.FARM}
+                      for item in terrain)
+    if difficult <= len(terrain) // 2 and open_ground <= len(terrain) // 2:
+        return 0
+    if difficult > open_ground:
+        return 1 if doctrine == "hold" else -1
+    return 1 if doctrine == "press" else 0
+
+
+def _fatigue_level(world, detachment):
+    """A small deterministic fatigue reading from uninterrupted deployment."""
+    return min(2, max(0, (world.clock.absolute_day - detachment.started_day) // 30))
 
 
 def _pre_offer_contact(world, engagement, detachment, counterparty_ref):
@@ -366,10 +428,17 @@ def join_field_engagement(world, actor, option_id, decision_event_id):
                None, f"columns={len(defender_columns)};count={defender_count};strength={defender_strength}"),
     ]
     for side, terms in (("challenger", challenger_terms), ("defender", defender_terms)):
-        for detachment, strength, prepared, supplied, doctrine in terms:
+        for detachment, strength, prepared, supplied, doctrine, morale in terms:
             deltas.append(_delta(
                 "field_engagement", engagement.id, f"{side}_column:{detachment.id}", None,
                 f"count={detachment.count};prepared={prepared};supplied={supplied};doctrine={doctrine};strength={strength}"))
+            deltas.extend((
+                _delta("field_engagement", engagement.id, f"terrain_modifier:{detachment.id}", None,
+                       _terrain_modifier(candidate, detachment.location_id, doctrine)),
+                _delta("field_engagement", engagement.id, f"fatigue_level:{detachment.id}", None,
+                       _fatigue_level(candidate, detachment)),
+                _delta("field_engagement", engagement.id, f"morale_level:{detachment.id}", None, morale),
+            ))
     for group_id, loss in sorted(group_losses.items()):
         if loss:
             group = groups[group_id]

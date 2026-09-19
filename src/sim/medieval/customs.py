@@ -1,11 +1,12 @@
-"""Material civil customs: presentation, declaration or attempted evasion.
+"""Material civil customs: presentation, declaration, evasion and seizure.
 
-This deliberately models neither blockade nor confiscation.  A checkpoint
-holds one parcel while its owner decides, and never changes ownership, route
-topology, quantity, or the parcel's agreed destination.
+A checkpoint holds one parcel while its owner or operator decides. Every
+resolution is explicit and revalidated; no policy silently changes ownership,
+route topology, quantity, or the parcel's agreed destination.
 """
 
 import math
+from copy import deepcopy
 
 from src.classes.economy.customs import CargoManifest, CustomsCheckpoint
 from src.classes.economy.models import MoneyAccount, Payroll
@@ -29,6 +30,14 @@ CUSTOMS_INSPECTIONS_PER_STAFF_PER_DAY = 2
 CUSTOMS_DETECTION_PERMILLE = 350
 
 
+def cargo_classification(world, resource_id):
+    """Return the authored trade class; actors cannot label cargo in prose."""
+    resource = world.economy.resources.get(resource_id)
+    if resource is None:
+        raise ValueError("customs cargo resource is unknown")
+    return resource.trade_class
+
+
 def _current_cycle(day):
     """A payroll at the month boundary staffs the following dated cycle."""
     return day // 30
@@ -45,9 +54,7 @@ class CustomsOpenOption(SocietyValue):
 
     def decision(self):
         return {"action": "open_customs_checkpoint", "actor_ref": self.actor_ref.to_dict(),
-                "option_id": self.id, "site_id": self.site_id, "account_id": self.account_id,
-                "staff_group_id": self.staff_group_id, "staff_count": self.staff_count,
-                "fee_per_bulk": self.fee_per_bulk}
+                "selected_affordance_id": self.id}
 
 
 class CustomsPaymentOption(SocietyValue):
@@ -61,8 +68,7 @@ class CustomsPaymentOption(SocietyValue):
 
     def decision(self):
         return {"action": "pay_customs_fee", "actor_ref": self.actor_ref.to_dict(),
-                "option_id": self.id, "notice_id": self.notice_id, "parcel_id": self.parcel_id,
-                "checkpoint_id": self.checkpoint_id, "account_id": self.account_id, "fee": self.fee}
+                "selected_affordance_id": self.id}
 
 
 class CustomsCargoOption(SocietyValue):
@@ -82,10 +88,30 @@ class CustomsCargoOption(SocietyValue):
     quantity: int
 
     def decision(self):
-        return {"action": self.action, "actor_ref": self.actor_ref.to_dict(), "option_id": self.id,
-                "notice_id": self.notice_id, "checkpoint_id": self.checkpoint_id,
-                "parcel_id": self.parcel_id, "order_id": self.order_id,
-                "resource_id": self.resource_id, "quantity": self.quantity}
+        return {"action": self.action, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+class CustomsSeizureOption(SocietyValue):
+    """An operator's explicit seizure of detected restricted cargo.
+
+    Detection is evidence, not confiscation.  The checkpoint owner must make a
+    fresh material decision, and the seized goods enter one of its own local
+    stocks only when there is real storage capacity.
+    """
+    id: Identity
+    notice_id: Identity
+    checkpoint_id: Identity
+    parcel_id: Identity
+    order_id: Identity
+    actor_ref: EntityRef
+    destination_stock_id: Identity
+    resource_id: Identity
+    quantity: int
+
+    def decision(self):
+        return {"action": "seize_contraband_cargo", "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 def _local_staff(world, site, actor):
@@ -132,6 +158,11 @@ def _event(world, event_id):
     return next((event for event in world.events if event.id == event_id), None)
 
 
+def _decision_causes(decision):
+    """Keep both the owner authorization and the actor's selected ID causal."""
+    return (decision.id, *(link.cause_event_id for link in decision.causal_links))
+
+
 def open_customs_checkpoint(world, option_id, *, decision_event_id):
     decision = _event(world, decision_event_id)
     payload = decision.decision if decision is not None else None
@@ -139,11 +170,24 @@ def open_customs_checkpoint(world, option_id, *, decision_event_id):
         actor = EntityRef.from_dict(payload.get("actor_ref")) if isinstance(payload, dict) else None
     except (KeyError, TypeError, ValueError):
         actor = None
+    selected_id = payload.get("selected_affordance_id") if isinstance(payload, dict) else None
     site_id = payload.get("site_id") if isinstance(payload, dict) else None
-    option = next((item for item in customs_open_options(world, site_id, actor) if item.id == option_id), None)
+    candidates = (customs_open_options(world, site_id, actor) if site_id is not None
+                  else tuple(option for site in world.map.infrastructure_sites.values()
+                              for option in customs_open_options(world, site.id, actor)))
+    option = next((item for item in candidates if item.id == option_id == selected_id), None)
     if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs opening option is stale")
+    authorization = record_event(
+        world, "customs_open_authorized", "O owner autorizou a abertura do posto escolhido.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "open_customs_checkpoint", "actor_ref": option.actor_ref.to_dict(),
+                  "option_id": option.id, "site_id": option.site_id, "account_id": option.account_id,
+                  "staff_group_id": option.staff_group_id, "staff_count": option.staff_count,
+                  "fee_per_bulk": option.fee_per_bulk},
+        cause_ids=(decision.id,))
+    decision = authorization
     if any(event.event_type == "customs_opened" and any(link.cause_event_id == decision.id for link in event.causal_links)
            for event in world.events):
         raise ValueError("customs opening decision already executed")
@@ -165,7 +209,7 @@ def open_customs_checkpoint(world, option_id, *, decision_event_id):
     event = record_event(world, "customs_opened", f"{site.name}: posto alfandegário civil aberto.",
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("customs_checkpoint", checkpoint.id, "opened", False, True),),
-                         cause_ids=_causes(decision.id, site.last_event_id, account.last_event_id, staff.last_event_id))
+                         cause_ids=_causes(*_decision_causes(decision), site.last_event_id, account.last_event_id, staff.last_event_id))
     world.economy.customs_checkpoints[checkpoint.id] = checkpoint.model_copy(update={"last_event_id": event.id})
     return event
 
@@ -268,6 +312,7 @@ def inspect_waiting_parcel(world, parcel, route_id):
     if notice_id in world.knowledge.customs_notices:
         return None
     order = world.economy.freight_orders[parcel.order_id]
+    classification = cargo_classification(world, order.resource_id)
     updated = parcel.model_copy(update={"stage": "held", "held_checkpoint_id": checkpoint.id,
                                         "held_notice_id": notice_id})
     event = record_event(
@@ -278,6 +323,7 @@ def inspect_waiting_parcel(world, parcel, route_id):
             _delta("cargo", parcel.id, "held_checkpoint_id", parcel.held_checkpoint_id, updated.held_checkpoint_id),
             _delta("cargo", parcel.id, "held_notice_id", parcel.held_notice_id, updated.held_notice_id),
             _delta("customs_notice", notice_id, "state", None, "presented"),
+            _delta("customs_notice", notice_id, "classification", None, classification),
         ),
         cause_ids=_causes(parcel.last_event_id, order.last_event_id, checkpoint.last_event_id,
                            world.map.infrastructure_sites[checkpoint.site_id].last_event_id),
@@ -287,6 +333,7 @@ def inspect_waiting_parcel(world, parcel, route_id):
     world.knowledge.customs_notices[notice_id] = CustomsNotice(
         id=notice_id, checkpoint_id=checkpoint.id, parcel_id=parcel.id, order_id=order.id,
         resource_id=order.resource_id, quantity=parcel.quantity, recipient_ref=order.owner_ref,
+        classification=classification,
         learned_day=world.clock.absolute_day, event_id=event.id, state_event_id=event.id, state="presented",
     )
     return event
@@ -302,6 +349,23 @@ def _matching_held_notice(world, notice):
             or order.resource_id != notice.resource_id or parcel.quantity != notice.quantity):
         return None
     return parcel, order, checkpoint
+
+
+def _contraband_returnable(world, parcel, order):
+    """A return is material only while the original physical path is usable."""
+    source = world.economy.stocks.get(order.source_id)
+    resource = world.economy.resources.get(order.resource_id)
+    if source is None or resource is None:
+        return False
+    capacity = world.economy.used_capacity(source)
+    if capacity + parcel.quantity * resource.bulk > source.capacity:
+        return False
+    return bool(order.route_ids) and all(
+        route_id in world.map.routes
+        and world.map.routes[route_id].allows_resource(order.resource_id)
+        and world.map.get_route_operational_capacity(route_id) > 0
+        for route_id in order.route_ids
+    )
 
 
 def customs_cargo_options(world, actor_ref):
@@ -330,15 +394,59 @@ def customs_cargo_options(world, actor_ref):
             continue
         common = (f":{notice.id}:{parcel.last_event_id}:{checkpoint.last_event_id}:"
                   f"{checkpoint.inspection_day}:{checkpoint.inspection_slots_used}:{world.clock.absolute_day}")
-        if notice.state in {"presented", "detected"} and notice.manifest_id is None:
+        if (notice.classification == "ordinary"
+                and notice.state in {"presented", "detected"} and notice.manifest_id is None):
             options.append(CustomsCargoOption(
                 id=f"customs-declare{common}", action="declare_customs_manifest", notice_id=notice.id,
                 checkpoint_id=checkpoint.id, parcel_id=parcel.id, order_id=order.id, actor_ref=actor_ref,
                 resource_id=order.resource_id, quantity=parcel.quantity))
-        if notice.state == "presented" and first_presented.get(checkpoint.id) == notice.id:
+        if (notice.classification == "ordinary" and notice.state == "presented"
+                and first_presented.get(checkpoint.id) == notice.id):
             options.append(CustomsCargoOption(
                 id=f"customs-evade{common}", action="attempt_customs_fee_evasion", notice_id=notice.id,
                 checkpoint_id=checkpoint.id, parcel_id=parcel.id, order_id=order.id, actor_ref=actor_ref,
+                resource_id=order.resource_id, quantity=parcel.quantity))
+        if (notice.classification == "contraband" and notice.state in {"presented", "detected"}
+                and notice.manifest_id is None and _contraband_returnable(world, parcel, order)):
+            options.append(CustomsCargoOption(
+                id=f"customs-return-contraband{common}:{order.source_id}:{order.last_event_id}",
+                action="return_contraband_cargo", notice_id=notice.id,
+                checkpoint_id=checkpoint.id, parcel_id=parcel.id, order_id=order.id, actor_ref=actor_ref,
+                resource_id=order.resource_id, quantity=parcel.quantity))
+    return tuple(options)
+
+
+def customs_seizure_options(world, actor_ref):
+    """Recompose only detected contraband for the checkpoint's operator."""
+    if (not isinstance(actor_ref, EntityRef)
+            or not all(can_actor_act_for(world, actor_ref, actor_ref, scope)
+                       for scope in ("supply", "trade", "taxation"))):
+        return ()
+    options = []
+    for notice in sorted(world.knowledge.customs_notices.values(), key=lambda item: item.id):
+        if notice.classification != "contraband" or notice.state not in {"presented", "detected"}:
+            continue
+        linked = _matching_held_notice(world, notice)
+        if linked is None:
+            continue
+        parcel, order, checkpoint = linked
+        if checkpoint.operator_ref != actor_ref or not checkpoint_active(world, checkpoint):
+            continue
+        site = world.map.infrastructure_sites.get(checkpoint.site_id)
+        resource = world.economy.resources.get(order.resource_id)
+        if site is None or resource is None:
+            continue
+        for stock in sorted(world.economy.stocks.values(), key=lambda item: item.id):
+            settlement = world.society.settlements.get(stock.location_id)
+            if (stock.owner_ref != actor_ref or settlement is None
+                    or settlement.region_id not in site.region_ids
+                    or world.economy.used_capacity(stock) + parcel.quantity * resource.bulk > stock.capacity):
+                continue
+            options.append(CustomsSeizureOption(
+                id=(f"customs-seize:{notice.id}:{checkpoint.last_event_id}:{parcel.last_event_id}:"
+                    f"{stock.id}:{stock.last_event_ids.get(order.resource_id)}"),
+                notice_id=notice.id, checkpoint_id=checkpoint.id, parcel_id=parcel.id,
+                order_id=order.id, actor_ref=actor_ref, destination_stock_id=stock.id,
                 resource_id=order.resource_id, quantity=parcel.quantity))
     return tuple(options)
 
@@ -355,7 +463,20 @@ def _decision_option(world, option_id, decision_event_id, action):
     if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs cargo option is stale")
-    if any(event.event_type in {"cargo_manifest_declared", "customs_fee_evaded", "customs_fee_evasion_detected"}
+    # The actor-facing turn contains only the selected affordance ID.  Preserve
+    # the exact cargo terms in a separate owner authorization so historical
+    # validation never needs to treat provider input as material truth.
+    authorization = record_event(
+        world, "customs_action_authorized", "O proprietário autorizou a resolução alfandegária escolhida.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": action, "actor_ref": actor.to_dict(),
+                  "notice_id": option.notice_id, "checkpoint_id": option.checkpoint_id,
+                  "parcel_id": option.parcel_id, "order_id": option.order_id,
+                  "resource_id": option.resource_id, "quantity": option.quantity},
+        cause_ids=(decision.id,))
+    decision = authorization
+    if any(event.event_type in {"cargo_manifest_declared", "customs_fee_evaded", "customs_fee_evasion_detected",
+                                "contraband_returned"}
            and any(link.cause_event_id == decision.id for link in event.causal_links) for event in world.events):
         raise ValueError("customs cargo decision already executed")
     require_authority(world, option.actor_ref, "trade")
@@ -389,12 +510,114 @@ def declare_customs_manifest(world, option_id, *, decision_event_id):
             _delta("customs_notice", notice.id, "fee", notice.fee, fee),
             _delta("customs_notice", notice.id, "manifest_id", notice.manifest_id, manifest.id),
         ),
-        cause_ids=_causes(decision.id, notice.event_id, notice.state_event_id, parcel.last_event_id,
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
                           order.last_event_id, checkpoint.last_event_id),
     )
     world.economy.cargo_manifests[manifest.id] = manifest.model_copy(update={"event_id": event.id})
     world.knowledge.customs_notices[notice.id] = notice.model_copy(
         update={"state": "fee_due", "fee": fee, "manifest_id": manifest.id, "state_event_id": event.id})
+    return event
+
+
+def return_contraband_cargo(world, option_id, *, decision_event_id):
+    """Return a held restricted parcel to its original stock by explicit choice."""
+    candidate = deepcopy(world)
+    option, decision, parcel, order, checkpoint = _decision_option(
+        candidate, option_id, decision_event_id, "return_contraband_cargo")
+    notice = candidate.knowledge.customs_notices[option.notice_id]
+    if notice.classification != "contraband" or notice.state not in {"presented", "detected"}:
+        raise ValueError("contraband return is no longer available")
+    if not _contraband_returnable(candidate, parcel, order):
+        raise ValueError("contraband return no longer has a usable route or source capacity")
+    source = candidate.economy.stocks[order.source_id]
+    before = source.goods.get(order.resource_id, 0)
+    resolved = order.resolved_quantity + parcel.quantity
+    event = record_event(
+        candidate, "contraband_returned", "A carga classificada como contrabando retornou ao estoque de origem.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(
+            _delta("stock", source.id, order.resource_id, before, before + parcel.quantity),
+            _delta("cargo", parcel.id, "quantity", parcel.quantity, 0),
+            _delta("freight", order.id, "resolved_quantity", order.resolved_quantity, resolved),
+            _delta("customs_notice", notice.id, "state", notice.state, "returned"),
+        ),
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
+                          order.last_event_id, checkpoint.last_event_id, source.last_event_ids.get(order.resource_id)),
+    )
+    candidate.economy.stocks[source.id] = source.model_copy(update={
+        "goods": {**source.goods, order.resource_id: before + parcel.quantity},
+        "last_event_ids": {**source.last_event_ids, order.resource_id: event.id},
+    })
+    candidate.economy.parcels.pop(parcel.id)
+    candidate.economy.freight_orders[order.id] = order.model_copy(update={
+        "resolved_quantity": resolved, "resolution_event_id": event.id, "last_event_id": event.id,
+    })
+    candidate.knowledge.customs_notices[notice.id] = notice.model_copy(
+        update={"state": "returned", "state_event_id": event.id})
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return event
+
+
+def seize_contraband_cargo(world, option_id, *, decision_event_id):
+    """Materially confiscate detected contraband into the operator's stock."""
+    candidate = deepcopy(world)
+    decision = _event(candidate, decision_event_id)
+    payload = decision.decision if decision is not None else None
+    try:
+        actor = EntityRef.from_dict(payload.get("actor_ref")) if isinstance(payload, dict) else None
+    except (KeyError, TypeError, ValueError):
+        actor = None
+    option = next((item for item in customs_seizure_options(candidate, actor) if item.id == option_id), None)
+    if (decision is None or decision.day != candidate.clock.absolute_day
+            or decision.fact_kind != FactKind.DECISION or option is None
+            or decision.decision != option.decision()):
+        raise ValueError("customs seizure option is stale")
+    require_authority(candidate, actor, "supply")
+    require_authority(candidate, actor, "trade")
+    require_authority(candidate, actor, "taxation")
+    notice = candidate.knowledge.customs_notices[option.notice_id]
+    linked = _matching_held_notice(candidate, notice)
+    if linked is None or notice.classification != "contraband" or notice.state not in {"presented", "detected"}:
+        raise ValueError("contraband seizure is no longer available")
+    parcel, order, checkpoint = linked
+    if checkpoint.operator_ref != actor or not checkpoint_active(candidate, checkpoint):
+        raise ValueError("customs seizure operator mismatch")
+    destination = candidate.economy.stocks.get(option.destination_stock_id)
+    resource = candidate.economy.resources.get(order.resource_id)
+    site = candidate.map.infrastructure_sites.get(checkpoint.site_id)
+    settlement = candidate.society.settlements.get(destination.location_id) if destination else None
+    if (destination is None or destination.owner_ref != actor or resource is None or site is None
+            or settlement is None or settlement.region_id not in site.region_ids
+            or candidate.economy.used_capacity(destination) + parcel.quantity * resource.bulk > destination.capacity):
+        raise ValueError("customs seizure destination is no longer valid")
+    before = destination.goods.get(order.resource_id, 0)
+    resolved = order.resolved_quantity + parcel.quantity
+    event = record_event(
+        candidate, "contraband_seized", "A alfândega apreendeu contrabando detectado e o recolheu ao estoque civil.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("stock", destination.id, order.resource_id, before, before + parcel.quantity),
+                _delta("cargo", parcel.id, "quantity", parcel.quantity, 0),
+                _delta("freight", order.id, "resolved_quantity", order.resolved_quantity, resolved),
+                _delta("customs_notice", notice.id, "state", notice.state, "seized")),
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
+                          order.last_event_id, checkpoint.last_event_id, destination.last_event_ids.get(order.resource_id)),
+    )
+    candidate.economy.stocks[destination.id] = destination.model_copy(update={
+        "goods": {**destination.goods, order.resource_id: before + parcel.quantity},
+        "last_event_ids": {**destination.last_event_ids, order.resource_id: event.id},
+    })
+    candidate.economy.parcels.pop(parcel.id)
+    candidate.economy.freight_orders[order.id] = order.model_copy(update={
+        "resolved_quantity": resolved, "resolution_event_id": event.id, "last_event_id": event.id,
+    })
+    candidate.knowledge.customs_notices[notice.id] = notice.model_copy(update={
+        "state": "seized", "state_event_id": event.id,
+    })
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
     return event
 
 
@@ -412,7 +635,7 @@ def _release_undetected(world, notice, parcel, order, checkpoint, decision, *, i
             _delta("cargo", parcel.id, "held_notice_id", parcel.held_notice_id, None),
             _delta("customs_notice", notice.id, "state", notice.state, "evaded_undetected"),
         ),
-        cause_ids=_causes(decision.id, notice.event_id, notice.state_event_id, parcel.last_event_id,
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
                           order.last_event_id, checkpoint.last_event_id, *cause_ids),
     )
     world.economy.parcels[parcel.id] = updated.model_copy(update={"last_event_id": event.id})
@@ -476,7 +699,7 @@ def attempt_customs_fee_evasion(world, option_id, *, decision_event_id):
         world, "customs_fee_evasion_detected", "A tentativa de evitar a taxa civil foi detectada no posto.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(*deltas, _delta("customs_notice", notice.id, "state", notice.state, "detected")),
-        cause_ids=_causes(decision.id, notice.event_id, notice.state_event_id, parcel.last_event_id,
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
                           order.last_event_id, checkpoint.last_event_id),
     )
     world.economy.customs_checkpoints[checkpoint.id] = updated_checkpoint.model_copy(update={"last_event_id": event.id})
@@ -521,6 +744,15 @@ def pay_customs_fee(world, option_id, *, decision_event_id):
     if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs payment option is stale")
+    authorization = record_event(
+        world, "customs_payment_authorized", "O proprietário autorizou o pagamento alfandegário escolhido.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "pay_customs_fee", "actor_ref": actor.to_dict(),
+                  "notice_id": option.notice_id, "parcel_id": option.parcel_id,
+                  "checkpoint_id": option.checkpoint_id, "account_id": option.account_id,
+                  "fee": option.fee},
+        cause_ids=(decision.id,))
+    decision = authorization
     if decision.id in world.economy.payments:
         raise ValueError("customs payment decision already executed")
     require_authority(world, option.actor_ref, "trade")
@@ -554,7 +786,7 @@ def pay_customs_fee(world, option_id, *, decision_event_id):
             _delta("cargo", parcel.id, "held_notice_id", parcel.held_notice_id, None),
             _delta("customs_notice", notice.id, "state", notice.state, "cleared"),
         ),
-        cause_ids=_causes(decision.id, notice.event_id, parcel.last_event_id, order.last_event_id,
+        cause_ids=_causes(*_decision_causes(decision), notice.event_id, parcel.last_event_id, order.last_event_id,
                            checkpoint.last_event_id, account.last_event_id, collector.last_event_id),
     )
     for account_id, change in account_changes.items():
@@ -572,5 +804,6 @@ def pay_customs_fee(world, option_id, *, decision_event_id):
 __all__ = ["CUSTOMS_DETECTION_PERMILLE", "CUSTOMS_FEE_PER_BULK", "CUSTOMS_INSPECTIONS_PER_STAFF_PER_DAY",
            "CUSTOMS_SITE_KINDS", "CUSTOMS_STAFF_WAGE", "CustomsCargoOption", "CustomsOpenOption",
            "CustomsPaymentOption", "attempt_customs_fee_evasion", "checkpoint_active", "customs_cargo_options",
-           "customs_fee", "customs_open_options", "customs_payment_options", "declare_customs_manifest",
+           "customs_fee", "customs_open_options", "customs_payment_options", "customs_seizure_options",
+           "cargo_classification", "declare_customs_manifest", "return_contraband_cargo", "seize_contraband_cargo",
            "inspect_waiting_parcel", "open_customs_checkpoint", "pay_customs_fee", "staff_customs_checkpoints"]

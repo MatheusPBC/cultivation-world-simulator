@@ -92,6 +92,35 @@ async def test_a_river_crossing_is_perceived_and_a_tribute_settles_the_demand(tm
     restored = load_world(path)
     assert world_snapshot(restored) == world_snapshot(world)
     assert restored.creatures.creatures[DRAKE_ID] == world.creatures.creatures[DRAKE_ID]
+    remembered = restored.creatures.creatures[DRAKE_ID].memory_event_ids
+    assert any(item.event_type == "creature_perceived_cargo" and item.id in remembered
+               for item in restored.events)
+    assert any(item.event_type == "creature_tribute_delivered"
+               and item.id in remembered for item in restored.events)
+
+
+async def test_partial_tribute_keeps_demand_open_and_can_be_completed():
+    world = await crossed_world()
+    request = pick(world, "request", route_id=ROUTE_ID)
+    execute_creature_option(world, DRAKE_ID, request.id, decide(world, request).id)
+    demand = next(iter(world.creatures.demands.values()))
+    partial = next(item for item in tribute_options(world, AUREN)
+                   if item.stock_id == SELLER_STOCK and item.food < demand.food)
+    before = world.economy.stocks[SELLER_STOCK].goods["food"]
+    offer_creature_tribute(world, AUREN, partial.id, decide(world, partial).id)
+
+    pending = world.creatures.demands[demand.id]
+    assert pending.stage == "open"
+    assert pending.food_received == partial.food
+    assert pending.settled_by_ref is None
+    assert world.economy.stocks[SELLER_STOCK].goods["food"] == before - partial.food
+
+    remaining = next(item for item in tribute_options(world, AUREN)
+                     if item.stock_id == SELLER_STOCK and item.food == demand.food - partial.food)
+    settled = offer_creature_tribute(world, AUREN, remaining.id, decide(world, remaining).id)
+    assert settled.stage == "satisfied"
+    assert settled.food_received == demand.food
+    assert settled.settled_by_ref == AUREN.to_dict()
 
 
 async def test_an_unanswered_demand_only_closes_the_river_by_explicit_decision():

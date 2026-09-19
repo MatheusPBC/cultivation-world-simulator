@@ -1,7 +1,11 @@
 Você é o cronista do mundo. Escreva um capítulo curto usando somente os fatos estruturados abaixo.
 Não invente fatos. Cada parágrafo deve declarar source_event_ids e toda referência deve usar apenas IDs fornecidos abaixo.
 Retorne JSON: {{"title":"...","paragraphs":[{{"source_event_ids":["event-id"],"segments":[{{"text":"texto comum","reference":null}},{{"text":"Nome Exato","reference":{{"id":"referencia-unica","kind":"avatar","label":"Nome Exato","target_id":"avatar-id","claim_kind":null,"source_event_ids":["event-id"]}}}}]}}]}}.
-Janela {start_month_stamp} a {end_month_stamp}, gatilho {trigger}.
+Janela canônica: {start_date} a {end_date}. Os campos numéricos
+start_month_stamp/end_month_stamp são cursores internos e nunca devem ser
+tratados como anos. Cada fato também traz sua data humana em `date`; use essa
+data quando mencionar ano ou mês.
+Gatilho: {trigger}.
 Fatos candidatos: {events}
 Separe cada nome exato de avatar, seita ou região em seu próprio segmento com referência. Referências de entidade usam somente IDs existentes em entities: avatar/sect/region preenchem target_id e claim_kind null. Referências event usam apenas IDs de events, preenchem claim_kind (fact ou inference), fact exige target_id presente em seus source_event_ids e inference exige target_id null. Cada id de referência deve ser único.
 Entidades disponíveis: {entities}

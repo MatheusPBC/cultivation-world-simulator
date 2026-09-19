@@ -1,18 +1,24 @@
 """Focused causal coverage for local economic workforce transitions."""
 
 import copy
+from types import SimpleNamespace
 
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import produce_monthly
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
+from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.workforce import (accept_workforce_transition, labor_shortfall, refresh_workforce_notices,
-                                         resolve_workforce_transitions, workforce_transition_options)
+                                         WorkforceTransitionOption, resolve_workforce_transitions, workforce_adapters,
+                                         workforce_transition_options)
+from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+from src.sim.medieval import ai_decider
 
 
 CUSTOMS_SITE = "passagem-negra"
@@ -28,7 +34,8 @@ def labour_limited_world():
     world.economy.recipes[recipe.id] = recipe.model_copy(update={"occupation": "artisan"})
     produce_monthly(world)
     refresh_workforce_notices(world)
-    notice = next(iter(world.knowledge.workforce_offer_notices.values()))
+    notice = next(item for item in world.knowledge.workforce_offer_notices.values()
+                  if item.demand_id.endswith(facility.id))
     group = world.society.population[notice.source_group_id]
     options = workforce_transition_options(world, group.id)
     assert len(options) == 1
@@ -39,6 +46,26 @@ def decide(world, option):
     notice = world.knowledge.workforce_offer_notices[option.notice_id]
     return record_event(world, "workforce_transition_decided", "O grupo avaliou sua oferta local.",
                         fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,))
+
+
+@pytest.mark.asyncio
+async def test_population_group_can_choose_workforce_offer_from_the_composed_turn(monkeypatch):
+    world, group, _facility, option = labour_limited_world()
+    actor = EntityRef("population_group", group.id)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr(ai_decider, "within_budget", lambda _world: True)
+    async def choose(*_args, **_kwargs):
+        return option.id
+    monkeypatch.setattr(ai_decider, "select_option", choose)
+
+    _claims, covered = await review_institutional_decision_turn(world, actor, workforce_adapters())
+
+    assert covered is True
+    assert len(world.society.workforce_transitions) == 1
+    transition = next(iter(world.society.workforce_transitions.values()))
+    assert transition.source_group_id == group.id
+    assert transition.decision_event_id in {event.id for event in world.events
+                                            if event.event_type == "institutional_decision_turn_decided"}
 
 
 def test_local_transition_is_dated_conservative_and_causally_material(tmp_path):
@@ -60,6 +87,7 @@ def test_local_transition_is_dated_conservative_and_causally_material(tmp_path):
     start = next(event for event in world.events if event.event_type == "workforce_transition_started")
     assert start.fact_kind == FactKind.STATE_TRANSITION
     assert any(link.cause_event_id == transition.decision_event_id for link in start.causal_links)
+
 
     path = tmp_path / "mid-transition.mws"
     save_world(world, path)
@@ -146,7 +174,10 @@ def test_a_superseded_offer_is_withdrawn_by_a_fact_not_deleted_silently():
     assert shortfall is not None and shortfall > 0, "production must restate the material labour shortfall"
     refresh_workforce_notices(world)
 
-    retraction = next(event for event in world.events if event.event_type == "workforce_offer_retracted")
+    retraction = next(event for event in world.events
+                      if event.event_type == "workforce_offer_retracted"
+                      and any(delta.owner_kind == "workforce_offer" and delta.owner_id == notice.id
+                              for delta in event.deltas))
     assert retraction.fact_kind == FactKind.STATE_TRANSITION
     assert any(delta.owner_kind == "workforce_offer" and delta.owner_id == notice.id
                and delta.aspect == "observation" and delta.before == superseded and delta.after == "None"
@@ -171,8 +202,11 @@ def test_a_demand_backing_an_active_transition_is_never_rewritten():
 
     assert world.knowledge.workforce_offer_notices[transition.notice_id] == notice
     assert world.knowledge.workforce_demand_reports[transition.demand_id] == report
-    assert len(world.events) == events, "the committed receipt is neither rewritten nor retracted"
-    assert not any(event.event_type == "workforce_offer_retracted" for event in world.events)
+    assert len(world.events) >= events
+    assert not any(event.event_type == "workforce_offer_retracted"
+                   and any(delta.owner_kind == "workforce_offer" and delta.owner_id == notice.id
+                           for delta in event.deltas)
+                   for event in world.events)
     assert world.society.workforce_transitions[transition.id] == transition
     world.knowledge.validate(world)
     world.society.validate(set(world.map.regions), world)
@@ -194,12 +228,146 @@ def test_the_labour_signal_is_typed_quantified_and_restated_every_cycle():
     assert labour_signal(world, facility) == first
 
 
-def test_no_material_labour_limit_creates_no_private_demand_or_offer():
+def test_agricultural_labour_limit_creates_a_private_return_to_farming_offer():
     world = create_medieval_world(73)
     produce_monthly(world)
     refresh_workforce_notices(world)
-    assert not world.knowledge.workforce_demand_reports
-    assert not world.knowledge.workforce_offer_notices
+    assert {report.target_occupation for report in world.knowledge.workforce_demand_reports.values()} == {"farmer"}
+    assert world.knowledge.workforce_offer_notices
+    assert all(notice.target_occupation != "artisan"
+               for notice in world.knowledge.workforce_offer_notices.values())
+
+
+def test_food_pressure_expands_only_the_engine_owned_farmer_demand():
+    world = create_medieval_world(73)
+    produce_monthly(world)
+    need = world.economy.needs["pedraclara"]
+    world.economy.needs[need.id] = need.model_copy(update={"missing_food": 450})
+    world.clock = world.clock.advance(30)
+    produce_monthly(world)
+    refresh_workforce_notices(world)
+
+    facility = next(item for item in world.economy.facilities.values()
+                    if item.stock_id == need.stock_id and world.economy.recipes[item.recipe_id].occupation == "farmer")
+    report = next(item for item in world.knowledge.workforce_demand_reports.values()
+                  if item.work_id == facility.id)
+    assert report.count >= 50, "450 missing food at 100 per batch requires five authored batches"
+    assert all(notice.count <= world.society.population[notice.source_group_id].count // 2
+               for notice in world.knowledge.workforce_offer_notices.values()
+               if notice.demand_id == report.id)
+
+
+def test_offline_workforce_fallback_prioritizes_farming_when_food_is_missing(monkeypatch):
+    """A hungry group chooses the enumerated food-production offer first."""
+    import src.sim.medieval.workforce as workforce
+
+    world = create_medieval_world(73)
+    refresh_reports(world)
+    group = next(iter(sorted(world.society.population.values(), key=lambda item: item.id)))
+    report = world.knowledge.settlement_report(
+        EntityRef("population_group", group.id), group.settlement_id)
+    world.knowledge.settlement_reports[report.id] = report.model_copy(update={"missing_food": 10})
+
+    farmer_notice = f"notice:{group.id}:farmer"
+    artisan_notice = f"notice:{group.id}:artisan"
+    source_event_id = world.events[-1].id
+    world.knowledge.workforce_offer_notices[farmer_notice] = SimpleNamespace(
+        target_occupation="farmer", event_id=source_event_id)
+    world.knowledge.workforce_offer_notices[artisan_notice] = SimpleNamespace(
+        target_occupation="artisan", event_id=source_event_id)
+    options = (WorkforceTransitionOption(id="option:artisan", notice_id=artisan_notice, group_id=group.id),
+               WorkforceTransitionOption(id="option:farmer", notice_id=farmer_notice, group_id=group.id))
+    chosen = []
+    monkeypatch.setattr(workforce, "workforce_transition_options", lambda _world, _group_id: options)
+    monkeypatch.setattr(workforce, "accept_workforce_transition",
+                        lambda _world, option_id, *, decision_event_id: chosen.append(option_id))
+
+    workforce.review_workforce_transition_fallback(world)
+
+    assert chosen == ["option:farmer"]
+
+
+def test_offline_workforce_fallback_prefers_local_food_production(monkeypatch):
+    """Local subsistence pressure outranks a larger remote offer."""
+    import src.sim.medieval.workforce as workforce
+
+    world = create_medieval_world(73)
+    refresh_reports(world)
+    group = next(item for item in sorted(world.society.population.values(), key=lambda item: item.id)
+                 if item.settlement_id == "pedraclara")
+    report = world.knowledge.settlement_report(
+        EntityRef("population_group", group.id), group.settlement_id)
+    world.knowledge.settlement_reports[report.id] = report.model_copy(update={"missing_food": 10})
+    source_event_id = world.events[-1].id
+    world.knowledge.workforce_offer_notices.update({
+        "notice:local": SimpleNamespace(target_occupation="farmer", demand_id="demand:local",
+                                         event_id=source_event_id, count=10),
+        "notice:remote": SimpleNamespace(target_occupation="farmer", demand_id="demand:remote",
+                                          event_id=source_event_id, count=200),
+    })
+    world.knowledge.workforce_demand_reports.update({
+        "demand:local": SimpleNamespace(work_kind="facility", work_id="site:local"),
+        "demand:remote": SimpleNamespace(work_kind="facility", work_id="site:remote"),
+    })
+    options = (WorkforceTransitionOption(id="option:remote", notice_id="notice:remote", group_id=group.id),
+               WorkforceTransitionOption(id="option:local", notice_id="notice:local", group_id=group.id))
+    chosen = []
+    monkeypatch.setattr(workforce, "workforce_transition_options", lambda _world, _group_id: options)
+    monkeypatch.setattr(workforce, "_work_settlement_id",
+                        lambda _world, _kind, work_id: "pedraclara" if work_id == "site:local" else "campomanso")
+    monkeypatch.setattr(workforce, "accept_workforce_transition",
+                        lambda _world, option_id, *, decision_event_id: chosen.append(option_id))
+
+    workforce.review_workforce_transition_fallback(world)
+
+    assert chosen == ["option:local"]
+
+
+def test_workforce_fallback_covers_actor_skipped_by_provider_budget(monkeypatch):
+    """Provider availability does not suppress an unconsulted actor's safety net."""
+    import src.sim.medieval.workforce as workforce
+
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={"ai_enabled": True})
+    refresh_reports(world)
+    group = next(iter(sorted(world.society.population.values(), key=lambda item: item.id)))
+    report = world.knowledge.settlement_report(
+        EntityRef("population_group", group.id), group.settlement_id)
+    world.knowledge.settlement_reports[report.id] = report.model_copy(update={"missing_food": 10})
+    notice_id = f"notice:{group.id}:farmer"
+    world.knowledge.workforce_offer_notices[notice_id] = SimpleNamespace(
+        target_occupation="farmer", event_id=world.events[-1].id)
+    option = WorkforceTransitionOption(id="option:farmer", notice_id=notice_id, group_id=group.id)
+    chosen = []
+    monkeypatch.setattr(workforce, "workforce_transition_options", lambda _world, _group_id: (option,))
+    monkeypatch.setattr(workforce, "accept_workforce_transition",
+                        lambda _world, option_id, *, decision_event_id: chosen.append(option_id))
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+
+    workforce.review_workforce_transition_fallback(world)
+
+    assert chosen == ["option:farmer"]
+
+
+def test_artisan_can_accept_a_paid_return_to_farming_when_harvest_is_labor_limited():
+    world = create_medieval_world(73)
+    produce_monthly(world)
+    refresh_workforce_notices(world)
+    notice = next(item for item in world.knowledge.workforce_offer_notices.values()
+                  if item.target_occupation == "farmer")
+    group = world.society.population[notice.source_group_id]
+    option = workforce_transition_options(world, group.id)[0]
+    transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
+    assert transition.target_occupation == "farmer"
+    expected = world.knowledge.workforce_demand_reports[notice.demand_id].count
+    assert transition.count == expected
+    world.clock = world.clock.advance(30)
+    resolve_workforce_transitions(world, due_situations(world, transition))
+    assert world.society.population[group.id].occupation == "artisan"
+    target = next(item for item in world.society.population.values()
+                  if item.settlement_id == group.settlement_id and item.people == group.people
+                  and item.occupation == "farmer")
+    assert target.count == expected
 
 
 def test_repair_labour_limit_is_an_equivalent_material_demand_source():
@@ -293,7 +461,7 @@ def test_workforce_receipts_keep_decision_and_prose_out_of_material_owners():
     assert all(link.cause_event_id != decision.id or start.fact_kind == FactKind.STATE_TRANSITION
                for link in start.causal_links)
     # The only quantities are engine-derived receipts, not fields in the group decision.
-    assert set(decision.decision) == {"action", "actor_ref", "notice_id", "option_id"}
+    assert set(decision.decision) == {"action", "actor_ref", "selected_affordance_id"}
 
 
 def test_save_snapshot_rejects_corrupted_transition_provenance():
@@ -463,9 +631,11 @@ def cross_settlement_world():
             world.society.population[candidate.id] = candidate.model_copy(update={"count": named})
     produce_monthly(world)
     refresh_workforce_notices(world)
-    notice = next(iter(world.knowledge.workforce_offer_notices.values()))
+    notice = next(item for item in world.knowledge.workforce_offer_notices.values()
+                  if item.demand_id.endswith(facility.id))
     group = world.society.population[notice.source_group_id]
-    options = workforce_transition_options(world, group.id)
+    options = tuple(item for item in workforce_transition_options(world, group.id)
+                    if item.notice_id == notice.id)
     assert len(options) == 1
     return world, group, facility, options[0], stock.location_id
 

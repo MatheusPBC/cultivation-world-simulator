@@ -53,8 +53,10 @@ acordo alternativo pode recuperar a situação sem uma batalha roteirizada.
 
 Evoluir objetivos e planos verificáveis para proteção, recursos, influência e
 território; integrar barganha autônoma, recusas, contrapartes, compromissos,
-persuasão, informação imperfeita, espionagem, suborno e sabotagem. Traição requer
-obrigação/confiança concreta e descoberta por canal causal.
+persuasão, informação imperfeita, espionagem, suborno e sabotagem. Uma
+investigação atribuída já pode abrir acusação institucional privada, sem culpa
+ou retaliação automática. Traição requer obrigação/confiança concreta e
+descoberta por canal causal.
 
 **Aceite:** uma concessão pode surgir sem batalha; uma quebra deliberada é
 rastreável, tem repercussão futura e não depende de uma cena obrigatória.
@@ -82,8 +84,11 @@ política. QG e comando são capacidades de instituições, não bônus narrativ
 
 Forças/destacamentos V1 já levantam soldados e provisões reais, marcham por rotas,
 registram ocupação revogável e dissolvem com retorno à coorte quando a provisão
-acaba. Batalha, comando, cerco, tática, campanha completa e solução política ainda
-não existem.
+acaba. Comando, doutrina, combate de campo voluntário, abastecimento de campanha,
+interdição de rotas, desescalada e uma guarnição persistente com custo recorrente
+já existem em fatias estreitas e causais. Ainda faltam campanha persistente ampla,
+manutenção militar por objetivos, cerco, controle territorial duradouro e solução
+política geral.
 
 **Aceite:** força menor pode vencer por preparo verificável; mudar terreno,
 informação, moral, fadiga, suprimento ou comando muda a explicação causal do
@@ -98,8 +103,10 @@ recuar ou atacar conforme condições, sem ser uma catástrofe programada.
 
 O WIP já tem ritos restaurativos materiais e um drake autônomo do Rio Lume: ele
 percebe travessias reais, pode pedir tributo/restringir sua própria passagem, e um
-provider pode escolher uma resposta enumerada. Isso é uma vertical estreita, não
-um sistema geral de magia, criaturas, ameaças ou dragões.
+provider pode escolher uma resposta enumerada. Dano de instalação já pode abrir
+uma investigação material pela mesma owner de sabotagem, inclusive quando a causa
+é `creature_damaged_site`. Isso ainda é uma vertical estreita, não um sistema geral
+de magia, criaturas, ameaças ou dragões.
 
 **Aceite:** ameaça ritual e defesa de vila admitem investigação/intervenção real;
 um ataque de criatura afeta pessoas, instalações e decisões posteriores.

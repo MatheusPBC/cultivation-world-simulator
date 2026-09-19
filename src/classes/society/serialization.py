@@ -2,8 +2,13 @@
 
 from .models import Character, Organization, Polity, PopulationGroup, Settlement
 from .force import (AssemblyDenial, Detachment, DetachmentCommand, FieldEngagement, ForcePosition, ForceStandoff,
+                    Garrison, SiegeCampaign,
                     RouteInterdiction, SettlementInvestment)
+from .control import TerritorialControl
 from .civic import CivicProtest
+from .movement import CivicMovement
+from .strike import CivicStrike
+from .amnesty import CivicAmnesty
 from .demography import BirthCohort
 from .migration import MigrationJourney
 from .workforce import WorkforceTransition
@@ -20,12 +25,18 @@ REGISTRIES = {
     "detachments": Detachment,
     "force_standoffs": ForceStandoff,
     "force_positions": ForcePosition,
+    "garrisons": Garrison,
+    "territorial_controls": TerritorialControl,
+    "siege_campaigns": SiegeCampaign,
     "detachment_commands": DetachmentCommand,
     "field_engagements": FieldEngagement,
     "route_interdictions": RouteInterdiction,
     "settlement_investments": SettlementInvestment,
     "assembly_denials": AssemblyDenial,
     "civic_protests": CivicProtest,
+    "civic_movements": CivicMovement,
+    "civic_strikes": CivicStrike,
+    "civic_amnesties": CivicAmnesty,
     "birth_cohorts": BirthCohort,
 }
 
@@ -34,7 +45,7 @@ class SocietySerialization:
     def to_dict(self) -> dict:
         self.validate()
         return {
-            "schema_version": 13,
+            "schema_version": 20,
             **{
                 name: {
                     key: value.model_dump(mode="json")
@@ -48,7 +59,7 @@ class SocietySerialization:
     def from_dict(cls, data: dict):
         if not isinstance(data, dict) or set(data) != {"schema_version", *REGISTRIES}:
             raise ValueError("invalid society fields")
-        if type(data["schema_version"]) is not int or data["schema_version"] != 13:
+        if type(data["schema_version"]) is not int or data["schema_version"] != 20:
             raise ValueError("unsupported society schema")
         parsed = {}
         for name, model in REGISTRIES.items():

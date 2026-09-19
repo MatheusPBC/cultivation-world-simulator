@@ -23,10 +23,20 @@ from src.sim.medieval.infrastructure import (
 )
 from src.sim.medieval.institutional_aid_policy import review_institutional_aid_with_provider
 from src.sim.medieval.intelligence import refresh_reports
-from src.sim.medieval.procurement import SUPPLY_OBJECTIVE_ACTION, execute_supply_objective_option, review_supply
-from src.sim.medieval.institutional_aid import REQUEST_ACTION
+from src.sim.medieval.procurement import (MARKET_PURCHASE_ACTION, SUPPLY_OBJECTIVE_ACTION,
+                                          execute_supply_objective_option, market_purchase_options,
+                                          review_supply)
+from src.sim.medieval.institutional_aid import (
+    REQUEST_ACTION,
+    aid_fulfillment_options,
+    aid_request_options,
+    aid_response_options,
+    request_institutional_aid,
+    respond_institutional_aid,
+)
 from src.sim.medieval.persistence import world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
+from src.systems.time import WorldClock
 from tests.test_medieval_institutional_aid import prepared_world
 
 REQUESTER = EntityRef("polity", "auren")
@@ -85,11 +95,12 @@ def test_the_natural_menu_offers_supply_and_aid_together():
     world = civil_pressure_world()
     options = concurrent_civil_options(world, REQUESTER)
     kinds = {option.decision()["action"] for option in options}
-    assert kinds == {SUPPLY_OBJECTIVE_ACTION, REQUEST_ACTION}
+    assert {SUPPLY_OBJECTIVE_ACTION, REQUEST_ACTION, "research"} <= kinds
     supply_option = next(o for o in options if o.decision()["action"] == SUPPLY_OBJECTIVE_ACTION)
     assert supply_option.objective_id == OBJECTIVE_ID
     # The option names only the objective; no supplier/quantity/route leaks out.
     assert set(vars(supply_option)) == {"id", "actor_ref", "objective_id"}
+    assert set(supply_option.decision()) == {"action", "actor_ref", "selected_affordance_id"}
 
 
 async def test_no_action_materializes_no_supply_or_aid(monkeypatch):
@@ -98,13 +109,113 @@ async def test_no_action_materializes_no_supply_or_aid(monkeypatch):
     provider(monkeypatch, ai_decider.NO_ACTION, prompts)
     before = world_snapshot(world)
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
-    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {REQUESTER}
+    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {
+        EntityRef("polity", identity) for identity in world.society.polities}
     after = world_snapshot(world)
     assert not world.economy.freight_orders
     assert not world.knowledge.institutional_aid_notices
     assert {k: v for k, v in before.items() if k != "event_count"} == \
         {k: v for k, v in after.items() if k != "event_count"}
     assert after["event_count"] > before["event_count"], "only a zero-delta receipt was added"
+
+
+async def test_supply_context_is_public_and_shared_without_private_handles(monkeypatch):
+    world = civil_pressure_world()
+    prompts = []
+    provider(monkeypatch, "first", prompts)
+
+    await review_concurrent_civil_decision_with_provider(world)
+
+    payload = json.loads(prompts[0].rsplit("\n", 1)[1])
+    situation = payload["situation"]
+    assert "supply" in situation
+    assert situation["supply"]["settlement_reports"]
+    assert situation["supply"]["opportunities"]
+    assert all("choice_index" in item for item in situation["supply"]["opportunities"])
+    serialized = prompts[0]
+    for private_marker in ("stock:", "treasury:", "account:", "payroll:", "household-stock:"):
+        assert private_marker not in serialized
+    assert "objective_id" not in serialized
+
+
+async def test_supply_context_includes_only_public_local_market_readings(monkeypatch):
+    world = civil_pressure_world()
+    from src.sim.medieval.markets import update_markets
+    update_markets(world)
+    prompts = []
+    provider(monkeypatch, "first", prompts)
+
+    await review_concurrent_civil_decision_with_provider(world)
+
+    payload = json.loads(prompts[0].rsplit("\n", 1)[1])
+    opportunities = payload["situation"]["supply"]["opportunities"]
+    readings = [item["market_readings"] for item in opportunities if "market_readings" in item]
+    assert readings
+    reading = readings[0]
+    assert reading["settlement_id"] in world.economy.markets
+    assert reading["updated_day"] == world.economy.markets[reading["settlement_id"]].updated_day
+    assert reading["observed_supply"] == world.economy.markets[reading["settlement_id"]].observed_supply
+    assert reading["observed_demand"] == world.economy.markets[reading["settlement_id"]].observed_demand
+    for private_marker in ("stock:", "treasury:", "account:", "payroll:", "household-stock:"):
+        assert private_marker not in json.dumps(reading)
+
+
+async def test_expansion_is_a_revalidated_civil_affordance(monkeypatch):
+    """An idle-but-full facility offers construction to its owner once.
+
+    The provider selects only the enumerated ID; the existing expansion owner
+    then creates the real project and decision receipt.
+    """
+    world = create_medieval_world(73)
+    world.clock = WorldClock(30)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 5,
+                                                    "ai_max_calls": 20})
+    facility = world.economy.facilities["works:minas-de-ferroalto"]
+    stock = world.economy.stocks[facility.stock_id]
+    world.economy.facilities[facility.id] = facility.model_copy(update={"last_batches": facility.max_batches})
+    world.economy.stocks[stock.id] = stock.model_copy(update={"goods": {**stock.goods, "tools": 0}})
+    from src.sim.medieval.expansion import expansion_options
+    option = expansion_options(world, stock.owner_ref)[0]
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        return {"selected_id": option.id}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    await review_concurrent_civil_decision_with_provider(world)
+
+    project = next(iter(world.economy.expansions.values()))
+    assert project.facility_id == facility.id
+    assert project.blueprint_id == "workshop-extension"
+    institutional = next(e for e in reversed(world.events)
+                         if e.event_type == "institutional_decision_turn_decided")
+    assert set(institutional.decision) == {"action", "actor_ref", "selected_affordance_id"}
+
+
+async def test_research_sponsorship_is_a_civil_affordance(monkeypatch):
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 5,
+                                                    "ai_max_calls": 20})
+    from src.sim.medieval.research_policy import research_options
+    actor = EntityRef("polity", "escarlia")
+    option = next(item for item in research_options(world, actor) if item.technology_id == "metallurgy")
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        return {"selected_id": option.id}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    await review_concurrent_civil_decision_with_provider(world)
+
+    projects = [project for project in world.research.projects.values()
+                if project.technology_id == "metallurgy"]
+    assert len(projects) == 1
+    assert projects[0].owner_ref == actor
+    assert projects[0].researcher_id == option.researcher_id
+    decision = next(e for e in reversed(world.events)
+                    if e.event_type == "institutional_decision_turn_decided")
+    assert set(decision.decision) == {"action", "actor_ref", "selected_affordance_id"}
+    assert "account_id" not in decision.decision
 
 
 async def test_unavailable_provider_claims_nothing_so_the_deterministic_fallback_still_runs(monkeypatch):
@@ -140,7 +251,8 @@ async def test_stale_option_id_leaves_no_plan_or_state_delta(monkeypatch):
     before = world_snapshot(world)
     plan_before = world.strategy.plans[f"plan:{OBJECTIVE_ID}"]
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
-    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {REQUESTER}
+    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {
+        EntityRef("polity", identity) for identity in world.society.polities}
     after = world_snapshot(world)
     plan_after = world.strategy.plans[f"plan:{OBJECTIVE_ID}"]
     assert plan_before == plan_after
@@ -185,7 +297,8 @@ async def test_choosing_supply_uses_the_existing_procurement_executor(monkeypatc
     prompts = []
     provider(monkeypatch, supply_option.id, prompts)
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
-    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {REQUESTER}
+    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {
+        EntityRef("polity", identity) for identity in world.society.polities}
     plan = world.strategy.plans[f"plan:{OBJECTIVE_ID}"]
     assert plan.stage == "await_delivery" and plan.order_ids
     assert set(plan.order_ids) <= set(world.economy.freight_orders)
@@ -196,6 +309,91 @@ async def test_choosing_supply_uses_the_existing_procurement_executor(monkeypatc
     assert decision.causal_origin.value == "actor_decision"
 
 
+async def test_existing_aid_fulfillment_is_in_the_same_monthly_menu(monkeypatch):
+    """An in-course aid obligation must not open a second provider turn.
+
+    The material executor remains institutional_aid's owner; only the
+    selection boundary moves into the composed menu.
+    """
+    world = prepared_world()
+    provider_ref = EntityRef("polity", "valedouro")
+    request_option = next(item for item in aid_request_options(world, REQUESTER)
+                          if item.provider_ref == provider_ref)
+    request_decision = record_event(
+        world, "aid_request_decided", "Pedido de ajuda escolhido.",
+        fact_kind=FactKind.DECISION, decision=request_option.decision())
+    request = request_institutional_aid(world, REQUESTER, request_option.id, request_decision.id)
+
+    world.clock = world.clock.advance(1)
+    refresh_route_reports(world)
+    response_option = next(item for item in aid_response_options(world, provider_ref)
+                           if item.request_event_id == request.id and item.kind == "accept")
+    response_decision = record_event(
+        world, "aid_response_decided", "Aceite de ajuda escolhido.",
+        fact_kind=FactKind.DECISION, decision=response_option.decision())
+    proposal = respond_institutional_aid(world, provider_ref, response_option.id, response_decision.id)
+
+    fulfillment = next(item for item in aid_fulfillment_options(world, provider_ref)
+                        if item.obligation_id == f"{proposal.id}:term:0")
+    calls = []
+
+    async def choose(prompt, *args, **kwargs):
+        calls.append(prompt)
+        payload = json.loads(prompt[prompt.index("{"):])
+        selected = next(
+            choice["id"] for choice in payload["choices"]
+            if choice["id"] == fulfillment.id or choice["label"].startswith("Cumprir a ajuda")
+        )
+        return {"selected_id": selected}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8,
+                                                   "ai_max_calls": 40})
+    await review_concurrent_civil_decision_with_provider(world)
+
+    assert world.relations.obligations[fulfillment.obligation_id].status == "fulfilled"
+    assert calls, "the composed boundary should consult the provider"
+    assert len([event for event in world.events if event.event_type == "institutional_aid_fulfilled"]) == 1
+
+
+async def test_market_offer_is_a_competing_material_supply_affordance(monkeypatch):
+    """A known bilateral offer can be chosen instead of the generic objective.
+
+    The menu exposes only the offer ID.  The existing market executor still
+    performs the seller's independent response, payment and freight creation.
+    """
+    world = civil_pressure_world()
+    refresh_route_reports(world)
+    from src.sim.medieval.intelligence import refresh_trade_reports
+    refresh_trade_reports(world, replace_today=True)
+    option = market_purchase_options(world, REQUESTER)[0]
+    assert option.decision()["action"] == MARKET_PURCHASE_ACTION
+    assert {item.id for item in concurrent_civil_options(world, REQUESTER)}.__contains__(option.id)
+
+    provider(monkeypatch, option.id, [])
+    claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
+    assert claimed == {OBJECTIVE_ID} and sites == set()
+    orders = [item for item in world.economy.freight_orders.values()
+              if item.destination_id == option.destination_id and item.resource_id == option.resource_id]
+    assert len(orders) == 1
+    assert orders[0].source_id == option.source_id
+    decision = next(event for event in world.events if event.event_type == "institutional_decision_turn_decided")
+    assert decision.decision == option.decision()
+    assert decision.causal_links
+
+
+def test_market_menu_keeps_distinct_known_routes_as_distinct_affordances():
+    world = civil_pressure_world()
+    refresh_route_reports(world)
+    from src.sim.medieval.intelligence import refresh_trade_reports
+    refresh_trade_reports(world, replace_today=True)
+    options = market_purchase_options(world, REQUESTER)
+    route_choices = {option.route_ids for option in options}
+    assert len(route_choices) > 1
+    assert len({option.id for option in options}) == len(options)
+
+
 async def test_choosing_aid_uses_the_existing_institutional_aid_executor(monkeypatch):
     world = civil_pressure_world()
     options = concurrent_civil_options(world, REQUESTER)
@@ -203,7 +401,8 @@ async def test_choosing_aid_uses_the_existing_institutional_aid_executor(monkeyp
     prompts = []
     provider(monkeypatch, aid_option.id, prompts)
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
-    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {REQUESTER}
+    assert claimed == {OBJECTIVE_ID} and sites == set() and excluded == {
+        EntityRef("polity", identity) for identity in world.society.polities}
     assert len(world.knowledge.institutional_aid_notices) == 1
     notice = next(iter(world.knowledge.institutional_aid_notices.values()))
     assert notice.requester_ref == REQUESTER and notice.recipient_ref == aid_option.provider_ref
@@ -223,7 +422,7 @@ async def test_being_covered_by_the_menu_suppresses_a_second_separate_aid_reques
     prompts = []
     provider(monkeypatch, ai_decider.NO_ACTION, prompts)
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
-    assert excluded == {REQUESTER}
+    assert excluded == {EntityRef("polity", identity) for identity in world.society.polities}
     before = world_snapshot(world)
     await review_institutional_aid_with_provider(world, allow_requests=True, excluded_requesters=excluded)
     after = world_snapshot(world)

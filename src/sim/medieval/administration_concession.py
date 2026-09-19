@@ -42,6 +42,8 @@ class AdministrationConcessionOffer:
     standoff_id: Identity
     detachment_id: Identity
     report_event_id: Identity
+    kind: str = "contact"
+    breach_event_id: Identity | None = None
 
     def decision(self):
         return administration_concession_intent(self.actor_ref, self.id)
@@ -90,6 +92,67 @@ def _duplicate(world, settlement_id):
                for proposal in world.relations.proposals.values())
 
 
+def _active_postwar_transfer(world, settlement_id):
+    """Whether an open/current transfer already binds this settlement."""
+    for proposal in world.relations.proposals.values():
+        if proposal.proposal_kind != "administration_concession" or proposal.status not in {"offered", "accepted"}:
+            continue
+        for index, clause in enumerate(proposal.clauses):
+            if clause.kind != "administration_transfer" or clause.settlement_id != settlement_id:
+                continue
+            obligation = world.relations.obligations.get(f"{proposal.id}:term:{index}")
+            if obligation is None or obligation.status in {"active"}:
+                return True
+    return False
+
+
+def _breached_postwar_transfer(world, settlement_id):
+    """Return the latest concluded transfer breach for a possible repair."""
+    candidates = []
+    for proposal in world.relations.proposals.values():
+        if proposal.proposal_kind != "administration_concession":
+            continue
+        for index, clause in enumerate(proposal.clauses):
+            if clause.kind != "administration_transfer" or clause.settlement_id != settlement_id:
+                continue
+            obligation = world.relations.obligations.get(f"{proposal.id}:term:{index}")
+            if obligation is not None and obligation.status == "breached" and obligation.breach_event_id:
+                candidates.append((obligation.breach_event_id, obligation))
+    return max(candidates, key=lambda item: item[0]) if candidates else None
+
+
+def _postwar_state(world, actor, settlement_id):
+    """Current occupation/control can open a political transfer without a standoff.
+
+    This is deliberately a single administration term.  It does not grant
+    control, troops, stock or ownership; those facts must already exist and
+    remain valid until the administrator later fulfils the obligation.
+    """
+    settlement = world.society.settlements.get(settlement_id)
+    control = world.society.territorial_controls.get(f"territorial-control:{settlement_id}")
+    if (settlement is None or settlement.occupier_id != actor.id
+            or settlement.administrator_id in {None, actor.id}
+            or control is None or control.stage != "active" or control.controller_id != actor.id):
+        return None
+    detachment = None
+    garrison = None
+    for candidate in sorted(world.society.garrisons.values(), key=lambda item: item.id):
+        current = world.society.detachments.get(candidate.detachment_id)
+        if (candidate.stage == "active" and candidate.settlement_id == settlement_id
+                and current is not None and current.owner_ref == actor
+                and current.stage == "present" and current.location_id == settlement_id
+                and current.provisions >= current.count):
+            garrison, detachment = candidate, current
+            break
+    report = _own_current_report(world, actor, settlement_id)
+    if (garrison is None or detachment is None or report is None
+            or any(item.phase in {"sieging", "breached"} and item.settlement_id == settlement_id
+                   for item in world.society.siege_campaigns.values())):
+        return None
+    counterparty = EntityRef("polity", settlement.administrator_id)
+    return settlement, control, garrison, detachment, report, counterparty
+
+
 def _offer_state(world, actor, notice, *, ignore_duplicate=False):
     standoff = world.society.force_standoffs.get(notice.standoff_id)
     if standoff is None or standoff.stage != "active" or _active_pair(world, standoff) is None:
@@ -130,6 +193,24 @@ def administration_concession_offer_options(world, actor, *, notice_id=None):
                 f"{detachment.last_event_id}:{report.event_id}"),
             actor_ref=actor, notice_id=notice.id, settlement_id=settlement.id, investment_id=investment.id,
             standoff_id=standoff.id, detachment_id=detachment.id, report_event_id=report.event_id))
+    # A sustained occupation may also seek a political settlement after the
+    # immediate contact path is no longer the only material basis.  This uses
+    # the same proposal/obligation owner, but contains no automatic withdrawal.
+    if notice_id is None:
+        for settlement in sorted(world.society.settlements.values(), key=lambda item: item.id):
+            state = _postwar_state(world, actor, settlement.id)
+            if state is None or _active_postwar_transfer(world, settlement.id):
+                continue
+            current, control, garrison, detachment, report, _counterparty = state
+            breached = _breached_postwar_transfer(world, settlement.id)
+            kind = "postwar_remediation" if breached is not None else "postwar"
+            breach_event_id = breached[0] if breached is not None else None
+            options.append(AdministrationConcessionOffer(
+                id=(f"administration-settlement:{settlement.id}:{control.last_event_id}:"
+                    f"{garrison.last_event_id}:{detachment.last_event_id}:{report.event_id}:{breach_event_id or '-'}"),
+                actor_ref=actor, notice_id="-", settlement_id=settlement.id,
+                investment_id="-", standoff_id="-", detachment_id=detachment.id,
+                report_event_id=report.event_id, kind=kind, breach_event_id=breach_event_id))
     return tuple(sorted(options, key=lambda item: item.id))
 
 
@@ -141,24 +222,35 @@ def offer_administration_concession(world, actor, option_id, decision_event_id):
     require_decision(candidate, decision_event_id, option.decision())
     require_authority(candidate, actor, "diplomacy")
     require_authority(candidate, actor, "military")
-    notice = candidate.knowledge.force_contact_notices[option.notice_id]
-    state = _offer_state(candidate, actor, notice)
-    if state is None:
-        raise ValueError("administration concession is no longer possible")
-    settlement, detachment, standoff, investment, report = state
-    counterparty = EntityRef("polity", settlement.administrator_id)
-    transfer_due = candidate.clock.absolute_day + TRANSFER_DUE_DAYS
-    clauses = (
-        AdministrationTransferClause(debtor_ref=counterparty, creditor_ref=actor, due_day=transfer_due,
-                                    settlement_id=settlement.id),
-        WithdrawalClause(debtor_ref=actor, creditor_ref=counterparty,
-                         due_day=candidate.clock.absolute_day + WITHDRAWAL_DUE_DAYS, depends_on=(0,),
-                         standoff_id=standoff.id, detachment_id=detachment.id),
-    )
+    if option.kind in {"postwar", "postwar_remediation"}:
+        state = _postwar_state(candidate, actor, option.settlement_id)
+        if state is None:
+            raise ValueError("political settlement is no longer materially possible")
+        settlement, _control, _garrison, detachment, _report, counterparty = state
+        transfer_due = candidate.clock.absolute_day + TRANSFER_DUE_DAYS
+        clauses = (AdministrationTransferClause(
+            debtor_ref=counterparty, creditor_ref=actor, due_day=transfer_due,
+            settlement_id=settlement.id),)
+    else:
+        notice = candidate.knowledge.force_contact_notices[option.notice_id]
+        state = _offer_state(candidate, actor, notice)
+        if state is None:
+            raise ValueError("administration concession is no longer possible")
+        settlement, detachment, standoff, investment, report = state
+        counterparty = EntityRef("polity", settlement.administrator_id)
+        transfer_due = candidate.clock.absolute_day + TRANSFER_DUE_DAYS
+        clauses = (
+            AdministrationTransferClause(debtor_ref=counterparty, creditor_ref=actor, due_day=transfer_due,
+                                        settlement_id=settlement.id),
+            WithdrawalClause(debtor_ref=actor, creditor_ref=counterparty,
+                             due_day=candidate.clock.absolute_day + WITHDRAWAL_DUE_DAYS, depends_on=(0,),
+                             standoff_id=standoff.id, detachment_id=detachment.id),
+        )
     proposal = offer_proposal(
         candidate, actor, counterparty, clauses, candidate.clock.absolute_day + OFFER_WINDOW_DAYS,
         decision_event_id=decision_event_id, intent=option.decision(), proposal_kind="administration_concession",
-        request_affordance_id=option.id)
+        request_affordance_id=option.id,
+        extra_cause_ids=((option.breach_event_id,) if option.breach_event_id else ()))
     candidate.relations.validate(candidate)
     candidate.knowledge.validate(candidate)
     world.__dict__.update(candidate.__dict__)
@@ -166,7 +258,11 @@ def offer_administration_concession(world, actor, option_id, decision_event_id):
 
 
 def _proposal_still_current(world, proposal):
-    if proposal.proposal_kind != "administration_concession" or len(proposal.clauses) != 2:
+    if proposal.proposal_kind != "administration_concession":
+        return False
+    if len(proposal.clauses) == 1 and proposal.clauses[0].kind == "administration_transfer":
+        return _postwar_state(world, proposal.proposer_ref, proposal.clauses[0].settlement_id) is not None
+    if len(proposal.clauses) != 2:
         return False
     transfer, withdrawal = proposal.clauses
     if transfer.kind != "administration_transfer" or withdrawal.kind != "withdrawal":
@@ -182,13 +278,18 @@ def administration_concession_response_options(world, actor, *, notice_id=None):
     known = tuple(notice for notice in world.knowledge.force_contacts_for_actor(actor)
                   if notice_id is None or notice.id == notice_id)
     for proposal in world.relations.proposals.values():
+        postwar = len(proposal.clauses) == 1 and proposal.clauses[0].kind == "administration_transfer"
+        known_proposal = any(notice.recipient_ref == actor and notice.proposal_id == proposal.id
+                             for notice in world.knowledge.notices.values())
         if (proposal.proposal_kind != "administration_concession" or proposal.status != "offered"
                 or proposal.counterparty_ref != actor or proposal.expires_day <= world.clock.absolute_day
-                or not _proposal_still_current(world, proposal)):
-            continue
-        transfer, withdrawal = proposal.clauses
-        if not any(notice.standoff_id == withdrawal.standoff_id and notice.settlement_id == transfer.settlement_id
-                   and notice.counterparty_ref == proposal.proposer_ref for notice in known):
+                or not _proposal_still_current(world, proposal)
+                or (not postwar and not any(notice.standoff_id == next((clause.standoff_id for clause in proposal.clauses
+                                                                        if clause.kind == "withdrawal"), None)
+                                             and notice.settlement_id == next((clause.settlement_id for clause in proposal.clauses
+                                                                               if clause.kind == "administration_transfer"), None)
+                                             and notice.counterparty_ref == proposal.proposer_ref for notice in known))
+                or (postwar and not known_proposal)):
             continue
         base = f"administration-concession-response:{proposal.id}:{proposal.last_event_id}"
         options.extend((AdministrationConcessionResponse(f"{base}:accept", actor, proposal.id, "accept"),
@@ -204,11 +305,12 @@ def respond_administration_concession(world, actor, option_id, decision_event_id
     proposal = respond_proposal(candidate, option.proposal_id, option.response, decision_event_id=decision_event_id,
                                 intent=option.decision())
     if option.response == "accept":
-        from .force_contact_policy import schedule_contact_review
-        withdrawal = next(clause for clause in proposal.clauses if clause.kind == "withdrawal")
-        for notice in candidate.knowledge.force_contact_notices.values():
-            if notice.standoff_id == withdrawal.standoff_id:
-                schedule_contact_review(candidate, notice, candidate.clock.absolute_day + 1)
+        withdrawal = next((clause for clause in proposal.clauses if clause.kind == "withdrawal"), None)
+        if withdrawal is not None:
+            from .force_contact_policy import schedule_contact_review
+            for notice in candidate.knowledge.force_contact_notices.values():
+                if notice.standoff_id == withdrawal.standoff_id:
+                    schedule_contact_review(candidate, notice, candidate.clock.absolute_day + 1)
     candidate.relations.validate(candidate)
     candidate.knowledge.validate(candidate)
     world.__dict__.update(candidate.__dict__)
