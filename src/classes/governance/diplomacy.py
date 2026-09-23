@@ -254,7 +254,14 @@ class RelationsState(RegistrySerialization):
         return tuple(m for _, m in sorted(self.memories.items()) if m.institution_ref == institution_ref)
 
     def validate(self, world=None):
-        super().validate(world)
+        # Registry values are frozen and owners replace entries rather than
+        # mutating them. Runtime transactions still check every key and every
+        # semantic provenance below, while save/load calls ``validate()``
+        # without a world to perform the full Pydantic round-trip once.
+        if world is None:
+            super().validate(world)
+        else:
+            self.validate_registry_structure()
         if world is None:
             return
         # This is an integrity boundary, not a query path.  The world index is
@@ -313,7 +320,8 @@ class RelationsState(RegistrySerialization):
                 raise ValueError('diplomatic status requires its own receipt')
             return event
         for p in self.proposals.values():
-            validate_actor(world, p.proposer_ref); validate_actor(world, p.counterparty_ref)
+            validate_actor(world, p.proposer_ref)
+            validate_actor(world, p.counterparty_ref)
             if not (p.proposal_kind == 'reciprocal_supply' and p.status in {'offered', 'superseded'}):
                 validate_clause_assets(world, p)
             decision = events.get(p.decision_event_id)

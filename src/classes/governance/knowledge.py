@@ -159,6 +159,8 @@ class KnowledgeState(RegistrySerialization):
     _registry_epoch: int = field(default=0, init=False, repr=False, compare=False)
     _registry_epochs: dict[str, int] = field(default_factory=dict, init=False, repr=False, compare=False)
     _structural_validation_epoch: int | None = field(default=None, init=False, repr=False, compare=False)
+    _historical_report_cache: dict[str, dict[str, tuple[object, object]]] = field(
+        default_factory=dict, init=False, repr=False, compare=False)
     reports: dict[str, KnowledgeReport] = field(default_factory=dict)
     technologies: dict[str, TechnicalKnowledge] = field(default_factory=dict)
     notices: dict[str, DiplomaticNotice] = field(default_factory=dict)
@@ -218,7 +220,9 @@ class KnowledgeState(RegistrySerialization):
                            if preserve_query else {})
         previous_epoch = getattr(self, "_registry_epoch", 0) if preserve_query else 0
         previous_structural = (getattr(self, "_structural_validation_epoch", None)
-                                if preserve_query else None)
+                               if preserve_query else None)
+        previous_historical = (getattr(self, "_historical_report_cache", {})
+                               if preserve_query else {})
         object.__setattr__(self, "_registry_epoch", previous_epoch)
         object.__setattr__(
             self,
@@ -230,6 +234,8 @@ class KnowledgeState(RegistrySerialization):
             if not isinstance(registry, _RegistryDict) or registry._owner is not self:
                 object.__setattr__(self, name, _RegistryDict(registry, owner=self, name=name))
         object.__setattr__(self, "_structural_validation_epoch", previous_structural)
+        object.__setattr__(self, "_historical_report_cache", {
+            name: dict(entries) for name, entries in previous_historical.items()})
         object.__setattr__(self, "_semantic_validation_key", None)
         if previous_query is None:
             object.__setattr__(self, "_query_cache", None)
@@ -472,11 +478,13 @@ class KnowledgeState(RegistrySerialization):
                 raise ValueError("knowledge requires a valid disclosure channel")
             self._validate_export_quote(events, report)
         for report in self.route_reports.values():
-            self._validate_route_report(world, events, report)
+            self._validate_historical_report(world, events, report, "route_reports",
+                                             self._validate_route_report)
         for report in self.fiscal_route_reports.values():
             self._validate_fiscal_route_report(world, events, report)
         for report in self.settlement_reports.values():
-            self._validate_settlement_report(world, events, report)
+            self._validate_historical_report(world, events, report, "settlement_reports",
+                                             self._validate_settlement_report)
         for report in self.site_reports.values():
             self._validate_site_report(world, events, report)
         for notice in self.customs_notices.values():
@@ -561,6 +569,29 @@ class KnowledgeState(RegistrySerialization):
                                and delta.aspect == "demand" for delta in event.deltas)):
                 raise ValueError("invalid civic demand notice provenance")
         object.__setattr__(self, "_semantic_validation_key", validation_key)
+
+    def _validate_historical_report(self, world, events, report, registry_name, validator):
+        """Reuse a receipt proof only while its immutable fact prefix is shared.
+
+        A transaction copies KnowledgeState but shares committed events and
+        frozen report values. New observations replace the report object; new
+        facts cannot rewrite a prior receipt. Actor and location existence and
+        clock bounds remain live checks even when the historical proof is reused.
+        The cache is transient and is rebuilt on load.
+        """
+        receipt = events.get(report.event_id)
+        cached = self._historical_report_cache.setdefault(registry_name, {})
+        proof = cached.get(report.id)
+        if proof is not None and proof[0] is report and proof[1] is receipt:
+            validate_actor(world, report.recipient_ref)
+            validate_actor(world, report.publisher_ref)
+            location_exists = (report.route_id in world.map.routes if registry_name == "route_reports"
+                               else report.settlement_id in world.society.settlements)
+            if not location_exists or report.observed_day > world.clock.absolute_day:
+                raise ValueError("historical report no longer has a valid actor, place or day")
+            return
+        validator(world, events, report)
+        cached[report.id] = (report, receipt)
 
     @staticmethod
     def _validate_investigation_finding(world, events, finding):

@@ -4047,3 +4047,30 @@ equivalente. A auditoria do save retornou `ok=true`, sem causas quebradas,
 autoria inválida ou mutação por Story/LLM. A saúde de Pedraclara/Portovelho
 ficou em 862/863; nem esse smoke curto nem os testes focados aprovam o gate de
 três seeds por dez anos ou a recuperação econômica espontânea.
+
+### Perfil do horizonte longo e validação histórica incremental — 23/09/2026
+
+Uma seed natural 73 sem provider, iniciada no schema 69 antes desta otimização,
+foi interrompida no dia 1500 por custo crescente; **não** gerou save final nem
+passou o gate de dez anos. A saída parcial registrou 404 mortes por privação e
+saúde média 333,12. Ajuda institucional continuava ocorrendo, mas o número de
+empregos permanentes pouco crescia. É diagnóstico de uma trajetória offline,
+não inferência sobre a escolha de um provider real. Os tempos por mês incluem
+outras sondas executadas em paralelo e não são benchmark isolado.
+
+Um perfil separado de um salto no dia 270 mostrou validações repetidas de
+boletins históricos de rota/assentamento e dos registries de relações. O
+KnowledgeState agora guarda somente uma prova transitória por objeto/recibo
+imutável; mudança do relatório ou recibo invalida a prova, e ator, lugar e dia
+continuam checados a cada validação. RelationsState mantém as verificações
+semânticas completas durante o runtime, mas só faz o round-trip Pydantic de
+todos os valores no save/load. Nada disso entra no snapshot.
+
+No mesmo salto perfilado, `engine.step` caiu de 0,963 s para 0,686 s. A
+continuação natural idêntica do dia 270 ao 300 produziu saves com SHA-256
+igual (`c4db184d985a3eee7808312316a230be4486d2ff18d7572058aa1c195e871d0e`),
+conservação, save/load e auditoria causal `ok=true`. Passaram 64 testes focados
+de conhecimento/ajuda/persistência, 38 de ajuda/persistência após a segunda
+mudança, e uma regressão que invalida a cache ao substituir relatório ou
+remover ator. O ganho medido nesse recorte não aprova escala de dez anos;
+o gate atualizado precisa recomeçar com checkpoints periódicos.

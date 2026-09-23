@@ -65,6 +65,25 @@ def test_a_closure_changes_no_plan_until_it_is_observed_again():
                and d.after == updated.observation() for d in receipt.deltas)
 
 
+def test_cached_historical_report_still_rejects_changed_report_and_missing_actor():
+    world = create_medieval_world(73)
+    refresh_reports(world)
+    actor = observer(world)
+    report = world.knowledge.route_report(actor, ROUTE)
+    world.knowledge.validate(world)
+
+    forged = world.transaction_copy()
+    forged.knowledge.route_reports[report.id] = report.model_copy(
+        update={"operational_capacity": report.operational_capacity + 1})
+    with pytest.raises(ValueError, match="route observation requires"):
+        forged.knowledge.validate(forged)
+
+    missing_actor = world.transaction_copy()
+    del missing_actor.society.polities[actor.id]
+    with pytest.raises(ValueError, match="unknown governance actor"):
+        missing_actor.knowledge.validate(missing_actor)
+
+
 def test_recovery_is_communicated_by_a_later_observation():
     world = create_medieval_world(73)
     world.map.routes[ROUTE].update_runtime(enabled=False)
