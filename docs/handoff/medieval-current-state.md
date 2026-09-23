@@ -3728,3 +3728,14 @@ ocupação são premissas explícitas da fixture; isso **não** demonstra que a
 sequência surgiu naturalmente, nem reação de QG/rei ou consequência
 populacional posterior. O recorte de force também passou a ligar diretamente
 `detachment_held` ao fato Map-owned que tornou a rota indisponível.
+
+### Medição natural de um ano no schema 67
+
+A seed 73, sem provider real e sem reforço artificial, completou 360 dias no
+checkout atual. Os checkpoints de 90/180/270/360 dias e o save final passaram
+round-trip; o final tem 13.024 eventos e 4.448.256 bytes. A auditoria causal
+do save final retornou `ok=true`, sem causas quebradas, autoria de decisão
+inválida, interpretação material ou Story material. No dia 360 havia 10.949
+habitantes, falta de 37 unidades de alimento, saúde média 934 e zero mortes por
+privação nessa seed. Isso é uma medição de um ano, não o gate natural de três
+seeds por dez anos e não mede escolhas de um provider real.
