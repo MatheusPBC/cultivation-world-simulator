@@ -11,6 +11,7 @@ from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.migration import _resolve, consume_travel_provisions, recover_migration, start_migration
+from src.sim.medieval.logistics import _route_causes
 from src.sim.medieval.migration_policy import migration_options, recovery_options, review_migration
 from src.sim.medieval.institutional_agenda import review_monthly_institutional_turn
 from src.sim.medieval import ai_decider
@@ -195,7 +196,8 @@ def test_repeated_route_blockage_adds_bounded_origin_pressure_with_causal_delta(
         journey = world.society.migrations[journey.id]
         world.clock = type(world.clock)(journey.due_day)
         world.agenda.cancel(journey.id)
-        _resolve(world, journey)
+        route_id = journey.route_ids[journey.route_index]
+        _resolve(world, journey, _route_causes(world, (route_id,)))
 
     delays = [event for event in world.events if event.event_type == "migration_delayed"
               and any(delta.owner_kind == "migration" and delta.owner_id == journey.id for delta in event.deltas)]

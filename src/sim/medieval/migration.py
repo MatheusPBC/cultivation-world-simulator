@@ -390,12 +390,12 @@ def _arrive(world, journey, causes):
     return event
 
 
-def _resolve(world, journey):
+def _resolve(world, journey, route_causes):
     provision = world.economy.migration_provisions[journey.provision_id]
     route_id = journey.route_ids[journey.route_index]
     route = world.map.routes[route_id]
     day = world.clock.absolute_day
-    causes = _route_causes(world, (route_id,))[route_id]
+    causes = route_causes[route_id]
     if journey.stage == "traveling":
         if journey.route_index == len(journey.route_ids) - 1:
             _arrive(world, journey, causes)
@@ -445,8 +445,14 @@ def resolve_migrations(world, situations):
         if situation.kind != "migration" or journey is None or journey.stage == "stranded" or journey.due_day != world.clock.absolute_day:
             raise ValueError("unknown or inconsistent dated migration")
         journeys.append(journey)
+    # Journeys change flow/population, never Map routes or sites.  All due
+    # journeys on this date therefore cite the same route provenance, without
+    # rescanning the entire ledger separately for each household.
+    route_causes = _route_causes(world, {
+        journey.route_ids[journey.route_index] for journey in journeys
+    })
     for journey in sorted(journeys, key=lambda item: item.id):
-        _resolve(world, journey)
+        _resolve(world, journey, route_causes)
 
 
 def consume_travel_provisions(world):

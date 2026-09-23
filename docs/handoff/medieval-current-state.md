@@ -4074,3 +4074,36 @@ de conhecimento/ajuda/persistência, 38 de ajuda/persistência após a segunda
 mudança, e uma regressão que invalida a cache ao substituir relatório ou
 remover ator. O ganho medido nesse recorte não aprova escala de dez anos;
 o gate atualizado precisa recomeçar com checkpoints periódicos.
+
+### Diagnóstico do ano 3 e custo das jornadas — 23/09/2026
+
+O novo gate natural da seed 73 (schema 69, sem provider) produziu checkpoints
+nos dias 360, 720, 1080 e 1440. O do dia 1440 passou na auditoria causal
+(`ok=true`, zero causas quebradas, autorias inválidas ou deltas Story/LLM).
+O gate continua em execução e **não** é
+o gate completo de três seeds por dez anos. No dia 1080 havia 60.031 unidades
+de alimento nos estoques, mas os saldos domésticos somados dos artesãos
+caíram de 278 (dia 360) para 9 (dia 1080), embora a população artesã
+permanecesse em 4.098. Dos 38 contratos permanentes, só 14 tiveram último
+resultado `paid`; 19 estavam `unpaid_funds` e cinco `unpaid_labor`. Em
+Pedraclara, os 1.242 artesãos tinham saldo doméstico zero e o estoque público
+ligado às necessidades continha 5.637 rações. Esses números distinguem falta
+de renda/acesso de falta física global de comida; **não** provam ainda que a
+oficina, sozinha, recupere a economia por dez anos. A trajetória natural já
+registrou mortalidade por privação, portanto o gate não deve ser descrito como
+sucesso econômico.
+
+Um salto isolado a partir do checkpoint do dia 1440 mostrou, sob `cProfile`,
+4,249 s em `engine.step`; 14 validações de `RelationsState` consumiram 1,761 s
+e 15 buscas de causa de rota consumiram 0,632 s. Como nenhuma memória ativa
+daquele save havia sido reforçada após a criação, a validação agora só percorre
+os deltas históricos de reforço quando há memória que precise dessa prova.
+Além disso, todas as jornadas vencidas no mesmo dia reutilizam uma única
+leitura das causas de suas rotas; migrações não mudam o Map durante esse lote.
+No mesmo checkpoint, o salto perfilado caiu para 3,434 s. É uma comparação
+local sob carga concorrente, não uma garantia de ganho para dez anos. Passaram
+35 testes focados de memória/ajuda e 49 de migração/histórico; a continuação
+otimizada do dia 1440 ao 1441 passou save/load e auditoria (`ok=true`, zero
+causas quebradas, autorias inválidas ou deltas Story/LLM). A continuação
+natural em andamento foi iniciada antes desta mudança, então seu resultado
+futuro será evidência do runtime anterior, não aprovação do checkout novo.

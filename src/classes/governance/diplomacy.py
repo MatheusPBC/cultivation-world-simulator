@@ -681,12 +681,17 @@ class RelationsState(RegistrySerialization):
                              world.knowledge.institutional_aid_notices)
             for notice in registry.values()
         }
-        reinforcements = {
-            (delta.owner_id, event.day, delta.after)
-            for event in events.values() for delta in event.deltas
-            if delta.owner_kind == 'institutional_memory'
-            and delta.aspect == 'last_reinforced_day'
-        }
+        # Most worlds have no reinforced active memory.  Only a memory whose
+        # current date differs from its creation needs the historical receipt;
+        # avoid walking every event at every nested owner validation otherwise.
+        reinforcements = (
+            {(delta.owner_id, event.day, delta.after)
+             for event in events.values() for delta in event.deltas
+             if delta.owner_kind == 'institutional_memory'
+             and delta.aspect == 'last_reinforced_day'}
+            if any(memory.last_reinforced_day != memory.recorded_day
+                   for memory in self.memories.values()) else set()
+        )
         for memory in self.memories.values():
             self._validate_memory(world, events, memory, known_facts, reinforcements)
 
