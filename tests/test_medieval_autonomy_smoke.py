@@ -51,6 +51,11 @@ async def test_smoke_accepts_string_output_paths(tmp_path):
     result = await medieval_autonomy_smoke.run(73, 30, output, gov_profile="desatento")
 
     assert result["save"] == output
+    assert result["save_bytes"] == Path(output).stat().st_size
+    assert result["save_elapsed_s"] >= 0
+    assert result["load_elapsed_s"] >= 0
+    assert result["memory_high_water_bytes"] > 0
+    assert result["disk_free_bytes_after_save"] > 0
 
 
 @pytest.mark.asyncio

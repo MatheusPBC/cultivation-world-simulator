@@ -110,6 +110,7 @@ import json
 from pathlib import Path
 import pstats
 import resource
+import shutil
 import sys
 import time
 from unittest.mock import patch
@@ -583,11 +584,15 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
     profiler = cProfile.Profile()
     if profile:
         profiler.enable()
+    save_started = time.perf_counter()
     save_world(world, output)
+    save_elapsed = time.perf_counter() - save_started
     if profile:
         profiler.disable()
         pstats.Stats(profiler).sort_stats("cumtime").print_stats(15)
+    load_started = time.perf_counter()
     resumed = load_world(output)
+    load_elapsed = time.perf_counter() - load_started
     assert world_snapshot(world) == world_snapshot(resumed) and world.events == resumed.events
     # Prove continuation, not only equality immediately after deserialization.
     await MedievalSimulator(world).step()
@@ -610,6 +615,11 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
             "food_conserved": True, "money_conserved": True, "all_resources_accounted": True,
              "save_load_equivalent": True,
              "checkpoints": checkpoints,
+             "save_bytes": output.stat().st_size,
+             "save_elapsed_s": round(save_elapsed, 4),
+             "load_elapsed_s": round(load_elapsed, 4),
+             "memory_high_water_bytes": process_high_water_bytes(),
+             "disk_free_bytes_after_save": shutil.disk_usage(output.parent).free,
              "real_ai_calls": (ai_decider.spent_calls(world) if real_provider else 0),
             "policy": world.config.decision_policy, "elapsed_s": round(time.perf_counter()-elapsed, 2),
             "save": str(output.resolve())}

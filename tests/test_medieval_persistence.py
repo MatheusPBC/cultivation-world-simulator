@@ -1,5 +1,6 @@
 import random
 import sqlite3
+import zlib
 
 import pytest
 
@@ -71,11 +72,11 @@ def test_xianxia_or_foreign_databases_are_rejected_without_modification(tmp_path
     assert path.read_bytes() == before
 
 
-def test_previous_freight_schema_is_rejected_without_touching_save(tmp_path):
-    path = tmp_path / "schema-65.mws"
+def test_previous_uncompressed_schema_is_rejected_without_touching_save(tmp_path):
+    path = tmp_path / "schema-66.mws"
     save_world(create_medieval_world(73), path)
     with sqlite3.connect(path) as conn:
-        conn.execute("UPDATE metadata SET schema_version=65 WHERE id=1")
+        conn.execute("UPDATE metadata SET schema_version=66 WHERE id=1")
     before = path.read_bytes()
     with pytest.raises(ValueError, match="Unsupported Medieval World Simulator save"):
         load_world(path)
@@ -135,3 +136,48 @@ def test_missing_tail_of_saved_history_is_detected(tmp_path):
         conn.execute("DELETE FROM events")
     with pytest.raises(ValueError, match="history"):
         load_world(path)
+
+
+def test_compressed_history_keeps_order_ids_and_causal_links_across_chunks(tmp_path):
+    world = create_medieval_world(73)
+    previous = None
+    for _ in range(1025):
+        previous = record_event(world, "observation", "Uma observação repetida.",
+                                cause_ids=(previous.id,) if previous else ())
+    path = tmp_path / "chunked-history.mws"
+    save_world(world, path)
+    with sqlite3.connect(path) as conn:
+        chunks = conn.execute("SELECT first_sequence,event_count,payload FROM event_chunks ORDER BY first_sequence").fetchall()
+        assert [(start, count) for start, count, _ in chunks] == [(1, 512), (513, 512), (1025, 1)]
+        assert all(zlib.decompress(payload) for _, _, payload in chunks)
+        assert conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 1025
+    loaded = load_world(path)
+    assert [event.model_dump(mode="json") for event in loaded.events] == [
+        event.model_dump(mode="json") for event in world.events]
+
+
+def test_corrupt_compressed_history_is_rejected(tmp_path):
+    world = create_medieval_world(73)
+    record_event(world, "observation", "Uma observação.")
+    path = tmp_path / "corrupt-history.mws"
+    save_world(world, path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE event_chunks SET payload=? WHERE first_sequence=1", (b"broken",))
+    with pytest.raises(ValueError, match="corrupt saved history"):
+        load_world(path)
+
+
+def test_failed_atomic_replace_keeps_previous_save_and_removes_temporary_file(tmp_path, monkeypatch):
+    world = create_medieval_world(73)
+    path = tmp_path / "existing.mws"
+    save_world(world, path)
+    before = path.read_bytes()
+    record_event(world, "observation", "Uma observação posterior.")
+    from src.sim.medieval import persistence
+    def fail_replace(_source, _destination):
+        raise OSError("disk full")
+    monkeypatch.setattr(persistence.os, "replace", fail_replace)
+    with pytest.raises(OSError, match="disk full"):
+        save_world(world, path)
+    assert path.read_bytes() == before
+    assert not list(tmp_path.glob(".existing-*.mws"))

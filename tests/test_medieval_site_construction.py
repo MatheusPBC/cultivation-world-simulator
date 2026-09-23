@@ -504,6 +504,38 @@ async def test_workshop_choice_reappears_as_foundation_in_the_normal_monthly_eng
     assert audit(path)["ok"] is True
 
 
+@pytest.mark.asyncio
+async def test_unmodified_seed_offers_workshop_beside_dated_livelihood_reading(monkeypatch):
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 2000,
+    })
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    observed = []
+
+    async def observe(_world, actor, situation, choices, **_kwargs):
+        if actor == AUREN and any(item["id"].startswith("site-construction:") for item in choices):
+            observed.append((situation, choices))
+        return ai_decider.NO_ACTION
+
+    monkeypatch.setattr(ai_decider, "select_option", observe)
+    engine = MedievalSimulator(world)
+    while engine.world.clock.absolute_day < 30:
+        await engine.step()
+
+    assert len(observed) == 1
+    situation, choices = observed[0]
+    assert len(choices) > 1, "a oficina compete no menu institucional real"
+    assert any(item["id"].startswith("site-construction:polity:auren:pedraclara:") for item in choices)
+    reading = next(item for item in situation["own_local_livelihood_readings"]
+                   if item["settlement_id"] == SETTLEMENT)
+    residents = reading["residents_by_occupation"]["artisan"]
+    paid = reading["own_production_paid_workers_by_occupation"].get("artisan", 0)
+    assert residents > paid
+    assert reading["source_event_ids"]
+    assert not engine.world.economy.expansions, "NO_ACTION não constrói a oficina"
+
+
 async def test_a_stale_construction_choice_fails_closed(monkeypatch):
     world = prepared()
     world.config = world.config.model_copy(

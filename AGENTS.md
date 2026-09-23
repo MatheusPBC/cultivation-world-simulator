@@ -13,10 +13,12 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 66 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
+  save schema 67 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
+- Schema 67 stores full causal events in compressed, indexed chunks. IDs,
+  sequence, day and links remain intact; there is no retention truncation.
 - Default data namespace is `MedievalWorldSimulator(-dev)`; retain `CWS_DATA_DIR`
   for isolated tests. Save IDs are confined basenames; manual overwrite is explicit.
 - Tests of inherited `main.py` routes/imports are historical contracts, not
@@ -168,7 +170,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 66 are rejected and preserved
+  older than schema 67 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction

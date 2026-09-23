@@ -9,7 +9,7 @@ o estado atual e suas limitações estão em `docs/handoff/medieval-current-stat
 
 ResearchState possui catálogo versionado e projetos; KnowledgeState possui o
 conhecimento por instituição. Economia continua dona de estoques, salários, contas,
-receitas e obras. O mapa possui as instalações. O save medieval atual usa schema 66
+receitas e obras. O mapa possui as instalações. O save medieval atual usa schema 67
 (Economy 15, Research 3), rejeita schemas anteriores e preserva os arquivos
 antigos sem migração ou sobrescrita.
 

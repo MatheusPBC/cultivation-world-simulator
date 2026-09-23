@@ -358,9 +358,9 @@ async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(
     payment_event_id = world.economy.payments[request.id]
     learned = next(item for item in world.knowledge.technologies.values()
                    if item.owner_ref == BUYER and item.technology_id == option.technology_id)
-    save_path = tmp_path / "sale-schema-66.mws"
+    save_path = tmp_path / "sale-schema-67.mws"
     save_world(world, save_path)
-    assert SCHEMA == 66
+    assert SCHEMA == 67
     world = load_world(save_path)
 
     app = create_app(save_dir=lambda: tmp_path / "runtime")

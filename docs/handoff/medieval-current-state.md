@@ -3322,7 +3322,7 @@ encerrado pela decisão de retirada, nunca move frete.
 abertura. Uma bagagem vazia pode seguir a coluna depois da entrega, sem
 reescrever a rota histórica do pedido; enquanto houver parcela pendente, o
 stock de destino não pode sair do local prometido. Economy schema 15/save
-schema 66 rejeitam snapshots anteriores sem migração ou remoção automática.
+schema 67 rejeitam snapshots anteriores sem migração ou remoção automática.
 As decisões dos testes selecionam IDs canônicos por fixture, não provam que
 o provider real escolheria cessar-fogo ou retomada. Terreno/informação,
 controle prolongado, provider real e os gates longos ainda estão abertos.
@@ -3689,3 +3689,29 @@ tesouro ampliados na fixture e escolhas injetadas por ID, sem consulta real ao
 Luna ou ao Laya. Ainda não prova que um mundo natural escolherá a oficina,
 nem que sua economia de longo prazo se recuperará. O goal foi pausado neste
 checkpoint a pedido do usuário.
+# Checkpoint de armazenamento e oficina natural — 23/09/2026
+
+O WIP E1–E156 foi preservado em commit local `6d0e357b`, sem push/deploy.
+Quatro diretórios temporários de checkpoints (anos 3–6, oito saves) foram
+compactados em `/tmp/cws-resume-year3-to6-20260923.tar.gz` (98.621.855 bytes,
+SHA-256 `9efb7985e4fcc743827fe8415a858666aec3092ac6f3162bc0d2579e352306a0`).
+O Dropbox confirmou o upload em `/VPS Backups/cws-resume-year3-to6-20260923.tar.gz`
+com o mesmo tamanho. Só então as quatro pastas expandidas foram removidas;
+o arquivo local e o remoto permanecem. Espaço livre: 4,2 → 6,2 GiB.
+
+Save schema 67 mantém o histórico integral em blocos zlib de até 512 eventos,
+com índice separado de sequência, ID e dia. O loader confere cada índice,
+rejeita bloco corrompido e continua exigindo snapshot/event_count e validação
+causal completos. Não migra nem sobrescreve schema 66. Um smoke natural de
+120 dias da seed 73, sem provider, gravou 3.947 eventos em 2.228.224 bytes,
+com save/load equivalente, conservação e auditoria causal `ok=true`; levou
+15,82 s de parede e atingiu 150.240 KiB de RSS no processo. Isso não mede
+dez anos nem prova decisão espontânea da IA. O smoke agora expõe tamanho do
+save, tempo de save/load, pico de RSS e espaço livre após a gravação.
+
+Na seed 73 sem qualquer reforço de estoque ou tesouro, o menu mensal de Auren
+já oferece a obra de oficina ao lado de outras opções, com leitura local datada
+de artesãos residentes versus empregados pagos. `NO_ACTION` não constrói nada.
+E155–E156 seguem sendo a prova material com decisão injetada; ainda falta
+observar um provider real escolher a oficina por conta própria e a recuperação
+econômica natural em horizonte longo.

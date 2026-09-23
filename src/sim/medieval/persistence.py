@@ -10,6 +10,7 @@ from pathlib import Path
 import random
 import sqlite3
 import tempfile
+import zlib
 
 from src.classes.core.infrastructure import validate_infrastructure
 from src.classes.core.medieval_world import MedievalWorld
@@ -34,7 +35,8 @@ PRODUCT = "medieval-world-simulator"
 # Freight now retains the factual endpoint locations from its opening, so a
 # later mobile campaign bag cannot rewrite a completed order's route. Older
 # saves lack those endpoints and are rejected without rewriting real data.
-SCHEMA = 66
+SCHEMA = 67
+EVENT_CHUNK_SIZE = 512
 
 
 def world_snapshot(world: MedievalWorld) -> dict:
@@ -145,8 +147,6 @@ def save_world(world: MedievalWorld, path: Path) -> None:
     # Validate the complete candidate before touching the destination.
     restore_snapshot(snapshot, world.events)
     payload = json.dumps(snapshot, ensure_ascii=False, allow_nan=False)
-    event_rows = [(e.sequence, e.id, e.day, json.dumps(e.model_dump(mode="json"), ensure_ascii=False, allow_nan=False))
-                  for e in world.events]
     if path.is_symlink():
         raise ValueError("save destination must not be a symlink")
     if path.exists():
@@ -165,13 +165,22 @@ def save_world(world: MedievalWorld, path: Path) -> None:
             conn.executescript("""
                 CREATE TABLE metadata (id INTEGER PRIMARY KEY CHECK(id=1), product TEXT NOT NULL, schema_version INTEGER NOT NULL);
                 CREATE TABLE world (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL);
-                CREATE TABLE events (sequence INTEGER PRIMARY KEY, id TEXT UNIQUE NOT NULL, day INTEGER NOT NULL, payload TEXT NOT NULL);
+                CREATE TABLE events (sequence INTEGER PRIMARY KEY, id TEXT UNIQUE NOT NULL, day INTEGER NOT NULL, chunk_start INTEGER NOT NULL);
                 CREATE INDEX events_by_day ON events(day, sequence);
+                CREATE TABLE event_chunks (first_sequence INTEGER PRIMARY KEY, event_count INTEGER NOT NULL, payload BLOB NOT NULL);
             """)
             with conn:
                 conn.execute("INSERT INTO metadata VALUES (1, ?, ?)", (PRODUCT, SCHEMA))
                 conn.execute("INSERT INTO world VALUES (1, ?)", (payload,))
-                conn.executemany("INSERT INTO events VALUES (?, ?, ?, ?)", event_rows)
+                for offset in range(0, len(world.events), EVENT_CHUNK_SIZE):
+                    batch = world.events[offset:offset + EVENT_CHUNK_SIZE]
+                    first_sequence = batch[0].sequence
+                    payloads = [json.dumps(event.model_dump(mode="json"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+                                for event in batch]
+                    conn.execute("INSERT INTO event_chunks VALUES (?, ?, ?)",
+                                 (first_sequence, len(batch), zlib.compress(b"\n".join(payloads), level=1)))
+                    conn.executemany("INSERT INTO events VALUES (?, ?, ?, ?)",
+                                     ((event.sequence, event.id, event.day, first_sequence) for event in batch))
         finally:
             conn.close()
         os.replace(temporary, path)
@@ -190,11 +199,23 @@ def load_world(path: Path) -> MedievalWorld:
         if row is None:
             raise ValueError("save has no world snapshot")
         events = []
-        for seq, event_id, day, payload in conn.execute("SELECT sequence, id, day, payload FROM events ORDER BY sequence"):
-            event = WorldEvent.model_validate_json(payload)
-            if (event.sequence, event.id, event.day) != (seq, event_id, day):
-                raise ValueError("inconsistent event index")
-            events.append(event)
+        for first_sequence, count, payload in conn.execute(
+                "SELECT first_sequence, event_count, payload FROM event_chunks ORDER BY first_sequence"):
+            try:
+                payloads = zlib.decompress(payload).split(b"\n")
+            except zlib.error as exc:
+                raise ValueError("corrupt saved history chunk") from exc
+            index_rows = conn.execute(
+                "SELECT sequence, id, day FROM events WHERE chunk_start=? ORDER BY sequence", (first_sequence,)).fetchall()
+            if len(payloads) != count or len(index_rows) != count or first_sequence != len(events) + 1:
+                raise ValueError("saved history chunk does not match its index")
+            for (seq, event_id, day), event_payload in zip(index_rows, payloads):
+                event = WorldEvent.model_validate_json(event_payload)
+                if (event.sequence, event.id, event.day) != (seq, event_id, day):
+                    raise ValueError("inconsistent event index")
+                events.append(event)
+        if conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] != len(events):
+            raise ValueError("saved history index has orphaned rows")
         return restore_snapshot(json.loads(row[0]), events)
     finally:
         conn.close()
