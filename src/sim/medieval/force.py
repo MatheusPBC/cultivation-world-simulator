@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from src.classes.economy.models import MoneyAccount
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, require_authority
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment, ForcePosition, ForceStandoff
 from src.classes.society.force import Garrison
@@ -271,15 +271,33 @@ def raise_options(world, actor, days=10):
     return tuple(sorted(options, key=lambda item: item.id))
 
 
-def raise_detachment(world, actor, option_id, decision_event_id, *, days=10):
+def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, operational_plan_id=None):
     """Soldiers and rations leave their owners; wages are paid at once."""
     candidate = deepcopy(world)
-    decision, decided_by = _decision(candidate, decision_event_id, RAISE_ACTION)
-    if decided_by != actor:
-        raise ValueError("raising a detachment has the wrong actor")
     option = next((item for item in raise_options(candidate, actor, days=days) if item.id == option_id), None)
-    if option is None or decision.decision != option.decision():
+    if option is None:
         raise ValueError("raise option is stale or unknown")
+    if operational_plan_id is None:
+        decision, decided_by = _decision(candidate, decision_event_id, RAISE_ACTION)
+        if decided_by != actor or decision.decision != option.decision():
+            raise ValueError("raising a detachment has the wrong actor decision")
+    else:
+        decision = _event(candidate, decision_event_id)
+        holder = headquarters_holder(candidate, actor)
+        expected = {"action": RAISE_ACTION, "actor_ref": holder.to_dict() if holder else None,
+                    "institution_ref": actor.to_dict(), "operational_plan_id": operational_plan_id,
+                    "selected_affordance_id": option.id}
+        from .strategy_response import _headquarters_briefing, defense_action_options
+        plan = candidate.strategy.plans.get(operational_plan_id)
+        objective = candidate.strategy.objectives.get(plan.objective_id) if plan else None
+        briefing_holder, briefing = _headquarters_briefing(candidate, objective) if objective else (None, None)
+        if (holder is None or decision is None or decision.fact_kind != FactKind.DECISION
+                or decision.day != candidate.clock.absolute_day or decision.decision != expected
+                or briefing_holder != holder or briefing is None
+                or briefing.event_id not in {link.cause_event_id for link in decision.causal_links}
+                or not any(item.id == option.id for item in defense_action_options(
+                    candidate, actor, operational_plan_id))):
+            raise ValueError("operational mobilization requires the current headquarters decision")
     require_authority(candidate, actor, "military")
     # The dated reports make this a valid choice for the actor, but the force
     # owner still cannot send people over a passage that has physically closed

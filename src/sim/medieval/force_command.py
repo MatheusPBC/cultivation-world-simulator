@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, require_authority
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import DetachmentCommand
 from src.classes.society.models import Identity
@@ -90,6 +90,7 @@ def command_is_current(world, command):
     day = world.clock.absolute_day
     return (detachment is not None and character is not None and office is not None
             and detachment.stage == "present" and character.death_day is None
+            and EntityRef("character", character.id) != headquarters_holder(world, command.institution_ref)
             and character.location_id == detachment.location_id
             and not is_traveling(world, character.id)
             and office.institution_ref == command.institution_ref and "military" in office.scopes
@@ -140,6 +141,7 @@ def detachment_command_options(world, actor, *, detachment_id=None):
         if command is None and not _engagement_started_today(world, detachment.id):
             for character in sorted(world.society.characters.values(), key=lambda item: item.id):
                 if (character.death_day is None and character.location_id == detachment.location_id
+                        and EntityRef("character", character.id) != headquarters_holder(world, actor)
                         # Somebody already on the road is not present to be
                         # appointed, even though its residence has not changed.
                         and not is_traveling(world, character.id)

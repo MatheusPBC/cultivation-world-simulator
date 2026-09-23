@@ -6,13 +6,15 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.governance.authority import headquarters_holder
+from src.classes.governance.knowledge import settlement_report_id
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import raise_options
+from src.sim.medieval.force import raise_detachment
 from src.sim.medieval.field_engagement import _fatigue_level
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
@@ -41,7 +43,6 @@ def occupied_response_world():
     soldiers_id = f"pop:{SOURCE}:{group.people}:soldier"
     world.society.population[soldiers_id] = group.model_copy(
         update={"id": soldiers_id, "occupation": "soldier", "count": 20})
-    settlement = world.society.settlements[TARGET]
     occupation = record_event(
         world, "test_strategy_occupation", "Fixture factual de ocupação observável.",
         fact_kind=FactKind.STATE_TRANSITION,
@@ -85,6 +86,13 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert world.strategy.plans[plan.id].detachment_id == raised.id
     force_decision = next(event for event in world.events if event.event_type == "strategy_defense_force_decided")
     material = next(event for event in world.events if event.event_type == "detachment_raised")
+    headquarters = headquarters_holder(world, OWNER)
+    own_briefing = world.knowledge.settlement_report(headquarters, TARGET)
+    assert headquarters.kind == "character" and headquarters != OWNER
+    assert force_decision.decision["actor_ref"] == headquarters.to_dict()
+    assert force_decision.decision["institution_ref"] == OWNER.to_dict()
+    assert force_decision.decision["operational_plan_id"] == plan.id
+    assert own_briefing.event_id in {link.cause_event_id for link in force_decision.causal_links}
     assert force_decision.id in {link.cause_event_id for link in material.causal_links}
     assert all(delta.owner_kind not in {"stock", "account", "detachment"} for delta in adoption.deltas)
 
@@ -321,6 +329,8 @@ def test_defense_no_action_preserves_a_later_choice(monkeypatch):
     assert not asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     assert world.strategy.plans[plan.id].stage == "adopted"
     assert not world.society.detachments
+    refusal = next(event for event in world.events if event.event_type == "strategy_defense_operational_declined")
+    assert refusal.decision["actor_ref"] == headquarters_holder(world, OWNER).to_dict()
     assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 31
 
     for day in range(2, 31):
@@ -331,6 +341,33 @@ def test_defense_no_action_preserves_a_later_choice(monkeypatch):
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     assert world.strategy.plans[plan.id].stage == "mobilized"
+
+
+def test_operational_mobilization_rejects_institutional_or_missing_briefing(monkeypatch):
+    world, _, _ = occupied_response_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
+                                                   "ai_max_calls": 10})
+    choose_first(monkeypatch)
+    assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    plan = next(iter(world.strategy.plans.values()))
+    due = tick(world)
+    option = defense_action_options(world, OWNER, plan.id)[0]
+    forged = record_event(world, "test_institutional_operational_decision", "Decisão da instituição, não do QG.",
+                          fact_kind=FactKind.DECISION,
+                          decision={"action": "raise_detachment", "actor_ref": OWNER.to_dict(),
+                                    "institution_ref": OWNER.to_dict(), "operational_plan_id": plan.id,
+                                    "selected_affordance_id": option.id})
+    before = world_snapshot(world)
+    with pytest.raises(ValueError, match="current headquarters decision"):
+        raise_detachment(world, OWNER, option.id, forged.id, days=option.days,
+                         operational_plan_id=plan.id)
+    assert world_snapshot(world) == before
+
+    headquarters = headquarters_holder(world, OWNER)
+    world.knowledge.settlement_reports.pop(settlement_report_id(headquarters, TARGET))
+    assert asyncio.run(review_strategy_responses_with_provider(world, due))
+    assert world.strategy.plans[plan.id].stage == "blocked"
+    assert not world.society.detachments
 
 
 def test_missing_stale_forged_or_no_action_never_adopts(monkeypatch):

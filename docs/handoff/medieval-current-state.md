@@ -3955,3 +3955,24 @@ outras ações como socorro. A prova mostra uma resposta parcial possível,
 **não** recuperação geral nem escolha de provider real. Neste ambiente,
 `provider_available()` retornou `False`; a validação com modelo real aguarda
 configuração operacional, não um fallback silencioso.
+
+### Elo operacional do QG na defesa de uma cidade ocupada
+
+Um reino com personagem local elegível começa com um `AuthorityOffice` de QG
+separado da autoridade militar institucional. O titular é um personagem
+existente, recebe sua própria observação local ou um boletim de assentamento
+com recibo causal e, após o plano defensivo da instituição, escolhe uma
+affordance atual de mobilização ou `NO_ACTION`. `Force` recompõe plano,
+autoridade, relatório do titular e opção material antes de retirar soldados,
+comida e salários. Sem titular ou conhecimento próprio, o plano fica bloqueado;
+uma decisão institucional forjada não consegue mobilizar a coluna por esse
+caminho. O titular do QG também não pode ocupar simultaneamente o comando de
+campo. A carga pendente em destino móvel continua bloqueando retirada.
+
+Evidência focada neste checkpoint: `33 passed` em resposta estratégica,
+campanha persistente, comando de campo e autonomia; Ruff e `git diff --check`
+passaram. A fixture separada de carga pendente protege o caso em que a remessa
+ainda não chegou; no teste de cerco desabastecido, a remessa inicial já pode
+ter sido entregue antes do início do cerco. Isto prova um elo de decisão
+operacional, **não** uma ordem política independente, atraso de transmissão,
+discordância rei/QG/general, campanha espontânea ou gate natural de dez anos.

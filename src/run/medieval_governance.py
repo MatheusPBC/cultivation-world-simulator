@@ -15,6 +15,18 @@ def create_authority(society):
             office = AuthorityOffice(id=f"office:{kind}:{identity}", institution_ref=ref,
                                      holder_ref=ref, scopes=("trade", "supply", "taxation", "research", "diplomacy", "military") if kind == "polity" else ("trade", "supply", "research", "diplomacy"))
             state.offices[office.id] = office
+            if kind == "polity":
+                officers = [character for character in society.characters.values()
+                            if society.settlements[character.location_id].administrator_id == identity]
+                if officers:
+                    # The initial staff officer is an information specialist;
+                    # the strongest field commander remains available to lead
+                    # an actual column when institution and person choose so.
+                    holder = min(officers, key=lambda person: (-person.skills.investigation, person.id))
+                    headquarters = AuthorityOffice(
+                        id=f"office:polity:{identity}:headquarters", institution_ref=ref,
+                        holder_ref=EntityRef("character", holder.id), scopes=("operations",))
+                    state.offices[headquarters.id] = headquarters
     for polity_id in society.polities:
         state.tax_policies[polity_id] = TaxPolicy(id=polity_id, account_id=f"treasury:{polity_id}")
     return state

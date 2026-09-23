@@ -10,7 +10,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, require_authority
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder, require_authority
 from src.classes.governance.models import Objective, StrategicPlan
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity, SocietyValue
@@ -141,6 +141,23 @@ def _plan_status(world, objective):
     if _current_occupied_report(world, objective.actor_ref, objective.settlement_id) is None:
         return "blocked", "relatório local não permite resposta atual"
     return None, None
+
+
+def _headquarters_briefing(world, objective):
+    """The named officer needs their own dated reading of the political target."""
+    holder = headquarters_holder(world, objective.actor_ref)
+    institution_report = world.knowledge.settlement_report(objective.actor_ref, objective.settlement_id)
+    report = world.knowledge.settlement_report(holder, objective.settlement_id) if holder else None
+    if (report is None or institution_report is None or report.recipient_ref != holder
+            or report.observed_day != institution_report.observed_day
+            or report.occupier_id != institution_report.occupier_id
+            or not 0 <= world.clock.absolute_day - report.observed_day < REPORT_MAX_AGE_DAYS):
+        return holder, None
+    try:
+        world.knowledge._validate_settlement_report(world, world.event_index(), report)
+    except ValueError:
+        return holder, None
+    return holder, report
 
 
 def _set_plan(world, plan, stage, *, blocker=None, causes=(), detachment_id=None,
@@ -352,6 +369,15 @@ async def _review_material_turn(world, plan):
     if not world.config.ai_enabled:
         _schedule_review(world, plan.id)
         return False
+    headquarters, briefing = _headquarters_briefing(world, objective)
+    if briefing is None:
+        blocker = ("sem titular atual do QG" if headquarters is None
+                   else "QG não recebeu observação atual do assentamento")
+        changed = plan.stage != "blocked" or plan.blocker != blocker
+        if changed:
+            _set_plan(world, plan, "blocked", blocker=blocker)
+        _schedule_review(world, plan.id)
+        return changed
     options = defense_action_options(world, objective.actor_ref, plan.id)
     if not options:
         blocker = "nenhuma coluna pode ser erguida para o assentamento conhecido"
@@ -366,13 +392,24 @@ async def _review_material_turn(world, plan):
         return changed
     report = world.knowledge.settlement_report(objective.actor_ref, objective.settlement_id)
     selected = await ai_decider.select_option(
-        world, objective.actor_ref,
-        {"you_are": objective.actor_ref.to_dict(), "settlement_id": objective.settlement_id,
-         "report_event_id": report.event_id, "today": world.clock.absolute_day},
+        world, headquarters,
+        {"you_are": headquarters.to_dict(), "serving_institution": objective.actor_ref.to_dict(),
+         "settlement_id": objective.settlement_id, "report_event_id": briefing.event_id,
+         "observed_occupier_id": briefing.occupier_id, "today": world.clock.absolute_day},
         [{"id": item.id, "label": (f"Erguer {item.count} soldados com {item.provisions} rações "
                                  f"para até {item.days} dias e marchar ao assentamento conhecido.")}
-         for item in options], causes=(plan.last_event_id, report.event_id))
-    if selected in (None, ai_decider.NO_ACTION):
+         for item in options], causes=(plan.last_event_id, briefing.event_id))
+    if selected == ai_decider.NO_ACTION:
+        record_event(world, "strategy_defense_operational_declined",
+                     "O titular do QG decidiu não mobilizar uma das colunas disponíveis.",
+                     fact_kind=FactKind.DECISION,
+                     decision={"action": "no_action", "actor_ref": headquarters.to_dict(),
+                               "operational_plan_id": plan.id,
+                               "declined_option_ids": tuple(sorted(item.id for item in options))},
+                     cause_ids=_causes(plan.last_event_id, briefing.event_id))
+        _schedule_review(world, plan.id)
+        return False
+    if selected is None:
         _schedule_review(world, plan.id)
         return False
     option = next((item for item in options if item.id == selected), None)
@@ -381,21 +418,28 @@ async def _review_material_turn(world, plan):
             f"provider decision required for {objective.actor_ref.kind}:{objective.actor_ref.id}: "
             "strategy affordance became stale"
         )
-    decision = record_event(world, "strategy_defense_force_decided",
-                            "A instituição selecionou uma coluna material possível para responder à ocupação.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
-                            cause_ids=_causes(plan.last_event_id, report.event_id))
+    decision = record_event(
+        world, "strategy_defense_force_decided",
+        "O titular do QG escolheu uma coluna material possível para responder à ocupação.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "raise_detachment", "actor_ref": headquarters.to_dict(),
+                  "institution_ref": objective.actor_ref.to_dict(), "operational_plan_id": plan.id,
+                  "selected_affordance_id": option.id},
+        cause_ids=_causes(plan.last_event_id, briefing.event_id))
     status, blocker = _plan_status(world, objective)
     if status is not None:
         _set_plan(world, plan, status, blocker=blocker, causes=(decision.id,))
         return True
-    if not any(item.id == option.id for item in defense_action_options(world, objective.actor_ref, plan.id)):
+    if (_headquarters_briefing(world, objective) != (headquarters, briefing)
+            or not any(item.id == option.id for item in defense_action_options(
+                world, objective.actor_ref, plan.id))):
         raise ProviderDecisionRequired(
             f"provider decision required for {objective.actor_ref.kind}:{objective.actor_ref.id}: "
             "strategy affordance became stale"
         )
     try:
-        detachment = raise_detachment(world, objective.actor_ref, option.id, decision.id, days=option.days)
+        detachment = raise_detachment(world, objective.actor_ref, option.id, decision.id,
+                                      days=option.days, operational_plan_id=plan.id)
     except ValueError as exc:
         raise ProviderDecisionRequired(
             f"provider decision required for {objective.actor_ref.kind}:{objective.actor_ref.id}: "

@@ -16,9 +16,11 @@ from src.sim.medieval.campaign_ceasefire import (campaign_ceasefire_fulfillment_
                                                   respond_campaign_ceasefire)
 from src.sim.medieval import ai_decider
 from src.sim.medieval.campaign_supply import review_campaign_supplies
+from src.sim.medieval.campaign_supply import campaign_stock_id
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import force_position_options, prepare_force_position
+from src.sim.medieval.logistics import queue_freight
 from src.sim.medieval.persistence import load_world, save_world
 from src.sim.medieval.settlement_investment import (execute_settlement_investment_option,
                                                     settlement_investment_options)
@@ -170,8 +172,8 @@ def test_plan_column_cannot_force_victory_without_supply(monkeypatch, tmp_path, 
         assert any(order.destination_id.endswith(own_id) for order in world.economy.freight_orders.values())
     pending_parcels = tuple(parcel for parcel in world.economy.parcels.values()
                             if world.economy.freight_orders[parcel.order_id].destination_id.endswith(own_id))
-    if not extra_food:
-        assert pending_parcels
+    # The first shipment may already have arrived by the time positioning and
+    # investment finish. Its order still proves that food traveled physically.
     if pending_parcels:
         assert not siege_campaign_withdrawal_options(world, OWNER)
         assert not campaign_ceasefire_offer_options(world, OWNER)
@@ -227,6 +229,31 @@ def test_plan_column_cannot_force_victory_without_supply(monkeypatch, tmp_path, 
     save_world(world, final_path)
     from tools.medieval_causal_audit import audit
     assert audit(final_path)["ok"] is True
+
+
+def test_pending_campaign_cargo_stays_at_its_destination_when_siege_could_withdraw(monkeypatch, tmp_path):
+    world, _, own_id, _ = _start_siege(monkeypatch, 12000)
+    source = next(stock for stock in world.economy.stocks.values()
+                  if stock.owner_ref == OWNER and stock.location_id == TARGET and stock.goods.get("food", 0) > 0)
+    destination_id = campaign_stock_id(own_id)
+    route_ids = ()
+    decision = record_event(
+        world, "test_pending_campaign_freight_decided", "A instituição decidiu enviar mais uma ração real.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "freight", "source_id": source.id, "destination_id": destination_id,
+                  "resource_id": "food", "quantity": 1, "route_ids": list(route_ids),
+                  "actor_ref": OWNER.to_dict()})
+    order = queue_freight(world, source.id, destination_id, "food", 1, route_ids,
+                          decision_event_id=decision.id)
+    assert any(parcel.order_id == order.id for parcel in world.economy.parcels.values())
+    assert not siege_campaign_withdrawal_options(world, OWNER)
+    assert not campaign_ceasefire_offer_options(world, OWNER)
+
+    forged = deepcopy(world)
+    bag = forged.economy.stocks[destination_id]
+    forged.economy.stocks[destination_id] = bag.model_copy(update={"location_id": SOURCE})
+    with pytest.raises(ValueError, match="pending cargo destination moved"):
+        save_world(forged, tmp_path / "forged-mobile-baggage.mws")
 
 
 def test_plan_column_can_negotiate_and_physically_withdraw(monkeypatch, tmp_path):

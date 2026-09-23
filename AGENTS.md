@@ -215,6 +215,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   without a column, schedules another dated review. It recomputes current
   reports and material force options; neither restored supplies nor the passage
   of time raises soldiers by itself.
+- A polity with an eligible named resident starts with a separate headquarters
+  `operations` office. The adopted defensive plan remains institutional, but
+  its current HQ holder needs their own dated settlement observation/bulletin
+  and independently selects a current raise option or `NO_ACTION`. Force
+  revalidates that person's exact decision, briefing, plan and material option;
+  the HQ holder cannot simultaneously command the field column. This is only
+  the operational link: no separate ruler decision, transmission delay or
+  complete king-to-HQ-to-general campaign chain is claimed yet.
 - A prepared column may invest an administered city only if its own fresh local
   report confirms a foreign occupier. The pressure notice goes to that occupier,
   and the investment receipt cites the local occupation report as well as the

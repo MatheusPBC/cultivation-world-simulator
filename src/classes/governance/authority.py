@@ -135,3 +135,14 @@ def require_authority(world, owner_ref, scope):
     elif can_actor_act_for(world, owner_ref, owner_ref, scope):
         return
     raise ValueError("current authority does not permit this operation")
+
+
+def headquarters_holder(world, institution_ref):
+    """Current named officer allowed to make this institution's operational choice."""
+    office = world.authority.offices.get(
+        f"office:{institution_ref.kind}:{institution_ref.id}:headquarters")
+    if (office is None or office.institution_ref != institution_ref
+            or office.holder_ref.kind != "character" or "operations" not in office.scopes
+            or not can_actor_act_for(world, office.holder_ref, institution_ref, "operations")):
+        return None
+    return office.holder_ref

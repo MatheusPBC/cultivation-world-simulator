@@ -1,9 +1,9 @@
 """Dated, aggregate settlement observations and physically delivered bulletins."""
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder
 from src.classes.governance.knowledge import settlement_report_id
-from src.classes.governance.models import SettlementReport, settlement_observation
+from src.classes.governance.models import SettlementReport
 from src.classes.mechanical_language import EntityRef
 from .economy import _causes, _delta
 from .events import record_event
@@ -170,12 +170,21 @@ def observe_present_force(world, detachment_id):
     return report
 
 
-def _recipients(world):
-    return [EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
-            if world.society.available_count(group_id) > 0]
+def _recipients(world, publisher):
+    recipients = [EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
+                  if world.society.available_count(group_id) > 0]
+    if publisher.kind == "polity":
+        holder = headquarters_holder(world, publisher)
+        if holder is not None:
+            recipients.append(holder)
+    return recipients
 
 
 def _reachable(world, settlement_id, recipient):
+    if recipient.kind == "character":
+        person = world.society.characters.get(recipient.id)
+        return (person is not None and person.death_day is None
+                and supply_path(world, settlement_id, person.location_id) is not None)
     group = world.society.population.get(recipient.id)
     return group is not None and world.society.available_count(group.id) > 0 and (
         supply_path(world, settlement_id, group.settlement_id) is not None)
@@ -185,7 +194,7 @@ def _publish(world, report):
     publisher = report.publisher_ref
     if not can_actor_act_for(world, publisher, publisher, "trade"):
         return
-    targets = [recipient for recipient in _recipients(world) if recipient != publisher
+    targets = [recipient for recipient in _recipients(world, publisher) if recipient != publisher
                and (world.knowledge.settlement_report(recipient, report.settlement_id) is None
                     or world.knowledge.settlement_report(recipient, report.settlement_id).observed_day != report.observed_day)
                and _reachable(world, report.settlement_id, recipient)]
