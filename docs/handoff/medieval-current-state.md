@@ -4249,6 +4249,16 @@ anteriores sem migração. O smoke natural que já rodava iniciou sob schema 69 
 natural atual e decisões de provider real para medir se atores de fato escolhem
 esse ajuste frente a outras prioridades.
 
+A composição entre domínios tem uma prova **pressionada** já existente e
+revalidada neste checkout: `test_medieval_campaign_creature_interference.py`
+passou. Nela, uma criatura decide restringir uma rota, a mesma coluna de um
+plano defensivo fica retida, uma carga de alimento atrasa e a subsistência
+civil piora em comparação à rota aberta; as fontes da restrição aparecem nos
+receipts de retenção, atraso e subsistência. A ocupação e a consulta de decisão
+foram montadas pela fixture. Portanto ela não prova que rei, QG, comandante,
+comerciantes e população formem espontaneamente toda essa cadeia num mundo
+natural; esse aceite continua aberto.
+
 Um mundo novo da seed 73 rodou 120 dias no schema 70: 3.867 eventos, dinheiro e
 recursos conservados, save/load equivalente e auditoria separada `ok=true`
 (zero causas quebradas, autorias inválidas ou deltas Story/LLM). O checkpoint
