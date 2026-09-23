@@ -25,7 +25,18 @@ const checkpointLabel=(checkpointId:string)=>{
 }
 const dossierCategory=(category:string)=>t('dossierCategories.'+category,{default:category})
 const dossierText=(entry:{id:string;payload:Record<string,unknown>})=>String(entry.payload.content??entry.payload.result??entry.payload.name??entry.payload.kind??entry.id)
+const defensePlans=computed(()=>polity.value ? data.value.governance.plans.flatMap(plan=>{
+  const objective=data.value.governance.objectives.find(item=>item.id===plan.objective_id)
+  return objective?.actor_ref.kind==='polity' && objective.actor_ref.id===polity.value!.id && objective.kind==='defend_occupied_settlement'
+    ? [{plan,objective}] : []
+}) : [])
+const currentMilitaryOffices=computed(()=>polity.value ? data.value.governance.offices.filter(office=>
+  office.institution_ref.kind==='polity' && office.institution_ref.id===polity.value!.id
+  && (office.scopes.includes('policy') || office.scopes.includes('operations'))
+  && office.starts_day<=data.value.world.day && (office.ends_day===null || office.ends_day>=data.value.world.day)
+) : [])
 const detachmentCommand=computed(()=>detachment.value ? data.value.campaigns.commands.find(item=>item.detachment_id===detachment.value!.id) : undefined)
+const detachmentPlan=computed(()=>detachment.value ? data.value.governance.plans.find(plan=>plan.detachment_id===detachment.value!.id) : undefined)
 const detachmentPosition=computed(()=>detachment.value ? data.value.campaigns.positions.find(item=>item.detachment_id===detachment.value!.id && item.stage==='prepared') : undefined)
 const detachmentStandoffs=computed(()=>detachment.value ? data.value.campaigns.standoffs.filter(item=>item.stage==='active' && item.detachment_ids.includes(detachment.value!.id)) : [])
 const detachmentGarrisons=computed(()=>detachment.value ? data.value.campaigns.garrisons.filter(item=>item.stage==='active' && item.detachment_id===detachment.value!.id) : [])
@@ -100,6 +111,20 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
           <p class="eyebrow">{{t('governments')}} · {{label(polity.government)}}</p><h2>{{polity.name}}</h2>
           <button class="link-row" @click="select('settlement',polity.capital_id)">{{t('capital')}}: {{placeName(polity.capital_id)}} →</button>
           <h3>{{t('interests')}}</h3><p v-for="interest in polity.interests" :key="interest" class="muted">{{interest}}</p>
+          <details v-if="currentMilitaryOffices.length || defensePlans.length" class="route-knowledge">
+            <summary>{{t('militaryMandate')}} ({{defensePlans.length}})</summary>
+            <p class="muted">{{t('militaryMandateHelp')}}</p>
+            <p v-for="office in currentMilitaryOffices" :key="office.id" :data-military-office="office.id">
+              {{office.scopes.includes('policy') ? t('currentPoliticalHolder') : t('currentHeadquartersHolder')}}: {{entityName(data,office.holder_ref)}}
+            </p>
+            <article v-for="{plan,objective} in defensePlans" :key="plan.id" class="stock-card" :data-defense-plan="plan.id">
+              <h4>{{placeName(objective.settlement_id)}} · {{t('defensePlanStages.' + plan.stage)}}</h4>
+              <p v-if="plan.blocker" class="notice warning">{{plan.blocker}}</p>
+              <p v-if="plan.detachment_id"><button class="link-row" @click="select('detachment',plan.detachment_id!)">{{t('assignedDetachment')}} →</button></p>
+              <p class="muted">{{t('lastReview')}}: {{calendar(plan.last_review_day)}}</p>
+              <button @click="source(plan.last_event_id)">{{t('source')}}</button>
+            </article>
+          </details>
           <h3>{{t('knownDossier')}}</h3>
           <p v-if="dossierLoading" class="muted">{{t('loadingDossier')}}</p>
           <p v-else-if="dossierError" class="notice warning">{{dossierError.message}}</p>
@@ -244,6 +269,11 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
             <button data-testid="detachment-decision-source" @click="source(detachment.decision_event_id)">{{t('decisionSource')}}</button>
             <button data-testid="detachment-last-source" @click="source(detachment.last_event_id)">{{t('lastEventSource')}}</button>
           </div>
+          <article v-if="detachmentPlan" class="stock-card" :data-detachment-plan="detachmentPlan.id">
+            <h3>{{t('militaryMandate')}}</h3>
+            <p>{{t('defensePlanStages.' + detachmentPlan.stage)}} · {{t('lastReview')}}: {{calendar(detachmentPlan.last_review_day)}}</p>
+            <button @click="source(detachmentPlan.last_event_id)">{{t('source')}}</button>
+          </article>
           <template v-if="detachmentCommand">
             <h3>{{t('attachedCommand')}}</h3>
             <article class="stock-card" :data-command="detachmentCommand.id">

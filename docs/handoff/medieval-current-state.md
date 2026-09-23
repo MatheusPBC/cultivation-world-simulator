@@ -4191,3 +4191,28 @@ teve `world_snapshot` integralmente igual e 13.185 eventos idênticos ao
 primeiro ano da execução anterior à mudança de apresentação/política. Passaram
 15 testes focados de emprego. Isso não certifica os anos seguintes nem a
 recuperação econômica.
+
+### Mandato defensivo visível e gargalo econômico natural — 23/09/2026
+
+O Inspector do Dao agora mostra, sob cada polity, os titulares **atuais** dos
+cargos `policy` e `operations` e seus planos defensivos persistidos. Cada plano
+mostra assentamento, estágio, impedimento, data da última revisão, coluna
+vinculada (quando existe) e fonte causal navegável. A coluna aponta de volta
+ao plano. A projeção usa os dados canônicos já presentes em `GovernanceView` e
+`CampaignView`; não atribui uma ordem histórica ao titular atual nem inventa
+transporte de mensagem. Os tipos TypeScript foram alinhados aos campos
+`operations`/`policy`, plano defensivo e `detachment_id` já emitidos pelo
+backend. Um teste focado do Inspector e o type-check passaram. Isto melhora a
+investigação, mas **não** implementa a cadeia independente rei–QG–general.
+
+No smoke offline atual da seed 73, o checkpoint do dia 1080 mostrou onze
+instalações com produção zero por `payroll_funds`. Havia alimento em estoques
+locais de cidades com saúde muito baixa: Pedraclara tinha 4.156 rações,
+saúde 31/1000 e 1.460 artesãos com poupança agregada zero; Ferroalto tinha
+1.690 rações, saúde 160/1000 e 1.343 artesãos com 68 moedas. As contas
+públicas no fim do dia ainda tinham saldo, mas o receipt tipado da produção
+registra limite de folha zero no momento da execução. A liquidação dos
+contratos permanentes acontece antes da produção e disputa o mesmo orçamento
+e força de trabalho; esta é uma hipótese causal forte para o gargalo, ainda
+não um contrafactual concluído. O smoke segue rodando, e seus resultados até
+agora não aprovam resiliência econômica.
