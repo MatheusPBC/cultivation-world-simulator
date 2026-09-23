@@ -3765,3 +3765,45 @@ verificados em `/tmp/cws-legacy-gate-evidence-20260923.tar.gz` (136.461.129
 bytes, SHA-256 `0e953d699d62b84f0b9eebb7e6f3b37277f7df4756d7d2810c0cfb67b4ddb697`)
 antes de remover somente as cópias expandidas. Esse segundo arquivo permanece
 apenas no disco local, não no Dropbox; o espaço livre subiu para 8,0 GiB.
+
+### Terceiro ano e limite da política offline
+
+Após o fix de migração, a mesma seed 73 alcançou o dia 1080 em 438,26 s.
+Conservação de moeda/recursos, checkpoints, round-trip e auditoria causal
+continuaram verdes: 42.390 eventos, save final de 12.009.472 bytes,
+`ok=true`, zero causas quebradas e zero Story/interpretação material. O pico
+RSS do processo foi 716.472.320 bytes. A saúde média, porém, caiu para
+477,75; Pedraclara chegou a 32/1000. Logo, integridade técnica não equivale
+a resiliência econômica.
+
+O diagnóstico read-only do save mostrou contraste material: no ano 3,
+Pedraclara recebeu apenas 862 moedas em `wages_paid` para domicílios, mas
+9.022 rações em relief, e terminou com 536 moedas domésticas, 6.548 rações
+no estoque público e saúde 32. Portovelho teve 602 moedas de salários e
+11.209 rações em relief. Já os assentamentos agrícolas Brumafria, Campomanso
+e Salgueiro receberam respectivamente 14.824, 16.860 e 17.200 moedas em
+salários e terminaram com saúde acima de 900. Esses números indicam um
+problema de renda/trabalho e acesso, não prova de falta física global de
+alimento; são agregados de eventos/estado, ainda não um diagnóstico causal
+completo de cada família.
+
+A affordance de construir oficina continua disponível para Pedraclara no
+dia 1080 (`construction_blocker=None`), mas `routine-rules` não a escolhe.
+Portanto prolongar indefinidamente esse mesmo mundo offline mede a ausência
+de decisão econômica discricionária, não a qualidade de um provider real.
+O gate de três seeds por dez anos e a escolha espontânea do provider seguem
+abertos; nenhuma oficina foi criada automaticamente para melhorar a métrica.
+
+### Custo do avanço após três anos
+
+Um perfil dos mesmos 30 dias, retomando o save do dia 1080, identificou duas
+varreduras repetidas de histórico/avisos dentro das validações: capacidade
+física era buscada uma vez por site; conhecimento do fato, uma vez por memória
+institucional. As duas validações agora criam índices **transitórios por chamada**,
+sem salvá-los e sem alterar os critérios de aceite. Os quatro módulos focados
+de infraestrutura, construção, memória e diplomacia passaram `71 passed`.
+Sob `cProfile`, o avanço comparável caiu de 75,968 s para 55,751 s (−26,6%).
+Partindo do mesmo save, os 30 dias após a alteração produziram snapshot e
+lista completa de 43.912 eventos idênticos aos da execução anterior. Isso
+mostra ganho no recorte medido, não garante a mesma taxa em dez anos; contexto
+diplomático e capacidade estratégica ainda aparecem entre os custos maiores.

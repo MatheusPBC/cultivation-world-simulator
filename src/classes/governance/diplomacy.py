@@ -666,11 +666,24 @@ class RelationsState(RegistrySerialization):
                                    and int(delta.after) - int(delta.before) == -clause.quantity
                                    for delta in material.deltas)):
                         raise ValueError('remediation requires the negotiated freight receipt')
+        known_facts = {
+            (notice.recipient_ref, notice.event_id)
+            for registry in (world.knowledge.notices,
+                             world.knowledge.investigation_findings,
+                             world.knowledge.institutional_aid_notices)
+            for notice in registry.values()
+        }
+        reinforcements = {
+            (delta.owner_id, event.day, delta.after)
+            for event in events.values() for delta in event.deltas
+            if delta.owner_kind == 'institutional_memory'
+            and delta.aspect == 'last_reinforced_day'
+        }
         for memory in self.memories.values():
-            self._validate_memory(world, events, memory)
+            self._validate_memory(world, events, memory, known_facts, reinforcements)
 
     @staticmethod
-    def _validate_memory(world, events, memory):
+    def _validate_memory(world, events, memory, known_facts, reinforcements):
         """Relevance of a fact the institution already knows through Knowledge."""
         validate_actor(world, memory.institution_ref)
         remembered = events.get(memory.event_id)
@@ -682,23 +695,12 @@ class RelationsState(RegistrySerialization):
                            and d.aspect == 'recorded_day' and d.after == str(memory.recorded_day)
                            for d in remembered.deltas)):
             raise ValueError('institutional memory requires its canonical fact and creation receipt')
-        knows_fact = any(notice.recipient_ref == memory.institution_ref and notice.event_id == memory.event_id
-                         for notice in world.knowledge.notices.values())
-        knows_fact = knows_fact or any(
-            finding.recipient_ref == memory.institution_ref and finding.event_id == memory.event_id
-            for finding in world.knowledge.investigation_findings.values())
         # Some material responses use a specialized notice registry rather
         # than the broad diplomatic-notice index.  Those notices are still
         # the actor's canonical knowledge boundary and may anchor memory.
-        knows_fact = knows_fact or any(
-            notice.recipient_ref == memory.institution_ref and notice.event_id == memory.event_id
-            for notice in world.knowledge.institutional_aid_notices.values())
-        if not knows_fact:
+        if (memory.institution_ref, memory.event_id) not in known_facts:
             raise ValueError('institutional memory requires the knowledge notice of that fact')
-        if memory.last_reinforced_day != memory.recorded_day and not any(
-                event.day == memory.last_reinforced_day
-                and any(d.owner_kind == 'institutional_memory' and d.owner_id == memory.id
-                        and d.aspect == 'last_reinforced_day' and d.after == str(memory.last_reinforced_day)
-                        for d in event.deltas)
-                for event in events.values()):
+        if (memory.last_reinforced_day != memory.recorded_day
+                and (memory.id, memory.last_reinforced_day,
+                     str(memory.last_reinforced_day)) not in reinforcements):
             raise ValueError('reinforced memory requires its own receipt')

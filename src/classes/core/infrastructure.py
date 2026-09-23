@@ -27,20 +27,21 @@ def site_aspect(site, aspect):
             "maintainer_ref": json.dumps(site.maintainer_ref.to_dict(), sort_keys=True) if site.maintainer_ref else "None"}.get(aspect)
 
 
-def _commissioned_capabilities(events, site):
-    """The last capability set history declared for this site, if any."""
-    latest = None
+def _commissioned_capabilities(events):
+    """Index the last capability receipt for every site in one history pass."""
+    latest = {}
     for event in events.values():
         for delta in event.deltas:
-            if (delta.owner_kind == "site" and delta.owner_id == site.id
-                    and delta.aspect == "capability_ids"):
-                if latest is None or event.sequence > latest[0].sequence:
-                    latest = (event, delta)
+            if delta.owner_kind == "site" and delta.aspect == "capability_ids":
+                previous = latest.get(delta.owner_id)
+                if previous is None or event.sequence > previous[0].sequence:
+                    latest[delta.owner_id] = (event, delta)
     return latest
 
 
 def validate_infrastructure(world) -> None:
     events = world.event_index()
+    commissioned_by_site = _commissioned_capabilities(events)
     granted = {blueprint.grants_capability_id
                for blueprint in world.economy.expansion_blueprints.values()
                if blueprint.grants_capability_id}
@@ -50,7 +51,7 @@ def validate_infrastructure(world) -> None:
         if (len(set(site.capability_ids)) != len(site.capability_ids)
                 or any(not capability or not capability.strip() for capability in site.capability_ids)):
             raise ValueError("site capabilities must be unique and named")
-        commissioned = _commissioned_capabilities(events, site)
+        commissioned = commissioned_by_site.get(site.id)
         if commissioned is not None:
             receipt, delta = commissioned
             # A capability history created must still read exactly as the
