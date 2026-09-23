@@ -145,6 +145,32 @@ def test_contract_records_nonpayment_without_inventing_wage(available_workers, b
     world.economy.validate(world)
 
 
+@pytest.mark.parametrize("limit_kind", ["labor", "funds"])
+def test_contract_pays_only_the_workers_and_wages_actually_available(limit_kind):
+    world, contract = contracted_world()
+    next_month(world)
+    available = monthly_workforce(world)
+    workers = contract.workforce_limit - 1
+    if limit_kind == "labor":
+        available[contract.cohort_id] = workers
+    else:
+        account = world.economy.accounts[contract.account_id]
+        world.economy.accounts[account.id] = account.model_copy(
+            update={"balance": workers * contract.wage_per_worker})
+    before_total = sum(item.balance for item in world.economy.accounts.values())
+
+    settle_permanent_employment(world, available)
+
+    payroll = world.economy.payrolls[contract.id]
+    assert payroll.workers_by_group == {contract.cohort_id: workers}
+    assert payroll.gross == workers * contract.wage_per_worker
+    assert world.economy.employment_contracts[contract.id].last_outcome == "paid"
+    assert sum(item.balance for item in world.economy.accounts.values()) == before_total
+    receipt = next(item for item in world.events if item.event_type == "permanent_employment_settled")
+    assert f"{workers}/{contract.workforce_limit}" in receipt.content
+    world.economy.validate(world)
+
+
 def test_contract_and_creation_decision_round_trip_in_current_save_schema(tmp_path):
     world, contract = contracted_world()
     path = tmp_path / "employment.mws"

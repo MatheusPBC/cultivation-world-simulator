@@ -288,9 +288,9 @@ def _blocker(world, contract, available):
         return "unavailable"
     if (group is None or group.settlement_id != contract.settlement_id
             or group.occupation != contract.occupation
-            or available.get(contract.cohort_id, 0) < contract.workforce_limit):
+            or available.get(contract.cohort_id, 0) <= 0):
         return "unpaid_labor"
-    if account.balance < contract.workforce_limit * contract.wage_per_worker:
+    if account.balance < contract.wage_per_worker:
         return "unpaid_funds"
     return None
 
@@ -326,16 +326,21 @@ def settle_permanent_employment(world, available):
                 update={"last_reviewed_day": world.clock.absolute_day, "last_outcome": blocker,
                         "last_event_id": event.id})
             continue
+        # The authored limit is a ceiling, not a minimum. A migration, death
+        # or reduced treasury must not turn still-payable work into zero wages.
+        workers = min(contract.workforce_limit, available[contract.cohort_id],
+                      account.balance // contract.wage_per_worker)
         settle_work(
             world, work_id=contract.id, account_id=contract.account_id, stock_id=contract.stock_id,
-            occupation=contract.occupation, worker_count=contract.workforce_limit,
+            occupation=contract.occupation, worker_count=workers,
             wage=contract.wage_per_worker, available=available, production_event_id=contract.last_event_id,
-            required_workers={contract.cohort_id: contract.workforce_limit},
+            required_workers={contract.cohort_id: workers},
         )
         payroll = world.economy.payrolls[contract.id]
         event = record_event(
             world, "permanent_employment_settled",
-            f"{contract.cohort_id}: vínculo local pagou {payroll.gross} unidade(s) de salário.",
+            f"{contract.cohort_id}: vínculo local pagou {payroll.gross} unidade(s) de salário a "
+            f"{workers}/{contract.workforce_limit} trabalhador(es).",
             fact_kind=FactKind.STATE_TRANSITION,
             deltas=(
                 _delta("employment_contract", contract.id, "last_reviewed_day",

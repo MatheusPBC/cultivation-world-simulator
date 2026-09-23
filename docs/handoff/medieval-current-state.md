@@ -4124,3 +4124,27 @@ continuação do **checkout otimizado** começou do save semanticamente idêntic
 de dia 1800 e tem alvo de dia 3600, com novos checkpoints a cada 360 dias.
 Ainda não há resultado final para a seed 73, nem execução das outras duas
 seeds exigidas pelo gate.
+
+### Trabalho parcial em contratos permanentes — 23/09/2026
+
+O diagnóstico do save natural no dia 1800 mostrou contratos que prometiam
+empregar **até** um limite, mas o owner exigia o limite inteiro disponível e
+financiado. Exemplo: um contrato de 178 artesãos em Ferroalto tinha 58 pessoas
+disponíveis e ficava `unpaid_labor`, pagando zero. A liquidação agora toma o
+mínimo entre teto contratado, trabalhadores presentes e salários que a conta
+real pode pagar. Zero trabalhadores ou verba insuficiente para um salário
+continuam gerando recibo de não pagamento; nenhum dinheiro ou pessoa é criado.
+O recibo de pagamento nomeia trabalhadores pagos versus teto.
+
+No recorte natural do dia 1800 ao 1830, nove contratos tiveram folha parcial:
+246 trabalhadores e 966 moedas brutas efetivamente transferidas. O smoke
+conservou dinheiro e recursos, passou save/load, e a auditoria do save de dia
+1830 registrou `ok=true`, sem causas quebradas, autoria inválida ou deltas de
+Story/LLM. Os 16 testes focados de emprego passaram. Esse resultado corrige
+uma perda artificial de renda, **não** prova recuperação macroeconômica: no
+dia 1830 várias cidades ainda estavam no piso de saúde.
+
+A execução de dez anos iniciada antes desta correção foi encerrada
+intencionalmente no dia 1980; seus checkpoints permanecem. O gate atual de
+três seeds por dez anos deve rodar novamente depois de estabilizar estas
+regras materiais, em vez de ser declarado verde a partir do runtime antigo.
