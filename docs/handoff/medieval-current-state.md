@@ -3885,3 +3885,25 @@ Após save/load no schema 68, a doutrina ainda não valia no dia da decisão;
 passou a valer no dia seguinte. Auditoria standalone `ok=true`, sem causas
 quebradas nem Story/LLM material. É uma prova curta de ator independente, não
 uma campanha natural com rei, QG e general.
+
+### Dinheiro acompanha a transição de trabalho
+
+O teste de mortalidade encontrou uma perda econômica de identidade: ao
+concluir uma mudança de ocupação, Society movia as pessoas, mas o saldo
+doméstico inteiro ficava na coorte de origem. A coorte nova, mesmo criada
+numa cidade com comida física, tinha apenas a pequena bolsa de aceitação e
+podia não comprar sua ração. O owner da transição agora transfere a fração
+inteira do saldo corrente correspondente às pessoas movidas, cria a conta
+doméstica de destino se necessário e registra os dois deltas no mesmo fato
+que muda a população. Nenhuma moeda é criada ou retirada; a migração já
+seguia regra análoga para o saldo portátil.
+
+O teste de transição verifica contas, deltas e soma global; o caso de
+mortalidade antes falhava com duas mortes de privação depois de fornecer
+comida, por duas coortes novas de agricultores sem poder de compra. Os grupos
+focados de workforce, mortalidade, campo e contato passaram `49 passed`.
+Um smoke offline sintético de 120 dias no schema 68 preservou moeda e
+recursos, save/load e auditoria causal (`ok=true`, 3.855 eventos, zero causas
+quebradas ou Story/LLM material). A saúde em Pedraclara/Portovelho ainda caiu
+para 862/860: esta correção resolve a renda que não acompanhava indivíduos,
+**não** prova equilíbrio econômico nem decisão espontânea de construir oficina.

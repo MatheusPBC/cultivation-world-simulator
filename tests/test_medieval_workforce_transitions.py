@@ -169,6 +169,11 @@ def test_completion_moves_both_cohorts_under_its_own_receipt():
     world, group, facility, option = labour_limited_world()
     transition = accept_workforce_transition(world, option.id, decision_event_id=decide(world, option).id)
     before = world.society.population[group.id].count
+    source_account = world.economy.accounts[f"household:{group.id}"]
+    target_account = world.economy.accounts.get(f"household:{transition.target_group_id}")
+    target_balance = target_account.balance if target_account else 0
+    moved_balance = source_account.balance * transition.count // before
+    money = sum(account.balance for account in world.economy.accounts.values())
 
     resolve_workforce_transitions(world, due_situations(world, transition))
 
@@ -179,6 +184,11 @@ def test_completion_moves_both_cohorts_under_its_own_receipt():
     assert artisans.occupation == "artisan" and artisans.count == transition.count
     assert world.society.population[group.id].last_event_id == completed.id == artisans.last_event_id
     assert world.society.available_count(group.id) == world.society.population[group.id].count
+    assert world.economy.accounts[source_account.id].balance == source_account.balance - moved_balance
+    assert world.economy.accounts[f"household:{transition.target_group_id}"].balance == target_balance + moved_balance
+    assert sum(account.balance for account in world.economy.accounts.values()) == money
+    assert {delta.owner_id for delta in completed.deltas if delta.owner_kind == "account"} == {
+        source_account.id, f"household:{transition.target_group_id}"}
     world.society.validate(set(world.map.regions), world)
 
 

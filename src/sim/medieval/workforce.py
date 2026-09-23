@@ -10,14 +10,13 @@ import math
 
 from src.classes.event import FactKind
 from src.classes.causal_origin import CausalOrigin
+from src.classes.economy.models import MoneyAccount
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.knowledge import workforce_demand_report_id, workforce_offer_notice_id
-from src.classes.governance.models import (WorkforceDemandReport, WorkforceOfferNotice,
-                                           workforce_demand_observation, workforce_offer_observation)
+from src.classes.governance.models import WorkforceDemandReport, WorkforceOfferNotice
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import SocietyValue
 from src.classes.society.workforce import WorkforceTransition
-from src.classes.state_delta import StateDelta
 from src.systems.calendar_agenda import ScheduledSituation
 
 from .actor_dossier import _latest_food_affordability
@@ -735,6 +734,12 @@ def _completion_plan(world, transition):
                 else f"pop:{transition.destination_settlement_id}:{source.people}:{transition.target_occupation}")
     if target_id != transition.target_group_id or (target is None and target_id in world.society.population):
         return None
+    source_account = world.economy.accounts.get(f"household:{source.id}")
+    target_account = world.economy.accounts.get(f"household:{target_id}")
+    if (source_account is None or source_account.owner_ref != EntityRef("population_group", source.id)
+            or (target_account is not None
+                and target_account.owner_ref != EntityRef("population_group", target_id))):
+        return None
     checkpoint = None
     if transition.work_kind == "customs":
         from .customs import CUSTOMS_SITE_KINDS, _operator_can_run
@@ -746,7 +751,7 @@ def _completion_plan(world, transition):
                 or site.integrity < 1.0 or account is None or account.owner_ref != checkpoint.operator_ref
                 or not _operator_can_run(world, checkpoint.operator_ref)):
             return None
-    return source, target, target_id, checkpoint
+    return source, target, target_id, checkpoint, source_account, target_account
 
 
 def _abandon_transition(world, transition):
@@ -771,7 +776,19 @@ def _complete_transition(world, transition):
     if plan is None:
         _abandon_transition(world, transition)
         return
-    source, target, target_id, checkpoint = plan
+    source, target, target_id, checkpoint, source_account, target_account = plan
+    # The people who change occupation retain their proportional share of the
+    # household balance, including any stipend already paid to their source
+    # group. The remaining people keep the rest; no money is created.
+    moved_balance = source_account.balance * transition.count // source.count
+    target_balance = target_account.balance if target_account is not None else 0
+    account_deltas = (
+        _delta("account", source_account.id, "balance", source_account.balance,
+               source_account.balance - moved_balance),
+        _delta("account", f"household:{target_id}", "balance",
+               target_balance if target_account is not None else None,
+               target_balance + moved_balance),
+    )
     checkpoint_deltas = ()
     if checkpoint is not None:
         checkpoint_deltas = (_delta("customs_checkpoint", checkpoint.id, "staff_group_id",
@@ -782,9 +799,12 @@ def _complete_transition(world, transition):
         deltas=(_delta("workforce_transition", transition.id, "stage", "training", "completed"),
                 _delta("population", source.id, "count", source.count, source.count - transition.count),
                 _delta("population", target_id, "count", target.count if target else 0,
-                       (target.count if target else 0) + transition.count), *checkpoint_deltas),
+                       (target.count if target else 0) + transition.count),
+                *account_deltas, *checkpoint_deltas),
         cause_ids=_causes(transition.last_event_id, transition.decision_event_id, source.last_event_id,
                           target.last_event_id if target else None,
+                          source_account.last_event_id,
+                          target_account.last_event_id if target_account is not None else None,
                           checkpoint.last_event_id if checkpoint is not None else None))
     world.society.transfer_people(source.id, transition.destination_settlement_id, transition.target_occupation,
                                   transition.count)
@@ -792,6 +812,15 @@ def _complete_transition(world, transition):
     updated_target = world.society.population[target_id]
     world.society.population[source.id] = updated_source.model_copy(update={"last_event_id": event.id})
     world.society.population[target_id] = updated_target.model_copy(update={"last_event_id": event.id})
+    world.economy.accounts[source_account.id] = source_account.model_copy(
+        update={"balance": source_account.balance - moved_balance, "last_event_id": event.id})
+    if target_account is None:
+        world.economy.accounts[f"household:{target_id}"] = MoneyAccount(
+            id=f"household:{target_id}", owner_ref=EntityRef("population_group", target_id),
+            balance=moved_balance, last_event_id=event.id)
+    else:
+        world.economy.accounts[target_account.id] = target_account.model_copy(
+            update={"balance": target_balance + moved_balance, "last_event_id": event.id})
     if checkpoint is not None:
         world.economy.customs_checkpoints[checkpoint.id] = checkpoint.model_copy(
             update={"staff_group_id": target_id, "last_event_id": event.id})

@@ -29,7 +29,9 @@ def feed(world):
     for free, so being fed now requires real, paid consumption."""
     for key, need in world.economy.needs.items():
         stock = world.economy.stocks[need.stock_id]
-        ration = world.society.population_at(key) * 2
+        # Leave room for births before the monthly consumption pass; a two-
+        # ration shortage in an artisan town still triggers the mortality law.
+        ration = world.society.population_at(key) * 2 + 100
         world.economy.stocks[stock.id] = stock.model_copy(
             update={"goods": {**stock.goods, "food": ration}})
         price = world.economy.markets[key].prices["food"]
@@ -37,7 +39,7 @@ def feed(world):
             if group.settlement_id != key:
                 continue
             account = world.economy.accounts[f"household:{group.id}"]
-            world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price})
+            world.economy.accounts[account.id] = account.model_copy(update={"balance": group.count * price * 2})
 
 
 def people_total(world):

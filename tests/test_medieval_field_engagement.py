@@ -50,7 +50,7 @@ def tick(world):
 
 
 def prepared_challenger_world(*, challenger_count=30, defender_count=50, defender_provisions=100,
-                              prepared=True, deployment_days=20, wait_days=0, extra_food=0):
+                              prepared=True, deployment_days=20, wait_days=0, extra_food=2000):
     world = create_medieval_world(73)
     world.economy.facilities.clear()
     if extra_food:
@@ -71,7 +71,7 @@ def prepared_challenger_world(*, challenger_count=30, defender_count=50, defende
     refresh_settlement_reports(world)
     refresh_route_reports(world)
     raise_option = next(item for item in raise_options(world, OWNER, days=deployment_days)
-                        if item.destination_id == TARGET)
+                        if item.destination_id == TARGET and item.group_id == soldiers_id)
     own = raise_detachment(world, OWNER, raise_option.id, decide(world, raise_option).id,
                            days=deployment_days)
     while world.society.detachments[own.id].stage == "marching":
@@ -154,7 +154,7 @@ def set_doctrine(world, owner, detachment_id, doctrine):
 
 
 def resolve_offer(world, *, detachment_id=None, counterparty_detachment_id=None):
-    engagement = offer(world, detachment_id=detachment_id, counterparty_detachment_id=counterparty_detachment_id)
+    offer(world, detachment_id=detachment_id, counterparty_detachment_id=counterparty_detachment_id)
     tick(world)
     join = field_engagement_join_options(world, RIVAL)[0]
     return join_field_engagement(world, RIVAL, join.id, decide(world, join).id)

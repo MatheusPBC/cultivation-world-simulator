@@ -1,7 +1,5 @@
 """Bounded force-contact readings are factual knowledge, never battle data."""
 
-import json
-
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
@@ -39,7 +37,8 @@ def sighting_world():
         update={"id": soldiers_id, "occupation": "soldier", "count": 20})
     refresh_settlement_reports(world)
     refresh_route_reports(world)
-    option = next(item for item in raise_options(world, OWNER) if item.destination_id == TARGET)
+    option = next(item for item in raise_options(world, OWNER)
+                  if item.destination_id == TARGET and item.group_id == soldiers_id)
     own = raise_detachment(world, OWNER, option.id, decide(world, option).id)
     while world.society.detachments[own.id].stage == "marching":
         tick(world)
