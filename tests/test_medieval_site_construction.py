@@ -88,6 +88,9 @@ def test_only_a_settlement_that_lacks_the_capability_can_raise_it():
     world = prepared()
     option = only_option(world)
     assert option.new_site_id == constructed_site_id(SETTLEMENT, world.economy.expansion_blueprints[BLUEPRINT])
+    assert world.society.settlements[SETTLEMENT].name in option.label
+    assert world.economy.expansion_blueprints[BLUEPRINT].name in option.label
+    assert option.account_id not in option.label
     # Ferroalto already has craftsmanship, so its administration is offered none.
     assert not [item for item in site_construction_options(world, EntityRef("polity", "escarlia"))]
 

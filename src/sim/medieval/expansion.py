@@ -276,6 +276,7 @@ def foundation_adapters():
 class SiteConstructionOption(SocietyValue):
     """Transient choice to raise an authored site kind in a settlement."""
     id: str
+    label: str
     actor_ref: EntityRef
     settlement_id: str
     new_site_id: str
@@ -365,6 +366,8 @@ def site_construction_options(world, actor):
             options.append(SiteConstructionOption(
                 id=(f"site-construction:{actor.kind}:{actor.id}:{settlement.id}:{blueprint.id}:"
                     f"{stock.last_event_ids.get(next(iter(blueprint.inputs)))}"),
+                label=(f"Construir {blueprint.name} em {settlement.name}; a obra usa materiais "
+                       "e trabalho pago antes de abrir a nova capacidade."),
                 actor_ref=actor, settlement_id=settlement.id,
                 new_site_id=constructed_site_id(settlement.id, blueprint),
                 blueprint_id=blueprint.id, stock_id=stock.id, account_id=account.id,
@@ -429,7 +432,7 @@ def site_construction_adapters():
 
     return (DiscretionaryAdapter(
         name="site_construction", family="production", options_fn=site_construction_options,
-        label_fn=lambda option: f"Construir {option.blueprint_id} em {option.settlement_id}.",
+        label_fn=lambda option: option.label,
         causes_fn=lambda world, option: _causes(option.stock_event_id),
         execute_fn=execute),)
 

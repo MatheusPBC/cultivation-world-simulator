@@ -4148,3 +4148,11 @@ A execução de dez anos iniciada antes desta correção foi encerrada
 intencionalmente no dia 1980; seus checkpoints permanecem. O gate atual de
 três seeds por dez anos deve rodar novamente depois de estabilizar estas
 regras materiais, em vez de ser declarado verde a partir do runtime antigo.
+
+O menu transitório de construção passou a apresentar o nome real da obra e
+do assentamento, além de esclarecer que materiais e trabalho pago vêm antes
+da nova capacidade. IDs de conta e estoque continuam fora do rótulo; o owner
+não mudou os critérios materiais da opção. Os 20 testes focados de construção
+passaram. A seed 73 foi reiniciada do dia zero no checkout atual, sem provider,
+com checkpoints anuais e alvo de 3600 dias; ainda está em execução. Esse gate
+offline mede conservação/estabilidade, não escolhas de um provider real.
