@@ -4213,6 +4213,14 @@ saúde 31/1000 e 1.460 artesãos com poupança agregada zero; Ferroalto tinha
 públicas no fim do dia ainda tinham saldo, mas o receipt tipado da produção
 registra limite de folha zero no momento da execução. A liquidação dos
 contratos permanentes acontece antes da produção e disputa o mesmo orçamento
-e força de trabalho; esta é uma hipótese causal forte para o gargalo, ainda
-não um contrafactual concluído. O smoke segue rodando, e seus resultados até
-agora não aprovam resiliência econômica.
+e força de trabalho. Um contrafactual isolado do save de dia 1080 até 1110
+confirmou o conflito de orçamento: o caminho normal concluiu 16 lotes em 3
+instalações; uma fixture que apenas suprimiu a liquidação dos contratos naquele
+ciclo concluiu 150 lotes em 9 instalações. Saúde média ao fim foi 453,5 contra
+457,12; a falta pontual foi 192 contra 225, portanto **não** se pode inferir
+cura imediata da privação somente pela produção. A fixture não é proposta de
+implementação: deixar de pagar vínculos sem decisão e receipt quebraria a
+causalidade social. O resultado aponta para uma affordance real de revisão ou
+priorização entre obrigações e produção, não para uma correção automática por
+falta alimentar. O smoke segue rodando, e seus resultados ainda não aprovam
+resiliência econômica.
