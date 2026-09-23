@@ -4169,3 +4169,25 @@ O texto esclarece que alimento disponível não implica poder de compra. Os
 três testes focados do painel, type-check e build medieval passaram; o build
 mantém um aviso não bloqueante de chunk JavaScript acima de 500 kB. Ainda
 faltam outras visões causais de campanha, comando e mudanças de plano.
+
+### Contratos não são produção alimentar — 23/09/2026
+
+Uma comparação da seed 73 no dia 1080 encontrou um efeito cruzado da nova
+liquidação parcial: a poupança artesã subiu de 9 para 74 moedas e contratos
+pagos de 14 para 21, mas a saúde média caiu de 509 para 471 e a produção
+alimentar daquele fechamento foi menor. O contrato reserva trabalhadores
+antes da produção; ele paga serviço local, não aciona a receita da instalação.
+Esse trade-off real não deve ser apresentado à IA como “emprego agrícola gera
+comida”. O menu da IA agora declara explicitamente esse efeito e a política
+offline não dá preferência artificial ao agricultor quando falta alimento.
+
+Foi testado, e rejeitado, um veto geral a contratos de agricultores: ao fim de
+360 dias ele deixou 279.671 unidades de alimento nos estoques, mas 486 rações
+faltantes; Campomanso tinha 31.788 no estoque local, produção limitada por
+armazenamento e uma coorte agrícola sem dinheiro. A regra final **não** contém
+esse veto: renda e produção continuam caminhos materiais distintos que podem
+competir por trabalhadores. Nessa seed, o primeiro ano com a política final
+teve `world_snapshot` integralmente igual e 13.185 eventos idênticos ao
+primeiro ano da execução anterior à mudança de apresentação/política. Passaram
+15 testes focados de emprego. Isso não certifica os anos seguintes nem a
+recuperação econômica.

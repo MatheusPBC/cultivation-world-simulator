@@ -1,7 +1,6 @@
 """Focused coverage for the bounded recurring local-payroll vertical."""
 
 from dataclasses import replace
-from types import SimpleNamespace
 
 import pytest
 
@@ -213,6 +212,7 @@ def test_employment_turn_exposes_public_pressure_without_private_terms():
     assert "account_id" not in first
     assert "stock_id" not in first
     assert "balance" not in repr(situation)
+    assert "não opera instalações nem cria alimentos" in situation["employment_effect"]
 
 
 def test_employment_site_is_bounded_by_its_authored_facility_occupation():
@@ -231,10 +231,10 @@ def test_employment_site_is_bounded_by_its_authored_facility_occupation():
 
 def test_offline_employment_fallback_uses_current_pressure_and_material_owner():
     world = create_medieval_world(73)
-    employer = EntityRef("polity", "auren")
+    employer = EntityRef("polity", "escarlia")
     refresh_reports(world)
     options = tuple(item for item in permanent_employment_options(world, employer)
-                    if item.settlement_id == "campomanso")
+                    if item.settlement_id == "ferroalto" and item.occupation == "artisan")
     option = options[0]
     report = world.knowledge.settlement_report(employer, option.settlement_id)
     world.knowledge.settlement_reports[report.id] = report.model_copy(update={"missing_food": 4})
@@ -249,33 +249,6 @@ def test_offline_employment_fallback_uses_current_pressure_and_material_owner():
     assert decision.decision["selected_affordance_id"] in {item.id for item in options}
     assert any(item.event_type == "permanent_employment_created" for item in world.events)
     world.economy.validate(world)
-
-
-def test_offline_employment_fallback_prefers_food_production_at_equal_pressure(monkeypatch):
-    import src.sim.medieval.permanent_employment as employment
-
-    world = create_medieval_world(73)
-    employer = EntityRef("polity", "auren")
-    refresh_reports(world)
-    report = world.knowledge.settlement_report(employer, "campomanso")
-    world.knowledge.settlement_reports[report.id] = report.model_copy(update={"missing_food": 20})
-    options = (
-        SimpleNamespace(id="employment:artisan", employer_ref=employer,
-                        settlement_id="campomanso", occupation="artisan"),
-        SimpleNamespace(id="employment:farmer", employer_ref=employer,
-                        settlement_id="campomanso", occupation="farmer"),
-    )
-    chosen = []
-    monkeypatch.setattr(employment, "permanent_employment_options", lambda _world, _actor: options)
-    monkeypatch.setattr(employment, "record_permanent_employment_decision",
-                        lambda _world, _actor, option_id: chosen.append(option_id)
-                        or SimpleNamespace(id="decision:employment"))
-    monkeypatch.setattr(employment, "create_permanent_employment",
-                        lambda _world, option_id, *, decision_event_id: option_id)
-
-    employment.review_permanent_employment_fallback(world)
-
-    assert chosen == ["employment:farmer"]
 
 
 def test_persisted_contract_rejects_an_employer_site_outside_the_cohort_settlement():

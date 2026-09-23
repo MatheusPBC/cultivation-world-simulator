@@ -371,6 +371,8 @@ def _situation(world, actor, options):
     return {
         "you_are": actor.to_dict(),
         "today": world.clock.absolute_day,
+        "employment_effect": ("Este vínculo paga trabalho local e reserva pessoas antes da produção mensal; "
+                              "não opera instalações nem cria alimentos por si só."),
         "own_production_readings": _own_production_readings(world, actor),
         "settlement_reports": [
             {"settlement_id": report.settlement_id, "missing_food": report.missing_food,
@@ -401,7 +403,8 @@ def permanent_employment_adapters():
 
     return (DiscretionaryAdapter(
         name="permanent_employment", family="employment", options_fn=permanent_employment_options,
-        label_fn=lambda option: f"Estabelecer vínculo local para {option.cohort_id}.",
+        label_fn=lambda option: (f"Pagar trabalho local a até {option.workforce_limit} pessoas de "
+                                 f"{option.cohort_id}; não aumenta a produção por si só."),
         # A stock, cohort and treasury can share the same latest receipt.  The
         # event ledger requires causal links to be unique, so normalize the
         # owner evidence exactly as the direct decision path does.
@@ -437,14 +440,7 @@ def review_permanent_employment_fallback(world, *, excluded_actors=()):
                 continue
             if report.missing_food <= 0 and report.health >= 700 and report.unrest < 250:
                 continue
-            # When local food is short, prefer a real food-producing job over
-            # another occupation at the same observed pressure.  The option
-            # is still fully engine-enumerated and the owner revalidates all
-            # terms; this only makes the conservative offline policy choose
-            # the material recovery path when it is available.
-            food_priority = int(report.missing_food > 0 and option.occupation == "farmer")
-            pressure = (report.missing_food, 1000 - report.health, report.unrest,
-                        food_priority)
+            pressure = (report.missing_food, 1000 - report.health, report.unrest)
             pressured.append((pressure, option))
         if not pressured:
             continue
