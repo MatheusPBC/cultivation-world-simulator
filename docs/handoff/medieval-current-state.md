@@ -3995,3 +3995,23 @@ Ruff, save/load e auditoria causal (`ok=true`, zero mutações Story) passaram.
 No perfil, as consultas `routes_for_actor` caíram de 2.183 para 1.227 e o
 tempo instrumentado de 10,33 para 9,65 s. É uma melhoria local medida,
 **não** solução do custo de dez anos nem aprovação do gate longo.
+
+### Um ano natural atual e custo da diplomacia offline
+
+A mesma seed 73 completou 360 dias no schema 68 com 12.926 eventos,
+4.456.448 bytes de save, conservação de moeda/recursos, round-trip e auditoria
+causal `ok=true` (zero causas quebradas ou Story material). Não houve morte por
+privação nesse primeiro ano, mas Pedraclara/Portovelho terminaram com saúde
+747/792 e média mundial 926,75. Uma seed por um ano não substitui o gate de
+três seeds por dez anos nem demonstra recuperação econômica.
+
+O perfil read-only dos dias 360→390 mostrou que a rotina diplomática montava
+repetidamente capacidade estratégica e evidências para objetos usados apenas
+na execução mecânica offline. `diplomatic_context(..., mechanical_only=True)`
+agora preserva caixa, orçamento, técnicas, propostas e autoridade, mas não
+monta as três projeções exclusivas do dossiê de provider. O contexto padrão
+continua completo para a IA. Os 35 testes focados de diplomacia passaram; a
+mesma continuação antes/depois produziu saves SHA-256 idênticos, snapshot e
+14.324 eventos iguais. O perfil instrumentado caiu de 16,05 para 13,98 s.
+Isto reduz custo medido sem alterar decisões, não é validação de IA real ou
+aprovação de horizonte longo.

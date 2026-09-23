@@ -107,7 +107,8 @@ def strategic_evidence(world, actor=None):
         str(item["kind"]), str(item.get("finding_id") or item.get("notice_id") or item["event_id"]))))
 
 
-def diplomatic_context(world, actor):
+def diplomatic_context(world, actor, *, mechanical_only=False):
+    """Actor facts; skip provider-only narrative projections in offline policy."""
     from .actor_dossier import provider_strategic_capacity
     last_identity = id(world.events[-1]) if world.events else 0
     knowledge_size = sum(len(getattr(world.knowledge, name)) for name in world.knowledge.registries)
@@ -116,7 +117,7 @@ def diplomatic_context(world, actor):
     if cached is None or cached[0] != signature:
         cached = (signature, {})
         world._diplomatic_context_cache = cached
-    cache_key = (actor.kind, actor.id)
+    cache_key = (actor.kind, actor.id, mechanical_only)
     if cache_key in cached[1]:
         return cached[1][cache_key]
     accounts = sorted((a for a in world.economy.accounts.values() if a.owner_ref == actor), key=lambda a:a.id)
@@ -140,8 +141,8 @@ def diplomatic_context(world, actor):
             +(t.assistants_per_unit+1)*t.wage_per_worker)) for t in sorted(world.research.technologies.values(),key=lambda t:t.id)),
         proposal_ids=tuple(sorted({n.proposal_id for n in world.knowledge.notices.values() if n.recipient_ref == actor})),
         authority=frozenset(s for s in ('diplomacy','research','trade') if can_actor_act_for(world,actor,actor,s)),
-        institutional_views=institutional_views(world, actor),
-        strategic_capacity=provider_strategic_capacity(world, actor),
-        strategic_evidence=strategic_evidence(world, actor))
+        institutional_views=() if mechanical_only else institutional_views(world, actor),
+        strategic_capacity={} if mechanical_only else provider_strategic_capacity(world, actor),
+        strategic_evidence=() if mechanical_only else strategic_evidence(world, actor))
     cached[1][cache_key] = context
     return context

@@ -172,7 +172,7 @@ def respond(world, ctx, proposal):
         event = decision(world, {'action': 'respond_proposal', 'actor_ref': ctx.actor.to_dict(),
                                  'proposal_id': proposal.id, 'response': response},
                          'Responder à remediação de ensino.', (proposal.last_event_id,))
-        if 'diplomacy' not in diplomatic_context(world, proposal.proposer_ref).authority:
+        if 'diplomacy' not in diplomatic_context(world, proposal.proposer_ref, mechanical_only=True).authority:
             return
         respond_proposal(world, proposal.id, response, decision_event_id=event.id)
         if response == 'accept':
@@ -211,7 +211,7 @@ def respond(world, ctx, proposal):
     event = decision(world,{'action':'respond_proposal','actor_ref':ctx.actor.to_dict(),
         'proposal_id':proposal.id,'response':response},reason,(proposal.last_event_id,))
     # If the original signatory lost authority, acceptance cannot bind either side.
-    other = diplomatic_context(world,proposal.proposer_ref)
+    other = diplomatic_context(world,proposal.proposer_ref, mechanical_only=True)
     if 'diplomacy' not in other.authority:
         return
     respond_proposal(world,proposal.id,response,decision_event_id=event.id)
@@ -238,7 +238,7 @@ def fulfill(world, ctx, proposal):
                 'target_id':clause.target_account_id,'amount':clause.amount},'Cumprir pagamento negociado.',(obligation.last_event_id,))
             fulfill_obligation(world,obligation.id,decision_event_id=event.id)
         else:
-            learner = diplomatic_context(world,clause.creditor_ref)
+            learner = diplomatic_context(world,clause.creditor_ref, mechanical_only=True)
             tech = world.research.technologies[clause.technology_id]
             if ('research' not in ctx.authority or 'research' not in learner.authority
                     or tech.id not in ctx.techniques or tech.id in learner.techniques
@@ -250,7 +250,7 @@ def fulfill(world, ctx, proposal):
                 'Aceitar o ensino contratado.',(offered.id,))
             fulfill_obligation(world,obligation.id,decision_event_id=offered.id,acceptance_id=accepted.id)
         schedule_review(world)
-        ctx = diplomatic_context(world,ctx.actor)
+        ctx = diplomatic_context(world,ctx.actor, mechanical_only=True)
 
 
 def _disclose_teaching_offer(world, actor, other, technology_id):
@@ -302,15 +302,15 @@ def review_diplomacy(world, *, allow_offers=False):
         if a.owner_ref.kind in {'polity','organization'}},key=lambda x:(x[0].kind,x[0].id,x[1]))
     actors = sorted({ref for ref,_ in addresses},key=lambda r:(r.kind,r.id))
     for actor in actors:
-        ctx = diplomatic_context(world,actor)
+        ctx = diplomatic_context(world,actor, mechanical_only=True)
         for identity in ctx.proposal_ids:
             p = world.relations.proposals[identity]
             if p.status == 'offered' and p.counterparty_ref == actor and p.offered_day < world.clock.absolute_day < p.expires_day:
                 respond(world,ctx,p)
             elif p.status == 'accepted':
                 fulfill(world,ctx,p)
-                ctx = diplomatic_context(world,actor)
-        if allow_offers: propose(world,diplomatic_context(world,actor),addresses)
+                ctx = diplomatic_context(world,actor, mechanical_only=True)
+        if allow_offers: propose(world,diplomatic_context(world,actor, mechanical_only=True),addresses)
 
 
 def _addresses(world):
