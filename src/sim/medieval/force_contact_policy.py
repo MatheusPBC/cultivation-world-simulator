@@ -5,6 +5,8 @@ is to stand down one's own detachment through the existing Society owner.
 """
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
+from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
@@ -46,11 +48,14 @@ from .sabotage import SABOTAGE_ACTION, execute_sabotage_option, sabotage_options
 from .force_command import (APPOINT_ACTION as COMMAND_APPOINT_ACTION,
                             RELEASE_ACTION as COMMAND_RELEASE_ACTION,
                             SET_DOCTRINE_ACTION as COMMAND_DOCTRINE_ACTION,
-                            detachment_command_options, execute_detachment_command_option)
+                            command_is_current, detachment_command_options,
+                            execute_detachment_command_option)
 
 
 REVIEW_KIND = "force_contact_review"
 _PREFIX = "force-contact-review:"
+COMMAND_REVIEW_KIND = "detachment_command_review"
+_COMMAND_PREFIX = "detachment-command-review:"
 SIGHTING_MAX_AGE_DAYS = 3
 
 
@@ -70,6 +75,23 @@ def _notice_id(situation):
         return None
     identity = situation.id[len(_PREFIX):]
     return identity or None
+
+
+def _command_notice_id(situation):
+    if situation.kind != COMMAND_REVIEW_KIND or not situation.id.startswith(_COMMAND_PREFIX):
+        return None
+    return situation.id[len(_COMMAND_PREFIX):] or None
+
+
+def _schedule_commander_review(world, notice):
+    command = world.society.detachment_commands.get(notice.own_detachment_id)
+    if (command is None or command.institution_ref != notice.recipient_ref
+            or not command_is_current(world, command)):
+        return
+    identity = f"{_COMMAND_PREFIX}{notice.id}"
+    if world.agenda.get(identity) is None:
+        world.agenda.schedule(ScheduledSituation(identity, COMMAND_REVIEW_KIND,
+                                                 world.clock.absolute_day + 1))
 
 
 def _turn_available(world):
@@ -229,7 +251,7 @@ async def _contact_turn(world, notice_id):
             execute_assembly_denial_option(world, notice.recipient_ref, option.id, decision.id)
         elif action == SABOTAGE_ACTION:
             execute_sabotage_option(world, notice.recipient_ref, option.id, decision.id)
-        elif action in {COMMAND_APPOINT_ACTION, COMMAND_DOCTRINE_ACTION, COMMAND_RELEASE_ACTION}:
+        elif action in {COMMAND_APPOINT_ACTION, COMMAND_RELEASE_ACTION}:
             execute_detachment_command_option(world, notice.recipient_ref, option.id, decision.id)
         else:
             return False
@@ -240,6 +262,61 @@ async def _contact_turn(world, notice_id):
             f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
             "force contact affordance became stale"
         ) from exc
+    return True
+
+
+async def _commander_turn(world, notice_id):
+    """The named local commander, not the institution, chooses tactical posture."""
+    notice = world.knowledge.force_contact_notices.get(notice_id)
+    if notice is None or contact_sighting_for_provider(world, notice)["counterparty_posture"] is None:
+        return False
+    command = world.society.detachment_commands.get(notice.own_detachment_id)
+    if (command is None or command.institution_ref != notice.recipient_ref
+            or not command_is_current(world, command)):
+        return False
+    actor = EntityRef("character", command.character_id)
+    options = detachment_command_options(world, actor, detachment_id=command.detachment_id)
+    if not options:
+        return False
+    character = world.society.characters[command.character_id]
+    detachment = world.society.detachments[command.detachment_id]
+    situation = {
+        "today": world.clock.absolute_day,
+        "your_command": {"detachment_id": detachment.id, "settlement_id": detachment.location_id,
+                         "count": detachment.count, "current_doctrine": command.doctrine,
+                         "personality": character.personality.model_dump()},
+        "armed_contact": {"settlement_id": notice.settlement_id,
+                          "rival_identity": notice.counterparty_ref.to_dict(),
+                          **contact_sighting_for_provider(world, notice)},
+    }
+    selected = await ai_decider.select_option(
+        world, actor, situation, [{"id": option.id, "label": _label(option)} for option in options],
+        causes=(notice.event_id, command.last_event_id))
+    if selected == ai_decider.NO_ACTION:
+        record_event(
+            world, "detachment_commander_declined",
+            "O comandante local optou por manter a postura atual diante do contato armado.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            decision={"action": "no_action", "actor_ref": actor.to_dict(),
+                      "declined_option_ids": tuple(sorted(option.id for option in options))},
+            cause_ids=(notice.event_id, command.last_event_id))
+        return False
+    if selected is None:
+        return False
+    option = next((item for item in detachment_command_options(world, actor,
+                        detachment_id=command.detachment_id) if item.id == selected), None)
+    if option is None:
+        raise ProviderDecisionRequired(f"provider decision required for character:{character.id}: stale doctrine")
+    decision = record_event(
+        world, "detachment_commander_decided",
+        "O comandante local escolheu sua postura diante do contato armado.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision=option.decision(), cause_ids=(notice.event_id, command.last_event_id))
+    try:
+        execute_detachment_command_option(world, actor, option.id, decision.id)
+    except ValueError as exc:
+        raise ProviderDecisionRequired(
+            f"provider decision required for character:{character.id}: stale doctrine") from exc
     return True
 
 
@@ -354,7 +431,7 @@ def _label(option):
 
 
 async def review_force_contacts(world, situations):
-    """At most one real-provider consultation per institution in this tick."""
+    """Institution and named commander receive separate, dated actor turns."""
     reviewed = set()
     for situation in sorted(situations, key=lambda item: item.id):
         notice_id = _notice_id(situation)
@@ -363,6 +440,18 @@ async def review_force_contacts(world, situations):
             continue
         reviewed.add(notice.recipient_ref)
         await _contact_turn(world, notice_id)
+        if world.config.ai_enabled:
+            _schedule_commander_review(world, notice)
+    reviewed_commanders = set()
+    for situation in sorted(situations, key=lambda item: item.id):
+        notice_id = _command_notice_id(situation)
+        notice = world.knowledge.force_contact_notices.get(notice_id) if notice_id else None
+        command = world.society.detachment_commands.get(notice.own_detachment_id) if notice else None
+        if command is None or command.character_id in reviewed_commanders:
+            continue
+        reviewed_commanders.add(command.character_id)
+        await _commander_turn(world, notice_id)
 
 
-__all__ = ["REVIEW_KIND", "contact_sighting_for_provider", "review_force_contacts", "schedule_contact_review"]
+__all__ = ["REVIEW_KIND", "COMMAND_REVIEW_KIND", "contact_sighting_for_provider",
+           "review_force_contacts", "schedule_contact_review"]

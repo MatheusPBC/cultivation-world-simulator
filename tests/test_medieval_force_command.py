@@ -1,9 +1,17 @@
 """Focused evidence for real commanders and delayed bounded doctrines."""
 
+import asyncio
+
 from src.classes.event import FactKind
+from src.classes.mechanical_language import EntityRef
+from src.systems.calendar_agenda import ScheduledSituation
+from src.sim.medieval import ai_decider
+from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.field_engagement import field_engagement_offer_options, field_strength
 from src.sim.medieval.force import withdraw_detachment, withdrawal_options
-from src.sim.medieval.force_command import (APPOINT_ACTION, RELEASE_ACTION, SET_DOCTRINE_ACTION,
+from src.sim.medieval.force_contact_policy import (COMMAND_REVIEW_KIND, REVIEW_KIND,
+                                                   review_force_contacts, review_id)
+from src.sim.medieval.force_command import (APPOINT_ACTION, SET_DOCTRINE_ACTION,
                                             appoint_detachment_commander, detachment_command_options,
                                             effective_doctrine, set_detachment_doctrine)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -24,9 +32,10 @@ def _commanded_world():
 
 
 def _set(world, detachment_id, doctrine):
-    option = next(item for item in detachment_command_options(world, OWNER, detachment_id=detachment_id)
+    actor = EntityRef("character", world.society.detachment_commands[detachment_id].character_id)
+    option = next(item for item in detachment_command_options(world, actor, detachment_id=detachment_id)
                   if item.decision()["action"] == SET_DOCTRINE_ACTION and item.doctrine == doctrine)
-    return set_detachment_doctrine(world, OWNER, option.id, decide(world, option).id)
+    return set_detachment_doctrine(world, actor, option.id, decide(world, option).id)
 
 
 def test_real_commander_is_thresholded_local_delayed_and_round_trips(tmp_path):
@@ -35,6 +44,8 @@ def test_real_commander_is_thresholded_local_delayed_and_round_trips(tmp_path):
     assert command.id == command.detachment_id == own_id
     assert world.society.characters[person_id].skills.command >= 40
     assert effective_doctrine(world, own_id) is None
+    assert not any(option.decision()["action"] == SET_DOCTRINE_ACTION
+                   for option in detachment_command_options(world, OWNER, detachment_id=own_id))
 
     command = _set(world, own_id, "hold")
     assert command.doctrine_effective_day == world.clock.absolute_day + 1
@@ -84,3 +95,59 @@ def test_withdrawal_releases_commander_and_leaves_the_real_person_at_column_loca
     released = [event for event in world.events if event.event_type == "detachment_commander_released"]
     assert len(released) == 1 and decision.id in {link.cause_event_id for link in released[0].causal_links}
     assert all(event.fact_kind == FactKind.STATE_TRANSITION for event in released)
+
+
+def test_contact_gives_the_named_commander_a_separate_later_turn(monkeypatch, tmp_path):
+    world, own_id, person_id, _ = _commanded_world()
+    notice = next(item for item in world.knowledge.force_contact_notices.values()
+                  if item.own_detachment_id == own_id and item.recipient_ref == OWNER)
+    world.config = world.config.model_copy(update={"ai_enabled": True})
+    asked = []
+
+    async def choose(_world, actor, _situation, choices, **_kwargs):
+        asked.append(actor)
+        if actor.kind == "polity":
+            return ai_decider.NO_ACTION
+        assert actor == EntityRef("character", person_id)
+        return next(item["id"] for item in choices if ":press:" in item["id"])
+
+    monkeypatch.setattr(ai_decider, "select_option", choose)
+    institutional = ScheduledSituation(review_id(notice.id), REVIEW_KIND, world.clock.absolute_day)
+    asyncio.run(review_force_contacts(world, (institutional,)))
+    assert asked == [OWNER]
+    assert world.society.detachment_commands[own_id].doctrine is None
+
+    path = tmp_path / "pending-commander-turn.mws"
+    save_world(world, path)
+    world = load_world(path)
+
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    assert any(item.kind == COMMAND_REVIEW_KIND for item in due)
+    resolve_dated(world, due)
+    asyncio.run(review_force_contacts(world, due))
+    assert asked[0] == OWNER and asked[-1] == EntityRef("character", person_id)
+    assert world.society.detachment_commands[own_id].doctrine == "press"
+    decision = next(item for item in reversed(world.events)
+                    if item.event_type == "detachment_commander_decided")
+    assert decision.decision["actor_ref"] == EntityRef("character", person_id).to_dict()
+    assert notice.event_id in {link.cause_event_id for link in decision.causal_links}
+
+
+def test_commander_no_action_is_a_decision_without_a_doctrine(monkeypatch):
+    world, own_id, person_id, _ = _commanded_world()
+    notice = next(item for item in world.knowledge.force_contact_notices.values()
+                  if item.own_detachment_id == own_id and item.recipient_ref == OWNER)
+
+    async def decline(_world, actor, _situation, _choices, **_kwargs):
+        assert actor == EntityRef("character", person_id)
+        return ai_decider.NO_ACTION
+
+    monkeypatch.setattr(ai_decider, "select_option", decline)
+    situation = ScheduledSituation(f"detachment-command-review:{notice.id}", COMMAND_REVIEW_KIND,
+                                   world.clock.absolute_day)
+    asyncio.run(review_force_contacts(world, (situation,)))
+    assert world.society.detachment_commands[own_id].doctrine is None
+    declined = [event for event in world.events if event.event_type == "detachment_commander_declined"]
+    assert len(declined) == 1 and not declined[0].deltas
+    assert declined[0].decision["actor_ref"] == EntityRef("character", person_id).to_dict()

@@ -135,18 +135,22 @@ def press_reinforcement(world, source_id, *, identity, owner, count, commander_i
     appoint = next(item for item in detachment_command_options(world, owner, detachment_id=column.id)
                    if item.decision()["action"] == APPOINT_ACTION)
     appoint_detachment_commander(world, owner, appoint.id, decide(world, appoint).id)
-    press = next(item for item in detachment_command_options(world, owner, detachment_id=column.id)
+    commander_actor = EntityRef("character", commander_id)
+    press = next(item for item in detachment_command_options(world, commander_actor, detachment_id=column.id)
                  if item.decision()["action"] == SET_DOCTRINE_ACTION and item.doctrine == "press")
-    set_detachment_doctrine(world, owner, press.id, decide(world, press).id)
+    set_detachment_doctrine(world, commander_actor, press.id, decide(world, press).id)
     tick(world)
     assert effective_doctrine(world, column.id) == "press"
     return world.society.detachments[column.id], arrival_id
 
 
 def set_doctrine(world, owner, detachment_id, doctrine):
-    option = next(item for item in detachment_command_options(world, owner, detachment_id=detachment_id)
+    command = world.society.detachment_commands[detachment_id]
+    assert command.institution_ref == owner
+    actor = EntityRef("character", command.character_id)
+    option = next(item for item in detachment_command_options(world, actor, detachment_id=detachment_id)
                   if item.decision()["action"] == SET_DOCTRINE_ACTION and item.doctrine == doctrine)
-    return set_detachment_doctrine(world, owner, option.id, decide(world, option).id)
+    return set_detachment_doctrine(world, actor, option.id, decide(world, option).id)
 
 
 def resolve_offer(world, *, detachment_id=None, counterparty_detachment_id=None):

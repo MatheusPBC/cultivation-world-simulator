@@ -35,7 +35,7 @@ PRODUCT = "medieval-world-simulator"
 # Freight now retains the factual endpoint locations from its opening, so a
 # later mobile campaign bag cannot rewrite a completed order's route. Older
 # saves lack those endpoints and are rejected without rewriting real data.
-SCHEMA = 67
+SCHEMA = 68
 EVENT_CHUNK_SIZE = 512
 
 

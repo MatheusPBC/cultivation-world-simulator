@@ -631,10 +631,12 @@ class SocietyState(SocietySerialization):
             decisions = [events.get(link.cause_event_id) for link in event.causal_links] if event else []
             expected = "set_detachment_doctrine" if event is not None and event.event_type == "detachment_doctrine_set" \
                 else "appoint_detachment_commander"
+            expected_actor = ({"kind": "character", "id": command.character_id}
+                              if expected == "set_detachment_doctrine" else command.institution_ref.to_dict())
             if (event is None or event.event_type not in {"detachment_commander_appointed", "detachment_doctrine_set"}
                     or not any(item is not None and item.fact_kind == FactKind.DECISION and item.decision
                                and item.decision.get("action") == expected
-                               and item.decision.get("actor_ref") == command.institution_ref.to_dict()
+                               and item.decision.get("actor_ref") == expected_actor
                                for item in decisions)):
                 raise ValueError("detachment command lacks its factual decision")
         for engagement in self.field_engagements.values():

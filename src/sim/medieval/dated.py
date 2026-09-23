@@ -25,7 +25,7 @@ def resolve_dated(world, situations):
     if any(s.kind not in {"activity", "cargo", "migration", "workforce_transition", "apprenticeship",
                           "force", "force_preparation", "force_training", "rite", "rite_interruption", "creature_review", "recourse_review",
                           "character_rite_offer_review", "character_rite_sponsor_review", "character_travel_review",
-                          "force_contact_review",
+                          "force_contact_review", "detachment_command_review",
                           "strategy_response_review",
                           "campaign_supply_review", "field_engagement", "field_aftermath_review", "diplomacy",
                           "diplomatic_review", "investigation", "civic_protest", "generation_maturity", "technique_copy",

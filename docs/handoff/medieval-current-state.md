@@ -3807,3 +3807,81 @@ Partindo do mesmo save, os 30 dias após a alteração produziram snapshot e
 lista completa de 43.912 eventos idênticos aos da execução anterior. Isso
 mostra ganho no recorte medido, não garante a mesma taxa em dez anos; contexto
 diplomático e capacidade estratégica ainda aparecem entre os custos maiores.
+
+### Uma decisão real de Luna no menu econômico natural
+
+Uma cópia sintética da seed 73 foi avançada sem provider até o dia 30. Nesse
+estado, Auren recebeu numa única consulta OAuth/Codex Luna o menu composto da
+instituição (29 opções). O dossiê incluía leitura datada de Pedraclara: 2.376
+artesãos residentes e nenhum trabalhador pago na produção própria, com eventos
+fonte. A construção de oficina em Pedraclara estava no mesmo menu. Luna escolheu
+um ID canônico diferente: criar vínculo permanente de emprego agrícola para a
+coorte de Pontenegro. O owner revalidou a escolha e criou o contrato; a
+interpretação da IA não carregou delta material. A auditoria do save resultante
+passou com zero causas quebradas ou mutações originadas em Story/LLM.
+
+Para observar consequências sem gastar novas consultas, duas cópias do dia 30
+(controle e escolha de Luna) avançaram pelos mesmos owners, ambas com IA
+desligada, até o dia 360. Em Pontenegro, a escolha terminou com falta alimentar
+2 contra 15 no controle e saúde 988 contra 984. No mundo inteiro, a falta foi
+22 contra 37, mas a saúde média ficou 933,25 contra 934,00. Ambos os saves
+conservaram moeda/recursos e passaram na auditoria causal. Esta é uma
+comparação contrafactual de **uma decisão real**, não autonomia do provider ao
+longo de um ano nem prova de recuperação econômica global. A amostra também
+não demonstra que a IA escolherá oficina quando a privação se agravar: no dia
+30 nenhuma cidade tinha fome, e não houve segunda consulta para esse cenário.
+
+### Consulta real sob privação no ano 2
+
+No save sintético da mesma seed no dia 720, Auren recebeu 46 affordances no
+menu composto. O dossiê continha censo local válido de Pedraclara, relatório
+de 1.495 pessoas sem poder comprar comida ali e falta de 81 rações em
+Pontenegro. A oficina de Pedraclara estava entre as opções. Uma consulta
+OAuth/Codex Luna com uma única tentativa escolheu, sem injeção de ID, distribuir
+socorro em Pontenegro. O owner consumiu estoque existente e registrou cinco
+deltas; a interpretação ficou sem delta. O save isolado
+`/tmp/cws-provider-auren-pressured-day720-20260923.mws` passou na auditoria
+standalone (`ok=true`, zero causas quebradas, autoria inválida ou mutações de
+Story/LLM). Isso demonstra seleção e execução material sob pressão, **não**
+escolha espontânea de investimento produtivo nem recuperação estrutural.
+
+No save do dia 1080, o dossiê pós-fechamento omite corretamente o censo de
+Pedraclara: seis migrações ocorreram depois do último `settlement_observed` do
+ciclo, invalidando sua contagem de ocupações. O relatório de acessibilidade
+alimentar permanece datado e visível. Não apresentar uma leitura ao vivo da
+população como se fosse conhecimento novo do ator apenas para orientar a IA.
+
+### Primeiro turno tático independente do comandante
+
+A instituição continua nomeando/liberando uma pessoa real para uma coluna,
+mas não pode mais escolher a doutrina dessa pessoa. Só o comandante atual,
+vivo e presente recebe `hold`/`press` por IDs recomputados. Um contato armado
+agenda sua consulta separada para o dia seguinte; a IA vê apenas sua coluna,
+personalidade e o contato local ainda válido. A escolha ou `NO_ACTION` ganha
+decisão própria com fonte no contato; mudar doutrina continua passando pelo
+owner de Society e só surte efeito no dia posterior. Perder pessoa, presença,
+office ou contato atual impede a execução. Uma fixture focada provou dois
+turnos de atores diferentes e o receipt material; os testes de comando/cerco
+passaram `11 passed`, o grupo com contato/desescalada/observatório passou
+`31 passed` (incluindo save/load do turno pendente e `NO_ACTION`), e
+`py_compile`/`git diff --check` passaram. O schema atual é 68: um save 67
+com autoria antiga foi rejeitado com `Unsupported Medieval World Simulator
+save`, mantendo hash e bytes intactos. Os saves anuais schema 67 citados acima
+são evidência histórica, não um gate de load no novo checkout. Isso fecha
+**um elo de comando tático independente**, não a cadeia rei → QG → general:
+objetivo político, plano operacional, ordem transmitida, atraso e desacordo
+ainda não estão compostos.
+
+Um smoke offline sintético de 60 dias no schema 68 concluiu com conservação
+de moeda/recursos, save/load equivalente e auditoria causal `ok=true` (1.732
+eventos, nenhuma causa quebrada, autoria inválida ou mutação Story/LLM). Ele
+não criou naturalmente um comandante em contato e não substitui o gate longo.
+
+Uma consulta real OAuth/Codex Luna como `character:002`, numa fixture de
+contato com uma coluna já nomeada, escolheu `hold` dentre as opções enumeradas.
+O receipt `ai_decision_interpreted` teve zero deltas, a decisão nomeou o
+personagem, e o owner registrou três deltas em `detachment_doctrine_set`.
+Após save/load no schema 68, a doutrina ainda não valia no dia da decisão;
+passou a valer no dia seguinte. Auditoria standalone `ok=true`, sem causas
+quebradas nem Story/LLM material. É uma prova curta de ator independente, não
+uma campanha natural com rei, QG e general.

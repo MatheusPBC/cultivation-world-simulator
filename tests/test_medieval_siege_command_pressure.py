@@ -3,15 +3,13 @@
 Field resolution has long explained an outcome by preparation, supply, terrain,
 fatigue, morale and doctrine. The siege -- the form that actually decides
 territory -- read none of it: only force ratio, attacker supply, elapsed days
-and the defender's rations. So an institution that appointed a commander and
-set a doctrine changed a skirmish and changed nothing where it mattered.
+and the defender's rations. So an institution that appointed a commander whose
+own doctrine changed a skirmish needs that doctrine to matter in a siege too.
 
 This reads the doctrine through its existing owner and adds no morale, terrain
 or table of its own. A column with no current command contributes nothing, so
 every authored siege wears exactly as it did before.
 """
-
-import pytest
 
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.siege_campaign import _command_pressure, _garrison_wear
@@ -36,9 +34,9 @@ def _command(world, detachment_id, doctrine, *, institution=ATTACKER, effective_
     from src.sim.medieval.events import record_event
 
     choice = record_event(
-        world, "test_command_decided", "Doutrina escolhida pela instituição.",
+        world, "test_command_decided", "Doutrina escolhida pelo comandante.",
         fact_kind=FactKind.DECISION,
-        decision={"action": "set_detachment_doctrine", "actor_ref": institution.to_dict(),
+        decision={"action": "set_detachment_doctrine", "actor_ref": EntityRef("character", holder.id).to_dict(),
                   "detachment_id": detachment_id, "doctrine": doctrine})
     from src.sim.medieval.economy import _delta
 

@@ -91,6 +91,7 @@ def command_is_current(world, command):
     return (detachment is not None and character is not None and office is not None
             and detachment.stage == "present" and character.death_day is None
             and character.location_id == detachment.location_id
+            and not is_traveling(world, character.id)
             and office.institution_ref == command.institution_ref and "military" in office.scopes
             and office.starts_day <= day and (office.ends_day is None or day < office.ends_day)
             and can_actor_act_for(world, command.institution_ref, command.institution_ref, "military"))
@@ -109,6 +110,21 @@ def effective_doctrine(world, detachment_id):
 
 def detachment_command_options(world, actor, *, detachment_id=None):
     """Engine-enumerated appointment, doctrine and explicit release choices."""
+    if actor.kind == "character":
+        options = []
+        for command in sorted(world.society.detachment_commands.values(), key=lambda item: item.id):
+            if ((detachment_id is not None and command.detachment_id != detachment_id)
+                    or command.character_id != actor.id or not command_is_current(world, command)
+                    or _engagement_open(world, command.detachment_id)):
+                continue
+            detachment = world.society.detachments[command.detachment_id]
+            for doctrine in ("hold", "press"):
+                if doctrine != command.doctrine:
+                    options.append(DetachmentDoctrineOption(
+                        id=(f"detachment-doctrine:{detachment.id}:{doctrine}:{command.last_event_id}:"
+                            f"{detachment.last_event_id}"), actor_ref=actor,
+                        detachment_id=detachment.id, doctrine=doctrine))
+        return tuple(sorted(options, key=lambda item: item.id))
     if actor.kind not in {"polity", "organization"} or not can_actor_act_for(world, actor, actor, "military"):
         return ()
     offices = _current_military_offices(world, actor)
@@ -139,13 +155,6 @@ def detachment_command_options(world, actor, *, detachment_id=None):
             options.append(DetachmentCommandReleaseOption(
                 id=f"detachment-command-release:{detachment.id}:{command.last_event_id}:{detachment.last_event_id}",
                 actor_ref=actor, detachment_id=detachment.id))
-            if not _engagement_open(world, detachment.id):
-                for doctrine in ("hold", "press"):
-                    if doctrine != command.doctrine:
-                        options.append(DetachmentDoctrineOption(
-                            id=(f"detachment-doctrine:{detachment.id}:{doctrine}:{command.last_event_id}:"
-                                f"{detachment.last_event_id}"), actor_ref=actor, detachment_id=detachment.id,
-                            doctrine=doctrine))
     return tuple(sorted(options, key=lambda item: item.id))
 
 
@@ -212,9 +221,10 @@ def set_detachment_doctrine(world, actor, option_id, decision_event_id):
     decision = _decision(candidate, decision_event_id, SET_DOCTRINE_ACTION)
     if _actor_from_decision(decision) != actor or decision.decision != option.decision():
         raise ValueError("detachment doctrine has the wrong decision")
-    require_authority(candidate, actor, "military")
     command = candidate.society.detachment_commands[option.detachment_id]
-    if not command_is_current(candidate, command) or _engagement_open(candidate, command.detachment_id):
+    if (actor.kind != "character" or command.character_id != actor.id
+            or not command_is_current(candidate, command)
+            or _engagement_open(candidate, command.detachment_id)):
         raise ValueError("detachment doctrine is no longer possible")
     effective_day = candidate.clock.absolute_day + 1
     previous = effective_doctrine(candidate, command.detachment_id)
