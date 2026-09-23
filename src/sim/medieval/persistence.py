@@ -32,10 +32,9 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-# Political defense authorization adds a distinct named policy office and
-# historical order to the canonical command chain. Older saves cannot supply
-# those facts and are rejected without rewriting real data.
-SCHEMA = 69
+# Employment contracts now persist a decision-backed staffing target distinct
+# from their original ceiling. Older saves are rejected without rewriting data.
+SCHEMA = 70
 EVENT_CHUNK_SIZE = 512
 
 

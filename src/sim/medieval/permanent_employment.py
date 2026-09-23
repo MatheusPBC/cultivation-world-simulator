@@ -11,6 +11,7 @@ from hashlib import sha256
 
 from src.classes.economy.models import PermanentEmploymentContract
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import SocietyValue
@@ -42,6 +43,23 @@ class PermanentEmploymentOption(SocietyValue):
 
     def decision(self):
         return {"action": ACTION, "actor_ref": self.employer_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+STAFFING_ACTION = "set_permanent_employment_staffing"
+
+
+class EmploymentStaffingOption(SocietyValue):
+    id: str
+    employer_ref: EntityRef
+    contract_id: str
+    target: int
+    current_target: int
+    workforce_limit: int
+    pressure_event_id: str
+
+    def decision(self):
+        return {"action": STAFFING_ACTION, "actor_ref": self.employer_ref.to_dict(),
                 "selected_affordance_id": self.id}
 
 
@@ -132,7 +150,7 @@ def _standing_monthly_cost(world, account_id):
     genuinely replenished balance and re-open the option.
     """
     return sum(
-        contract.workforce_limit * contract.wage_per_worker
+        contract.staffing_target * contract.wage_per_worker
         for contract in world.economy.employment_contracts.values()
         if contract.account_id == account_id
     )
@@ -253,6 +271,7 @@ def create_permanent_employment(world, option_id, *, decision_event_id):
         id=contract_id, employer_ref=option.employer_ref, settlement_id=option.settlement_id,
         cohort_id=option.cohort_id, work_site_id=option.work_site_id, occupation=option.occupation, stock_id=option.stock_id,
         account_id=option.account_id, workforce_limit=option.workforce_limit,
+        staffing_target=option.workforce_limit, staffing_event_id=None,
         wage_per_worker=option.wage_per_worker, created_day=candidate.clock.absolute_day,
         decision_event_id=decision.id, selected_affordance_id=option.id,
         created_event_id="pending", last_reviewed_day=candidate.clock.absolute_day,
@@ -269,6 +288,95 @@ def create_permanent_employment(world, option_id, *, decision_event_id):
     candidate.economy.employment_contracts[contract.id] = contract
     candidate.economy.validate(candidate)
     candidate.society.validate(set(candidate.map.regions), candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.employment_contracts[contract.id]
+
+
+def _payroll_pressure(world, account_id, employer):
+    """One current, own production receipt proving competition for payroll."""
+    events = world.event_index()
+    for facility in sorted(world.economy.facilities.values(), key=lambda item: item.id):
+        stock = world.economy.stocks.get(facility.stock_id)
+        event = events.get(facility.last_event_id)
+        if (facility.payroll_account_id == account_id and stock is not None
+                and stock.owner_ref == employer and "payroll_funds" in facility.last_limitations
+                and event is not None and event.event_type in {"production_limited", "production_completed"}
+                and event.day == world.clock.absolute_day
+                and event.causal_payload.get("production", {}).get("facility_id") == facility.id):
+            return event
+    return None
+
+
+def employment_staffing_options(world, employer):
+    """Offer a lower or restored staffing target only after own paid production stalled."""
+    if (not isinstance(employer, EntityRef)
+            or any(not can_actor_act_for(world, employer, employer, scope)
+                   for scope in ("supply", "trade"))):
+        return ()
+    options = []
+    for contract in sorted(world.economy.employment_contracts.values(), key=lambda item: item.id):
+        if contract.employer_ref != employer:
+            continue
+        pressure = _payroll_pressure(world, contract.account_id, employer)
+        if pressure is None:
+            continue
+        for target in sorted({max(1, contract.workforce_limit // 4),
+                              max(1, contract.workforce_limit // 2), contract.workforce_limit}):
+            if target == contract.staffing_target:
+                continue
+            options.append(EmploymentStaffingOption(
+                id=(f"employment-staffing:{contract.id}:{target}:{world.clock.absolute_day}:"
+                    f"{contract.last_event_id}:{pressure.id}"), employer_ref=employer,
+                contract_id=contract.id, target=target,
+                current_target=contract.staffing_target,
+                workforce_limit=contract.workforce_limit, pressure_event_id=pressure.id))
+    return tuple(options)
+
+
+def _staffing_causes(world, option):
+    contract = world.economy.employment_contracts[option.contract_id]
+    return _causes(contract.last_event_id,
+                   world.economy.accounts[contract.account_id].last_event_id,
+                   option.pressure_event_id)
+
+
+def record_employment_staffing_decision(world, employer, option_id):
+    option = next((item for item in employment_staffing_options(world, employer)
+                   if item.id == option_id), None)
+    if option is None:
+        raise ValueError("employment staffing option is stale or unknown")
+    return record_event(world, "employment_staffing_decided",
+                        "O empregador escolheu um novo alvo de contratação dentro do vínculo vigente.",
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), cause_ids=_staffing_causes(world, option))
+
+
+def set_employment_staffing(world, employer, option_id, *, decision_event_id):
+    """Persist an explicit staffing choice; next payroll still revalidates resources."""
+    candidate = deepcopy(world)
+    option = next((item for item in employment_staffing_options(candidate, employer)
+                   if item.id == option_id), None)
+    decision = candidate.event_index().get(decision_event_id)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != candidate.clock.absolute_day or decision.decision != option.decision()
+            or option.pressure_event_id not in {link.cause_event_id for link in decision.causal_links}):
+        raise ValueError("employment staffing option is stale or has no matching sourced decision")
+    require_authority(candidate, employer, "supply")
+    require_authority(candidate, employer, "trade")
+    contract = candidate.economy.employment_contracts[option.contract_id]
+    event = record_event(candidate, "employment_staffing_changed",
+                         f"{contract.cohort_id}: alvo de contratação alterado para até {option.target} pessoas.",
+                         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_event_id": decision.id,
+                                         "actor_ref": employer.to_dict(),
+                                         "selected_affordance_id": option.id},
+                         deltas=(_delta("employment_contract", contract.id, "staffing_target",
+                                        contract.staffing_target, option.target),),
+                         cause_ids=_causes(decision.id, *_staffing_causes(candidate, option)))
+    candidate.economy.employment_contracts[contract.id] = contract.model_copy(
+        update={"staffing_target": option.target, "staffing_event_id": event.id,
+                "last_event_id": event.id})
+    candidate.economy.validate(candidate)
     world.__dict__.update(candidate.__dict__)
     return world.economy.employment_contracts[contract.id]
 
@@ -328,7 +436,7 @@ def settle_permanent_employment(world, available):
             continue
         # The authored limit is a ceiling, not a minimum. A migration, death
         # or reduced treasury must not turn still-payable work into zero wages.
-        workers = min(contract.workforce_limit, available[contract.cohort_id],
+        workers = min(contract.staffing_target, available[contract.cohort_id],
                       account.balance // contract.wage_per_worker)
         settle_work(
             world, work_id=contract.id, account_id=contract.account_id, stock_id=contract.stock_id,
@@ -340,7 +448,8 @@ def settle_permanent_employment(world, available):
         event = record_event(
             world, "permanent_employment_settled",
             f"{contract.cohort_id}: vínculo local pagou {payroll.gross} unidade(s) de salário a "
-            f"{workers}/{contract.workforce_limit} trabalhador(es).",
+            f"{workers}/{contract.staffing_target} trabalhador(es) planejado(s) "
+            f"(teto do vínculo: {contract.workforce_limit}).",
             fact_kind=FactKind.STATE_TRANSITION,
             deltas=(
                 _delta("employment_contract", contract.id, "last_reviewed_day",
@@ -413,6 +522,32 @@ def permanent_employment_adapters():
     ),)
 
 
+def employment_staffing_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    return (DiscretionaryAdapter(
+        name="employment_staffing", family="employment_staffing",
+        options_fn=employment_staffing_options,
+        label_fn=lambda option: (
+            f"Ajustar trabalho remunerado do vínculo {option.contract_id} para até "
+            f"{option.target}/{option.workforce_limit} pessoas no próximo ciclo; "
+            "a verba e os trabalhadores restantes poderão servir à produção."),
+        causes_fn=_staffing_causes,
+        execute_fn=lambda world, actor, option_id, decision_event_id:
+            set_employment_staffing(world, actor, option_id, decision_event_id=decision_event_id),
+        situation_fn=lambda world, actor, options: {
+            "you_are": actor.to_dict(), "today": world.clock.absolute_day,
+            "own_production_readings": _own_production_readings(world, actor),
+            "staffing_options": [
+                {"id": option.id, "contract_id": option.contract_id,
+                 "current_target": option.current_target, "proposed_target": option.target,
+                 "workforce_limit": option.workforce_limit,
+                 "pressure_event_id": option.pressure_event_id}
+                for option in options],
+        },
+    ),)
+
+
 def review_permanent_employment_fallback(world, *, excluded_actors=()):
     """Choose one current job for an actor without a completed provider turn.
 
@@ -453,4 +588,6 @@ def review_permanent_employment_fallback(world, *, excluded_actors=()):
 __all__ = ["ACTION", "PermanentEmploymentOption", "permanent_employment_options",
            "record_permanent_employment_decision", "create_permanent_employment",
            "settle_permanent_employment", "permanent_employment_adapters",
-           "review_permanent_employment_fallback"]
+           "review_permanent_employment_fallback", "STAFFING_ACTION", "EmploymentStaffingOption",
+           "employment_staffing_options", "record_employment_staffing_decision",
+           "set_employment_staffing", "employment_staffing_adapters"]

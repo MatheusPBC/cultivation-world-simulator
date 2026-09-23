@@ -120,6 +120,11 @@ class PermanentEmploymentContract(SocietyValue):
     stock_id: Identity
     account_id: Identity
     workforce_limit: Positive
+    # Current employer-selected staffing target within the accepted ceiling.
+    # A smaller target frees real people and payroll for other material work;
+    # it never increases the contract's original ceiling.
+    staffing_target: Positive
+    staffing_event_id: Identity | None
     wage_per_worker: Positive
     created_day: Count
     decision_event_id: Identity
@@ -133,6 +138,8 @@ class PermanentEmploymentContract(SocietyValue):
     def names_its_cohort(self):
         if self.id != f"employment:{self.cohort_id}":
             raise ValueError("employment contract ID must name its cohort")
+        if self.staffing_target > self.workforce_limit:
+            raise ValueError("employment staffing target exceeds its contract ceiling")
         if self.last_reviewed_day < self.created_day:
             raise ValueError("employment contract review predates creation")
         return self

@@ -49,7 +49,7 @@ const { savings, totalSavings, payrolls, employmentContracts, policies, source }
     <p v-if="!employmentContracts.length" class="muted">{{ t('noEmploymentContracts') }}</p>
     <article v-for="contract in employmentContracts" :key="contract.id" class="stock-card" :data-employment="contract.id">
       <h4>{{ contract.employer }} · {{ contract.cohort?.id ?? contract.cohort_id }}</h4>
-      <p class="muted">{{ contract.workSite }} · {{ contract.workforce_limit }} {{ t('workers') }} · {{ n(contract.wage_per_worker) }} / {{ t('perPerson') }}</p>
+      <p class="muted">{{ contract.workSite }} · {{ t('staffingTarget') }}: {{ n(contract.staffing_target) }} / {{ n(contract.workforce_limit) }} {{ t('workers') }} · {{ n(contract.wage_per_worker) }} / {{ t('perPerson') }}</p>
       <p>{{ t('employmentOutcomes.' + contract.last_outcome) }}</p>
       <button @click="source(contract.last_event_id)">{{ t('source') }}</button>
     </article>

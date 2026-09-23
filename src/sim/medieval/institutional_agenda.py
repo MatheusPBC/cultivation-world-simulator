@@ -43,7 +43,8 @@ from .bribery import (bribery_adapters, bribery_offer_options, bribery_payment_o
 from .technology_sale_policy import technology_sale_actors, technology_sale_adapters
 from .market_purchase_policy import market_purchase_actors
 from .technology_theft import technology_theft_adapters, technology_theft_options
-from .permanent_employment import permanent_employment_adapters, permanent_employment_options
+from .permanent_employment import (employment_staffing_adapters, employment_staffing_options,
+                                   permanent_employment_adapters, permanent_employment_options)
 from .production_priority import production_priority_adapters, production_priority_options
 from .workforce import (military_recruitment_adapters, military_recruitment_group_actors,
                         workforce_adapters, workforce_transition_options)
@@ -53,7 +54,7 @@ from .garrison_policy import garrison_adapters, garrison_actors
 from .research_policy import research_options
 from .expansion import expansion_options
 from .site_services import service_adapters, service_options
-from .tariffs import tariff_adapters, tariff_options
+from .tariffs import tariff_adapters
 from .migration_policy import migration_adapters, migration_actors
 from .household_provisioning import (household_provision_adapters,
                                       household_provision_options,
@@ -70,6 +71,7 @@ def monthly_adapters(*, allow_offers=True):
             *technology_sale_adapters(),
             *technology_theft_adapters(),
             *permanent_employment_adapters(),
+            *employment_staffing_adapters(),
             *production_priority_adapters(),
             *workforce_adapters(),
             *military_recruitment_adapters(),
@@ -98,6 +100,8 @@ def monthly_actors(world):
                   if technology_theft_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if permanent_employment_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if employment_staffing_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if production_priority_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())

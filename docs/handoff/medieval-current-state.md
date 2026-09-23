@@ -4224,3 +4224,35 @@ causalidade social. O resultado aponta para uma affordance real de revisão ou
 priorização entre obrigações e produção, não para uma correção automática por
 falta alimentar. O smoke segue rodando, e seus resultados ainda não aprovam
 resiliência econômica.
+
+### Alvo de contratação decidido pelo empregador — 23/09/2026
+
+Depois de um recibo **próprio e atual** de produção limitada por folha, a
+instituição empregadora recebe no menu mensal único opções transitórias de
+ajustar o alvo de trabalhadores de cada vínculo a um quarto, metade ou teto
+original. A IA ou fixture escolhe apenas o ID; Economy recompõe a opção,
+confere autoridade e a decisão com fonte, e persiste `staffing_target` com
+delta e receipt. O teto original não muda. A próxima folha paga somente
+trabalho e salário materialmente disponíveis até esse alvo. O alvo não cria
+produto: a instalação precisa executar sua receita e pagar sua própria folha.
+O modo offline não escolhe automaticamente esse ajuste.
+
+Um teste contrafactual a partir da mesma pressão de folha demonstrou que
+reduzir o alvo deixou mais orçamento e trabalho para produção no fechamento
+seguinte; opção stale ou sem relatório-fonte é rejeitada sem mutação. Passaram
+18 testes focados de emprego, 23 com a agenda composta e 56 no recorte
+emprego/agenda/observatório/construção; type-check e testes de Finanças
+passaram. O save da escolha passou round-trip e auditoria causal `ok=true`.
+O schema medieval agora é 70 (Economy 16), rejeitando e preservando saves
+anteriores sem migração. O smoke natural que já rodava iniciou sob schema 69 e
+é apenas uma linha de base antiga, não gate do checkout novo. Falta uma série
+natural atual e decisões de provider real para medir se atores de fato escolhem
+esse ajuste frente a outras prioridades.
+
+Um mundo novo da seed 73 rodou 120 dias no schema 70: 3.867 eventos, dinheiro e
+recursos conservados, save/load equivalente e auditoria separada `ok=true`
+(zero causas quebradas, autorias inválidas ou deltas Story/LLM). O checkpoint
+antigo schema 69 de dia 1440 foi rejeitado por `load_world`; seu SHA-256 antes
+e depois da tentativa permaneceu
+`7a45729add2609cc1deb25b645048cc03207df16b724c74d6febf3222dd9cb6e`.
+Essas provas são focadas e curtas, não substituem as três séries longas.

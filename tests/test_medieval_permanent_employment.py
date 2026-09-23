@@ -1,5 +1,6 @@
 """Focused coverage for the bounded recurring local-payroll vertical."""
 
+from copy import deepcopy
 from dataclasses import replace
 
 import pytest
@@ -10,10 +11,14 @@ from src.sim.medieval.economy import monthly_workforce
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.permanent_employment import (
     create_permanent_employment,
+    employment_staffing_options,
+    employment_staffing_adapters,
     permanent_employment_options,
     permanent_employment_adapters,
     record_permanent_employment_decision,
+    record_employment_staffing_decision,
     review_permanent_employment_fallback,
+    set_employment_staffing,
     settle_permanent_employment,
 )
 from src.sim.medieval.persistence import load_world, save_world
@@ -168,6 +173,125 @@ def test_contract_pays_only_the_workers_and_wages_actually_available(limit_kind)
     receipt = next(item for item in world.events if item.event_type == "permanent_employment_settled")
     assert f"{workers}/{contract.workforce_limit}" in receipt.content
     world.economy.validate(world)
+
+
+def test_employer_can_choose_lower_staffing_after_real_production_payroll_limit(tmp_path):
+    from src.sim.medieval.economy import produce_monthly
+
+    world, contract = contracted_world()
+    account = world.economy.accounts[contract.account_id]
+    world.economy.accounts[account.id] = account.model_copy(
+        update={"balance": contract.workforce_limit * contract.wage_per_worker})
+    next_month(world)
+    available = monthly_workforce(world)
+    settle_permanent_employment(world, available)
+    produce_monthly(world, available)
+    employer = contract.employer_ref
+    choices = employment_staffing_options(world, employer)
+    assert choices
+    assert any(world.event_index()[option.pressure_event_id].event_type == "production_limited"
+               for option in choices)
+    option = next(item for item in choices if item.contract_id == contract.id
+                  and item.target == max(1, contract.workforce_limit // 4))
+    unrevised = deepcopy(world)
+    decision = record_employment_staffing_decision(world, employer, option.id)
+    revised = set_employment_staffing(world, employer, option.id, decision_event_id=decision.id)
+    assert revised.staffing_target == option.target
+    assert revised.workforce_limit == contract.workforce_limit
+    assert revised.last_event_id in {event.id for event in world.events
+                                     if event.event_type == "employment_staffing_changed"}
+    assert not any(item.id == option.id for item in employment_staffing_options(world, employer))
+    situation = employment_staffing_adapters()[0].situation_fn(world, employer,
+                                                               employment_staffing_options(world, employer))
+    assert situation["own_production_readings"]
+    assert "balance" not in repr(situation)
+    path = tmp_path / "staffing.mws"
+    save_world(world, path)
+    resumed = load_world(path)
+    assert resumed.economy.employment_contracts[contract.id].staffing_target == option.target
+    resumed.economy.validate(resumed)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
+    saved_contract = resumed.economy.employment_contracts[contract.id]
+    resumed.economy.employment_contracts[contract.id] = saved_contract.model_copy(
+        update={"staffing_target": contract.workforce_limit})
+    with pytest.raises(ValueError, match="staffing decision provenance"):
+        resumed.economy.validate(resumed)
+
+    # Same available funds at the next boundary: the actor's lower staffing
+    # target leaves real payroll and workers for a facility. No output is
+    # granted by the staffing decision itself.
+    produced = []
+    for candidate in (unrevised, world):
+        treasury = candidate.economy.accounts[contract.account_id]
+        candidate.economy.accounts[treasury.id] = treasury.model_copy(
+            update={"balance": contract.workforce_limit * contract.wage_per_worker})
+        next_month(candidate)
+        workforce = monthly_workforce(candidate)
+        settle_permanent_employment(candidate, workforce)
+        produce_monthly(candidate, workforce)
+        produced.append(sum(facility.last_batches for facility in candidate.economy.facilities.values()
+                            if facility.payroll_account_id == contract.account_id))
+    assert produced[1] > produced[0]
+
+
+def test_staffing_rejects_stale_or_unsourced_choice_without_mutation():
+    from src.classes.event import FactKind
+    from src.sim.medieval.economy import produce_monthly
+    from src.sim.medieval.events import record_event
+
+    world, contract = contracted_world()
+    account = world.economy.accounts[contract.account_id]
+    world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
+    next_month(world)
+    produce_monthly(world, monthly_workforce(world))
+    option = employment_staffing_options(world, contract.employer_ref)[0]
+    unsourced = record_event(world, "fixture_unsourced_staffing", "Escolha sem relatório.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world.economy.employment_contracts[contract.id]
+    with pytest.raises(ValueError, match="matching sourced decision"):
+        set_employment_staffing(world, contract.employer_ref, option.id,
+                                decision_event_id=unsourced.id)
+    assert world.economy.employment_contracts[contract.id] == before
+    decision = record_employment_staffing_decision(world, contract.employer_ref, option.id)
+    world.clock = world.clock.advance(1)
+    with pytest.raises(ValueError, match="stale"):
+        set_employment_staffing(world, contract.employer_ref, option.id,
+                                decision_event_id=decision.id)
+    assert world.economy.employment_contracts[contract.id] == before
+
+
+@pytest.mark.asyncio
+async def test_staffing_option_joins_the_single_institutional_provider_menu(monkeypatch):
+    from src.sim.medieval import ai_decider
+    from src.sim.medieval.economy import produce_monthly
+    from src.sim.medieval.institutional_agenda import monthly_adapters
+    from src.sim.medieval.institutional_decision_turn import (
+        _by_id, review_institutional_decision_turn_with_provider)
+
+    world, contract = contracted_world()
+    account = world.economy.accounts[contract.account_id]
+    world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
+    next_month(world)
+    produce_monthly(world, monthly_workforce(world))
+    option = employment_staffing_options(world, contract.employer_ref)[0]
+    assert option.id in _by_id(world, contract.employer_ref, monthly_adapters())
+    world.config = world.config.model_copy(update={"ai_enabled": True,
+                                                   "ai_calls_per_step": 100, "ai_max_calls": 100})
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+
+    async def choose(_prompt, *args, **kwargs):
+        return {"selected_id": option.id}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose)
+    _, covered = await review_institutional_decision_turn_with_provider(
+        world, monthly_adapters(), actors=(contract.employer_ref,))
+    assert contract.employer_ref in covered
+    assert world.economy.employment_contracts[contract.id].staffing_target == option.target
+    decision = next(event for event in reversed(world.events)
+                    if event.event_type == "institutional_decision_turn_decided")
+    assert decision.decision == option.decision()
+    assert not decision.deltas
 
 
 def test_contract_and_creation_decision_round_trip_in_current_save_schema(tmp_path):

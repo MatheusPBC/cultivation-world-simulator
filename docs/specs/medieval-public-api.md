@@ -72,10 +72,11 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
 - GET query/economy: catálogo, estoques, contas, produção, últimas folhas salariais, necessidades, mercados,
   ordens pendentes, cargas, `customs_checkpoints` e `cargo_manifests`; ordens concluídas permanecem rastreáveis por eventos.
   O catálogo inclui `repair_blueprints`, `repairs`, contratos `employment_contracts`, postos civis de alfândega e manifestos
-  (economia schema 14); custos, limites de trabalhadores e salários são definidos pelo engine, não pelo cliente.
+  (economia schema 16); custos, limites de trabalhadores e salários são definidos pelo engine, não pelo cliente.
   Cada contrato também expõe o `work_site_id` próprio do empregador, a coorte,
-  o resultado do último ciclo e os recibos causais; a projeção não cria nem
-  renova vínculos.
+  o teto original `workforce_limit`, o alvo atual `staffing_target`, o recibo
+  `staffing_event_id` quando o empregador o alterou e o resultado do último
+  ciclo. A projeção não cria nem renova vínculos.
 - `EconomyView.migration_provisions` expõe provisões e seu `MoneyAccount`; o
   observador apenas projeta a transferência bilateral e não controla famílias.
 - GET query/map: geografia, território, rotas e instalações canônicas.

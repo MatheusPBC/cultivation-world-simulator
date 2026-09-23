@@ -13,7 +13,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 69 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
+  save schema 70 (Society schema 21, economy schema 16, Strategy schema 2) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -170,7 +170,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 69 are rejected and preserved
+  older than schema 70 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
@@ -265,8 +265,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   update or by the policy's general `last_event_id`. A foreign buyer receives only
   the dated quoted metadata, never the collector's balance. Domestic/own freight
   has rate zero; transit tolls and blockades are not part of this vertical.
-- Initial employment terms are authored standing agreements. Monthly household
-  purchases consume actual rations and debit savings with bilateral decisions;
+- Initial employment terms are authored standing agreements. Contract payroll
+  may use a lower, employer-decided `staffing_target` within the original
+  `workforce_limit` after an own current production receipt shows a payroll
+  shortfall. This is a transient affordance in the single institutional menu;
+  Economy records its decision and target delta, and later payroll still
+  revalidates workers and funds. The option creates no output or saved plan.
+  The offline fallback does not choose a staffing adjustment automatically.
+  Monthly household purchases consume actual rations and debit savings with bilateral decisions;
   public relief covers the unpaid share of the existing public distribution.
   Allocate available rations by people, not wealth, and never consume paid food
   again in relief. Both decision receipts and same-day closure survive save/load.

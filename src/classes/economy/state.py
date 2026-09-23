@@ -244,8 +244,30 @@ class EconomyState(EconomySerialization):
                                and delta.aspect == "created" and delta.before == "False" and delta.after == "True"
                                for delta in created.deltas)
                     or last.event_type not in {"permanent_employment_created", "permanent_employment_settled",
-                                               "permanent_employment_unpaid"}):
+                                               "permanent_employment_unpaid", "employment_staffing_changed"}):
                 raise ValueError("invalid permanent employment contract provenance")
+            staffing_change = events.get(contract.staffing_event_id) if contract.staffing_event_id else None
+            if staffing_change is None:
+                if contract.staffing_event_id is not None or contract.staffing_target != contract.workforce_limit:
+                    raise ValueError("employment staffing target has no decision provenance")
+            else:
+                staffing_decision_id = staffing_change.causal_payload.get("decision_event_id")
+                staffing_decision = events.get(staffing_decision_id)
+                selected_id = staffing_change.causal_payload.get("selected_affordance_id")
+                if (staffing_change.event_type != "employment_staffing_changed"
+                        or staffing_change.fact_kind != FactKind.STATE_TRANSITION
+                        or staffing_change.causal_origin != CausalOrigin.ACTOR_DECISION
+                        or staffing_decision is None or staffing_decision.fact_kind != FactKind.DECISION
+                        or staffing_decision.decision != {
+                            "action": "set_permanent_employment_staffing",
+                            "actor_ref": contract.employer_ref.to_dict(),
+                            "selected_affordance_id": selected_id,
+                        }
+                        or staffing_decision_id not in {link.cause_event_id for link in staffing_change.causal_links}
+                        or not any(delta.owner_kind == "employment_contract" and delta.owner_id == contract.id
+                                   and delta.aspect == "staffing_target" and delta.after == str(contract.staffing_target)
+                                   for delta in staffing_change.deltas)):
+                    raise ValueError("invalid employment staffing decision provenance")
         for stock in self.stocks.values():
             if stock.location_id not in world.society.settlements:
                 raise ValueError("unknown stock location")
