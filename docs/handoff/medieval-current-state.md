@@ -4272,3 +4272,29 @@ Na mesma continuação, Finanças passou a oferecer um link causal separado para
 decisão que alterou o alvo de trabalhadores sem confundi-la com o receipt da
 folha mais recente. O teste focado `web/src/medieval/__tests__/income.test.ts`
 valida essa navegação (4 testes passaram), assim como o type-check do frontend.
+
+### Smoke natural schema 70 retomado até o ano 4 — 23/09/2026
+
+A seed 73 do checkout schema 70 foi retomada do save íntegro do dia 1080 e
+avançada mais 360 dias até o dia 1440, sem provider real e com a política
+`routine-rules`. Conservou as 76.000 moedas e todos os recursos, salvou e
+recarregou estado/história equivalentemente; o checkpoint do dia 1440 ocupa
+15.765.504 bytes e o pico de memória observado foi 938.307.584 bytes. O save
+final avançou uma etapa adicional de continuação determinística. A auditoria
+causal do checkpoint encontrou 59.634 eventos, `ok=true`, nenhuma causa
+quebrada, autoria inválida, Story material ou delta de interpretação.
+
+O resultado natural não é saudável: população 10.479, 452 mortes por privação,
+saúde média 321,62/1000, unrest médio 449,75/1000 e 320 rações faltantes no
+fechamento. Houve 135 pedidos de ajuda, 123 cumpridos, 133 distribuições de
+alívio, 141 compras de mercado, 232 migrações iniciadas e 136 transições de
+trabalho. No último snapshot havia 49 contratos permanentes, dos quais 29
+pagos e 20 sem fundos; dez de 13 instalações estavam limitadas por
+`payroll_funds` e oito não produziram lotes. Nenhum contrato registrou
+`staffing_event_id`: a decisão de ajuste de equipe não foi escolhida nesta
+execução sem provider, o que não permite inferir como o modelo real escolheria.
+
+Este gate avançou apenas uma seed até quatro anos; não é a série completa de
+dez anos/três seeds nem valida a economia como estável. Os artefatos ficam em
+`/tmp/cws-schema70-seed73-resumed-to1440.mws` e
+`/tmp/cws-schema70-seed73-resumed-to1440.checkpoint-day-01440.mws`.
