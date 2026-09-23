@@ -3939,3 +3939,19 @@ dominante é renda doméstica/acesso, não ausência física de comida na cidade
 Coortes grandes de artesãos tinham saldos quase zerados. A próxima mudança
 econômica deve ampliar trabalho/remuneração materialmente viável para essas
 coortes ou outro caminho de acesso decidido por ator, não criar rações.
+
+### Oficina e empregos com recursos iniciais, sem cura roteirizada
+
+Uma fixture parte de dois mundos idênticos da seed 73, sem aumentar estoques
+ou tesouros. Em um, um decisor stub seleciona por ID válido a oficina em
+Pedraclara, depois sua fundação produtiva e, em turnos mensais posteriores,
+contratos de trabalho para artesãos. No outro, responde `NO_ACTION`.
+Construção e produção consumiram materiais, tempo e salários reais; os
+contratos fizeram dez pagamentos até o dia 390. O mundo com decisões comprou
+mais rações e teve falta de 1.604, contra 2.264 no controle. Save/load e
+auditoria causal passaram. Ainda assim, ambos chegaram ao piso de saúde:
+mesmo quatro contratos não cobrem toda a população, e este stub recusou
+outras ações como socorro. A prova mostra uma resposta parcial possível,
+**não** recuperação geral nem escolha de provider real. Neste ambiente,
+`provider_available()` retornou `False`; a validação com modelo real aguarda
+configuração operacional, não um fallback silencioso.

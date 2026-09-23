@@ -26,6 +26,7 @@ from src.sim.medieval.expansion import (construction_blocker, constructed_site_i
                                         site_construction_adapters, site_construction_options,
                                         start_foundation, start_site_construction)
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+from src.sim.medieval.permanent_employment import permanent_employment_options
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.systems.time import WorldClock
 
@@ -534,6 +535,89 @@ async def test_unmodified_seed_offers_workshop_beside_dated_livelihood_reading(m
     assert residents > paid
     assert reading["source_event_ids"]
     assert not engine.world.economy.expansions, "NO_ACTION não constrói a oficina"
+
+
+@pytest.mark.asyncio
+async def test_unmodified_seed_can_fund_workshop_and_pay_artisans_without_extra_resources(monkeypatch, tmp_path):
+    """The natural opening holdings, not a topped-up fixture, finance both acts."""
+    world, control = create_medieval_world(73), create_medieval_world(73)
+    for candidate in (world, control):
+        candidate.config = candidate.config.model_copy(update={
+            "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 2000,
+        })
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    mode = {"build": False, "jobs": False}
+    chosen = []
+    chosen_jobs = []
+
+    async def choose(candidate, actor, _situation, choices, **_kwargs):
+        if mode["build"] and actor == AUREN:
+            offered = {item["id"] for item in choices}
+            option = next((item for item in site_construction_options(candidate, actor)
+                           if item.id in offered and item.settlement_id == SETTLEMENT
+                           and item.blueprint_id == BLUEPRINT), None)
+            if option is None:
+                site_id = constructed_site_id(SETTLEMENT, candidate.economy.expansion_blueprints[BLUEPRINT])
+                option = next((item for item in foundation_options(candidate, actor)
+                               if item.id in offered and item.site_id == site_id
+                               and item.blueprint_id == FOUNDATION), None)
+            if option is not None:
+                chosen.append((candidate.clock.absolute_day, option.blueprint_id))
+                return option.id
+        if mode["jobs"] and actor == AUREN:
+            offered = {item["id"] for item in choices}
+            option = next((item for item in sorted(permanent_employment_options(candidate, actor),
+                                                  key=lambda item: (-item.workforce_limit, item.id))
+                           if item.id in offered and item.settlement_id == SETTLEMENT
+                           and item.occupation == "artisan"), None)
+            if option is not None:
+                chosen_jobs.append((candidate.clock.absolute_day, option.cohort_id))
+                return option.id
+        return ai_decider.NO_ACTION
+
+    monkeypatch.setattr(ai_decider, "select_option", choose)
+    built, unchanged = MedievalSimulator(world), MedievalSimulator(control)
+    for engine, wants_workshop in ((built, True), (unchanged, False)):
+        mode["build"] = wants_workshop
+        while engine.world.clock.absolute_day < 240:
+            await engine.step()
+
+    assert [blueprint for _, blueprint in chosen] == [BLUEPRINT, FOUNDATION]
+    line_id = f"line:{constructed_site_id(SETTLEMENT, world.economy.expansion_blueprints[BLUEPRINT])}:toolmaking"
+    assert line_id in world.economy.facilities
+    assert line_id not in control.economy.facilities
+    assert any(event.event_type == "wages_paid" and any(
+        delta.owner_id.startswith("household:pop:pedraclara:") and delta.aspect == "balance"
+        for delta in event.deltas) for event in world.events)
+    def latest(candidate):
+        return next(event.causal_payload["subsistence"] for event in reversed(candidate.events)
+                    if event.event_type == "subsistence_resolved"
+                    and event.causal_payload["subsistence"]["settlement_id"] == SETTLEMENT)
+    assert latest(world)["purchased_quantity"] > latest(control)["purchased_quantity"]
+    assert world.economy.needs[SETTLEMENT].health > control.economy.needs[SETTLEMENT].health
+
+    # The commissioned workplace also makes funded standing jobs possible.
+    # A separate later institutional decision is required for each cohort;
+    # neither the construction nor the foundation silently hires anyone.
+    assert any(option.settlement_id == SETTLEMENT and option.occupation == "artisan"
+               for option in permanent_employment_options(world, AUREN))
+    mode["build"], mode["jobs"] = False, True
+    while built.world.clock.absolute_day < 390:
+        await built.step()
+    mode["jobs"] = False
+    while unchanged.world.clock.absolute_day < 390:
+        await unchanged.step()
+    assert len(chosen_jobs) >= 2
+    assert any(event.event_type == "permanent_employment_settled" for event in world.events)
+    assert latest(world)["missing_food"] < latest(control)["missing_food"]
+    # Partial income is not a scripted cure: both worlds can still reach the
+    # health floor if most residents remain unable to buy their ration.
+    assert latest(world)["missing_food"] > 0
+    path = tmp_path / "natural-holdings-workshop.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
 
 
 async def test_a_stale_construction_choice_fails_closed(monkeypatch):
