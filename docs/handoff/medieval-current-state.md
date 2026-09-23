@@ -3976,3 +3976,22 @@ ainda não chegou; no teste de cerco desabastecido, a remessa inicial já pode
 ter sido entregue antes do início do cerco. Isto prova um elo de decisão
 operacional, **não** uma ordem política independente, atraso de transmissão,
 discordância rei/QG/general, campanha espontânea ou gate natural de dez anos.
+
+### Rechecagem natural e leitura sob demanda da migração
+
+No schema 68, a seed 73 sem provider chegou a 120 dias: 3.864 eventos,
+2.224.128 bytes de save, conservação de moeda/recursos, save/load equivalente,
+zero mortes por privação e saúde média 952,88. Pedraclara/Portovelho já caíram
+para 862/863; o problema econômico segue aberto. O perfil da continuação
+120→150 dias mostrou 2.183 consultas a relatórios de rota, embora a maioria
+das coortes não precisasse de um grafo de migração.
+
+`review_migration` agora consulta rotas apenas para jornadas encalhadas ou
+coortes cuja leitura própria satisfaz os pré-requisitos de migração. A busca
+dos retornos do dia também para no primeiro fato anterior, sem varrer todo o
+histórico. A mesma continuação de 30 dias antes/depois gerou arquivos com
+SHA-256 idêntico, snapshots e 4.900 eventos iguais; 22 testes focados,
+Ruff, save/load e auditoria causal (`ok=true`, zero mutações Story) passaram.
+No perfil, as consultas `routes_for_actor` caíram de 2.183 para 1.227 e o
+tempo instrumentado de 10,33 para 9,65 s. É uma melhoria local medida,
+**não** solução do custo de dez anos nem aprovação do gate longo.

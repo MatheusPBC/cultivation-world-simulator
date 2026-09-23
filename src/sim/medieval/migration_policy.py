@@ -2,8 +2,6 @@
 
 from collections import deque
 
-from pydantic import Field
-
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Count, Identity, SocietyValue
 
@@ -96,15 +94,24 @@ def _has_own_account(world, group_id):
     return account is not None and account.owner_ref == EntityRef("population_group", group_id)
 
 
-def migration_options(world, group_id, *, route_reports=None, route_graph=None):
-    """Return only destinations this household was actually told about."""
+def _migration_source(world, group_id):
+    """Cheap eligibility check before reading any destination or route graph."""
     group = world.society.population.get(group_id)
     actor = EntityRef("population_group", group_id)
     source = world.knowledge.settlement_report(actor, group.settlement_id) if group else None
     if (group is None or world.society.available_count(group_id) != group.count
             or not _has_own_account(world, group_id) or not _fresh(world, source)
             or not (source.missing_food > 0 or source.health < 700 or source.unrest >= 250)):
+        return None
+    return group, actor, source
+
+
+def migration_options(world, group_id, *, route_reports=None, route_graph=None):
+    """Return only destinations this household was actually told about."""
+    ready = _migration_source(world, group_id)
+    if ready is None:
         return ()
+    group, actor, source = ready
     food_available = _own_food(world, group_id)
     choices = []
     for destination in world.knowledge.settlements_for_actor(actor):
@@ -204,20 +211,23 @@ def review_migration(world, *, excluded_actors=()):
     # A stranded group is physically at its endpoint and can make a fresh local
     # observation there. This is presence, not a map-derived private fact.
     recovered_groups = set()
-    # Reuse each population group's dated public route reports for the whole
-    # review.  This is a transient read index, not persisted world state.
-    route_reports_by_actor = {
-        EntityRef("population_group", group_id): world.knowledge.routes_for_actor(
-            EntityRef("population_group", group_id))
-        for group_id in sorted(world.society.population)
-    }
-    route_graph_by_actor = {
-        actor: _route_graph(world, reports)
-        for actor, reports in route_reports_by_actor.items()
-    }
-    recovered_groups.update(delta.owner_id for event in world.events
-                            if event.day == world.clock.absolute_day and event.event_type == "migration_returned"
-                            for delta in event.deltas if delta.owner_kind == "population_group")
+    # Route knowledge is only needed by a stranded journey or a household
+    # whose own report makes migration possible. One review reuses its graph
+    # without scanning every group's bulletins at every daily boundary.
+    route_contexts = {}
+
+    def route_context(actor):
+        if actor not in route_contexts:
+            reports = world.knowledge.routes_for_actor(actor)
+            route_contexts[actor] = (reports, _route_graph(world, reports))
+        return route_contexts[actor]
+
+    for event in reversed(world.events):
+        if event.day < world.clock.absolute_day:
+            break
+        if event.event_type == "migration_returned":
+            recovered_groups.update(delta.owner_id for delta in event.deltas
+                                    if delta.owner_kind == "population_group")
     for journey in sorted(world.society.migrations.values(), key=lambda item: item.id):
         if journey.stage != "stranded":
             continue
@@ -225,9 +235,8 @@ def review_migration(world, *, excluded_actors=()):
         if actor in excluded:
             continue
         observe_present_household(world, journey.source_group_id, journey.destination_id, journey.last_event_id)
-        options = recovery_options(world, journey.id,
-                                   route_reports=route_reports_by_actor.get(actor, ()),
-                                   route_graph=route_graph_by_actor.get(actor, {}))
+        reports, graph = route_context(actor)
+        options = recovery_options(world, journey.id, route_reports=reports, route_graph=graph)
         retry = next((item for item in options if item.action == "retry_migration_arrival"), None)
         source = world.knowledge.settlement_report(actor, world.society.population[journey.source_group_id].settlement_id)
         destination = world.knowledge.settlement_report(actor, journey.destination_id)
@@ -266,9 +275,10 @@ def review_migration(world, *, excluded_actors=()):
         actor = EntityRef("population_group", group_id)
         if actor in excluded:
             continue
-        options = migration_options(world, group_id,
-                                    route_reports=route_reports_by_actor.get(actor, ()),
-                                    route_graph=route_graph_by_actor.get(actor, {}))
+        if _migration_source(world, group_id) is None:
+            continue
+        reports, graph = route_context(actor)
+        options = migration_options(world, group_id, route_reports=reports, route_graph=graph)
         if not options:
             continue
         # Conservative household choice: the best observed health/food/headroom,
