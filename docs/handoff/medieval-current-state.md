@@ -4156,3 +4156,16 @@ não mudou os critérios materiais da opção. Os 20 testes focados de construç
 passaram. A seed 73 foi reiniciada do dia zero no checkout atual, sem provider,
 com checkpoints anuais e alvo de 3600 dias; ainda está em execução. Esse gate
 offline mede conservação/estabilidade, não escolhas de um provider real.
+
+### Leitura econômica do Dao — 23/09/2026
+
+O painel existente de Finanças agora abre, por povoado, a poupança total ao
+lado da quantidade de artesãos, sua poupança agregada, alimento no estoque
+local, déficit de rações e saúde do último fechamento. Grupos artesãos podem
+ser expandidos até suas contas e recibos; estoque e subsistência também abrem
+os fatos-fonte. É uma projeção do snapshot observacional já autorizado ao Dao,
+não conhecimento extra entregue aos atores e não uma nova fonte de verdade.
+O texto esclarece que alimento disponível não implica poder de compra. Os
+três testes focados do painel, type-check e build medieval passaram; o build
+mantém um aviso não bloqueante de chunk JavaScript acima de 500 kB. Ainda
+faltam outras visões causais de campanha, comando e mudanças de plano.

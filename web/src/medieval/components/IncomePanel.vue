@@ -14,7 +14,25 @@ const { savings, totalSavings, payrolls, employmentContracts, policies, source }
     <h3>{{ t('householdSavings') }}</h3>
     <p class="population-number" data-testid="household-savings">{{ n(totalSavings) }}</p>
     <details><summary>{{ t('bySettlement') }}</summary>
-      <div v-for="s in savings" :key="s.id" class="list-row"><span>{{ s.name }}</span><strong>{{ n(s.balance) }}</strong></div>
+      <p class="muted">{{ t('incomeAccessHelp') }}</p>
+      <article v-for="s in savings" :key="s.id" class="stock-card" :data-income-settlement="s.id">
+        <h4>{{ s.name }}</h4>
+        <dl><dt>{{ t('householdSavings') }}</dt><dd>{{ n(s.balance) }}</dd>
+          <dt>{{ t('artisanPeople') }}</dt><dd>{{ n(s.artisanPeople) }}</dd>
+          <dt>{{ t('artisanSavings') }}</dt><dd data-testid="artisan-savings">{{ n(s.artisanCash) }}</dd>
+          <dt>{{ t('localFoodStock') }}</dt><dd data-testid="local-food-stock">{{ n(s.food) }}</dd>
+          <dt>{{ t('missing') }}</dt><dd>{{ n(s.missingFood) }}</dd>
+          <dt>{{ t('health') }}</dt><dd>{{ n(s.health) }} / 1.000</dd></dl>
+        <button v-if="s.foodSourceId" @click="source(s.foodSourceId)">{{ t('source') }} · {{ t('localFoodStock') }}</button>
+        <button v-if="s.needSourceId" @click="source(s.needSourceId)">{{ t('source') }} · {{ t('lastSubsistence') }}</button>
+        <details v-if="s.artisanGroups.length"><summary>{{ t('artisanGroups') }}</summary>
+          <div v-for="group in s.artisanGroups" :key="group.id" class="stock-card">
+            <p>{{ t('kinds.' + group.people) }} · {{ n(group.count) }} {{ t('workers') }}</p>
+            <p>{{ t('householdSavings') }}: {{ n(group.balance) }}</p>
+            <button v-if="group.sourceId" data-testid="artisan-source" @click="source(group.sourceId)">{{ t('source') }}</button>
+          </div>
+        </details>
+      </article>
     </details>
     <h3>{{ t('payrolls') }}</h3>
     <p v-if="!payrolls.length" class="muted">{{ t('noPayrolls') }}</p>

@@ -30,6 +30,37 @@ it('separates accumulated savings from dated wages and opens payroll evidence', 
   panel.unmount()
 })
 
+it('shows local food beside artisan purchasing money without treating stock as income', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  const artisan = data.society.population_groups.find(group => group.occupation === 'artisan')!
+  const account = data.economy.accounts.find(item => item.owner_ref.kind === 'population_group'
+    && item.owner_ref.id === artisan.id)!
+  account.balance = 3
+  account.last_event_id = 'event:artisan-wage'
+  const need = data.economy.needs.find(item => item.id === artisan.settlement_id)!
+  need.health = 250
+  need.missing_food = 14
+  const stock = data.economy.stocks.find(item => item.id === need.stock_id)!
+  stock.goods.food = 500
+  store.snapshot = data
+
+  const panel = mount(IncomePanel, { global: { plugins: [pinia, medievalI18n] } })
+  const city = panel.get(`[data-income-settlement="${artisan.settlement_id}"]`)
+  expect(city.get('[data-testid="local-food-stock"]').text()).toBe('500')
+  expect(city.text()).toContain('14')
+  expect(city.text()).toContain('250 / 1.000')
+  const expectedCash = data.society.population_groups
+    .filter(group => group.settlement_id === artisan.settlement_id && group.occupation === 'artisan')
+    .reduce((total, group) => total + (data.economy.accounts.find(item =>
+      item.owner_ref.kind === 'population_group' && item.owner_ref.id === group.id)?.balance ?? 0), 0)
+  expect(city.get('[data-testid="artisan-savings"]').text()).toBe(String(expectedCash))
+  await city.get('[data-testid="artisan-source"]').trigger('click')
+  expect(store.focusEventId).toBe('event:artisan-wage')
+  panel.unmount()
+})
+
 it('rejects snapshots that omit financial registries instead of breaking the panel later', async () => {
   const { acceptSnapshot } = await import('../mappers')
   const data = structuredClone(fixture)

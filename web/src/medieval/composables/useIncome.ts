@@ -6,14 +6,32 @@ export function useIncome() {
   const store = useObserverStore()
   const data = computed(() => store.snapshot!)
   const savings = computed(() => {
-    const groups = new Map(data.value.society.population_groups.map(g => [g.id, g.settlement_id]))
+    const groups = new Map(data.value.society.population_groups.map(g => [g.id, g]))
     const balances = new Map<string, number>()
+    const accounts = new Map<string, { balance: number; last_event_id: string | null }>()
     for (const account of data.value.economy.accounts) {
       if (account.owner_ref.kind !== 'population_group') continue
-      const place = groups.get(account.owner_ref.id)
-      if (place) balances.set(place, (balances.get(place) ?? 0) + account.balance)
+      const group = groups.get(account.owner_ref.id)
+      if (group) {
+        balances.set(group.settlement_id, (balances.get(group.settlement_id) ?? 0) + account.balance)
+        accounts.set(group.id, account)
+      }
     }
-    return data.value.society.settlements.map(s => ({ id: s.id, name: s.name, balance: balances.get(s.id) ?? 0 }))
+    return data.value.society.settlements.map(s => {
+      const need = data.value.economy.needs.find(item => item.id === s.id)
+      const stock = data.value.economy.stocks.find(item => item.id === need?.stock_id)
+      const artisans = data.value.society.population_groups.filter(
+        group => group.settlement_id === s.id && group.occupation === 'artisan')
+      const artisanGroups = artisans.map(group => ({ ...group,
+        balance: accounts.get(group.id)?.balance ?? 0,
+        sourceId: accounts.get(group.id)?.last_event_id ?? null }))
+      return { id: s.id, name: s.name, balance: balances.get(s.id) ?? 0,
+        artisanPeople: artisans.reduce((total, group) => total + group.count, 0),
+        artisanCash: artisanGroups.reduce((total, group) => total + group.balance, 0),
+        artisanGroups, food: stock?.goods.food ?? 0, foodSourceId: stock?.last_event_ids.food ?? null,
+        missingFood: need?.missing_food ?? 0, health: need?.health ?? 0,
+        needSourceId: need?.last_event_id ?? null }
+    })
   })
   const totalSavings = computed(() => savings.value.reduce((sum, s) => sum + s.balance, 0))
   const payrolls = computed(() => data.value.economy.payrolls.map(p => {
