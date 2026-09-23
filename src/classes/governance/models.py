@@ -14,7 +14,7 @@ class AuthorityOffice(SocietyValue):
     id: Identity
     institution_ref: EntityRef
     holder_ref: EntityRef
-    scopes: tuple[Literal["trade", "supply", "taxation", "research", "diplomacy", "military", "operations"], ...]
+    scopes: tuple[Literal["trade", "supply", "taxation", "research", "diplomacy", "military", "operations", "policy"], ...]
     starts_day: Count = 0
     ends_day: Count | None = None
 

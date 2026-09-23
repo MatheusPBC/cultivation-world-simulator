@@ -17,16 +17,26 @@ def create_authority(society):
             state.offices[office.id] = office
             if kind == "polity":
                 officers = [character for character in society.characters.values()
-                            if society.settlements[character.location_id].administrator_id == identity]
+                            if (settlement := society.settlements.get(character.location_id)) is not None
+                            and settlement.administrator_id == identity]
                 if officers:
+                    capital = society.polities[identity].capital_id
+                    principal_pool = [person for person in officers if person.location_id == capital] or officers
+                    principal = min(principal_pool, key=lambda person: (-person.skills.diplomacy, person.id))
+                    political = AuthorityOffice(
+                        id=f"office:polity:{identity}:political", institution_ref=ref,
+                        holder_ref=EntityRef("character", principal.id), scopes=("policy",))
+                    state.offices[political.id] = political
                     # The initial staff officer is an information specialist;
                     # the strongest field commander remains available to lead
                     # an actual column when institution and person choose so.
-                    holder = min(officers, key=lambda person: (-person.skills.investigation, person.id))
-                    headquarters = AuthorityOffice(
-                        id=f"office:polity:{identity}:headquarters", institution_ref=ref,
-                        holder_ref=EntityRef("character", holder.id), scopes=("operations",))
-                    state.offices[headquarters.id] = headquarters
+                    staff = [person for person in officers if person.id != principal.id]
+                    if staff:
+                        holder = min(staff, key=lambda person: (-person.skills.investigation, person.id))
+                        headquarters = AuthorityOffice(
+                            id=f"office:polity:{identity}:headquarters", institution_ref=ref,
+                            holder_ref=EntityRef("character", holder.id), scopes=("operations",))
+                        state.offices[headquarters.id] = headquarters
     for polity_id in society.polities:
         state.tax_policies[polity_id] = TaxPolicy(id=polity_id, account_id=f"treasury:{polity_id}")
     return state

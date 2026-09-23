@@ -1,4 +1,3 @@
-import random
 import sqlite3
 import zlib
 
@@ -72,11 +71,12 @@ def test_xianxia_or_foreign_databases_are_rejected_without_modification(tmp_path
     assert path.read_bytes() == before
 
 
-def test_previous_uncompressed_schema_is_rejected_without_touching_save(tmp_path):
-    path = tmp_path / "schema-66.mws"
+@pytest.mark.parametrize("schema", (66, 68))
+def test_previous_schema_is_rejected_without_touching_save(tmp_path, schema):
+    path = tmp_path / f"schema-{schema}.mws"
     save_world(create_medieval_world(73), path)
     with sqlite3.connect(path) as conn:
-        conn.execute("UPDATE metadata SET schema_version=66 WHERE id=1")
+        conn.execute("UPDATE metadata SET schema_version=? WHERE id=1", (schema,))
     before = path.read_bytes()
     with pytest.raises(ValueError, match="Unsupported Medieval World Simulator save"):
         load_world(path)

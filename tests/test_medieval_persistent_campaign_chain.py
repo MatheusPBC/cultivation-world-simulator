@@ -120,6 +120,7 @@ def _start_siege(monkeypatch, extra_food, *, dispatch_repeat_supply=True):
 
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_campaign)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     plan = next(iter(world.strategy.plans.values()))
     own_id = plan.detachment_id
     assert own_id is not None
@@ -216,12 +217,12 @@ def test_plan_column_cannot_force_victory_without_supply(monkeypatch, tmp_path, 
     save_world(world, path)
     world = load_world(path)
     assert world.strategy.plans[plan.id].detachment_id == own_id
-    while world.clock.absolute_day < 31:
+    while world.clock.absolute_day < 32:
         due = tick(world)
         asyncio.run(review_campaign_supplies(world, due))
         if world.clock.absolute_day == 30:
             refresh_settlement_reports(world)
-        if world.clock.absolute_day == 31:
+        if world.clock.absolute_day == 32:
             assert asyncio.run(review_strategy_responses_with_provider(world, due))
     assert world.strategy.plans[plan.id].stage == "closed"
     assert world.society.settlements[TARGET].occupier_id == OWNER.id
@@ -288,12 +289,12 @@ def test_plan_column_can_negotiate_and_physically_withdraw(monkeypatch, tmp_path
     midpoint = tmp_path / "negotiated-campaign-midpoint.mws"
     save_world(world, midpoint)
     world = load_world(midpoint)
-    while world.clock.absolute_day < 31:
+    while world.clock.absolute_day < 32:
         due = tick(world)
         asyncio.run(review_campaign_supplies(world, due))
         if world.clock.absolute_day == 30:
             refresh_settlement_reports(world)
-        if world.clock.absolute_day == 31:
+        if world.clock.absolute_day == 32:
             assert asyncio.run(review_strategy_responses_with_provider(world, due))
     assert world.strategy.plans[plan.id].stage == "closed"
     final_path = tmp_path / "negotiated-campaign.mws"

@@ -8,10 +8,13 @@ enumerate.
 
 from copy import deepcopy
 from dataclasses import dataclass
+import json
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, headquarters_holder, require_authority
+from src.classes.governance.authority import (can_actor_act_for, headquarters_holder,
+                                              political_holder, require_authority)
 from src.classes.governance.models import Objective, StrategicPlan
+from src.classes.governance.knowledge import settlement_report_id
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity, SocietyValue
 from src.systems.calendar_agenda import ScheduledSituation
@@ -143,9 +146,8 @@ def _plan_status(world, objective):
     return None, None
 
 
-def _headquarters_briefing(world, objective):
-    """The named officer needs their own dated reading of the political target."""
-    holder = headquarters_holder(world, objective.actor_ref)
+def _office_briefing(world, objective, holder):
+    """A named officer needs their own dated reading of the political target."""
     institution_report = world.knowledge.settlement_report(objective.actor_ref, objective.settlement_id)
     report = world.knowledge.settlement_report(holder, objective.settlement_id) if holder else None
     if (report is None or institution_report is None or report.recipient_ref != holder
@@ -158,6 +160,51 @@ def _headquarters_briefing(world, objective):
     except ValueError:
         return holder, None
     return holder, report
+
+
+def _headquarters_briefing(world, objective):
+    return _office_briefing(world, objective, headquarters_holder(world, objective.actor_ref))
+
+
+def _political_briefing(world, objective):
+    return _office_briefing(world, objective, political_holder(world, objective.actor_ref))
+
+
+def _political_order(world, plan, objective):
+    """Only the current principal's sourced order can reach HQ on a later day."""
+    principal = political_holder(world, objective.actor_ref)
+    institution_report = world.knowledge.settlement_report(objective.actor_ref, objective.settlement_id)
+    if principal is None or institution_report is None:
+        return None
+    events = world.event_index()
+    report_owner_id = settlement_report_id(principal, objective.settlement_id)
+    for event in reversed(world.events_of_type("strategy_defense_political_ordered")):
+        decision = event.decision or {}
+        sources = {link.cause_event_id for link in event.causal_links}
+        briefing_id = decision.get("report_event_id")
+        receipt = events.get(briefing_id)
+        supported_reading = (receipt is not None and receipt.event_type in {
+            "settlement_observed", "settlement_report_received"}
+            and any(delta.owner_kind == "settlement_report" and delta.owner_id == report_owner_id
+                    and delta.aspect == "observation"
+                    and json.loads(delta.after).get("occupier_id") == institution_report.occupier_id
+                    for delta in receipt.deltas))
+        expected = {
+            "action": "authorize_defense_plan", "actor_ref": principal.to_dict(),
+            "institution_ref": objective.actor_ref.to_dict(), "operational_plan_id": plan.id,
+            "selected_affordance_id": f"strategy-defense-authorize:{plan.id}:{briefing_id}",
+            "report_event_id": briefing_id,
+            "observed_occupier_id": institution_report.occupier_id,
+        }
+        if (event.fact_kind == FactKind.DECISION and event.day < world.clock.absolute_day
+                and decision == expected and supported_reading and briefing_id in sources
+                and any((source := events.get(source_id)) is not None
+                        and source.event_type in {"strategy_defense_adopted", "strategy_defense_plan_updated"}
+                        and any(delta.owner_kind == "strategy_plan" and delta.owner_id == plan.id
+                                for delta in source.deltas)
+                        for source_id in sources)):
+            return event
+    return None
 
 
 def _set_plan(world, plan, stage, *, blocker=None, causes=(), detachment_id=None,
@@ -369,15 +416,6 @@ async def _review_material_turn(world, plan):
     if not world.config.ai_enabled:
         _schedule_review(world, plan.id)
         return False
-    headquarters, briefing = _headquarters_briefing(world, objective)
-    if briefing is None:
-        blocker = ("sem titular atual do QG" if headquarters is None
-                   else "QG não recebeu observação atual do assentamento")
-        changed = plan.stage != "blocked" or plan.blocker != blocker
-        if changed:
-            _set_plan(world, plan, "blocked", blocker=blocker)
-        _schedule_review(world, plan.id)
-        return changed
     options = defense_action_options(world, objective.actor_ref, plan.id)
     if not options:
         blocker = "nenhuma coluna pode ser erguida para o assentamento conhecido"
@@ -390,7 +428,70 @@ async def _review_material_turn(world, plan):
                       causes=(report.event_id,), recruitment_source=source)
         _schedule_review(world, plan.id)
         return changed
-    report = world.knowledge.settlement_report(objective.actor_ref, objective.settlement_id)
+    order = _political_order(world, plan, objective)
+    principal, political_briefing = _political_briefing(world, objective)
+    if order is None and political_briefing is None:
+        blocker = ("sem titular político atual" if principal is None
+                   else "titular político não recebeu observação atual do assentamento")
+        changed = plan.stage != "blocked" or plan.blocker != blocker
+        if changed:
+            _set_plan(world, plan, "blocked", blocker=blocker)
+        _schedule_review(world, plan.id)
+        return changed
+    if order is None:
+        option_id = f"strategy-defense-authorize:{plan.id}:{political_briefing.event_id}"
+        selected = await ai_decider.select_option(
+            world, principal,
+            {"you_are": principal.to_dict(), "serving_institution": objective.actor_ref.to_dict(),
+             "settlement_id": objective.settlement_id,
+             "report_event_id": political_briefing.event_id, "today": world.clock.absolute_day},
+            [{"id": option_id, "label": "Autorizar o QG a preparar uma resposta material à ocupação observada."}],
+            causes=(plan.last_event_id, political_briefing.event_id))
+        if selected is None:
+            _schedule_review(world, plan.id)
+            return False
+        if (_political_briefing(world, objective) != (principal, political_briefing)
+                or world.strategy.plans.get(plan.id) != plan
+                or _plan_status(world, objective)[0] is not None
+                or not defense_action_options(world, objective.actor_ref, plan.id)):
+            raise ProviderDecisionRequired(
+                f"provider decision required for {objective.actor_ref.kind}:{objective.actor_ref.id}: "
+                "political authorization became stale"
+            )
+        if selected == ai_decider.NO_ACTION:
+            record_event(world, "strategy_defense_political_declined",
+                         "O titular político decidiu não autorizar a resposta defensiva agora.",
+                         fact_kind=FactKind.DECISION,
+                         decision={"action": "no_action", "actor_ref": principal.to_dict(),
+                                   "operational_plan_id": plan.id, "declined_option_ids": (option_id,)},
+                         cause_ids=_causes(plan.last_event_id, political_briefing.event_id))
+            _schedule_review(world, plan.id)
+            return False
+        if selected != option_id:
+            raise ProviderDecisionRequired(
+                f"provider decision required for {objective.actor_ref.kind}:{objective.actor_ref.id}: "
+                "political authorization became stale"
+            )
+        record_event(world, "strategy_defense_political_ordered",
+                     "O titular político autorizou o QG a preparar a defesa observada.",
+                     fact_kind=FactKind.DECISION,
+                     decision={"action": "authorize_defense_plan", "actor_ref": principal.to_dict(),
+                               "institution_ref": objective.actor_ref.to_dict(),
+                               "operational_plan_id": plan.id, "selected_affordance_id": option_id,
+                               "report_event_id": political_briefing.event_id,
+                               "observed_occupier_id": political_briefing.occupier_id},
+                     cause_ids=_causes(plan.last_event_id, political_briefing.event_id))
+        _schedule_review(world, plan.id, days=1)
+        return True
+    headquarters, briefing = _headquarters_briefing(world, objective)
+    if briefing is None:
+        blocker = ("sem titular atual do QG" if headquarters is None
+                   else "QG não recebeu observação atual do assentamento")
+        changed = plan.stage != "blocked" or plan.blocker != blocker
+        if changed:
+            _set_plan(world, plan, "blocked", blocker=blocker)
+        _schedule_review(world, plan.id)
+        return changed
     selected = await ai_decider.select_option(
         world, headquarters,
         {"you_are": headquarters.to_dict(), "serving_institution": objective.actor_ref.to_dict(),
@@ -398,7 +499,7 @@ async def _review_material_turn(world, plan):
          "observed_occupier_id": briefing.occupier_id, "today": world.clock.absolute_day},
         [{"id": item.id, "label": (f"Erguer {item.count} soldados com {item.provisions} rações "
                                  f"para até {item.days} dias e marchar ao assentamento conhecido.")}
-         for item in options], causes=(plan.last_event_id, briefing.event_id))
+         for item in options], causes=(plan.last_event_id, order.id, briefing.event_id))
     if selected == ai_decider.NO_ACTION:
         record_event(world, "strategy_defense_operational_declined",
                      "O titular do QG decidiu não mobilizar uma das colunas disponíveis.",
@@ -406,7 +507,7 @@ async def _review_material_turn(world, plan):
                      decision={"action": "no_action", "actor_ref": headquarters.to_dict(),
                                "operational_plan_id": plan.id,
                                "declined_option_ids": tuple(sorted(item.id for item in options))},
-                     cause_ids=_causes(plan.last_event_id, briefing.event_id))
+                     cause_ids=_causes(plan.last_event_id, order.id, briefing.event_id))
         _schedule_review(world, plan.id)
         return False
     if selected is None:
@@ -425,7 +526,7 @@ async def _review_material_turn(world, plan):
         decision={"action": "raise_detachment", "actor_ref": headquarters.to_dict(),
                   "institution_ref": objective.actor_ref.to_dict(), "operational_plan_id": plan.id,
                   "selected_affordance_id": option.id},
-        cause_ids=_causes(plan.last_event_id, briefing.event_id))
+        cause_ids=_causes(plan.last_event_id, order.id, briefing.event_id))
     status, blocker = _plan_status(world, objective)
     if status is not None:
         _set_plan(world, plan, status, blocker=blocker, causes=(decision.id,))

@@ -72,8 +72,8 @@ O servidor é local e não possui autenticação para exposição pública.
 A variável `SERVER_PORT` permite escolher a porta.
 
 Sem override, dados usam a pasta de aplicativo `MedievalWorldSimulator(-dev)`,
-separada da origem. Saves estão em `saves/medieval/*.mws`, schema 68 (Society 21,
-economia 15). Saves xianxia e schemas anteriores ao 67 são rejeitados e
+separada da origem. Saves estão em `saves/medieval/*.mws`, schema 69 (Society 21,
+economia 15). Saves xianxia e schemas anteriores ao 69 são rejeitados e
 preservados, sem sobrescrita nem migração.
 O histórico causal é mantido integralmente em blocos compactados, com índice
 de IDs, sequência e dia. Salvar substitui o arquivo de forma atômica; em caso

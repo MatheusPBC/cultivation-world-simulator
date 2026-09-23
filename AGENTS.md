@@ -13,7 +13,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 68 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
+  save schema 69 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -170,7 +170,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 68 are rejected and preserved
+  older than schema 69 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
@@ -215,14 +215,16 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   without a column, schedules another dated review. It recomputes current
   reports and material force options; neither restored supplies nor the passage
   of time raises soldiers by itself.
-- A polity with an eligible named resident starts with a separate headquarters
-  `operations` office. The adopted defensive plan remains institutional, but
-  its current HQ holder needs their own dated settlement observation/bulletin
-  and independently selects a current raise option or `NO_ACTION`. Force
-  revalidates that person's exact decision, briefing, plan and material option;
-  the HQ holder cannot simultaneously command the field column. This is only
-  the operational link: no separate ruler decision, transmission delay or
-  complete king-to-HQ-to-general campaign chain is claimed yet.
+- A polity with eligible named residents starts with distinct `policy` and
+  headquarters `operations` offices. A defensive plan remains institutional:
+  its current political holder needs their own dated settlement bulletin and
+  authorizes or declines the response. Only on a later day may the distinct HQ
+  holder use their own dated bulletin to select a current raise option or
+  `NO_ACTION`. Force revalidates both decisions, both briefings, the plan and
+  the material option; the HQ holder cannot simultaneously command the field
+  column. This proves separate political and operational turns with a calendar
+  delay, not physical message transit, disagreement through a complete chain of
+  command, or a spontaneous king-to-HQ-to-general campaign.
 - A prepared column may invest an administered city only if its own fresh local
   report confirms a foreign occupier. The pressure notice goes to that occupier,
   and the investment receipt cites the local occupation report as well as the

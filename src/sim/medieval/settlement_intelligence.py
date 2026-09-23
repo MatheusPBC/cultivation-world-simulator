@@ -1,7 +1,7 @@
 """Dated, aggregate settlement observations and physically delivered bulletins."""
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, headquarters_holder
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder, political_holder
 from src.classes.governance.knowledge import settlement_report_id
 from src.classes.governance.models import SettlementReport
 from src.classes.mechanical_language import EntityRef
@@ -174,9 +174,9 @@ def _recipients(world, publisher):
     recipients = [EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
                   if world.society.available_count(group_id) > 0]
     if publisher.kind == "polity":
-        holder = headquarters_holder(world, publisher)
-        if holder is not None:
-            recipients.append(holder)
+        for holder in (political_holder(world, publisher), headquarters_holder(world, publisher)):
+            if holder is not None and holder not in recipients:
+                recipients.append(holder)
     return recipients
 
 

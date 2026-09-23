@@ -26,7 +26,7 @@ from src.sim.medieval.workforce import (accept_workforce_transition, authorize_m
                                         refresh_workforce_notices,
                                         workforce_transition_options)
 from tools.medieval_causal_audit import audit
-from tests.test_medieval_strategy_response import (OWNER, SOURCE, TARGET, choose_first,
+from tests.test_medieval_strategy_response import (OWNER, SOURCE, choose_first,
                                                    occupied_response_world, tick)
 
 
@@ -243,7 +243,7 @@ def test_defense_plan_can_recruit_after_soldiers_are_committed_elsewhere(monkeyp
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
-    for day in range(32, 62):
+    for day in range(32, 63):
         due = tick(world)
         if day == 60:
             refresh_route_reports(world)
@@ -251,6 +251,7 @@ def test_defense_plan_can_recruit_after_soldiers_are_committed_elsewhere(monkeyp
         if day == 61:
             assert transition.id not in world.society.workforce_transitions
             assert world.society.population[transition.target_group_id].count >= notice.count
+        if day in {61, 62}:
             assert asyncio.run(review_strategy_responses_with_provider(world, due))
     mobilized = world.strategy.plans[plan.id]
     assert mobilized.stage == "mobilized" and mobilized.detachment_id is not None

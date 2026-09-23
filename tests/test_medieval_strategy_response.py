@@ -6,7 +6,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import headquarters_holder
+from src.classes.governance.authority import headquarters_holder, political_holder
 from src.classes.governance.knowledge import settlement_report_id
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -64,6 +64,67 @@ def choose_first(monkeypatch):
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
 
 
+def authorize_defense(world):
+    due = tick(world)
+    assert asyncio.run(review_strategy_responses_with_provider(world, due))
+    assert any(event.event_type == "strategy_defense_political_ordered"
+               for event in world.events)
+    assert not world.society.detachments
+
+
+def test_political_no_action_cannot_mobilize_or_substitute_headquarters(monkeypatch):
+    world, _, _ = occupied_response_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
+                                                   "ai_max_calls": 10})
+    choose_first(monkeypatch)
+    assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    plan = next(iter(world.strategy.plans.values()))
+
+    async def no_action(prompt, *args, **kwargs):
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", no_action)
+    before = world_snapshot(world)
+    assert not asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    refusal = next(event for event in world.events if event.event_type == "strategy_defense_political_declined")
+    assert refusal.decision["actor_ref"] == political_holder(world, OWNER).to_dict()
+    assert not any(event.event_type == "strategy_defense_force_decided" for event in world.events)
+    assert world.strategy.plans[plan.id].stage == "adopted"
+    assert world_snapshot(world)["economy"] == before["economy"]
+    assert not world.society.detachments
+
+
+def test_pending_political_order_survives_save_before_headquarters_turn(monkeypatch, tmp_path):
+    world, _, _ = occupied_response_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
+                                                   "ai_max_calls": 10})
+    choose_first(monkeypatch)
+    assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    authorize_defense(world)
+    path = tmp_path / "pending-political-order.mws"
+    save_world(world, path)
+    world = load_world(path)
+    assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    decision = next(event for event in world.events if event.event_type == "strategy_defense_force_decided")
+    order = next(event for event in world.events if event.event_type == "strategy_defense_political_ordered")
+    assert order.id in {link.cause_event_id for link in decision.causal_links}
+    assert world.society.detachments
+
+
+def test_same_person_cannot_be_political_principal_and_headquarters(monkeypatch):
+    world, _, _ = occupied_response_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
+                                                   "ai_max_calls": 10})
+    choose_first(monkeypatch)
+    assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    authorize_defense(world)
+    office = world.authority.offices["office:polity:auren:headquarters"]
+    world.authority.offices[office.id] = office.model_copy(update={"holder_ref": political_holder(world, OWNER)})
+    assert headquarters_holder(world, OWNER) is None
+    assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    assert not world.society.detachments
+
+
 def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypatch):
     world, occupation_id, report = occupied_response_world()
     world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2, "ai_max_calls": 10})
@@ -78,6 +139,7 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert occupation_id not in {link.cause_event_id for link in adoption.causal_links}
     assert not world.society.detachments
 
+    authorize_defense(world)
     due = tick(world)
     assert asyncio.run(review_strategy_responses_with_provider(world, due))
     raised = next(item for item in world.society.detachments.values() if item.owner_ref == OWNER)
@@ -85,6 +147,7 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert world.strategy.plans[plan.id].stage == "mobilized"
     assert world.strategy.plans[plan.id].detachment_id == raised.id
     force_decision = next(event for event in world.events if event.event_type == "strategy_defense_force_decided")
+    political = next(event for event in world.events if event.event_type == "strategy_defense_political_ordered")
     material = next(event for event in world.events if event.event_type == "detachment_raised")
     headquarters = headquarters_holder(world, OWNER)
     own_briefing = world.knowledge.settlement_report(headquarters, TARGET)
@@ -92,6 +155,9 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert force_decision.decision["actor_ref"] == headquarters.to_dict()
     assert force_decision.decision["institution_ref"] == OWNER.to_dict()
     assert force_decision.decision["operational_plan_id"] == plan.id
+    assert political.decision["actor_ref"] == political_holder(world, OWNER).to_dict()
+    assert political.day < force_decision.day
+    assert political.id in {link.cause_event_id for link in force_decision.causal_links}
     assert own_briefing.event_id in {link.cause_event_id for link in force_decision.causal_links}
     assert force_decision.id in {link.cause_event_id for link in material.causal_links}
     assert all(delta.owner_kind not in {"stock", "account", "detachment"} for delta in adoption.deltas)
@@ -117,6 +183,7 @@ def test_defense_menu_can_choose_sustained_column_with_real_daily_rations(monkey
     options = defense_action_options(world, OWNER, plan.id)
     assert {item.days for item in options} == {10, 40}
     sustained = next(item for item in options if item.days == 40)
+    authorize_defense(world)
 
     async def choose_sustained(prompt, *args, **kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
@@ -153,29 +220,30 @@ def test_mobilized_plan_survives_load_and_reconsiders_lost_column(monkeypatch, t
                                                    "ai_max_calls": 10})
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    authorize_defense(world)
     due = tick(world)
     assert asyncio.run(review_strategy_responses_with_provider(world, due))
     plan = next(iter(world.strategy.plans.values()))
     assert plan.stage == "mobilized" and plan.detachment_id is not None
-    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 31
+    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 32
     path = tmp_path / "mobilized-plan.mws"
     save_world(world, path)
     world = load_world(path)
     # Only dated force laws and the owner's own monthly observation run here;
     # no provider is asked to maintain or replace the army automatically.
     world.config = world.config.model_copy(update={"ai_enabled": False})
-    for day in range(2, 32):
+    for day in range(3, 33):
         due = tick(world)
         if day == 30:
             refresh_settlement_reports(world)
-        if day == 31:
+        if day == 32:
             assert world.strategy.plans[plan.id].stage == "mobilized"
             assert asyncio.run(review_strategy_responses_with_provider(world, due))
     current = world.strategy.plans[plan.id]
     assert world.society.detachments[plan.detachment_id].stage == "disbanded"
     assert current.stage == "adopted" and current.detachment_id is None
     assert current.blocker == "coluna indisponível; reconsiderar meios"
-    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 32
+    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 33
     final_path = tmp_path / "reconsidered-plan.mws"
     save_world(world, final_path)
     assert world_snapshot(load_world(final_path)) == world_snapshot(world)
@@ -190,6 +258,7 @@ def test_mobilized_plan_closes_only_after_own_fresh_report(monkeypatch, tmp_path
                                                    "ai_max_calls": 10})
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    authorize_defense(world)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     plan = next(iter(world.strategy.plans.values()))
     assert plan.stage == "mobilized"
@@ -197,7 +266,7 @@ def test_mobilized_plan_closes_only_after_own_fresh_report(monkeypatch, tmp_path
     # The earlier column may lapse without supply. Resolve the occupation at
     # the observation boundary, as a separate explicit material fixture fact.
     assert world.strategy.plans[plan.id].stage == "mobilized"
-    for day in range(2, 31):
+    for day in range(3, 32):
         tick(world)
     end = record_event(
         world, "test_strategy_occupation_resolved", "Fixture factual do fim da ocupação estrangeira.",
@@ -237,13 +306,14 @@ def test_reoccupation_after_clear_report_blocks_stale_closure(monkeypatch):
                                                    "ai_max_calls": 10})
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    authorize_defense(world)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     plan = next(iter(world.strategy.plans.values()))
     record_event(world, "test_strategy_occupation_ended", "Fixture factual do fim da ocupação.",
                  fact_kind=FactKind.STATE_TRANSITION,
                  deltas=(_delta("settlement", TARGET, "occupier_id", OCCUPIER.id, None),))
     world.society.set_occupation(TARGET, None)
-    for day in range(2, 31):
+    for day in range(3, 32):
         tick(world)
         if day == 30:
             refresh_settlement_reports(world)
@@ -257,7 +327,7 @@ def test_reoccupation_after_clear_report_blocks_stale_closure(monkeypatch):
     current = world.strategy.plans[plan.id]
     assert current.stage == "blocked" and current.detachment_id == plan.detachment_id
     assert current.blocker == "relatório local contradito; aguardar nova observação"
-    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 61
+    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 62
     world.strategy.validate(world)
 
 
@@ -303,6 +373,8 @@ def test_blocked_defense_reopens_when_material_means_return(monkeypatch, tmp_pat
             refresh_settlement_reports(world)
     assert defense_action_options(world, OWNER, plan.id)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    assert not world.society.detachments
+    assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     current = world.strategy.plans[plan.id]
     assert current.stage == "mobilized" and current.detachment_id in world.society.detachments
     material = world.event_index()[world.society.detachments[current.detachment_id].last_event_id]
@@ -321,6 +393,7 @@ def test_defense_no_action_preserves_a_later_choice(monkeypatch):
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
     plan = next(iter(world.strategy.plans.values()))
+    authorize_defense(world)
 
     async def no_action(prompt, *args, **kwargs):
         return {"selected_id": ai_decider.NO_ACTION}
@@ -331,9 +404,9 @@ def test_defense_no_action_preserves_a_later_choice(monkeypatch):
     assert not world.society.detachments
     refusal = next(event for event in world.events if event.event_type == "strategy_defense_operational_declined")
     assert refusal.decision["actor_ref"] == headquarters_holder(world, OWNER).to_dict()
-    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 31
+    assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 32
 
-    for day in range(2, 31):
+    for day in range(3, 32):
         tick(world)
         if day == 30:
             refresh_route_reports(world)
@@ -350,6 +423,7 @@ def test_operational_mobilization_rejects_institutional_or_missing_briefing(monk
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
     plan = next(iter(world.strategy.plans.values()))
+    authorize_defense(world)
     due = tick(world)
     option = defense_action_options(world, OWNER, plan.id)[0]
     forged = record_event(world, "test_institutional_operational_decision", "Decisão da instituição, não do QG.",
@@ -410,6 +484,7 @@ def test_saved_plan_and_changed_authority_route_or_occupation_block_executor_ato
         choose_first(monkeypatch)
         asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
         plan = next(iter(world.strategy.plans.values()))
+        authorize_defense(world)
         path = tmp_path / f"strategy-response-{label}.mws"
         save_world(world, path)
         restored = load_world(path)

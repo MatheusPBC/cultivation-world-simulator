@@ -4015,3 +4015,35 @@ mesma continuação antes/depois produziu saves SHA-256 idênticos, snapshot e
 14.324 eventos iguais. O perfil instrumentado caiu de 16,05 para 13,98 s.
 Isto reduz custo medido sem alterar decisões, não é validação de IA real ou
 aprovação de horizonte longo.
+
+### Autorização política anterior ao QG e retirada bilateral — 23/09/2026
+
+Na defesa de um assentamento ocupado, um titular político nomeado recebe seu
+próprio boletim datado e escolhe autorizar o plano ou `NO_ACTION`. A ordem
+auditável só permite que o titular distinto do QG decida no dia posterior; Force
+revalida ordem, relatório do QG, autoridade e opção material antes de mover
+pessoas ou recursos. Uma recusa não mobiliza ninguém. O recibo da ordem
+pendente preserva a cadeia após save/load. Isto é uma separação de decisões e
+um atraso de calendário, **não** um sistema de mensageiro físico, conflito
+rei/QG/general completo ou campanha espontânea.
+
+O contrato persistido passa a schema 69; saves 68 continuam intactos em disco,
+mas não carregam no runtime atual, sem migração automática.
+
+O dia adicional revelou uma inconsistência real no cessar-fogo bilateral: o
+defensor podia receber uma opção de retirada com pedido de suprimento aberto,
+mas o executor recusava o mesmo estado. A decisão de cumprir agora encerra o
+pedido aberto antes de retirar a guarnição; carga pendente ou bolsa abastecida
+continuam impedindo a retirada. O pedido encerrado e a retirada têm causa
+auditável na decisão, sem teleporte ou descarte de carga.
+
+O checkpoint passou em 74 testes focados de persistência, observatório,
+resposta estratégica, campanha, interferência de criatura, recrutamento,
+comando de campo e autonomia; uma regressão adicional confirmou que a mesma
+pessoa não pode ocupar simultaneamente o turno político e o do QG. A seed
+natural 73 no schema 69 chegou a 120 dias
+sem provider: 3.864 eventos, conservação de moeda/recursos e round-trip
+equivalente. A auditoria do save retornou `ok=true`, sem causas quebradas,
+autoria inválida ou mutação por Story/LLM. A saúde de Pedraclara/Portovelho
+ficou em 862/863; nem esse smoke curto nem os testes focados aprovam o gate de
+três seeds por dez anos ou a recuperação econômica espontânea.

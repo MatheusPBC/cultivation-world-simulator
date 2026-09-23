@@ -287,14 +287,18 @@ def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, ope
         expected = {"action": RAISE_ACTION, "actor_ref": holder.to_dict() if holder else None,
                     "institution_ref": actor.to_dict(), "operational_plan_id": operational_plan_id,
                     "selected_affordance_id": option.id}
-        from .strategy_response import _headquarters_briefing, defense_action_options
+        from .strategy_response import (_headquarters_briefing, _political_order,
+                                        defense_action_options)
         plan = candidate.strategy.plans.get(operational_plan_id)
         objective = candidate.strategy.objectives.get(plan.objective_id) if plan else None
         briefing_holder, briefing = _headquarters_briefing(candidate, objective) if objective else (None, None)
+        political_order = _political_order(candidate, plan, objective) if objective else None
         if (holder is None or decision is None or decision.fact_kind != FactKind.DECISION
                 or decision.day != candidate.clock.absolute_day or decision.decision != expected
                 or briefing_holder != holder or briefing is None
                 or briefing.event_id not in {link.cause_event_id for link in decision.causal_links}
+                or political_order is None
+                or political_order.id not in {link.cause_event_id for link in decision.causal_links}
                 or not any(item.id == option.id for item in defense_action_options(
                     candidate, actor, operational_plan_id))):
             raise ValueError("operational mobilization requires the current headquarters decision")

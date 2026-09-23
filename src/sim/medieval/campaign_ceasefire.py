@@ -266,7 +266,7 @@ def fulfill_campaign_ceasefire(world, actor, option_id, decision_event_id):
                       and item.destination_id == option.destination_id and item.route_ids == option.route_ids), None)
         if route is None:
             raise ValueError("campaign ceasefire attacker route is stale")
-        material = _execute_siege_withdrawal(candidate, actor, route, decision_event_id)
+        _execute_siege_withdrawal(candidate, actor, route, decision_event_id)
         material_event_id = candidate.society.siege_campaigns[clause.campaign_id].last_event_id
     else:
         route = next((item for item in withdrawal_options(
@@ -275,6 +275,10 @@ def fulfill_campaign_ceasefire(world, actor, option_id, decision_event_id):
                       if item.destination_id == option.destination_id and item.route_ids == option.route_ids), None)
         if route is None:
             raise ValueError("campaign ceasefire defender route is stale")
+        # Accepting withdrawal abandons an open supply request, not its cargo.
+        # The option has already excluded pending parcels and a stocked bag.
+        from .campaign_supply import _lapse_campaign_notices
+        _lapse_campaign_notices(candidate, clause.detachment_id, decision_event_id)
         garrison = next(item for item in candidate.society.garrisons.values()
                         if item.detachment_id == clause.detachment_id)
         _withdraw_garrison(candidate, actor, GarrisonOption(

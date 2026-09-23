@@ -39,7 +39,7 @@ async def test_drake_closure_holds_a_mobilized_column_and_food_against_open_rout
     execute_creature_option(world, DRAKE_ID, demand_option.id, decide(world, demand_option).id)
     demand = next(iter(world.creatures.demands.values()))
 
-    while world.clock.absolute_day < demand.due_day - 1:
+    while world.clock.absolute_day < demand.due_day - 2:
         tick(world)
     direct = world.map.routes["road-portovelho-salgueiro"]
     record_event(world, "fixture_road_closed", "Uma estrada existente está indisponível.",
@@ -67,9 +67,11 @@ async def test_drake_closure_holds_a_mobilized_column_and_food_against_open_rout
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
 
     async def choose(_world, _actor, _situation, choices, **_kwargs):
-        return next(item["id"] for item in choices if ROUTE_ID in item["id"] and ":160:" in item["id"])
+        return next((item["id"] for item in choices
+                     if ROUTE_ID in item["id"] and ":160:" in item["id"]), choices[0]["id"])
 
     monkeypatch.setattr(ai_decider, "select_option", choose)
+    assert await review_strategy_responses_with_provider(world, tick(world))
     due = tick(world)
     assert world.clock.absolute_day == demand.due_day
     assert await review_strategy_responses_with_provider(world, due)

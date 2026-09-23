@@ -32,10 +32,10 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-# Freight now retains the factual endpoint locations from its opening, so a
-# later mobile campaign bag cannot rewrite a completed order's route. Older
-# saves lack those endpoints and are rejected without rewriting real data.
-SCHEMA = 68
+# Political defense authorization adds a distinct named policy office and
+# historical order to the canonical command chain. Older saves cannot supply
+# those facts and are rejected without rewriting real data.
+SCHEMA = 69
 EVENT_CHUNK_SIZE = 512
 
 
