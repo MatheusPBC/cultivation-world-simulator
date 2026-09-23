@@ -51,6 +51,14 @@ def decide_recovery(world, journey, option):
                         decision=option.decision(journey.source_group_id), cause_ids=tuple(sorted(evidence)))
 
 
+def test_migration_menu_requires_the_household_account_used_by_the_owner():
+    world, group, _ = pressured_household()
+    assert migration_options(world, group.id)
+
+    del world.economy.accounts[f"household:{group.id}"]
+    assert migration_options(world, group.id) == ()
+
+
 @pytest.mark.asyncio
 async def test_known_pressure_moves_household_with_its_own_cash_and_rations(tmp_path):
     world, group, source_account = pressured_household()

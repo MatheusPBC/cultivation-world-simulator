@@ -3739,3 +3739,29 @@ inválida, interpretação material ou Story material. No dia 360 havia 10.949
 habitantes, falta de 37 unidades de alimento, saúde média 934 e zero mortes por
 privação nessa seed. Isso é uma medição de um ano, não o gate natural de três
 seeds por dez anos e não mede escolhas de um provider real.
+
+### Continuação natural até o segundo ano
+
+O primeiro avanço a partir do save do dia 360 abortou no dia 420: a coorte
+`pop:pedraclara:human:dependent`, surgida por nascimento, tinha seis rações
+mas não possuía conta doméstica. `migration_options` oferecia uma viagem
+chegável por rota/comida sem verificar a conta que `start_migration` exige.
+Agora a opção só existe quando a conta pertence ao próprio grupo; o owner
+continua a revalidar antes de mover qualquer pessoa. Não foi criada conta nem
+moeda fictícia. Os 15 testes focados de migração passaram, e a reprodução
+determinística ultrapassou o dia 420 com migrações de outros grupos.
+
+A seed 73 prosseguiu até o dia 720, sem provider real, conservando moeda e
+recursos. Os saves trimestrais e o final passaram round-trip. O final tem
+27.273 eventos, 8.028.160 bytes e auditoria `ok=true`, sem causas quebradas
+ou mutações originadas em Story/interpretação. A saúde média caiu de 934 para
+749,88 ao longo desses dois anos; não há evidência de equilíbrio econômico.
+O ano 2 consumiu 240,17 s e atingiu 489.971.712 bytes de pico RSS. O gate de
+três seeds por dez anos permanece aberto.
+
+O checkpoint `a260c3df` foi publicado em `github-personal/codex/medieval-remote`.
+Cinco diretórios de medições antigas (2,4 GiB expandidos) foram compactados e
+verificados em `/tmp/cws-legacy-gate-evidence-20260923.tar.gz` (136.461.129
+bytes, SHA-256 `0e953d699d62b84f0b9eebb7e6f3b37277f7df4756d7d2810c0cfb67b4ddb697`)
+antes de remover somente as cópias expandidas. Esse segundo arquivo permanece
+apenas no disco local, não no Dropbox; o espaço livre subiu para 8,0 GiB.

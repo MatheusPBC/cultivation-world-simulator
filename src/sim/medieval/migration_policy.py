@@ -91,12 +91,18 @@ def _own_food(world, group_id):
             and stock.location_id == group.settlement_id else 0)
 
 
+def _has_own_account(world, group_id):
+    account = world.economy.accounts.get(f"household:{group_id}")
+    return account is not None and account.owner_ref == EntityRef("population_group", group_id)
+
+
 def migration_options(world, group_id, *, route_reports=None, route_graph=None):
     """Return only destinations this household was actually told about."""
     group = world.society.population.get(group_id)
     actor = EntityRef("population_group", group_id)
     source = world.knowledge.settlement_report(actor, group.settlement_id) if group else None
-    if (group is None or world.society.available_count(group_id) != group.count or not _fresh(world, source)
+    if (group is None or world.society.available_count(group_id) != group.count
+            or not _has_own_account(world, group_id) or not _fresh(world, source)
             or not (source.missing_food > 0 or source.health < 700 or source.unrest >= 250)):
         return ()
     food_available = _own_food(world, group_id)
