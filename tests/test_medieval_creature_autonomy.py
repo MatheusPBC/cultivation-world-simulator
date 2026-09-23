@@ -4,7 +4,8 @@ import pytest
 
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
-from src.sim.medieval.creature_policy import REVIEW_KIND
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
+from src.sim.medieval.creature_policy import REVIEW_KIND, review_creatures
 from src.sim.medieval.creatures import creature_options, tribute_options
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -15,7 +16,7 @@ from tests.test_medieval_logistics import total_food
 AUREN = EntityRef("polity", "auren")
 
 
-def enable(world, *, per_step=6, maximum=100):
+def enable(world, *, per_step=256, maximum=1000):
     world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": per_step,
                                                    "ai_max_calls": maximum})
     return world
@@ -129,9 +130,10 @@ async def test_without_a_choice_no_deadline_demands_or_closes_the_river(monkeypa
     assert not disabled.creatures.demands and disabled.map.routes[ROUTE_ID].enabled
     failed = await hungry_world()
     provider(monkeypatch, lambda prompt: RuntimeError("provider down"))
-    await MedievalSimulator(failed).step()
+    with pytest.raises(ProviderDecisionRequired):
+        await MedievalSimulator(failed).step()
     assert failed.map.routes[ROUTE_ID].enabled
-    assert any(item.event_type == "ai_decision_failed" for item in failed.events)
+    assert not any(item.event_type == "ai_decision_failed" for item in failed.events)
 
     # A later crossing remains factual, but an ignored open demand does not
     # mint another creature turn just because more cargo passes the river.
@@ -148,6 +150,25 @@ async def test_without_a_choice_no_deadline_demands_or_closes_the_river(monkeypa
     assert not any(item["kind"] == REVIEW_KIND for item in world.agenda.to_dict())
 
 
+async def test_creature_selection_that_goes_stale_pauses_instead_of_noop(monkeypatch):
+    from src.sim.medieval import creature_policy as policy
+
+    world = await hungry_world()
+    initial = policy.creature_options(world, DRAKE_ID)
+    assert len(initial) > 1
+    calls = 0
+
+    def options(current, creature_id):
+        nonlocal calls
+        calls += 1
+        return initial if calls == 1 else ()
+
+    monkeypatch.setattr(policy, "creature_options", options)
+    provider(monkeypatch, lambda prompt: {"selected_id": initial[0].id})
+    due = world.agenda.pop_due(world.clock.absolute_day + 1)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_creatures(world, due)
+    assert not any(event.event_type == "creature_decided" for event in world.events)
 async def test_many_real_crossings_do_not_fan_out_reviews_while_demand_is_open(monkeypatch):
     world = await hungry_world()
     provider(monkeypatch, choose("Exigir tributo"))

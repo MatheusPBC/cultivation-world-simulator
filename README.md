@@ -72,8 +72,8 @@ O servidor é local e não possui autenticação para exposição pública.
 A variável `SERVER_PORT` permite escolher a porta.
 
 Sem override, dados usam a pasta de aplicativo `MedievalWorldSimulator(-dev)`,
-separada da origem. Saves estão em `saves/medieval/*.mws`, schema 28 (Society 4,
-economia 11). Saves xianxia e schemas anteriores ao 27 são rejeitados e
+separada da origem. Saves estão em `saves/medieval/*.mws`, schema 66 (Society 21,
+economia 15). Saves xianxia e schemas anteriores ao 66 são rejeitados e
 preservados, sem sobrescrita nem migração.
 
 Overflow regional é uma lei física sazonal engine-owned: usa água declarada e

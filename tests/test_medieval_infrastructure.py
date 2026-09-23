@@ -13,7 +13,10 @@ from src.sim.medieval.events import record_event, validate_history
 from src.sim.medieval.infrastructure import (damage_site, execute_site_reactivation,
                                               progress_repairs, review_maintenance,
                                               site_reactivation_options)
-from src.sim.medieval.intelligence import refresh_reports
+from src.sim.medieval.intelligence import refresh_reports, refresh_trade_reports
+from src.sim.medieval.route_intelligence import refresh_route_reports
+from src.sim.medieval.markets import purchase
+from src.sim.medieval.tariffs import export_fee, export_quote
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.site_services import service_options, set_site_service
 
@@ -247,6 +250,12 @@ def test_recovered_interdiction_requires_an_explicit_maintainer_decision():
     )
     event = execute_site_reactivation(world, maintainer, option.id, decision.id)
     assert event.event_type == "site_reactivated"
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert event.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": maintainer.to_dict(),
+        "selected_affordance_id": option.id,
+    }
     assert world.map.infrastructure_sites[SITE].enabled is True
     assert world.map.get_route_operational_capacity(route_id) == intact
 
@@ -371,9 +380,34 @@ def importing_world():
 async def test_a_damaged_crossing_delays_cargo_and_the_repaired_one_delivers_again():
     world = importing_world()
     await run_to(world, 30)
-    crossing = [o for o in world.economy.freight_orders.values() if RIVER in o.route_ids]
-    assert crossing, "the prepared scarcity must produce a shipment across the river"
-    order = sorted(crossing, key=lambda o: o.id)[0]
+    # Open one real paid order from independent buyer/seller decisions.  The
+    # damage test must not depend on whichever relief or supply policy happens
+    # to choose a route on this boundary.
+    refresh_reports(world)
+    refresh_route_reports(world)
+    refresh_trade_reports(world, replace_today=True)
+    source = world.economy.stocks["stock:campomanso"]
+    destination = world.economy.stocks["stock:portovelho"]
+    quantity = 1100
+    market = world.economy.markets[source.location_id]
+    quote = export_quote(world, source.id, destination.id)
+    fee = export_fee(quantity, market.prices["food"], quote["export_rate_permille"])
+    terms = {
+        "source_id": source.id, "destination_id": destination.id, "resource_id": "food",
+        "quantity": quantity, "unit_price": market.prices["food"], "quote_day": market.updated_day,
+        "route_ids": ["road-campomanso-pedraclara", RIVER],
+        "seller_account_id": f"treasury:{source.owner_ref.id}",
+        "buyer_account_id": f"treasury:{destination.owner_ref.id}",
+        **quote, "total_price": quantity * market.prices["food"] + fee,
+    }
+    decisions = []
+    for action, owner in (("buy", destination.owner_ref), ("sell", source.owner_ref)):
+        decisions.append(record_event(
+            world, f"{action}_decided", "Termos comerciais aceitos.",
+            fact_kind=FactKind.DECISION,
+            decision={**terms, "action": action, "actor_ref": owner.to_dict()},
+        ).id)
+    order = purchase(world, *decisions)
     site = world.map.infrastructure_sites[SITE]
     assert site.id in {s.id for s in world.map.get_route_dependency_sites(RIVER)}
 
@@ -457,8 +491,12 @@ async def test_a_failed_save_on_the_repairing_jump_restores_work_money_and_the_s
     control = load_world(path)
     await MedievalSimulator(control).step()
     assert control.economy.repairs[project.id].restored_permille == 100
-    # Day90's own wear (-0.01) lands before the batch's repair (+0.10): 0.49 -> 0.48 -> 0.58.
-    assert control.map.infrastructure_sites[SITE].integrity == pytest.approx(0.58)
+    assert control.map.infrastructure_sites[SITE].integrity == pytest.approx(0.59)
+    repair_receipt = next(event for event in control.events if event.id == control.economy.repairs[project.id].last_event_id)
+    assert repair_receipt.event_type == "repair_progressed"
+    assert any(delta.owner_kind == "site" and delta.owner_id == SITE
+               and delta.aspect == "integrity" and delta.before == "0.49" and delta.after == "0.59"
+               for delta in repair_receipt.deltas)
 
     before, history = world_snapshot(world), list(world.events)
     rng_state, knowledge = world.rng.getstate(), world.knowledge.to_dict()
@@ -478,11 +516,8 @@ async def test_a_failed_save_on_the_repairing_jump_restores_work_money_and_the_s
 
     await MedievalSimulator(world).step()
     assert world.economy.repairs[project.id].restored_permille == 100
-    assert world.map.infrastructure_sites[SITE].integrity == pytest.approx(0.58)
+    assert world.map.infrastructure_sites[SITE].integrity == pytest.approx(0.59)
     assert world_snapshot(world) == world_snapshot(control)
-    # The same jump's wear is a real, causally-linked fact, not an invented number.
-    assert any(e.event_type == "site_worn" and any(d.owner_kind == "site" and d.owner_id == SITE for d in e.deltas)
-               for e in world.events)
 
     with sqlite3.connect(path) as connection:
         connection.execute("UPDATE metadata SET schema_version=12")

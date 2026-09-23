@@ -32,7 +32,8 @@ from .institutional_decision_turn import (_rotated, review_institutional_decisio
 from .recourse_policy import (REVIEW_KIND as RECOURSE_REVIEW_KIND, recourse_actors,
                               recourse_adapters, schedule_pending_recourse)
 from .relief_policy import relief_actors, relief_adapters
-from .strategy_response import strategy_adoption_actors, strategy_adoption_adapters
+from .strategy_response import (garrison_supply_adapters, garrison_supply_options,
+                                strategy_adoption_actors, strategy_adoption_adapters)
 from .technique_copy_policy import technique_copy_actors, technique_copy_adapters
 from .sabotage import (accusation_options, accusation_response_options, investigation_options,
                        sabotage_adapters, sabotage_options)
@@ -40,10 +41,14 @@ from .espionage import espionage_adapters, espionage_options
 from .bribery import (bribery_adapters, bribery_offer_options, bribery_payment_options,
                       bribery_response_options)
 from .technology_sale_policy import technology_sale_actors, technology_sale_adapters
+from .market_purchase_policy import market_purchase_actors
 from .technology_theft import technology_theft_adapters, technology_theft_options
 from .permanent_employment import permanent_employment_adapters, permanent_employment_options
-from .workforce import workforce_adapters, workforce_transition_options
+from .production_priority import production_priority_adapters, production_priority_options
+from .workforce import (military_recruitment_adapters, military_recruitment_group_actors,
+                        workforce_adapters, workforce_transition_options)
 from .customs_policy import customs_adapters, customs_actors
+from .embargo import embargo_options
 from .garrison_policy import garrison_adapters, garrison_actors
 from .research_policy import research_options
 from .expansion import expansion_options
@@ -55,6 +60,7 @@ from .household_provisioning import (household_provision_adapters,
                                       household_provision_sale_options)
 from .assembly_denial import assembly_denial_adapters, assembly_denial_options
 from .campaign_ceasefire import campaign_ceasefire_adapters
+from .force_training import training_adapters, training_options
 
 from src.classes.mechanical_language import EntityRef
 
@@ -64,11 +70,19 @@ def monthly_adapters(*, allow_offers=True):
             *technology_sale_adapters(),
             *technology_theft_adapters(),
             *permanent_employment_adapters(),
+            *production_priority_adapters(),
             *workforce_adapters(),
-            *customs_adapters(), *service_adapters(), *tariff_adapters(), *migration_adapters(),
+            *military_recruitment_adapters(),
+            # The embargo adapter arrives through CIVIL_ADAPTERS above; a second
+            # registration here would let one budget answer the same affordance
+            # twice in a single turn.
+            *customs_adapters(), *service_adapters(), *tariff_adapters(),
+            *migration_adapters(),
             *garrison_adapters(),
             *household_provision_adapters(),
-            *relief_adapters(), *civic_adapters(), *strategy_adoption_adapters(), *sabotage_adapters(),
+            *relief_adapters(), *civic_adapters(), *strategy_adoption_adapters(),
+            *garrison_supply_adapters(), *sabotage_adapters(),
+            *training_adapters(),
             *espionage_adapters(), *bribery_adapters(), *assembly_denial_adapters(),
             *campaign_ceasefire_adapters())
 
@@ -79,10 +93,13 @@ def monthly_actors(world):
     actors.update(diplomacy_actors(world))
     actors.update(technique_copy_actors(world))
     actors.update(technology_sale_actors(world))
+    actors.update(market_purchase_actors(world))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if technology_theft_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if permanent_employment_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if production_priority_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if research_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
@@ -93,7 +110,10 @@ def monthly_actors(world):
     actors.update(EntityRef("population_group", group.id)
                   for group in world.society.population.values()
                   if workforce_transition_options(world, group.id))
+    actors.update(military_recruitment_group_actors(world))
     actors.update(customs_actors(world))
+    actors.update(EntityRef("polity", identity) for identity in world.society.polities
+                  if embargo_options(world, EntityRef("polity", identity)))
     actors.update(garrison_actors(world))
     # Campaign affordances are also valid for organizations with a current
     # military/diplomatic office.  Polities remain in the base set; this only
@@ -104,7 +124,8 @@ def monthly_actors(world):
          if office.institution_ref.kind == "organization"},
         key=lambda ref: (ref.kind, ref.id)))
     for actor in campaign_candidates:
-        if any(adapter.options_fn(world, actor) for adapter in campaign_ceasefire_adapters()):
+        if (any(adapter.options_fn(world, actor) for adapter in campaign_ceasefire_adapters())
+                or training_options(world, actor)):
             actors.add(actor)
     actors.update(civic_actors(world))
     actors.update(relief_actors(world))
@@ -115,6 +136,11 @@ def monthly_actors(world):
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if household_provision_sale_options(world, actor))
     actors.update(strategy_adoption_actors(world))
+    actors.update(actor for actor in {garrison.detachment_id and detachment.owner_ref
+                                      for garrison in world.society.garrisons.values()
+                                      for detachment in (world.society.detachments.get(garrison.detachment_id),)
+                                      if detachment is not None}
+                  if actor is not None and garrison_supply_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if espionage_options(world, actor))
     # Organizations do not belong to the base polity set.  Include one when

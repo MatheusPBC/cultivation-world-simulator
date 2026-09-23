@@ -1,5 +1,326 @@
 # Estado atual — Medieval World Simulator
 
+## Nova série natural com o fallback corrigido — 23/09/2026
+
+As seeds 73, 101 e 137 foram executadas do dia zero ao dia 3.600 no checkout
+com o fallback de ajuda e a affordance de workforce corrigidos. Os checkpoints
+anuais passaram conservação e auditoria causal independente; os saves finais
+passaram também save/load. As três auditorias finais retornaram `ok=true`,
+respectivamente com 121.707, 105.622 e 108.090 eventos materiais, sem causa
+quebrada, autoria inválida ou mutação por Story/LLM. O log do sexto ano da
+seed 137 não registrou seu recibo final de save/load, mas o arquivo foi
+auditado, retomado e passou um round-trip independente com continuação
+equivalente; os anos 7–10 também passaram essa checagem. Nenhuma série usa
+provider real: são smokes offline `routine-rules`.
+
+Isso não demonstra economia saudável. No dia 3.600, as seeds 73/101/137
+acumularam 5.297/5.162/5.949 mortes por privação; saúde média 97/118,62/91,12
+e falta alimentar 211/86/210. O relief offline escolhe uma cidade por
+polity/ciclo, embora o owner transfira rações reais à despensa dos moradores
+e deixe deltas navegáveis. Outras cidades podem continuar famintas apesar de
+estoque público local e incapacidade de compra das famílias. A adequação
+dessa restrição decisória ainda precisa ser avaliada; nenhuma mudança nela
+foi feita durante a série. O gate natural está fechado, mas os gates de
+provider real, produto e funcionalidades amplas do roadmap continuam abertos.
+
+## Ajuda institucional deixa de privilegiar IDs — 22/09/2026
+
+O save natural da seed 73 no dia 2.520 revelou um bloqueio do fallback offline:
+Auren e Escarlia, sempre consultadas primeiro por ID, pediram 1–2 rações a
+cada mês e ocuparam os dois provedores que admitem um pedido pendente.
+Valedouro, apesar de mais de mil rações em falta, não abriu nenhum pedido no
+ano 7. O fallback agora ordena instituições e seus assentamentos pela falta
+do relatório próprio atual; uma cidade com cadeia aberta não impede a mesma
+instituição de considerar outra cidade. Não muda consentimento, quantidades,
+frete, owners nem a escolha do provider real.
+
+A regressão falhou antes da correção e o recorte de ajuda/agenda passou
+`32 testes` depois. Retomando o save real, Valedouro pediu 1.290 rações para
+Portovelho no dia 2.550; Auren aceitou no dia seguinte e despachou no outro.
+As 1.290 rações chegaram fisicamente até o dia 2.568. No dia 2.580,
+Portovelho distribuiu 1.321 rações do estoque e ficou com falta residual de
+20; Valedouro pediu então 992 rações para Salgueiro. Ambos os saves de 30 dias
+passaram conservação, equivalência save/load e auditoria causal independente.
+Esta é evidência de uma cadeia offline corrigida, não de equilíbrio econômico
+global ou decisão por provider real. Como os sete anos anteriores foram
+simulados antes da correção, esse save é diagnóstico; o gate de três seeds por
+dez anos precisa recomeçar do dia zero com o checkout corrigido.
+
+## Smoke natural longo: seed 73 até sete anos — 22/09/2026
+
+A seed 73 foi retomada por checkpoints anuais até o dia 2.520 (sete anos), sem
+provider real e sem recomeçar do dia zero. O save final tem 133.690 eventos;
+conservação de comida, dinheiro e recursos, equivalência save/load e auditoria
+causal standalone passaram. A auditoria encontrou 107.304 eventos materiais,
+nenhuma causa quebrada, autoria inválida ou mutação originada em Story/LLM.
+Isso não fecha o gate planejado de três seeds por dez anos.
+
+O resultado econômico merece investigação antes de seguir: 4.222 mortes por
+privação acumuladas e falta alimentar de 2.244 no dia 2.520. Ainda existem
+110.539 unidades de comida em estoques do mundo, concentradas longe dos
+assentamentos famintos. Valedouro tinha só 24 moedas; seu menu canônico
+oferecia compras pequenas, pedidos de troca/ajuda, abastecimento e relief
+local. A evidência aponta para distribuição, poder de compra e escolhas de
+política como hipóteses, não para perda oculta de comida nem para uma correção
+automática. A trajetória foi medida em `routine-rules`, portanto não demonstra
+comportamento de provider real.
+
+## Observação pós-relief e validação de commitment — C130 — 21/09/2026
+
+Uma distribuição material de alimento agora recompõe somente os relatórios
+locais que já existiam no assentamento atingido. A nova observação aponta para
+o receipt de `relief_distributed`; não publica boletim novo nem revela a
+situação a uma instituição remota. Assim um pedido institucional posterior no
+mesmo ciclo vê a falta residual canônica, e não a leitura anterior ao ato de
+ajuda.
+
+Durante a regressão, a validação de relações também passou a reconstruir o
+índice factual no seu limite de integridade. O índice global otimizado continua
+válido para o ledger append-only normal, mas não pode mascarar adulteração de
+um evento intermediário quando `RelationsState.validate` verifica a
+proveniência de um compromisso. A suite combinada de relief, ajuda institucional
+e engine passou em `36 testes` (`12,65s`). Isso cobre a cadeia curta e a
+rejeição de provenance adulterada; não substitui os smokes longos de economia.
+
+## Fallback de relief passa a ser decisão auditável — C127 — 21/09/2026
+
+O modo offline/teste agora possui uma política de ajuda alimentar declarada:
+cada polity pode selecionar no máximo uma affordance local de distribuição já enumerada
+quando o shortfall observado for coletivo (`>= 20`). A prioridade é urgência,
+entrega direta em empate, cobertura e ordem estável. O fallback registra uma
+`DECISION` com `ACTOR_DECISION`; Economy recompõe a opção e ainda
+revalida estoque, autoridade e quantidade antes da mutação. Transferência roteada
+permanece uma opção concorrente exclusiva do provider, pois depende de rota e
+fiscalidade atuais no despacho. Com provider
+habilitado esse caminho não roda: o ator continua vendo todas as opções
+concorrentes e pode escolher qualquer uma ou não agir.
+
+O recorte de relief e engine passou em `20 testes` (`8,93s`), seguido de
+`compileall` e `git diff --check`. Isso torna o mundo offline menos inerte sem
+introduzir repasse automático, mas não prova resiliência anual nem substitui uma
+política escolhida por IA real. MetaGame/Laya registrou C127 e a correção C129
+em `shadow/observe`.
+
+O smoke natural de `120` dias também foi reexecutado com esse caminho e salvou
+`3.334` eventos; a auditoria retornou `ok=true`, sem causas quebradas, decisão
+sem fonte, autoria divergente, Story material ou interpretação LLM material.
+O artefato temporário foi removido após a auditoria por causa do espaço livre
+limitado. A tentativa inicial de incluir transferência roteada no fallback foi
+retirada: ela exige uma oferta de rota/fiscal ainda atual no despacho e, portanto,
+permanece corretamente no menu que o provider pode escolher/revalidar.
+Durante essa verificação, a enumeração de transferências internas foi corrigida
+para excluir estoques de destino pertencentes a outra polity: conhecer pressão
+estrangeira não é autoridade para abrir freight para ela. Antes, o executor já
+rejeitava esse caso; agora a opção inválida nem chega ao ator.
+
+## Diagnóstico da resiliência: decisão e fluxo são distintos — C126 — 21/09/2026
+
+Uma execução natural de oito meses na seed `73` mostrou que os três
+assentamentos inicialmente pressionados acumulam déficit enquanto suas
+granarias públicas ainda conservam alimento. Isso não é criação/perda oculta:
+sem provider, `relief` não possui fallback automático, logo a administração
+não pode transformar estoque em distribuição sem uma decisão discricionária.
+Com o perfil de decisão de recuperação, as distribuições acontecem e a
+escassez inicial cai; porém a política de fixture seleciona apenas uma ação
+por instituição/boundary e não é evidência de uma estratégia geral nem de
+resiliência anual.
+
+O checkpoint também expôs um limite operacional: o save SQLite de doze meses
+com cerca de `10.369` eventos não foi gravado neste ambiente porque restavam
+apenas alguns megabytes no filesystem. Os artefatos temporários criados para a
+medição foram removidos; nenhum dado do projeto ou save do usuário foi tocado.
+Antes de executar gates longos, é necessário disponibilizar espaço persistente
+suficiente para os artefatos. A próxima correção de produto deve separar com
+cuidado política de fallback de decisão por provider, sem converter a ajuda em
+um repasse automático roteirizado.
+
+## Auditoria do artefato de save separada do harness — C125 — 21/09/2026
+
+O smoke de recuperação de `120` dias foi reexecutado com `save_load_equivalent`,
+conservação de dinheiro/recursos e auditoria causal sem causas quebradas,
+decisões sem fonte, autoria divergente ou materialidade de interpretação. Uma
+reprodução de `30` dias confirmou que o arquivo `.mws` é criado e pode ser lido
+pela auditoria. A tentativa anterior de auditar um caminho em `/dev/shm` numa
+invocação posterior falhou porque esse diretório é efêmero entre invocações do
+harness; não foi uma falha do contrato de persistência. Nenhuma alteração de
+código foi necessária neste checkpoint. MetaGame/Laya registrou C125 em
+`shadow/observe`.
+
+## Receipts de produção explicam o limite engine-owned — C124 — 21/09/2026
+
+Eventos `production_completed` e `production_limited` agora carregam um
+`causal_payload.production` estruturado com instalação, assentamento, receita,
+lotes, limites calculados, fatores limitantes, shortfall de mão de obra e dia
+observado. O payload é somente evidência: não é instrução, não altera o owner
+de Economy e não substitui os deltas canônicos.
+
+A regressão de produção/indústria/workforce passou em `29 testes`; a cadeia de
+rota e persistência passou em `11 testes`, com `compileall` e `git diff --check`
+verdes. Isso melhora `Why` e diagnóstico sem usar prosa como causa. A Onda 1,
+as campanhas amplas e os gates longos continuam abertos. MetaGame/Laya registrou
+C124 em `shadow/observe`.
+
+## Cadeia de pressão produtiva tem aceite material — C123 — 21/09/2026
+
+Foi adicionada uma fixture de aceite de `150` dias para a cadeia econômica:
+linhas limitadas por mão de obra publicam o shortfall, grupos recebem ofertas
+engine-owned, decisões de workforce/emprego são executadas pelos owners e os
+receipts posteriores de produção reduzem a falta alimentar. A cadeia não cria
+comida, trabalhadores ou dinheiro e ainda exige que a pressão residual possa
+permanecer.
+
+O teste passou isoladamente em `15,57s`; a regressão combinada de workforce,
+emprego e economia passou em `68 testes` (`32,34s`), com `compileall` e
+`git diff --check` verdes. Isso prova uma fixture multietapas, não resiliência
+natural universal nem o gate de dez anos. MetaGame/Laya registrou C123 em
+`shadow/observe`.
+
+## Evidência produtiva chega à diplomacia — C122 — 21/09/2026
+
+O fragmento customizado da consulta diplomática agora inclui
+`own_production_readings`, mantendo a mesma fronteira do dossier: somente
+instalações do ator, último receipt de produção, limitações e falta de mão de
+obra. Saldos, contas, estoques privados e produção estrangeira continuam fora
+do contexto. Nenhuma proposta ou obrigação é executada por essa leitura.
+
+A regressão de diplomacia, decisão civil e dossier passou em `68 testes`, com
+`compileall` e `git diff --check` verdes. Isso melhora negociações baseadas em
+escassez material, mas não é ainda a implementação de barganha/estratégia
+ampla nem fecha a Onda 1 econômica. MetaGame/Laya registrou C122 em
+`shadow/observe`.
+
+## Gargalo produtivo chega às consultas institucionais — C121 — 21/09/2026
+
+As situações customizadas de abastecimento, relief e emprego permanente agora
+incluem a mesma leitura `own_production_readings` do dossier. Assim, uma
+consulta que usa um fragmento específico não perde a evidência das próprias
+linhas produtivas: o ator pode comparar escassez, produção limitada, mão de
+obra e alternativas enumeradas. A projeção continua somente leitura, limitada
+ao estoque do próprio ator e derivada do receipt mais recente; nenhum contexto
+expõe saldo, conta, estoque privado estrangeiro ou efeito futuro.
+
+A regressão de dossier, decisão civil, relief e emprego passou em `56 testes`,
+com uma verificação adicional de consulta em `24 testes`; `compileall` e
+`git diff --check` também passaram. Isso fecha a passagem da evidência para as
+consultas, mas ainda não fecha a resiliência econômica nem qualquer onda ampla
+do roadmap. MetaGame/Laya permaneceu em `shadow/observe`.
+
+## Dossier expõe gargalo produtivo do próprio ator — C120 — 21/09/2026
+
+O dossier institucional agora projeta `own_production_readings` somente para
+instalações cujo estoque pertence ao ator. Cada leitura vem do último receipt
+canônico de produção e informa assentamento, ocupação, lotes/capacidade,
+limitações, eventual `labor_shortfall`, dia observado e `event_id`; não estima
+produção futura, não expõe saldos estrangeiros e não cria trabalhadores ou
+comida. Isso dá ao ator evidência para escolher workforce, mercado ou expansão
+sem transformar a leitura em planner ou mutação.
+
+A regressão focal de dossier/turno institucional/decisão passou em `32 testes`,
+e a regressão econômica de produção/renda/mercado/workforce/expansão passou em
+`100 testes`, com `compileall` e `git diff --check` verdes. O recorte melhora a agência
+informada da Onda 1, mas não resolve a resiliência econômica nem o gate natural
+de dez anos. MetaGame/Laya registrou C120 em `shadow/observe`; nenhum agente
+externo foi executado.
+
+## Gate natural longo evidencia a lacuna econômica — C119 — 21/09/2026
+
+O gate natural da seed `73` foi iniciado para `3.600` dias em `/dev/shm`, mas
+foi interrompido no dia `570` depois de tornar a limitação econômica observável
+sem esperar dezenas de minutos por um resultado já conhecido. Até esse ponto a
+simulação preservou a cadeia factual e continuou produzindo pedidos de ajuda,
+entregas, compras, migrações e transições de workforce; não houve provider real
+nem mutação narrativa.
+
+O mundo, porém, não é resiliente no modo natural: no mês 19 havia população
+`10.758`, `161` mortes por privação, saúde média `494`, unrest médio `277,88` e
+déficit alimentar agregado `4.704`. Isso não é falha de causalidade nem aceita
+o gate de dez anos; é evidência direta de que produção, mobilidade, mercado e
+decisões sem um perfil de governo ainda não fecham a resiliência econômica.
+O arquivo de saída foi temporário e não é um artefato de release. MetaGame/Laya
+registrou C119 em `shadow/observe` e recomendou continuar.
+
+## Checkpoint de verificação de infraestrutura e campanha — C118 — 21/09/2026
+
+O recorte foi verificado em `/dev/shm`, sem alterar o código neste checkpoint.
+Infraestrutura, desgaste, reativação, manutenção e overflow regional passaram
+em `40 passed`; força, guarnição, abastecimento e cerco passaram em `31 passed`.
+Os testes confirmam que dano, reparo, controle e retirada continuam separados:
+decisões apenas selecionam affordances, enquanto Map/Society/Economy executam
+os deltas materiais com causas navegáveis.
+
+Isso não fecha a etapa de campanhas: ainda faltam manutenção militar ampla,
+controle territorial duradouro fora da fixture estreita e solução política geral.
+Também não fecha a etapa econômica nem o smoke natural de 3.600 dias. O
+MetaGame/Laya registrou C118 em `shadow/observe`; a primeira emissão inválida
+usou tipos de evento inexistentes, foi classificada como falha de protocolo sem
+efeito no repositório e corrigida usando somente os tipos suportados.
+
+## Relief, workforce e histórico cívico preservam a cadeia material — 21/09/2026
+
+Uma distribuição de relief agora reduz `missing_food` e recupera `health`/
+`unrest` apenas em proporção à comida realmente entregue, limitada a 20 por
+ciclo; não há subsídio nem cura narrativa. A demanda de workforce preserva os
+termos do receipt enquanto o mesmo evento de produção mantém o
+`labor_shortfall`, mesmo se outro owner alterar a subsistência no mesmo dia.
+Protestos abertos exigem uma coorte completamente disponível; protestos
+fechados mantêm sua participação como história e não invalidam quando a
+coorte depois encolhe.
+
+A regressão composta passou em 81 testes. O smoke pressionado de 360 dias da
+seed 73 terminou com 10.247 eventos, déficit alimentar agregado 3.249, saúde
+média 633,38, unrest médio 366,62, 74 transições de workforce, zero mortes por
+privação e auditoria causal limpa (`broken_cause_ids=[]`, zero decisões sem
+autoria e zero material Story/LLM). A Onda 1 continua aberta: renda,
+produção, rotas e o gate de dez anos ainda não estão resolvidos.
+
+## Contratos não agravam falta de mão de obra alimentar — 21/09/2026
+
+O owner de emprego permanente agora lê o receipt tipado da produção atual. Se
+uma linha de comida está limitada por `labor_shortfall`, ele não enumera um
+contrato que reserve agricultores antes da produção. Isso evita transformar a
+própria política de emprego em causa da escassez; recomposição continua
+dependendo de uma decisão de workforce e da execução do owner. A regressão
+focada passou em 61 testes. Na fixture `seed=73`, 180 dias reduziram a falta
+alimentar agregada de 1.195 para 325, mantendo conservação, save/load e
+auditoria causal (`broken_cause_ids=[]`). O horizonte ainda não prova
+resiliência de dez anos.
+
+## Affordability reading chega ao dossier sem vazar contas — 21/09/2026
+
+O receipt engine-owned de `subsistence_resolved` já calculava
+`unaffordable_by_group`, mas o contexto institucional mostrava apenas a falta
+agregada. O dossier e o menu de relief agora projetam somente
+`unaffordable_food`, `unaffordable_group_count` e o `affordability_event_id`.
+Isso permite distinguir estoque público de renda doméstica sem expor saldos,
+IDs de famílias ou inventários, e sem transformar leitura em subsídio ou
+planner. A regressão focada passou em 36 testes; a resiliência econômica segue
+pendente.
+
+## Revisões individuais também respeitam fail-closed — 21/09/2026
+
+Viagem de personagem, oferta/patrocínio de rito restaurador e consequência
+privada após uma vitória de campo agora atravessam `select_option` quando uma
+affordance material já foi agendada. Se o mundo está em modo IA e o provider
+desaparece, falta orçamento ou a consulta falha, `ProviderDecisionRequired`
+descarta a transação; nenhum movimento, oferta, ocupação ou delta é aplicado.
+Em modo offline essas revisões continuam explicitamente inativas. A regressão
+focada composta passou em 28 testes, e o smoke/auditoria de 30 dias manteve
+`broken_cause_ids=[]`, zero decisões sem autoria e zero material Story/LLM.
+Isso fecha mais uma fronteira de provider, mas não conclui a resiliência
+econômica, as campanhas persistentes ou os gates longos.
+
+## Abastecimento de campanha respeita fail-closed do provider — 21/09/2026
+
+O review datado de abastecimento de uma coluna não retorna mais silenciosamente
+quando o mundo está em modo IA sem provider, sem orçamento ou com consulta
+indisponível. Havendo opções materiais, a decisão chega ao mesmo
+`ProviderDecisionRequired` do turno institucional e a transação é descartada;
+nenhuma carga é aberta. Em modo offline essa vertical opcional permanece
+explicitamente inativa. A regressão focada de campanha passou em 4 testes,
+incluindo seleção, `NO_ACTION`, chegada/save-load e a pausa fail-closed. Isso
+fecha uma fronteira de provider, mas não a campanha persistente geral nem o
+gate de provider real.
+
 ## Matriz natural de três seeds — 19/09/2026
 
 O gate natural de 360 dias foi executado para as seeds `73`, `101` e `137` com
@@ -1964,3 +2285,1407 @@ ajuda, mas a economia ainda terminou pressionada: `missing_food` variou de
 materiais distintos, não de equilíbrio ou resiliência econômica de longo prazo.
 O provider remoto e o gate natural de três seeds por dez anos continuam
 pendentes.
+
+### Continuação causal — 21/09/2026
+
+O owner de cessar-fogo de campanha agora aceita iniciativa de qualquer
+participante atual do cerco. A affordance só aparece quando o próprio
+destacamento possui uma rota de retirada conhecida e abastecida; a proposta
+usa o destacamento do proponente e o da contraparte como termos separados,
+sem mover tropas no aceite. A regressão específica de cessar-fogo passou em
+4 testes e a regressão conjunta de cerco, abastecimento e concessão em 25.
+
+`tools/medieval_causal_audit.py` também passou a reportar explicitamente
+transições `ACTOR_DECISION` sem decisão-fonte e materialidade de interpretações
+LLM. O save natural auditado nesta rodada ficou `ok=true`, com ambas as listas
+vazias. Isso amplia a prova de autoria, mas não fecha campanha persistente,
+provider real ou os gates naturais de dez anos.
+
+Na continuação da mesma rodada, foi adicionada a fixture pressionada
+`recuperacao`. Ela não introduz uma política no motor: apenas seleciona, em
+ordem estável, affordances que o próprio estado enumerou para ajuda,
+suprimento, mercado, emprego e transição de workforce. Em 120 dias, a fixture
+registrou 9 pedidos e 6 cumprimentos de ajuda, 13 decisões de emprego e 19
+transições de workforce, conservando dinheiro e recursos. O save passou no
+auditor causal (`ok=true`, sem causas quebradas, decisões sem fonte ou
+interpretações materiais). A pressão alimentar nos assentamentos artesanais
+continua visível; isso é precisamente a pendência de resiliência econômica,
+não uma razão para adicionar fallback roteirizado.
+
+O observatório do Dao também passou a projetar propostas vivas de
+`campaign_ceasefire` junto das demais soluções políticas de campanha. O
+assentamento é resolvido a partir da campanha canônica referenciada pelos
+termos, e uma proposta mútua mantém visíveis os dois compromissos de retirada;
+nenhum deles executa movimentação por si só. A regressão de projeção passou em
+5 testes.
+
+O contrato web PT-BR foi atualizado para aceitar essa nova categoria de solução
+política; o type-check e os 66 testes medievais do frontend passaram. A leitura
+continua somente observacional: aceitar um acordo ainda exige as decisões e
+retiradas materiais dos proprietários.
+
+Os tipos públicos e a tela de diplomacia também reconhecem termos de retirada,
+retirada de campanha e transferência administrativa. Eles não são mais
+renderizados como termos de ensino; a regressão específica passou em 6 testes
+com type-check verde.
+
+### Reparação de entregas negociadas — 21/09/2026
+
+Compromissos `resource_transfer` fora da vertical específica de ajuda agora
+também têm uma affordance transitória de reparação. Depois de um breach
+notificado, o devedor pode decidir novamente; o owner recompõe estoque próprio,
+rota fiscal conhecida, autoridade e disponibilidade atuais, abre uma nova
+remessa pelo owner de logística e marca somente a obrigação atual como
+`remediated`. O breach original, seu evento e sua memória continuam intactos.
+O caminho foi incluído no menu civil institucional comum e validado junto com
+as regressões de reciprocal supply, ajuda, diplomacia, repudiation e
+renegotiation: 56 testes passaram. Isso fecha uma lacuna de commitments, mas
+não encerra a resiliência econômica ou as demais ondas amplas.
+
+### Leitura de demanda publicada após custos derivados — 21/09/2026
+
+O owner de `Market` agora congela `observed_demand` somente depois de acumular
+demanda de produção, construção, pesquisa e reparos — a mesma leitura
+engine-owned usada para calcular a cotação. Antes, a cotação já reagia a
+reparos e projetos, mas o relatório público entregue ao ator omitia esses
+componentes, deixando a affordance com contexto material incompleto. A correção
+não altera estoque, preço ou política automaticamente; apenas torna a evidência
+publicada coerente com a causa do preço. A regressão de mercados, menu civil e
+smoke de autonomia passou em 46 testes.
+
+### Migração não usa fallback em modo IA — 21/09/2026
+
+O tick datado do engine deixou de chamar `review_migration` quando
+`ai_enabled=true`. Migração e recuperação já estão registradas no turno
+institucional mensal dos próprios grupos populacionais, portanto a chamada
+datada duplicava o owner e podia mover uma coorte por política determinística
+fora da decisão do ator. O fallback continua disponível somente no modo
+offline/teste explícito; no modo IA a opção precisa passar pelo menu e pela
+revalidação do owner.
+
+### Execução da migração escolhida pela IA — 21/09/2026
+
+A autorização material criada pelo adapter de migração passou a carregar o
+`option_id` canônico e todos os eventos dos relatórios de assentamento e rota
+que sustentam a affordance. Isso permite ao owner `start_migration` recompor a
+opção atual, rejeitar alterações reais e, quando ela permanece válida, executar
+a jornada com provisão, custos e deltas de população. A regressão de mobilidade
+e agenda passou em 29 testes; a onda de resiliência econômica continua aberta.
+
+### Orçamento do smoke autônomo — 21/09/2026
+
+O harness autônomo passou a usar por padrão 256 consultas por boundary, o
+mesmo teto configurado pelo engine para a agenda institucional composta. O
+padrão anterior era menor que o número de atores/fases consultáveis e podia
+interromper um smoke por `ProviderDecisionRequired` antes de completar as
+decisões, sem representar uma falha do mundo. O smoke de 30 dias concluiu com
+conservação de dinheiro/recursos e save/load equivalente. Isso não resolve o
+déficit material observado nos assentamentos pressionados; ele continua sendo
+o próximo recorte da onda de economia resiliente.
+
+### Acessibilidade alimentar publicada — 21/09/2026
+
+O recibo `subsistence_resolved` passou a publicar `unaffordable_by_group`: a
+quantidade de ração que cada grupo não conseguiu comprar com sua cota e saldo
+atuais. Isso distingue estoque público de alimento efetivamente acessível e
+explica o déficit observado no smoke sem criar comida, subsídio ou decisão
+automática. A regressão de consumo, economia, workforce e smoke passou em 75
+testes; ainda falta a cadeia institucional que escolha uma resposta material
+suficiente para eliminar a pressão.
+
+### Revalidação de criaturas, tecnologia e campanha — 21/09/2026
+
+Os harnesses compostos dessas verticais foram alinhados ao contrato atual de
+provider: cenários que consultam a agenda expandida usam orçamento explícito,
+enquanto o caso de provider quebrado espera `ProviderDecisionRequired` e
+rollback, sem publicar uma falha determinística como se fosse decisão do ator.
+Criaturas, ritos, técnica, intriga estreita, campanha e abastecimento passaram
+em 83 testes focados. Isso é evidência dos slices existentes, não conclusão
+das ondas amplas.
+
+### Folha recorrente e rotação de produção — 21/09/2026
+
+O owner de emprego permanente agora recompõe o custo mensal dos contratos já
+aceitos por conta de payroll antes de enumerar um novo vínculo. Uma instituição
+não recebe uma affordance recorrente se a própria conta não cobre as obrigações
+existentes e o primeiro pagamento do candidato; isso não cria crédito, cancela
+contratos ou presume receita futura. A regressão de economia, renda e emprego
+passou em 49 testes.
+
+Além disso, `produce_monthly` agrupa as linhas pelo account de payroll e gira a
+ordem de execução de forma determinística a cada mês. O caixa compartilhado não
+é mais consumido permanentemente pela primeira linha em ordem alfabética. Cada
+linha continua usando seus limites de trabalhadores, estoque, capacidade,
+autoridade e saldo, e os salários continuam sendo pagos pelo owner.
+
+O smoke pressionado de 360 dias (`seed=73`, `recuperacao`) terminou com falta
+agregada `2174` (antes `2208`), saúde média `799.5`, unrest médio `200.5`,
+conservação de dinheiro/recursos e save/load equivalentes. A auditoria causal
+retornou `ok=true`, com `10369` eventos, zero causas quebradas, decisões sem
+fonte ou materialidade de Story/LLM. A melhora é parcial: renda doméstica,
+rotas alternativas e resiliência econômica de longo prazo continuam abertas.
+
+### Transferência preserva a necessidade da origem — 21/09/2026
+
+O owner de relief agora desconta também o `missing_food` canônico do
+assentamento de origem ao enumerar transferências. Reservas de subsistência,
+ordens e produção continuam sendo respeitadas; a nova guarda impede que uma
+ajuda válida para o destino piore uma escassez que já existia na origem. A
+regressão de relief/abastecimento/logística passou em 25 testes. O smoke
+pressionado de 180 dias manteve conservação, contabilidade, save/load e
+auditoria causal verdes (`5071` eventos, falta final `344`, `ok=true`). Isso é
+uma correção de segurança causal local, não uma solução para a resiliência
+econômica de longo prazo.
+
+### Imposto de renda preserva o bruto agregado — 21/09/2026
+
+O owner de folha agora calcula a retenção sobre o salário bruto total antes de
+arredondar e distribui os restos de forma determinística entre as contas das
+coortes. Antes, folhas pequenas podiam truncar cada parcela para zero e perder
+um imposto que existia no agregado. A regressão de pesquisa/emprego/economia/
+renda/consumo passou em 86 testes; smoke pressionado de 180 dias conservou
+recursos, dinheiro e save/load, com auditoria causal `ok=true`. Isso corrige
+contabilidade, não fecha a falta de renda estrutural da Onda 1.
+
+### Review de ajuda respeita uma consulta por ator — 21/09/2026
+
+O review provider agora diferencia ausência de affordance, `NO_ACTION` e
+execução. Uma instituição que foi consultada e recusou não é consultada de
+novo por fulfillment, remediação ou pedido no mesmo turno. A regressão de
+decisão institucional/ajuda/menu passou em 44 testes; um smoke offline de 60
+dias preservou conservação, contabilidade e save/load. Provider real continua
+sem sondagem nesta rodada.
+
+### Autoria histórica rejeita decisão-fantasma — 21/09/2026
+
+Foi adicionada uma regressão que tenta marcar uma transição material como
+`ACTOR_DECISION` usando um `decision_event_id` inexistente e uma causa que é
+apenas ocorrência. `validate_history` rejeita o histórico antes do commit. A
+regressão composta de autoria, relief, abastecimento e logística passou em 39
+testes; `compileall` e `git diff --check` também ficaram verdes. O guardrail
+está comprovado, mas a varredura de autoria de todos os owners e os gates de
+provider/horizonte longo continuam pendentes.
+
+### Fixture pressionada prova cadeia material — 21/09/2026
+
+O smoke de recuperação pressionada ganhou uma aceitação explícita para 120
+dias (`seed=73`, perfil `recuperacao`). A execução passou em 13 testes e
+materializou, pelas affordances/owners existentes, compras de mercado, emprego
+permanente, transições de workforce e relief. Os totais finais foram 3, 12, 16
+e 9, respectivamente; a pressão permaneceu visível com `missing_food=148`,
+sem mortes por privação. Conservação, save/load e auditoria causal continuam
+verdes. É uma fixture determinística de cobertura, não provider real,
+autonomia natural de dez anos ou conclusão da Onda 1 econômica.
+
+### Stale de provider aborta o candidato — 21/09/2026
+
+Quando o provider escolhe uma affordance que desaparece na revalidação, o
+receipt `institutional_decision_stale_affordance` continua disponível no
+diagnóstico unitário, mas o `MedievalSimulator` agora levanta a espera tipada
+`ProviderDecisionRequired` e descarta o candidato inteiro em modo IA, inclusive
+quando o stale ocorre na revisão diária de recourse. Assim,
+nenhum evento, decisão ou delta de famílias posteriores é publicado junto de
+um mês parcialmente processado. Engine/provider/AI passaram em 26 testes
+focados; provider real e owners diários continuam sem cobertura completa.
+
+### Fixtures de recourse respeitam o fail-closed — 21/09/2026
+
+Os testes que preparam uma quebra diplomática agora usam um provider falso
+explicitamente durante a preparação. Quando a consulta real é feita sem
+provider em modo IA, a expectativa é `ProviderDecisionRequired`: não há
+fallback determinístico nem receipt de falha publicado. Engine, menu
+institucional, turno diário e AI passaram em 34 testes. Provider remoto e a
+varredura completa dos owners diários continuam pendentes.
+
+### Abastecimento de campanha respeita stale do provider — 21/09/2026
+
+Uma escolha de abastecimento que deixa de revalidar não é mais engolida pelo
+review. O owner propaga `ProviderDecisionRequired`, nenhum frete é aberto pela
+chamada direta e o `MedievalSimulator` continua responsável por descartar o
+candidato. A regressão de campanha passou em 5 testes; contatos armados,
+aftermath e resposta estratégica ainda não têm a mesma auditoria completa.
+-
+### Estratégia e aftermath respeitam stale do provider — 21/09/2026
+
+As duas famílias restantes deste recorte agora propagam `ProviderDecisionRequired`
+quando a affordance escolhida deixa de ser válida ou o owner rejeita a execução.
+IDs forjados, rota fechada e provider ausente foram cobertos pela regressão focada
+de 7 testes. O fechamento de um objetivo por condição factual resolvida continua
+normal. A responsabilidade de rollback permanece no `MedievalSimulator`; provider
+remoto, owners diários completos e as verticais maiores ainda estão pendentes.
+
+### Contato armado e viagem individual respeitam stale — 21/09/2026
+
+Os reviews de contato armado e viagem de personagem agora pausam com
+`ProviderDecisionRequired` quando a affordance escolhida envelhece entre consulta
+e execução. A regressão composta com estratégia e aftermath passou em 16 testes,
+incluindo uma rota fechada durante a consulta e um standoff resolvido antes da
+execução. Provider remoto e os demais owners opcionais permanecem pendentes.
+
+### Ajuda institucional respeita stale do provider — 21/09/2026
+
+Resposta, cumprimento, reparação e pedido de ajuda agora levantam
+`ProviderDecisionRequired` quando a opção escolhida fica stale ou o owner
+material recusa a execução. Aid/recourse/daily turn passaram em 26 testes e a
+regressão de decisões provider em 9. A rotina determinística ainda pode tentar
+novamente em um dia posterior; provider remoto e rollback integrado de todos os
+owners continuam pendentes.
+
+### Ritos individuais respeitam stale do provider — 21/09/2026
+
+Oferta de rito por personagem e patrocínio institucional agora pausam com
+`ProviderDecisionRequired` quando a observação ou oferta envelhece entre a
+consulta e a execução. A regressão de ritos passou em 4 testes. Pesquisa, cópia
+tecnológica, criaturas, espionagem e provider remoto ainda precisam da mesma
+auditoria.
+
+### Criaturas e tributos respeitam stale do provider — 21/09/2026
+
+O turno da criatura e a resposta institucional a uma exigência de tributo agora
+levantam `ProviderDecisionRequired` quando a affordance envelhece ou o owner
+rejeita a execução. A regressão de autonomia/criaturas passou em 8 testes,
+incluindo ausência de provider e demandas ignoradas. Pesquisa, cópia tecnológica,
+espionagem e provider remoto permanecem pendentes.
+
+### Aceitação de ensino revalida compromisso — 21/09/2026
+
+A fase separada do aprendiz agora recompõe a affordance e o consentimento do
+professor antes de registrar a decisão. Se a obrigação fica stale, o provider é
+pausado com `ProviderDecisionRequired`; nenhum ensino é cumprido por seleção
+obsoleta. A regressão de diplomacia provider passou em 16 testes. Provider real,
+rollback integrado e as verticais maiores continuam pendentes.
+
+### Learner diplomático fail-closed — 21/09/2026
+
+O aceite de ensino posterior ao menu composto revalida a obrigação e o
+consentimento do professor antes de gravar a decisão do aprendiz. Seleção stale
+ou rejeição do owner pausa com `ProviderDecisionRequired`; a regressão provider
+passou em 16 testes sem criar conhecimento ou cumprimento parcial.
+
+### Gate comparativo após fail-closed — 21/09/2026
+
+O gate de 120 dias passou com seeds naturais 73/101/137, fixture pressionada e
+comparação econômica (`ok=true`). Todas as linhas conservaram dinheiro/recursos,
+save/load e auditoria causal; alívio, mercado e mobilidade produziram resultados
+materiais distintos. A fixture ainda termina com déficit alimentar, e o provider
+real/gate de dez anos continuam pendentes.
+
+### Diagnóstico do smoke natural de dez anos — 21/09/2026
+
+O smoke de 3600 dias iniciou com as três seeds e chegou ao dia 450 sem erro
+causal, mas levou aproximadamente 630 segundos para 15 meses. Foi interrompido
+controladamente antes de produzir um gate final; a taxa atual tornaria três
+seeds por dez anos impraticáveis. O próximo passo é perfilar/otimizar o caminho
+de horizonte longo sem reduzir as garantias de rollback e autoria.
+
+### Cópia transacional de conhecimento — 21/09/2026
+
+O perfil de 60 dias localizou custo relevante na cópia repetida dos valores
+históricos de `KnowledgeState`. A transação agora copia os registries, mas
+compartilha seus valores congelados; o teste focado passou em 23 casos e o gate
+natural de 120 dias da seed 73 passou com `ok=true`, conservação e save/load.
+Isso é uma otimização parcial: o smoke natural de 3600 dias segue não aprovado,
+e provider remoto/rollback integrado das verticais maiores permanecem
+pendentes.
+
+### Validação runtime de conhecimento — 21/09/2026
+
+A proveniência semântica continua sendo validada em cada candidato, mas o
+runtime não serializa novamente cada valor congelado de `KnowledgeState`; a
+validação Pydantic completa permanece no load/save. O recorte de conhecimento e
+autoria passou em 37 testes e o gate natural de 120 dias continuou verde. O
+perfil curto caiu de 4,24 s para 3,95 s sob cProfile, mas o smoke de 3.600 dias
+continua pendente.
+
+### Índices derivados de ledger — 21/09/2026
+
+O runtime passou a reutilizar índices transitórios por ID/tipo de evento e
+contextos diplomáticos/capacidade estratégica, invalidando-os quando a
+assinatura do ledger ou do conhecimento muda. O recorte passou em 69 testes; os
+gates naturais de 120 dias com seeds 73/101/137 e de 210 dias com seed 73
+ficaram verdes. O smoke de 3.600 dias ainda não foi concluído.
+
+### Leituras derivadas de migração — 21/09/2026
+
+A revisão de migração reutiliza um grafo transitório por ator e as projeções
+frequentes de `KnowledgeState` usam cache invalidado por mudanças no ledger ou
+registry. O recorte passou em 60 testes e o gate de 210 dias continuou verde
+em ~25,5 s. Isso reduz trabalho repetido, mas não conclui o smoke de 3.600 dias.
+
+### Dispatcher institucional fail-closed para affordances stale — 21/09/2026
+
+O dispatcher comum agora propaga `ProviderDecisionRequired` em modo IA quando
+uma affordance escolhida desaparece durante a recomposição ou quando o owner
+rejeita a execução. Isso fecha a lacuna comum que afetava pesquisa, cópia,
+roubo e espionagem: a consulta não pode virar silenciosamente um receipt de
+ausência de ação depois de uma decisão stale. Offline/teste explícito mantém o
+receipt sem mutação. A regressão focada passou em 37 testes; provider remoto,
+rollback integrado e o smoke natural de 3.600 dias continuam pendentes.
+
+### Cessar-fogo do defensor respeita guarnição colapsada — 21/09/2026
+
+O owner de campanhas agora enumera uma iniciativa de cessar-fogo do defensor
+somente quando sua guarnição ainda tem retirada materialmente executável. Após o
+colapso, a affordance e a opção de cumprimento desaparecem; o compromisso ativo
+não transfere controle nem cria retirada automática. A mesma vertical permite
+que o defensor inicie um cessar-fogo quando a saída existe. A regressão de
+cerco/força/concessão passou em 28 testes.
+
+### Pesquisa institucional com publicação atômica — 21/09/2026
+
+O patrocínio de pesquisa agora monta autorização, aceite e projeto num candidato
+isolado e só publica o conjunto depois que o owner valida `start_research`.
+Seleção stale ou rejeição de termos não deixa recibos de autorização, aceite ou
+projeto no mundo publicado. A auditoria conjunta das verticais de conhecimento
+passou em 86 testes; a verificação integrada com campanhas passou em 109. A
+suíte global não foi promovida: foi interrompida por custo e expôs um 404
+pré-existente da API de avatar fora do fork.
+### Owners de tecnologia sem `StopIteration` e orchestration em shadow — 21/09/2026
+
+Venda e roubo de tecnologia agora rejeitam explicitamente conhecimento, site ou
+resultado ausente. A rejeição sobe pelo dispatcher IA como
+`ProviderDecisionRequired`, sem transformar uma affordance inválida em ausência
+de ação e sem publicar recibos/deltas parciais. A regressão focada passou em 52
+testes; a integração do recorte atual passou em 109.
+
+Também foi validado o `task-orchestration` em `RuntimeMode.SHADOW` com o
+observador MetaGame/Laya. O runtime passou em 32 testes e recebeu eventos de
+tarefa/plano/arquivos/testes, mas permaneceu somente observacional. O provider
+Laya real não está instalado/configurado: a decisão foi fallback neutro com
+`observe`, e nenhum agente foi executado pelo runtime. Provider remoto, smoke
+natural de 3.600 dias e ondas de economia resiliente, magia/ecologia e campanhas
+completas permanecem abertos.
+
+### Cadeia composta de resiliência econômica — 21/09/2026
+
+A auditoria da Onda 1 confirmou que o déficit observado não é automaticamente
+falta física: nos cenários auditados havia comida nos celeiros e rotas abertas,
+enquanto `missing_food` coincidia com a leitura agregada de alimento inacessível
+por falta de saldo doméstico. O contexto de workforce passou a entregar apenas
+essa leitura engine-owned (`unaffordable_food` e `unaffordable_group_count`),
+sem expor contas ou IDs privados.
+
+O teste composto novo percorre a cadeia real por affordance e owner: interrupção
+factual da rota, escassez datada, remessa sucessora por rota conhecida, entrega
+conservada e distribuição institucional posterior para despensas. A distribuição
+melhora a condição, mas o teste preserva e explica o déficit residual; a rota não
+é tratada como causa única. Foram `35 passed` no recorte de rota/recuperação/
+relief/logística e `41 passed` no recorte workforce/dossier. A correção de
+indentação em `customs.py` também restaurou seus seis testes focados.
+
+O task-orchestration segue validado em shadow com MetaGame/Laya em modo somente
+observação. O provider Laya real ainda não está configurado; não houve execução
+autônoma pelo runtime. Smoke natural de 3.600 dias, provider remoto e ondas de
+magia/ecologia e campanhas amplas permanecem pendentes.
+
+### Espionagem com conhecimento acionável e presença limitada — 21/09/2026
+
+Uma missão bem-sucedida agora produz uma observação local própria do assentamento
+para a instituição que enviou o agente. O evento `settlement_observed` é publicado
+antes de `espionage_resolved`, torna-se o `evidence_event_id` do finding e fica
+ligado à decisão, à evidência pública alvo e à presença material. Missões falhas
+ou descobertas não aprendem nada.
+
+Relatórios obtidos por visita não são renovados indefinidamente: a rotina de
+refresh exige presença atual do observador. Assim, espionagem não vira uma fonte
+gratuita de vigilância permanente nem altera o estado do assentamento observado.
+A regressão de espionagem, agenda institucional e protesto passou em 22 testes;
+compileall e diff check ficaram verdes. Provider remoto, smoke de 3.600 dias e
+as ondas amplas permanecem abertos.
+
+### Guarnição defensiva no próprio assentamento — 21/09/2026
+
+Uma instituição administradora pode agora escolher, no turno mensal, uma
+guarnição defensiva para uma coluna própria presente, abastecida e financiada.
+O caminho reutiliza o mesmo `Garrison` e os owners existentes: salário e rações
+continuam materiais, manutenção ocorre como consequência da decisão, e a
+guarnição decai quando perde tesouro, presença ou administração. Não há defesa
+automática nem estado militar paralelo.
+
+O controle territorial continua exigindo `occupier_id`, portanto a defesa de uma
+cidade própria não duplica sua administração com `TerritorialControl`. Foram
+`31 passed` nos testes focados, com compileall e `git diff --check` verdes.
+Campanhas amplas, soluções políticas gerais, provider Laya real e smoke natural
+de 3.600 dias continuam abertos.
+
+### Memória direcional de suborno — 21/09/2026
+
+O pagamento de suborno já era uma obrigação material concluída pelo owner
+genérico de compromissos e, portanto, já criava memórias para as duas partes.
+O recorte desta etapa corrige a interpretação: `institutional_memory` resolve o
+proposal canônico e classifica `proposal_kind=bribery` com peso próprio, em vez
+de conceder crédito de compromisso honrado ou desaparecer da leitura.
+
+Isso não cria affordances, autoridade, culpa ou retaliação automáticas; é apenas
+contexto institucional derivado de um fato conhecido. A regressão focada de
+bribery, memória, diplomacia e estratégia passou em `37 passed`, com compileall
+e `git diff --check` verdes. Composição estratégica ampla, provider Laya real,
+provider remoto e smoke natural de 3.600 dias permanecem pendentes.
+
+### Leitura causal de exposição a transbordamento — 21/09/2026
+
+O dossier de cada ator passou a incluir `known_site_overflow_reports` somente
+quando existe um `SiteReport` próprio para o site. A projeção combina a
+vulnerabilidade geográfica do mapa com a última avaliação hidrológica e a
+ocorrência aberta já persistidas pelo owner de overflow. Ela não calcula o mês
+seguinte, não cria ocorrência, não recomenda manutenção e não revela estoque,
+contas ou rotas de sites estrangeiros.
+
+O recorte de overflow, dossier e regressões de hazards passou em `36 passed`,
+com compileall e `git diff --check` verdes. O task-orchestration foi encerrado
+em shadow/observe após registrar arquivos, testes e conclusão; como o provider
+Laya real não está configurado, o observador usou fallback neutro. Provider
+remoto, smoke natural de 3.600 dias e as ondas de economia/magia/campanhas
+amplas permanecem pendentes.
+
+### Validade do canal de conhecimento de overflow — 21/09/2026
+
+O dossier institucional não trata mais a existência de um registro em
+`site_reports` como conhecimento atual. Antes de projetar exposição de
+transbordamento, ele reutiliza `current_observation`, que verifica a proveniência
+do recibo e a janela de frescor de 30 dias. Observações stale ou adulteradas são
+omitidas, enquanto a leitura continua derivada, sem previsão, planner ou mutação.
+
+A regressão conjunta de dossier, overflow e infraestrutura passou em `39 passed`,
+com compileall e `git diff --check` verdes. O MetaGame/Laya permaneceu em
+shadow/observe com fallback neutro. Provider remoto, smoke natural de 3.600 dias
+e as ondas de economia, magia/ecologia e campanhas amplas permanecem pendentes.
+
+### Fundação causal de linha produtiva — 21/09/2026
+
+A economia agora possui uma primeira vertical para transformar capacidade física
+authored em trabalho real sem inventar uma facility. Um site sem linha pode
+oferecer uma affordance transitória de fundação; a instituição escolhe apenas o
+ID, e o owner revalida site, autoridade, conhecimento, estoque, conta,
+trabalhadores, materiais e fundos. O projeto usa o progresso e payroll de
+expansão já existentes e só ao completar cria a `ProductionFacility`, com
+receipt, deltas e causal links.
+
+O caminho não cria capacidade, dinheiro ou materiais por narrativa. Expansões
+normais continuam exigindo uma facility-mãe; `demand` e `investment` passaram a
+tratar explicitamente projetos de fundação sem assumir `facility_id`. A
+regressão focada passou em `86 passed`; a suíte ampliada de economia, engine,
+agenda, recuperação de rota e campanha passou em `117 passed`, com compileall e
+`git diff --check`.
+
+O observador MetaGame/Laya registrou C98 em shadow/observe com fallback neutro;
+Laya real não está disponível. Provider remoto, smoke natural de 3.600 dias e
+as ondas maiores de economia/diplomacia, magia/ecologia e campanhas continuam
+abertos. Esta etapa não foi commitada, enviada ao remoto ou deployada.
+
+### Proveniência direta de capabilities de sítio — 21/09/2026
+
+C104 endurece a cadeia C99: o receipt material que comissiona um sítio agora
+declara também `capability_ids`. O validator Map/infrastructure compara a
+capacidade atual com esse delta, exige IDs únicos e não vazios e rejeita uma
+capacidade que nenhum blueprint authored concede. Sites authored continuam
+válidos sem receipt de commissioning.
+
+O foco passou em `15 passed`; a regressão de construção, fundação, expansão e
+infraestrutura passou em `77 passed`, com uma falha antiga fora do recorte:
+`test_map_source_schema_six_requires_and_round_trips_sites` ainda espera um
+payload sem `service_suspended`. Compileall e `git diff --check` passaram.
+MetaGame/Laya permaneceu em shadow/observe com fallback neutro; provider real,
+smoke longo e ondas amplas continuam abertos. Nada foi commitado, enviado ou
+deployado.
+
+### Comando e fadiga no desgaste de cerco — 21/09/2026
+
+C102 fecha a lacuna causal em que comando, doutrina e fadiga alteravam combate
+de campo, mas eram inertes no cerco persistente. `siege_campaign` agora lê
+`effective_doctrine` e `_fatigue_level` pelos helpers canônicos de
+`field_engagement`: `press` sustenta pressão enquanto a coluna consegue fazê-lo,
+`hold` reduz a pressão, a postura do defensor modula a resistência e a fadiga
+remove o ganho ofensivo com o tempo.
+
+Sem comando vigente, o resultado é exatamente o anterior. O desgaste continua
+limitado a `[1, 7]`, suprimento não é contado duas vezes e nenhum planner,
+registro, affordance ou subsistema novo foi criado. Foram `6 passed` no recorte
+focado e `59 passed` na regressão de cerco, força, comando, campo, campanha e
+manutenção, com compileall e `git diff --check` verdes. MetaGame/Laya permaneceu
+em shadow/observe com fallback neutro; provider real, smoke natural de 3.600
+dias e ondas amplas continuam abertos. Esta etapa não foi commitada, enviada ao
+remoto ou deployada.
+
+### Construção causal de sítio de infraestrutura — 21/09/2026
+
+C99 fecha o elo que faltava entre população artesã e a capacidade física do
+mapa. Uma administração pode escolher uma affordance para construir um sítio
+authored em um assentamento já existente, mas a engine não deixa o ator inventar
+posição, região ou capacidade. O owner revalida autoridade, administração,
+estoque, conta, materiais, construtores e o teto de uma capacidade por local.
+
+O progresso usa o mesmo `ExpansionProject`, payroll e consumo material de C98.
+Quando a obra termina, o `Map` escolhe uma célula livre da região já conhecida,
+registra o sítio e mantém a proveniência no recibo; `validate_infrastructure`
+confirma os deltas. A linha de produção pode então ser fundada no sítio, e a
+cadeia demonstrada melhora a leitura de renda dos artesãos sem criar dinheiro
+ou recursos por narrativa.
+
+Foram `78 passed` no recorte C99 e `118 passed` na regressão ampliada, com
+compileall e `git diff --check`. O MetaGame/Laya foi usado em shadow/observe com
+fallback neutro; Laya real não está configurado. Um teste antigo de fixture de
+mapa ainda espera um payload sem `service_suspended`, uma falha fora do diff de
+C99. Provider remoto, smoke natural de 3.600 dias e as ondas amplas permanecem
+abertos. Nada foi commitado, enviado ao remoto ou deployado.
+
+### Embargo econômico dirigido — 21/09/2026
+
+C100 adiciona o instrumento que faltava entre tarifa universal, suspensão de
+serviço e bloqueio militar: uma instituição pode recusar a carga de uma
+contraparte específica em um posto alfandegário que realmente opera. Declarar e
+levantar são affordances transitórias; a decisão persistida carrega apenas o ID,
+e o owner recompõe política, posto, alvo e autoridade.
+
+A recusa ocorre no encontro material da carga com o posto. A mercadoria volta ao
+estoque de origem, nenhuma taxa é cobrada, a rota continua aberta para outros
+atores e o aviso só aparece para o dono da carga. O motivo fica disponível ao
+owner de recuperação (`refused_routes`) sem criar retaliação, memória ou
+conhecimento global; rotas alternativas e contrabando continuam decisões
+independentes. O mesmo adapter foi integrado ao menu civil composto e à agenda,
+sem duplicar o orçamento de consulta.
+
+Foram `12 passed` no recorte do embargo e `93 passed` na regressão ampliada,
+com compileall e `git diff --check`. MetaGame/Laya rodou em shadow/observe com
+fallback neutro; Laya real ainda não está configurado. Provider remoto, smoke
+natural de 3.600 dias e as ondas de campanhas, magia/ecologia e continuidade
+histórica continuam abertos. Nada foi commitado, enviado ou deployado.
+
+### Objetivo persistente de manutenção militar — 21/09/2026
+
+C101 fecha a lacuna entre campanha e manutenção durável: a instituição pode
+escolher uma affordance para reservar rações de uma guarnição própria ativa,
+presente e ocupando validamente o assentamento. O owner recompõe todos esses
+termos, além de conta, estoque e autoridade; nenhum texto ou decisão fornece
+guarnição, coluna, posse ou recurso.
+
+O objetivo `maintain_garrison_supply` só soma ao `reserve_quantity` a comida já
+existente necessária para `count × 30 × reserve_months`. Não compra, cria,
+recruta, marcha, paga automaticamente ou mantém o dever vivo. A guarnição
+continua passando pelo `_maintain_garrison` existente e pode sofrer lapse;
+abandonar o objetivo remove a prioridade sem alterar a força. O save/load, o
+menu civil e a agenda institucional usam o mesmo adapter, sem consulta
+duplicada.
+
+Foram `14 passed` nos testes focados e `77 passed` na regressão composta local,
+com compileall e `git diff --check` verdes. A validação persistida rejeita
+também ocupação perdida, coluna deslocada/retornando, dever lapsado e coluna de
+outro dono. MetaGame/Laya foi mantido em shadow/observe com fallback neutro;
+Laya real não está configurado. Provider remoto, smoke natural de 3.600 dias e
+as ondas de campanhas, magia/ecologia e continuidade histórica continuam
+abertos. Esta etapa não foi commitada, enviada ao remoto ou deployada.
+
+### Marca causal após espionagem descoberta — 21/09/2026
+
+C103 torna a defesa materialmente relevante para espionagem persistente. Um
+finding com `result=discovered` marca o mesmo agente no mesmo assentamento por
+uma janela curta de 30 dias, e a affordance desaparece nesse período. A mesma
+leitura engine-owned é reutilizada por roubo de tecnologia, com o lugar sendo a
+instalação observada.
+
+A marca é derivada dos findings já persistidos: não há timer, agenda, modelo,
+memória, relação, notícia ou retaliação. Failure e success continuam apenas
+gastando o dia; outro agente, outro lugar e mundos sem guarnição não são
+bloqueados. Save/load e `knowledge.validate` permanecem no caminho existente.
+
+Foram `15 passed` no foco e `86 passed` na regressão ampliada de espionagem,
+roubo, tecnologia, agenda, guarnição e knowledge, com compileall e
+`git diff --check` verdes. MetaGame/Laya permaneceu em shadow/observe com
+fallback neutro; provider real, smoke natural e ondas amplas continuam
+abertos. Esta etapa não foi commitada, enviada ao remoto ou deployada.
+
+### Cache transitório da validação de conhecimento — 21/09/2026
+
+`KnowledgeState.validate(world)` mantém a validação estrutural em toda chamada,
+mas evita repetir a validação semântica quando o mesmo snapshot canônico é
+validado novamente dentro da transação. A chave transitória inclui o tamanho e
+o último objeto do ledger, o dia e a identidade de cada valor dos registries;
+qualquer novo fato ou substituição de entrada invalida o cache. Save/load segue
+no caminho completo de validação, e nenhum estado novo é persistido.
+
+O recorte de histórico, knowledge e rotas passou em `50 passed`; o recorte
+conjunto do dispatcher e knowledge passou em `45 passed`; o smoke de 120 dias
+com `seed=73` e perfil `socorro` conservou dinheiro/recursos e save/load.
+O ganho medido foi pequeno (aproximadamente `8,7s` por 120 dias nesta máquina),
+portanto o smoke natural de 3.600 dias continua não certificado. MetaGame/Laya
+registrou C106 em shadow/observe com fallback neutro; provider real, commit,
+push e deploy continuam fora desta etapa.
+
+### Época O(1) para registries de conhecimento — C108 — 21/09/2026
+
+O perfil de horizonte longo mostrou que a tentativa anterior de invalidar a
+validação semântica por identidade de todos os valores ainda percorria e
+ordenava os 26 registries a cada chamada. C108 substitui isso por dicionários
+rastreados com uma época transitória: qualquer `set`, `delete`, `update` ou
+substituição de entrada incrementa a época em O(1), e a chave da validação
+continua combinando ledger, dia e época. O cache de consultas também mantém um
+índice independente por registry, sem apagar `reports` ao consultar rotas.
+
+`transaction_copy` reata os registries ao candidato e limpa projeções/cache;
+save/load continua no caminho completo de validação. A regressão focada de
+histórico, knowledge, rotas e migração passou em `68 passed`; smoke natural de
+120 dias (`9,14s`) e 360 dias (`89,46s`) preservou dinheiro, recursos e
+save/load. O ganho não linear ainda não fecha o gate natural de 3.600 dias:
+ele permanece pendente e deve ser medido novamente após a próxima fatia de
+perfil. MetaGame/Laya registrou C108 em shadow/observe com fallback neutro;
+provider real, commit, push e deploy continuam fora da etapa.
+
+### Índices de conhecimento preservados entre transações — C109 — 21/09/2026
+
+Os candidatos transacionais agora recebem uma cópia rasa dos índices de
+consulta por ator enquanto compartilham apenas os valores congelados de
+conhecimento. Os containers continuam isolados; uma escrita no registry
+incrementa a época e descarta a entrada correspondente. O cache semântico de
+validação permanece limpo no candidato, portanto nenhuma validação causal é
+herdada sem ser reexecutada quando necessário.
+
+O recorte conjunto de história, knowledge, rotas, migração e dispatcher passou
+em `70 passed`; o smoke natural de 360 dias (`89,11s`) preservou dinheiro,
+recursos e save/load. O perfil ainda mostra custo dominante em
+`_actor_query`/`knowledge.validate`, então o gate de 3.600 dias continua
+aberto. MetaGame/Laya registrou C109 em shadow/observe com fallback neutro;
+provider real, commit, push e deploy permanecem fora desta etapa.
+
+### Auditoria de transições actor-decision sem delta — C110 — 21/09/2026
+
+Foi testada uma ampliação do guardrail para exigir decisão real em qualquer
+`STATE_TRANSITION` com `CausalOrigin.ACTOR_DECISION`, mesmo sem `deltas`. O
+schema já rejeita esse estado impossível antes de `validate_history`: uma
+transição material precisa conter pelo menos um delta. A alteração redundante
+foi revertida, sem adicionar caminho alternativo ou compatibilidade artificial.
+
+O recorte de autoria, histórico, knowledge, rotas, migração e dispatcher ficou
+em `73 passed`, com compileall e `git diff --check`. MetaGame/Laya registrou a
+auditoria C110 em shadow/observe com fallback neutro; a auditoria completa de
+todos os owners, provider real, smoke natural de 3.600 dias e ondas amplas
+continuam abertos.
+
+### Épocas por registry no índice transitório — C116 — 21/09/2026
+
+O cache de consultas de `KnowledgeState` agora invalida apenas o registry que
+recebeu uma escrita. `set`, `delete`, `update` e `|=` mantêm uma época global
+para a validação estrutural e épocas independentes para as projeções de ator;
+assim, uma observação diplomática nova não descarta um índice de relatórios
+inalterado. Os candidatos transacionais continuam reatachando os registries ao
+clone e isolando os dicionários de projeção, sem persistir épocas ou caches.
+
+Foi adicionada uma regressão explícita para garantir que uma escrita em outro
+registry preserve a projeção já construída. O recorte conjunto de histórico,
+knowledge, rotas, migração e dispatcher passou em `71 passed`; `compileall` e
+`git diff --check` também passaram. O perfil de 120 dias continua dominado por
+`KnowledgeState.validate`, cópias transacionais e políticas institucionais,
+sem ganho material mensurável neste horizonte; o smoke natural de 3.600 dias,
+a auditoria owner-a-owner e as ondas amplas do roadmap continuam abertos.
+MetaGame/Laya registrou C116 em `shadow/observe`, com provider real ausente e
+fallback neutro; nenhuma ação externa foi autorizada.
+
+### Clones preservam projeções transitórias de knowledge — C117 — 21/09/2026
+
+`transaction_copy` agora preserva as épocas por registry e as projeções de
+consulta já construídas quando os valores congelados de `KnowledgeState` são
+compartilhados entre o mundo publicado e o candidato. Os dicionários continuam
+isolados: qualquer escrita no clone incrementa sua própria época global e a
+época do registry afetado, descartando somente aquela projeção. O cache não é
+persistido e a validação completa de save/load permanece intacta.
+
+O recorte de histórico, knowledge, rotas, migração e dispatcher passou em
+`71 passed`; `compileall` e `git diff --check` passaram. Duas execuções de 120
+dias ficaram em `10,68s` e `10,63s`, sem ganho material neste horizonte, então
+o próximo gargalo não deve ser tratado como resolvido por esta otimização. O
+smoke natural de 3.600 dias, provider real e as verticais amplas do roadmap
+continuam abertos. MetaGame/Laya registrou C117 em `shadow/observe`, com
+fallback neutro e sem autoridade de execução.
+
+### Cache estrutural transitório de knowledge — C114 — 21/09/2026
+
+Além da chave semântica, `KnowledgeState.validate(world)` agora memoriza a
+validação estrutural dos registries até a próxima época de escrita. O cache é
+transitório, é invalidado por `set/delete/update/|=` e não participa do schema;
+`validate()` sem mundo continua revalidando todos os modelos no save/load.
+
+O recorte de histórico, knowledge, rotas, migração e dispatcher passou em
+`70 passed`; o smoke natural de 120 dias completou em aproximadamente `10,43s`
+nesta máquina. A medição não mostrou ganho material neste horizonte, portanto
+o smoke não-linear de 3.600 dias continua aberto. MetaGame/Laya registrou C114
+em shadow/observe com fallback neutro; provider real e ondas amplas permanecem
+pendentes.
+
+### Fixture econômica de recuperação — C111 — 21/09/2026
+
+O smoke pressionado `seed=73`, perfil explícito `recuperacao`, por 180 dias
+reduziu o déficit alimentar final para `344` sem criação automática de comida,
+dinheiro ou população. A cadeia usou apenas as affordances já enumeradas de
+relief, emprego permanente e workforce; houve 15 distribuições de relief e 25
+transições de workforce. Dinheiro, recursos, save/load e continuidade do dia
+seguinte permaneceram conservados.
+
+No mesmo arquivo, a auditoria causal retornou `ok=true`, com
+`broken_cause_ids=[]`, nenhuma autoria de decisão inválida, nenhuma transição
+de decisão sem fonte e nenhum Story/LLM material. MetaGame/Laya registrou C111
+em shadow/observe com fallback neutro. Isso fecha evidência da fixture, não a
+resiliência econômica de dez anos: o provider real, o gate natural de três
+seeds e a redução estrutural do déficit continuam abertos.
+
+### Gate natural de três seeds — execução interrompida por espaço — 21/09/2026
+
+Uma execução do gate natural de 120 dias foi iniciada para as seeds `73`,
+`101` e `137`. As duas primeiras completaram com conservação de dinheiro e
+recursos, save/load e auditoria causal; a terceira chegou ao horizonte, mas a
+persistência falhou com `sqlite3.OperationalError: database or disk is full`
+porque `/tmp` estava sem espaço. Os diretórios temporários desta tentativa
+foram removidos; o gate não é considerado verde e precisa ser repetido em um
+filesystem com espaço disponível. Isso não altera o estado canônico do projeto.
+
+### Gate natural de três seeds concluído no horizonte curto — C112 — 21/09/2026
+
+Repetindo a matriz em `/dev/shm`, as seeds `73`, `101` e `137` completaram 120
+dias com `natural_ok=true` e `ok=true`. Cada save/load foi equivalente, dinheiro
+e recursos permaneceram conservados e as auditorias dos três arquivos não
+encontraram causas quebradas ou materialidade narrativa. O resultado não
+antecipa estabilidade em dez anos: `3.600` dias continua um gate separado.
+
+### Auditor de autoria cobre receipts sem delta — C113 — 21/09/2026
+
+`tools/medieval_causal_audit.py` agora verifica toda ocorrência não-`DECISION`
+com `CausalOrigin.ACTOR_DECISION`, não apenas eventos que carregam `StateDelta`.
+Transições materiais continuam exigindo o payload que casa ator e affordance
+com a decisão-fonte; receipts actor-owned também precisam apontar para uma
+decisão real. O recorte de smoke/autoria passou em `16 passed`, e um save de 360
+dias retornou `ok=true` sem gaps de autoria. MetaGame/Laya registrou C113 em
+shadow/observe com fallback neutro; a revisão owner-a-owner e o provider real
+continuam abertos.
+
+### Continuação do gate natural no checkout corrigido — 22/09/2026
+
+Após corrigir a prioridade dos pedidos de ajuda da política offline, a seed
+`73` foi reiniciada no dia zero: os sete anos de um checkout anterior não
+contam para este gate. Seis checkpoints anuais chegaram ao dia `2160`, todos
+com conservação de comida, dinheiro e recursos, equivalência save/load e
+auditoria causal standalone `ok=true`. No sexto ano houve 103.791 eventos
+(80.729 materiais), sem causas quebradas, autoria de decisão inválida, decisão
+sem fonte ou mutação originada em Story/LLM.
+
+A cadeia de ajuda deixou de ficar presa a cidades pequenas com pedido aberto:
+em diagnóstico anterior, Valedouro pediu 1.290 rações, Auren aceitou, o frete
+foi aberto e a entrega material chegou a Portovelho. No mundo reiniciado, porém,
+a população caiu a 8.494, saúde média a 137,62 e houve 2.425 mortes por privação
+até o dia 2160. O resultado prova continuidade e auditabilidade deste recorte,
+não resiliência econômica. Restam quatro anos da seed `73` e o horizonte longo
+das seeds `101` e `137`; o teste usa `routine-rules`, sem provider real.
+
+Uma continuação ao sétimo ano expôs outra lacuna antes do dia 2460: a oferta de
+transição ocupacional permanecia enumerada após a conta do patrocinador perder
+fundos. O owner recusou a execução e o smoke parou sem publicar o save final.
+`workforce_transition_options` agora recompõe também a viabilidade financeira
+e o ownership das contas; o executor continua revalidando. O teste de regressão
+falhou antes da mudança, e o arquivo focado passou em `36 passed` depois.
+Como isso pode alterar decisões anteriores, os seis anos acima são diagnóstico
+histórico e **não** certificam o checkout final: o gate de dez anos será
+reiniciado do dia zero após verificar a continuação que reproduziu a falha.
+
+Essa continuação diagnóstica atravessou o ciclo antes bloqueado e chegou ao dia
+`2520` com código 0, conservação de recursos e equivalência save/load. A
+auditoria standalone retornou `ok=true` em 118.456 eventos, sem causas quebradas
+ou materialidade Story/LLM. Ainda não é o gate final: começou de um save gerado
+antes da correção, e a saúde média caiu a 100,12 com 3.263 mortes por privação.
+
+O gate do checkout atual foi então reiniciado: a seed `73` completou cinco anos
+(`1800` dias) com conservação, save/load e auditoria causal `ok=true` em
+87.706 eventos. Os arquivos anuais coincidem byte a byte com os cinco primeiros
+anos da trajetória anterior, mas os outros checkpoints ainda precisam de
+execução própria. A seed continua em política offline `routine-rules`, sem
+provider real. Restam cinco anos dessa seed e as seeds `101`/`137` inteiras.
+Já há 1.631 mortes por privação e saúde média 186: a continuidade causal não
+resolveu a crise material.
+
+Um checkpoint MetaGame/Laya de revisão da ordem foi repetido com inicialização
+mais longa depois de um timeout inicial. A sessão somente leitura terminou sem
+erros de observer ou telemetria perdida; o sinal primário Laya foi real, mas de
+baixa confiança, com fallback neutro e sem override. A decisão de continuar o
+gate longo vem do plano e das provas focadas anteriores, não de aprovação do
+Laya nem de uma suposição de equilíbrio econômico.
+
+O sexto ano do checkout atual chegou ao dia `2160` com auditoria `ok=true` em
+103.791 eventos, conservação e save/load. Seu arquivo é byte a byte idêntico
+ao save que iniciou a continuação corrigida do sétimo ano, já executada e
+auditada no dia `2520`. Nenhum código Python de `src/` ou `tools/` mudou entre
+essa execução e a comparação; por isso o save corrigido do dia `2520` foi
+adotado como checkpoint do ano 7 sem repetir um run determinístico idêntico.
+Ele tem 118.456 eventos e auditoria causal `ok=true`, mas registra população
+7.656, saúde média 100,12 e 3.263 mortes por privação. O ano 8 foi iniciado
+desse save; faltam três anos da seed `73` e as seeds `101`/`137` longas.
+
+O oitavo ano da seed `73` terminou no dia `2880` com código 0, conservação de
+dinheiro/recursos e equivalência save/load. A auditoria standalone do save
+retornou `ok=true` em 133.005 eventos (101.387 materiais), sem causa quebrada,
+autoria inválida ou mutação Story/LLM. A população caiu a 6.757; são 4.161
+mortes acumuladas por privação. A crise material permanece e não deve ser
+confundida com falha causal nem ocultada por uma recuperação automática.
+Faltam dois anos dessa seed e os horizontes longos de `101`/`137`.
+O `civic_protests_total=0` desse smoke não significa que os grupos não possam
+protestar: uma leitura do save encontrou 30 grupos com opções cívicas válidas.
+Este run usa `ai_enabled=false` e nenhum `gov_profile`, logo não instala ator
+cívico e o motor não força um protesto. O horizonte natural serve para testar
+conservação, persistência e causalidade, não para inferir decisões de NPCs com
+provider real. As provas cívicas com ator consultado permanecem separadas.
+
+O nono ano da mesma seed `73` terminou no dia `3240`: conservação de comida,
+dinheiro e recursos, equivalência save/load e auditoria causal standalone
+`ok=true` em 147.201 eventos, sem causa quebrada, autoria inválida ou material
+Story/LLM. A população era 6.125, com 4.793 mortes acumuladas por privação.
+Falta o décimo ano dessa seed e as seeds `101`/`137` por dez anos; os dados
+offline não comprovam que um mundo com provider real teria as mesmas escolhas.
+
+A seed `73` completou os dez anos naturais no dia `3600`: cada retomada anual
+partiu de save previamente auditado, e o save final passou conservação,
+equivalência save/load e auditoria causal standalone (`ok=true`, 161.796
+eventos, 121.707 materiais, zero causas quebradas, autoria inválida ou mutação
+Story/LLM). É **uma de três** seeds do gate longo, ainda sem provider real.
+A população caiu a 5.621, com 5.297 mortes acumuladas por privação; isso é
+um sinal de crise material a investigar, não algo que o gate causal sozinho
+possa declarar resolvido. As seeds `101` e `137` seguem em checkpoints
+independentes, com saves auditados até os dias `1080` de ambas.
+
+O checkpoint MetaGame/Laya após essa primeira seed completa teve inferência
+primária real e nenhum erro de observer, mas a baixa confiança resultou na
+política efetiva neutra `observe`, sem override e sem arquivos alterados. Ele
+não certifica causalidade nem balanceamento. As seeds `101` e `137` chegaram
+com auditoria limpa ao dia `1440` cada e seguem para o quinto ano; ambas
+também apresentam mortes por privação, então o problema econômico não se
+restringe à seed `73`.
+
+As seeds `101` e `137` também completaram cinco anos (`1800` dias) com
+conservação, save/load e auditoria causal `ok=true` em cada checkpoint anual.
+As mortes por privação já chegam, respectivamente, a 2.050 e 2.201. Os
+sextos anos estão em execução; dez anos de cada uma ainda não foram provados.
+Saves temporários dos anos 1–3 dessas duas seeds foram removidos após hashes
+e auditorias, preservando os logs e os saves usados na continuação.
+Uma inspeção dos receipts do dia `1800` mostrou a mesma classe de gargalo
+material nas duas: Salgueiro (`101`) tinha 20.416 rações fora das casas, mas
+200 não eram compráveis; Pontenegro (`137`) tinha 33.783 e 283 não eram
+compráveis. As administrações distribuíram ajuda em outras cidades naquele
+ciclo. Isto indica acesso/poder de compra e triagem limitada, não comida
+desaparecida; ainda não prova como o provider real escolheria.
+
+## 23/09/2026 — aplicação material de treino de campo
+
+O bônus genérico de força baseado em qualquer conhecimento de `military_training`
+foi removido. Apenas `field_drill` e `siegecraft` podem fortalecer uma coluna
+específica depois de uma decisão de treino, consumo de ferramentas locais e
+três dias estacionários com rações reais. Falta de suprimento ou partida causa
+lapse do treino ainda em curso. Conhecimento institucional sozinho não altera
+força; `fortification` e `field_logistics` não entram nessa soma.
+
+Society persiste o treino e seus receipts; Economy debita as ferramentas;
+combate cita a conclusão e a aquisição da técnica. Um cenário pressionado
+verificou combate, save/load, auditoria causal e seleção stale. O schema de
+save atual é 62 (Society 21, Economy 14); saves anteriores permanecem no
+disco e são rejeitados explicitamente, sem migração. Os três smokes offline
+de dez anos ocorreram antes dessa mudança e não são gate do checkout atual.
+O efeito logístico por conhecimento isolado continua pendente, assim como a
+árvore tecnológica ampla e a validação com provider real.
+
+## 23/09/2026 — logística aplicada à coluna
+
+`field_logistics` deixa de ampliar provisões ou bagagem por conhecimento
+institucional isolado. Depois de `field_drill`, a mesma coluna precisa de uma
+decisão de treino, ferramentas locais e três dias abastecidos. A conclusão
+amplia apenas o limite de provisões dessa coluna; uma bagagem já existente
+recebe aumento de capacidade por transição própria, ligada à conclusão. A
+criação tardia da bagagem também preserva a referência ao treino, embora o
+fluxo normal a estabeleça antes da conclusão. Nenhuma
+ração é criada pelo bônus. Save schema 63 rejeita saves anteriores sem tentar
+inventar o treino ausente; os arquivos antigos permanecem intactos.
+
+Testes focados de treino, abastecimento, combate, persistência e observatório
+passaram (`40 passed`). Uma tentativa de testar criação tardia falhou porque a fixture
+já estabelece a bagagem durante os dias de treino; o cenário artificial foi
+retirado. A regressão final ainda precisa de execução. Os smokes naturais anteriores
+foram executados antes desta semântica e não validam o checkout atual.
+
+## 23/09/2026 — roubo técnico exige aplicação observável
+
+A affordance de roubo técnico antes confundia técnica conhecida com técnica
+operando: bastava o detentor ter qualquer facility no site com a capacidade
+correspondente. Agora o agente local só recebe a opção quando há uma linha
+que produziu recentemente por uma receita dependente daquela técnica, com
+`production_completed` positivo e link ao conhecimento do detentor. A opção
+e o receipt citam também essa operação. Linha parada, receita básica ou
+conhecimento não aplicado não são alvo válido; o owner recompõe a opção no
+momento da execução.
+
+A fixture de roubo passou a construir a linha de carvão, pagar seu trabalho e
+produzir antes da tentativa; o forno eficiente não serviu porque sua receita
+operacional não requer metalurgia, embora a construção requeira. A primeira
+regressão expôs isso (`3 failed, 1 passed`); corrigida a fixture material, a
+regressão de roubo/venda/cópia/indústria/observatório/persistência passou
+(`44 passed`), incluindo save/load e auditoria standalone `ok=true` do roubo.
+Save schema 64 rejeita o contrato antigo sem produção-fonte, preservando os
+arquivos. O checkpoint shadow `medieval-stage3a-catalog-20260923` teve sinal
+primário Laya real, mas baixa confiança e efeito neutro `observe`; não foi
+verificação de código. A árvore tecnológica ampla e os gates finais seguem
+pendentes.
+
+## 23/09/2026 — difusão paga até treino material
+
+Uma fixture pressionada integrou venda bilateral de `field_drill` a outra
+instituição, com sighting voluntário, decisão independente do comprador e do
+vendedor, transferência real de dinheiro, e só depois treino local de uma
+coluna dessa compradora. A venda não mudou a força. O treino consumiu
+ferramentas e três dias de provisões antes de elevar a força apenas daquela
+coluna; a conclusão cita o conhecimento recebido. Save/load e auditoria
+standalone passaram. O site militar adicional da compradora é premissa
+explícita da fixture, não uma instalação criada pela venda.
+
+Um teste integrado e a regressão adjacente (`17 passed`) cobrem essa cadeia.
+Isso prova uma via de difusão aplicada em cenário preparado, não a árvore
+tecnológica inteira nem decisões autônomas de provider real.
+
+## 23/09/2026 — intenção defensiva sobrevive à mobilização
+
+O plano `defend_occupied_settlement` antes passava a `closed` no instante em
+que o owner levantava uma coluna. Agora a decisão e o destacamento real deixam
+o plano em `mobilized`, com `detachment_id` persistido e uma revisão datada. A
+perda da coluna retorna a intenção a `adopted`, para nova escolha do ator; não
+cria substituto. O fim da ocupação só encerra o plano depois de relatório local
+atual da própria instituição. Uma contradição entre relatório e estado canônico
+bloqueia a execução até nova observação, sem ensinar a verdade privada ao ator.
+
+A observação de ocupação alterada agora cita a transição material de ocupação;
+leituras seguintes citam a observação anterior. Assim o receipt de encerramento
+alcança o fato real pela cadeia causal. Save schema 65/Strategy schema 2
+persistem a coluna vinculada e rejeitam snapshots antigos explicitamente. O
+teste preparado cobre adoção, mobilização, perda após 30 dias, revisão,
+encerramento após relatório e round-trip. A regressão focada de estratégia,
+campanha, retirada, cerco, observatório e persistência passou (`71 passed`).
+Isso é uma intenção militar persistente e auditável, não uma campanha completa:
+suprimento continuado, combate em vários turnos, solução política e escolha por
+provider real nessa cadeia ainda exigem prova integrada. Também foi constatado
+que o ensino institucional imediato conclui hoje a obrigação no mesmo ato;
+simplesmente postergar a técnica sem mudar a semântica do cumprimento criaria
+um compromisso falsamente satisfeito. A via de ensino datado permanece aberta.
+
+### Reocupação entre relatório e revisão
+
+A revisão agora revalida a ocupação canônica antes de aceitar um relatório que
+diz “livre”. Se outra ocupação material surgiu depois dessa observação, o plano
+fica `blocked`, preserva sua coluna e agenda nova revisão; não publica um
+encerramento obsoleto nem revela automaticamente ao ator quem retomou a cidade.
+O teste de corrida cobre essa ordem e a regressão focada conjunta passou em
+`72 passed`. O cenário contrafactual injeta os dois fatos territoriais como
+premissas de teste; não representa uma invasão espontânea no mundo natural.
+
+## 23/09/2026 — cidade própria ocupada entra no caminho material de cerco
+
+A affordance de `settlement_invest` antes exigia administração estrangeira.
+Isso deixava sem cerco possível justamente a resposta defensiva a uma cidade
+própria sob ocupação inimiga. Agora uma coluna própria presente e preparada
+pode pressionar acessos de sua cidade administrada somente quando um relatório
+local próprio, atual, confirma o ocupante estrangeiro. O ID transitório e o
+receipt citam a observação junto das leituras de rota; o notice privado vai ao
+ocupante, não à administração que está tentando recuperar o lugar. Cidade
+própria livre continua sem affordance. Se o ocupante dissolve materialmente sua
+guarnição antes da seleção chegar ao owner, a opção antiga é recusada sem
+mutação de investimento.
+
+Uma fixture com administração própria, guarnição estrangeira e coluna atacante
+já presente percorreu investimento → rotas restringidas → notice ao ocupante
+→ cerco datado → brecha/colapso → decisão separada de ocupar. O resultado
+preserva a administração, salva/carrega equivalentemente e passa auditoria
+causal standalone. A revisão do plano também reconhece `occupier_id` próprio
+como fim da ocupação estrangeira após relatório atual, sem oferecer nova defesa
+contra si mesmo. O caso de revisão é uma fixture separada; a coluna da adoção
+estratégica ainda não foi conduzida ponta a ponta até esse cerco no mesmo teste.
+Isto fecha um elo de affordance e execução, não o aceite completo de campanha
+persistente nem uma escolha de provider real para a cadeia toda.
+
+## 23/09/2026 — mesma coluna: retomada, escassez e cessar-fogo
+
+Uma fixture integrada agora parte da adoção do plano defensivo e conserva o
+mesmo `detachment_id` por mobilização, marcha, frete real, carga de provisões,
+posição preparada, investimento e cerco. Com estoque inicial suficiente, a
+guarnição rival sofre breach, o ator decide retomar a cidade e a revisão do
+dia 31 fecha o plano somente depois do relatório próprio. Sem o alimento
+adicional declarado como premissa factual da fixture, o cerco expira e nenhuma
+ocupação é oferecida. Os dois resultados passam save/load e auditoria causal;
+não houve suplemento automático nem vitória roteirizada.
+
+O ramo negociado mantém a mesma coluna, mas a política injetada recusa um
+segundo frete: atacante e ocupante tomam decisões independentes de
+cessar-fogo, cumprem retiradas materiais separadas e o plano fecha após a
+observação de fim da ocupação. Isso revelou que uma parcela pendente ainda
+fazia o menu oferecer retirada impossível; a opção agora desaparece até a
+bagagem estar vazia e sem cargo em trânsito. Notice aberto sem carga pode ser
+encerrado pela decisão de retirada, nunca move frete.
+
+`FreightOrder` guarda os locais imutáveis de dispatch com deltas no receipt de
+abertura. Uma bagagem vazia pode seguir a coluna depois da entrega, sem
+reescrever a rota histórica do pedido; enquanto houver parcela pendente, o
+stock de destino não pode sair do local prometido. Economy schema 15/save
+schema 66 rejeitam snapshots anteriores sem migração ou remoção automática.
+As decisões dos testes selecionam IDs canônicos por fixture, não provam que
+o provider real escolheria cessar-fogo ou retomada. Terreno/informação,
+controle prolongado, provider real e os gates longos ainda estão abertos.
+
+## 23/09/2026 — fechamento físico de rota interrompe o mesmo cerco
+
+Uma continuação controlada da cadeia persistente fecha fisicamente um acesso
+durante o investimento. Na revisão datada, o owner levanta o investimento,
+o cerco expira, a cidade continua com o ocupante rival e não há opção de
+ocupação. O levantamento agora cita o fato que fechou a rota, além do fato
+anterior do investimento; o relatório próprio observa capacidade zero.
+Save/load e auditoria causal passam. O fechamento é uma premissa factual da
+fixture, não uma enchente ou sabotagem espontânea, e as escolhas anteriores
+continuam injetadas por IDs canônicos. A regressão afetada passou em 54 testes;
+isso não fecha provider real nem campanha natural longa.
+
+## 23/09/2026 — terreno muda perdas com o mesmo contato e decisões
+
+Um contrafactual de combate mantém colunas, avistamento limitado, oferta e
+aceite iguais, mas troca apenas o terreno autoral da região de floresta para
+planície. A lei Map-owned já existente produz modificador diferente e muda
+as baixas, que ficam explícitas no fato de resolução. Os dois lados salvam,
+carregam e passam auditoria causal; 29 testes afetados passaram. Isso prova
+um efeito material de terreno nessa fixture, não que o ator planejou usando
+conhecimento geográfico próprio, nem campanha natural longa ou provider real.
+
+## 23/09/2026 — sem observação local, a pressão não abre
+
+Uma coluna estrangeira presente, preparada e abastecida diante dos mesmos
+dois acessos não recebe affordance de investimento sem os relatórios próprios
+dessas rotas. Um ID obtido no contrafactual informado falha na recomposição
+do owner sem mutação. Após observação local dos dois acessos, uma nova opção
+com novos IDs de evidência abre e sua execução material fecha as rotas.
+Save/load e auditoria causal passam; 53 testes afetados passaram. A ausência
+de observação é premissa da fixture, não um ator esquecendo um relatório que
+já recebeu. Isto comprova um limite de informação na decisão de cercar, mas
+não escolha espontânea por provider real nem campanha natural longa.
+
+## 23/09/2026 — defesa pode escolher duração material da coluna
+
+O menu do plano defensivo agora compõe expedições de 10 ou 40 dias pelo mesmo
+owner de força, sempre conforme população disponível, estoque próprio,
+salários, rota conhecida e autoridade atual. A opção informa soldados, rações
+e duração calculados pela engine; a escolha é somente o ID, e o owner recompõe
+exatamente aquela duração antes de debitar estoque, pagar e mobilizar.
+
+Uma fixture pressionada escolhe a expedição longa: a coluna recebe `count × 40`
+rações do estoque factual, consome 30 dias pela agenda e continua presente com
+`count × 10` rações. A leitura de fadiga chega a 1 após dias reais; save/load
+e auditoria causal passam. Isso habilita campanha prolongada sem alimento
+gratuito, mas não demonstra ainda um combate tardio cujo resultado muda pela
+fadiga. A regressão afetada passou em 56 testes. Uma fixture anterior de
+posição tinha orçamento para uma consulta embora dois atores fossem
+consultados; ela agora lhes dá turnos independentes, com `NO_ACTION` do rival.
+
+## 23/09/2026 — fadiga de dias reais altera baixas de campo
+
+Duas fixtures mantêm a mesma força, terreno, suprimento inicial, contato e
+decisões de oferta/aceite. Uma desafia logo após preparar posição; a outra
+passa 30 dias adicionais em campo, consumindo rações pela agenda diária antes
+de encontrar o rival. Ambas ainda têm provisões suficientes para lutar, mas
+a veterana sofre mais baixas. Cada fato de resolução expõe sua leitura de
+fadiga (`0` ou `1`); os dois mundos salvam/carregam e passam auditoria causal.
+O rival chega como premissa factual da fixture no dia do contato, não por
+mobilização autônoma. A prova fecha o efeito material da fadiga num combate
+controlado, não campanha natural longa nem escolha de provider real.
+
+## 23/09/2026 — ensino consentido só afeta combate após treino material
+
+Uma prova integrada parte de conhecimento prévio da instituição docente,
+registra decisões atuais e independentes de ensinar e aprender, e usa o owner
+de ensino existente para transferir apenas `field_drill`. A força da coluna
+aluna não muda com esse conhecimento. A instituição precisa então escolher um
+treino da própria coluna, gastar ferramentas locais e sustentar três dias de
+instrução com provisões; só a conclusão aumenta a força. O fato de conclusão
+cita o conhecimento adquirido. Save/load e auditoria causal passam.
+
+O teste fecha a composição aplicada dessa via num cenário preparado, não o
+catálogo tecnológico completo ou uma escolha espontânea da IA. O ensino
+institucional segue imediato como transferência de conhecimento; não foi
+introduzido um curso obrigatório sem resolver instrutor, localização, meios e
+prazo do compromisso. Uma nova amostra de provider real foi tentada, mas a
+revisão de permissão barrou a consulta antes do envio dos dados da fixture;
+portanto ela não é contada como validação do provider.
+
+Atualização após autorização explícita: uma única sonda OAuth/Codex Luna com
+fixture sintética de ocupação e relatório foi executada no checkout atual. Havia
+uma affordance de adoção defensiva; o provider retornou `NO_ACTION`. O receipt
+`ai_decision_declined` tem origem `llm_interpretation`, zero deltas e nenhuma
+ação material foi executada. É uma recusa válida dentro do menu, não uma prova
+de que o provider escolha uma campanha positiva nem de que a cadeia militar
+completa funciona em execução natural.
+
+## 23/09/2026 — paliçada material e população militar de abertura
+
+`defensive_barriers` agora é uma técnica dependente de `fortification` que
+habilita obra de paliçada. A obra usa materiais, mão de obra e salários do
+estoque local; o site com maintainer e integridade pertence ao Map. O cerco
+calcula uma resistência limitada de um ponto de desgaste diário somente quando
+a paliçada do defensor está íntegra e operante, e cita o fato material atual do
+site. Dano até integridade inferior a 0,50 retira o efeito; reparo pago e
+material pode restaurá-lo. A fixture prova construção, dano, perda do bônus,
+reparo, save/load e auditoria causal, mas injeta conhecimento e impacto físico
+como premissas explícitas. Não é descoberta natural nem lei de hazard nova.
+
+A inspeção revelou que o mundo inicial não possuía nenhuma coorte de soldados,
+embora pesquisa militar e mobilização as exigissem. O catálogo de sociedade
+agora distribui 109 pessoas em coortes de ocupação militar entre os oito assentamentos, subtraídas das
+ocupações civis sem alterar os 10.900 habitantes. São uma premissa física de
+abertura, não guarnições ativas, destacamentos, ordens de marcha ou salários
+automáticos. Após
+relatórios próprios de rotas e assentamentos, as três instituições têm
+affordances reais de mobilização, ainda limitadas por rações, dinheiro e
+autoridade. Recrutamento posterior continua ausente e é uma lacuna distinta.
+
+O recorte integrado de sociedade, mundo, força, pesquisa, paliçada, obra,
+cerco, infraestrutura, rotas e persistência passou em `131 passed`; o teste
+novo de abertura também passa a validação completa do snapshot. Uma quebra
+colateral da observação de obras sem `facility_id` foi corrigida em
+`route_intelligence.py`; não havia caminho válido para esse acesso quando o
+projeto criava um site novo. Os smokes naturais anteriores foram executados
+antes dessa mudança de população inicial e não validam o checkout atual.
+Um smoke natural curto da seed 73 avançou 60 dias, conservou dinheiro/recursos,
+salvou/carregou o mesmo estado e passou auditoria standalone sem causas ou
+autorias quebradas. No segundo mês ainda houve falta alimentar; dois meses
+offline não equivalem a dez anos nem a decisões de provider real.
+Um teste separado parte desse mundo gerado, seleciona uma opção canônica de
+pesquisa militar para Auren e paga seis parcelas de ferramentas, trabalho de
+soldados e salário até conhecer `field_drill` no dia 180, com save/load
+equivalente. A decisão foi selecionada pela fixture; não é resultado espontâneo
+de IA ou prova de recrutamento.
+
+## 23/09/2026 — falta real em pesquisa pode recrutar assistentes
+
+Pesquisa autorizada agora registra `labor_shortfall` apenas quando assistentes
+indisponíveis são o impedimento efetivo, com líder, insumos e caixa ainda
+viáveis. O relatório privado e a oferta direta usam esse recibo tipado, a
+ocupação exigida pela técnica e a quantidade limitada pela engine. O grupo
+escolhe a oferta atual ou pode não agir; só a aceitação paga bolsa, reserva a
+fração por 30 dias e permite à Society mudar sua ocupação. O projeto continua
+sem progresso até novo trabalho material.
+
+A fixture mobiliza todos os soldados do local por decisões válidas, consumindo
+rações e salários. `field_drill` fica bloqueada por dois assistentes. Um grupo
+civil aceita a oferta, o tesouro paga sua conta, a opção vencida é recusada,
+e no dia 60 os dois participantes passam à coorte militar sem alterar o total
+populacional. Só então um novo fechamento de pesquisa avança uma unidade.
+O save pendente e o final carregam iguais, e a auditoria causal é limpa. A
+regressão de força de trabalho, pesquisa, força e persistência passou em
+`75 passed`. Um smoke natural curto de 60 dias no checkout novo também
+conservou recursos/dinheiro, fez save/load e passou auditoria (`ok=true`).
+Isso prova uma via de recrutamento derivada de trabalho real; campanhas ainda
+não podem emitir uma oferta equivalente por iniciativa militar, e o provider
+real não escolheu essa oferta na prova.
+
+## 23/09/2026 — plano defensivo bloqueado volta a consultar meios atuais
+
+Um plano defensivo sem coluna deixava de receber revisão se não houvesse opção
+material para mobilizar. `NO_ACTION` também encerrava a chance de uma decisão
+posterior. Agora ambos mantêm uma revisão datada em 30 dias. O owner recompõe
+o relatório próprio e as opções de força; um plano sem coluna só mobiliza se
+uma nova escolha válida do ator chegar ao executor. Uma fixture retira
+provisões reais de todos os estoques da instituição, observa o bloqueio,
+repõe os estoques e demonstra que o mesmo plano pode escolher uma coluna na
+revisão seguinte. Outra comprova `NO_ACTION` seguido de decisão posterior.
+O primeiro cenário salva/carrega e passa auditoria causal.
+
+A regressão focada de estratégia, campanha persistente e recrutamento passou
+em `15 passed`. Quatro falhas intermediárias de campanha eram pressupostos de
+fixture após a inclusão de coortes militares iniciais: o teste escolhia uma
+coorte menor pelo primeiro ID e esperava carga pendente mesmo no ramo que
+partiu com provisões para 40 dias. A fixture passou a selecionar explicitamente
+a coluna de 60 pessoas e a distinguir carga pendente de ração inicial;
+nenhuma lei de campanha foi ajustada para alcançar vitória. Isto não cria uma
+oferta de recrutamento para a campanha, não valida o provider real e não
+substitui o gate natural longo.
+
+## 23/09/2026 — campanha pede voluntários por duas decisões independentes
+
+Um plano defensivo bloqueado por falta de soldados agora pode gerar uma
+leitura `labor_shortfall` somente se Force confirmar rota própria atual,
+rações livres, caixa para bolsa e salário inicial, autoridade e civis locais
+disponíveis. Esse recibo não envia ofertas. A instituição precisa escolher
+`authorize_military_recruitment` no menu mensal; o owner revalida e envia
+avisos diretos. Cada grupo pode aceitar ou recusar, e a aceitação paga a bolsa
+e reserva no máximo um quinto da coorte por 30 dias. Society muda a ocupação;
+um novo turno do plano ainda precisa selecionar a coluna real e Force volta
+a cobrar rações e salário.
+
+A fixture começou com todos os soldados de dois assentamentos enviados, pagos
+e provisionados em outras colunas. O plano de cidade ocupada ficou sem força,
+observou a falta e, no mês seguinte, recebeu o relatório datado. `NO_ACTION`
+do patrocinador não criou oferta. Depois da decisão institucional e da
+aceitação independente do grupo, uma opção forjada e a retirada posterior de
+rações foram rejeitadas. No dia 61 a nova coorte permitiu erguer uma coluna;
+total populacional conservado, save/load pendente/final e auditoria causal
+passaram. A regressão afetada foi `76 passed`. Um smoke natural offline de
+60 dias conservou recursos e dinheiro, fez round-trip e terminou com auditoria
+`ok=true`, sem provider real; nesse mundo não houve esta pressão militar.
+
+Isso fecha a fatia de recrutamento ligada ao plano defensivo conhecido, não
+reposição geral de guarnição, campanha ampla ou escolha por IA real no novo
+fluxo. O gate natural de três seeds por dez anos segue pendente para o checkout
+final.
+
+## 23/09/2026 — observador reconhece todas as demandas de trabalho atuais
+
+O backend já enviava demandas e transições de `customs`, `research` e
+`military_recruitment`, mas a validação do snapshot no frontend aceitava
+somente `facility` e `repair`; um mundo válido com essas demandas podia ser
+recusado como retrato incompleto. O contrato TypeScript e a validação agora
+incluem as cinco origens e os campos canônicos de ocupação/destino. A tela
+Trabalho mostra a ocupação pretendida e resolve local por instalação, reparo,
+posto alfandegário, projeto de pesquisa ou assentamento do recrutamento.
+“Por quê?” continua ligado ao fato de demanda, ao aviso e à decisão do grupo,
+sem converter texto em efeito.
+
+O teste focado de interface passou `3 passed`; `vue-tsc` e build de produção
+passaram. Isso corrige a visualização desse fluxo, mas não comprova navegação
+humana em navegador nem cobre todas as cadeias do observador.
+
+## 23/09/2026 — ajuda alimentar respeita a falta de cada coorte
+
+O diagnóstico do dia 60 mostrou alimento público disponível em Ferroalto,
+mas apenas 399 de 1.805 rações foram compradas. A decisão de ajuda distribuiu
+1.406 rações; antes, o owner as repartia por população total, inclusive para
+coortes que já tinham comprado comida. O fechamento agora registra
+`unmet_by_group` no fato `subsistence_resolved`. A affordance e o executor de
+ajuda recompõem a falta remanescente por coorte, descontam distribuições
+anteriores ao próximo fechamento e alocam apenas a quem não recebeu a ração.
+Nenhum alimento, saldo ou decisão foi criado por essa leitura. Uma premissa
+inicial de escassez sem fechamento mensal ainda usa a falta canônica existente.
+
+O teste focado de compra parcial prova que a coorte já alimentada não recebe
+ajuda duplicada; save/load preserva o receipt. A regressão de consumo,
+relief, autonomia e ajuda institucional passou em 74 testes após a correção
+da chegada tardia de carga (a falha intermediária restringia indevidamente a
+leitura ao mesmo dia do fechamento). Um smoke offline natural de 60 dias
+conservou dinheiro/recursos, fez save/load e passou auditoria standalone:
+`ok=true`, 1.214 eventos materiais, zero causas/autorias quebradas e zero
+mutação Story/LLM. A saúde média no dia 60 ainda foi 971,62 e houve déficit
+alimentar; a distribuição correta não resolve por si só a renda doméstica
+insuficiente nem valida o gate final de três seeds por dez anos.
+
+## 23/09/2026 — leitura de acessibilidade respeita o canal observado
+
+O dossiê recuperava o último `subsistence_resolved` global de uma cidade mesmo
+quando o ator só possuía um `SettlementReport` anterior. Isso podia mostrar
+ao decisor uma falta de poder de compra ainda não observada. A projeção agora
+usa a observação factual que originou o relatório (inclusive quando chegou
+por boletim) e não inclui recibos de subsistência posteriores àquela
+observação. Sem relatório válido, não há leitura de acessibilidade; sem novo
+boletim, um destinatário remoto não recebe a atualização do mesmo dia.
+`relief` e workforce usam a mesma regra, sem copiar saldos privados.
+
+A fixture de mesmo dia demonstra os três estados — antes do fechamento,
+observação local posterior e boletim remoto posterior. A regressão focada de
+dossiê, relief, workforce e menu institucional passou `75 passed`. O primeiro
+teste de workforce falhou porque assumia que a coorte conhecia a nova leitura
+sem chamar a observação; a fixture foi ajustada para provar explicitamente
+zero antes do relatório e o valor após o relatório. Não se alterou a lei de
+consumo, preço ou transferência.
+
+Um diagnóstico natural adicional da seed 73 chegou a 180 dias com conservação
+e save/load, falta final agregada 18 e saúde média 950,63, sem mortes por
+privação até então. Isto não é equilíbrio: no dia 180, Pedraclara tinha preço
+de alimento 1, 1.929 artesãos e apenas 473 moedas de salários artesanais no
+mesmo ciclo; Portovelho tinha 1.603 artesãos e 202 moedas de salários.
+Existia alimento público nas duas cidades. A renda insuficiente e sua
+distribuição entre coortes continuam problema a investigar; o smoke de 180
+dias não representa provider real nem substitui o gate de dez anos.
+
+## 23/09/2026 — mais recrutamento agrícola, sozinho, não resolveu a renda
+
+Um contrafactual local ampliou a demanda de trabalhadores das fazendas até o
+headroom físico e financeiro registrado no receipt de produção. Na seed 73,
+em 180 dias, Pedraclara/Portovelho produziram 118/118 lotes em vez de 44/37,
+e passaram a ter 1.443/1.352 agricultores em vez de 450/380. Ainda assim, a
+falta alimentar agregada subiu de 18 para 35; o tesouro de Auren caiu de
+12.359 para 6.269. Conservação e save/load passaram no contrafactual.
+
+O experimento foi retirado do código: mais oferta física e folha agrícola não
+deram renda aos artesãos sem trabalho. A próxima correção econômica precisa
+vincular emprego e produção a trabalho material e demanda observável, sem
+inventar subsídio, quota de drama ou distribuição por prosa. Os saves
+sintéticos do comparativo permanecem apenas em `/tmp`; este não é um aceite
+de equilíbrio econômico nem uma validação de provider real.
+
+## 23/09/2026 — administrador enxerga trabalho produtivo local ao avaliar obra
+
+No save natural da seed 73/dia 180, `site_construction_options` ainda oferecia
+uma oficina de artesanato em Pedraclara para Auren e outra em Portovelho para
+Valedouro. O menu institucional já incluía essas affordances, mas o dossiê
+composto não mostrava a população por ocupação ao lado do trabalho produtivo
+remunerado. A IA via a obra possível sem uma leitura local clara do problema.
+
+`build_actor_dossier` agora acrescenta `own_local_livelihood_readings` apenas
+para a administração que possui um `SettlementReport` próprio e observado no
+dia atual. A projeção valida o receipt do relatório, recusa contagens alteradas
+depois dele e mostra por ocupação os residentes e os trabalhadores pagos
+naquele ciclo **por linhas produtivas da própria instituição**. Não estima
+desemprego total, não revela saldos, empregadores estrangeiros ou IDs de
+coortes; os IDs-fonte do relatório e payroll acompanham a leitura. É só
+contexto de decisão, sem nova affordance, delta ou persistência.
+
+No mesmo save, a leitura aponta 1.929/1.603 artesãos em Pedraclara/Portovelho
+e zero salários artesanais das linhas produtivas próprias, ao lado das opções
+de construir oficina. O primeiro teste novo falhou por esperar agricultores
+pagos em Pedraclara na premissa inicial, onde ainda não havia agricultores;
+a fixture passou a verificar a folha rural real de Campomanso. A regressão
+final de dossiê, turno institucional e construção passou `42 passed`;
+`py_compile` e `git diff --check` saíram 0. Não houve consulta ao provider real
+nem prova de que o ator escolherá a obra, a completará ou recuperará a renda.
+
+Um teste adicional com provider stub entregou o novo dossiê no mesmo menu da
+oficina. O ator devolveu o ID canônico, o owner abriu um projeto de construção
+e registrou decisão/fonte, sem criar site, emprego ou moeda no ato de escolher.
+A regressão focada ampliada passou `43 passed`. Nenhuma consulta real ao Luna
+foi feita neste recorte.
+
+## 23/09/2026 — escolha de oficina até compra doméstica numa fixture única
+
+`test_chosen_workshop_pays_artisans_and_improves_food_access_against_no_works`
+compõe o dossiê datado com duas escolhas por IDs canônicos: a administração
+autoriza primeiro a oficina e, depois da obra paga, a linha de ferramentas.
+Cada autorização aponta para a decisão do menu; obra e fundação consomem
+materiais/trabalho antes de criar o sítio e a linha. Num limite mensal posterior,
+a linha paga artesãos; um recibo de compra doméstica desses trabalhadores
+aponta ao pagamento (ou à retenção tributária derivada dele). Save/load e
+auditoria causal do mundo resultante passaram.
+
+Comparado com um mundo equivalente sem as obras, no mesmo dia de produção e
+consumo, o cenário com oficina comprou mais comida, teve menor falta e saúde
+maior em Pedraclara. Moeda e população se conservaram. A regressão focada de
+construção, dossiê e menu passou `44 passed`; `py_compile` e `git diff --check`
+passaram. É uma fixture pressionada com estoque/tesouro iniciais ampliados e
+decisões selecionadas por stub; o avanço das obras chama seus owners, não um
+turno completo da simulação. Portanto prova a composição material e o
+contrafactual local, **não** escolha espontânea de Luna, melhora econômica em
+mundo natural nem o gate final de três seeds/dez anos. Laya não participou
+deste recorte.
+
+## 23/09/2026 — obra e fundação atravessam os turnos completos do simulador
+
+A fixture E155 provava os owners em sequência, mas não o menu mensal completo.
+`test_workshop_choice_reappears_as_foundation_in_the_normal_monthly_engine`
+agora executa `MedievalSimulator.step()` com provider stub: a administração
+escolhe a oficina no menu concorrente, a obra progride nos meses seguintes, a
+fundação volta como opção válida, a linha produz e paga artesãos, e uma compra
+doméstica cita a renda recebida. O save final passa round-trip e auditoria
+causal. Outros atores escolhem `NO_ACTION`; nenhuma obra é imposta pela engine.
+
+Esse turno revelou um defeito real em `line_exists_or_planned`: ao compor
+outras opções de expansão, ele acessava `economy.facilities[None]` para uma
+obra sem instalação de origem. A consulta agora só examina projetos que têm
+`facility_id`; não transforma a obra em linha nem cria fallback. A regressão
+ampliada encontrou também um teste antigo que ainda assumia 1.800 artesãos
+em Ferroalto, embora a população inicial atual separe 18 soldados; sua
+expectativa passou a ser calculada do trabalho local e dos payrolls reais.
+
+Após a correção, os cinco arquivos de testes afetados passaram `72 passed`
+em 30,08s; `py_compile` e `git diff --check` passaram. A prova usa estoque e
+tesouro ampliados na fixture e escolhas injetadas por ID, sem consulta real ao
+Luna ou ao Laya. Ainda não prova que um mundo natural escolherá a oficina,
+nem que sua economia de longo prazo se recuperará. O goal foi pausado neste
+checkpoint a pedido do usuário.

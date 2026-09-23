@@ -102,7 +102,7 @@ async def test_sustained_foreign_paid_access_copies_without_harming_holder_and_r
     # composes every discretionary family into one menu per institution: the
     # provider picks the copy option only when the engine actually offered it.
     world, sighting, _ = access_world(progress=False)
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8, "ai_max_calls": 30})
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 1000})
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
 
     async def choose_first(prompt, *_args, **_kwargs):

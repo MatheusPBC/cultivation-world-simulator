@@ -68,6 +68,31 @@ it('shows breach and dependent excuse without claiming material fulfillment', as
   panel.unmount()
 })
 
+it('renders campaign withdrawal terms without treating them as teaching', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore(), data = negotiation()
+  const attacker = { kind: 'polity', id: 'auren' }, defender = { kind: 'polity', id: 'escarlia' }
+  const ceasefire: DiplomaticProposal = {
+    id: 'proposal:ceasefire', proposer_ref: attacker, counterparty_ref: defender,
+    offered_day: 90, expires_day: 91, parent_id: null, decision_event_id: 'event:ceasefire',
+    status: 'accepted', last_event_id: 'event:ceasefire-accepted', proposal_kind: 'campaign_ceasefire',
+    request_affordance_id: 'campaign-ceasefire:1',
+    clauses: [{ kind: 'campaign_withdrawal', debtor_ref: attacker, creditor_ref: defender,
+      due_day: 94, depends_on: [], campaign_id: 'siege-campaign:1', detachment_id: 'detachment:1' }],
+  }
+  data.diplomacy.proposals = [ceasefire]
+  data.diplomacy.obligations = [{ id: `${ceasefire.id}:term:0`, proposal_id: ceasefire.id, clause_index: 0,
+    status: 'active', material_event_id: null, breach_event_id: null,
+    remediation_material_event_id: null, last_event_id: ceasefire.last_event_id }]
+  store.snapshot = data
+  const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
+  await panel.findAll('nav button').find(b => b.text() === 'Diplomacia')!.trigger('click')
+  const term = panel.get('[data-term="proposal:ceasefire:1"]')
+  expect(term.text()).toContain('Retirar a coluna detachment:1 da campanha siege-campaign:1')
+  expect(term.text()).not.toContain('Ensinar')
+  panel.unmount()
+})
+
 it('reads the aid trail, remembered facts and the directional institutional reading', async () => {
   const pinia = createPinia(); setActivePinia(pinia)
   const store = useObserverStore(), data = negotiation()

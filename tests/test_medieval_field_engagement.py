@@ -2,9 +2,12 @@
 
 import asyncio
 import json
+from copy import deepcopy
 
 import pytest
 
+from src.classes.environment.geography import GeographyLayer
+from src.classes.environment.tile import TileType
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
@@ -46,17 +49,31 @@ def tick(world):
     return due
 
 
-def prepared_challenger_world(*, challenger_count=30, defender_count=50, defender_provisions=100, prepared=True):
+def prepared_challenger_world(*, challenger_count=30, defender_count=50, defender_provisions=100,
+                              prepared=True, deployment_days=20, wait_days=0, extra_food=0):
     world = create_medieval_world(73)
     world.economy.facilities.clear()
+    if extra_food:
+        stock = next(item for item in world.economy.stocks.values()
+                     if item.owner_ref == OWNER and item.location_id == HOME)
+        before = stock.goods.get("food", 0)
+        premise = record_event(
+            world, "test_field_food_premise", "Premissa factual de rações da expedição.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            deltas=(_delta("stock", stock.id, "food", before, before + extra_food),))
+        world.economy.stocks[stock.id] = stock.model_copy(update={
+            "goods": {**stock.goods, "food": before + extra_food},
+            "last_event_ids": {**stock.last_event_ids, "food": premise.id}})
     group = next(item for item in world.society.population.values() if item.settlement_id == HOME)
     soldiers_id = f"pop:{HOME}:{group.people}:soldier"
     world.society.population[soldiers_id] = group.model_copy(
         update={"id": soldiers_id, "occupation": "soldier", "count": challenger_count})
     refresh_settlement_reports(world)
     refresh_route_reports(world)
-    raise_option = next(item for item in raise_options(world, OWNER, days=20) if item.destination_id == TARGET)
-    own = raise_detachment(world, OWNER, raise_option.id, decide(world, raise_option).id, days=20)
+    raise_option = next(item for item in raise_options(world, OWNER, days=deployment_days)
+                        if item.destination_id == TARGET)
+    own = raise_detachment(world, OWNER, raise_option.id, decide(world, raise_option).id,
+                           days=deployment_days)
     while world.society.detachments[own.id].stage == "marching":
         tick(world)
     if prepared:
@@ -64,6 +81,8 @@ def prepared_challenger_world(*, challenger_count=30, defender_count=50, defende
         prepare_force_position(world, OWNER, position.id, decide(world, position).id)
         for _ in range(3):
             tick(world)
+    for _ in range(wait_days):
+        tick(world)
     own = world.society.detachments[own.id]
 
     resident = next(item for item in world.society.population.values() if item.settlement_id == "ferroalto")
@@ -190,7 +209,7 @@ async def test_prepared_supplied_thirty_beats_hungry_fifty_with_only_field_effec
     assert not any(event.event_type in {"battle_resolved", "loot_taken"} for event in world.events)
 
 
-def test_learned_field_drill_has_only_a_bounded_material_strength_effect():
+def test_learned_field_drill_alone_does_not_train_a_column():
     world, own_id, _, _ = prepared_challenger_world(prepared=False)
     detachment = world.society.detachments[own_id]
     before = field_strength(world, detachment)
@@ -202,11 +221,10 @@ def test_learned_field_drill_has_only_a_bounded_material_strength_effect():
     learn_technology(world, OWNER, "field_drill", "teaching", (decision.id,))
     after = field_strength(world, detachment)
     assert before == (detachment.count * 3, False, True)
-    assert after == (detachment.count * 4, False, True)
-    assert after[0] - before[0] == detachment.count
+    assert after == before
 
 
-def test_siegecraft_requires_field_drill_and_adds_only_one_more_strength_step():
+def test_siegecraft_requires_field_drill_but_knowledge_alone_adds_no_strength():
     world, own_id, _, _ = prepared_challenger_world(prepared=False)
     detachment = world.society.detachments[own_id]
     blocked = record_event(
@@ -228,7 +246,7 @@ def test_siegecraft_requires_field_drill_and_adds_only_one_more_strength_step():
         decision={"action": "research", "actor_ref": OWNER.to_dict(), "technology_id": "siegecraft"},
     )
     learn_technology(world, OWNER, "siegecraft", "teaching", (second.id, first.id))
-    assert field_strength(world, detachment)[0] == detachment.count * 5
+    assert field_strength(world, detachment)[0] == detachment.count * 3
 
 
 def test_withdrawal_or_missing_join_lapses_without_battle():
@@ -242,6 +260,68 @@ def test_withdrawal_or_missing_join_lapses_without_battle():
     assert not world.knowledge.field_engagement_outcome_notices
     assert not any(event.event_type in {"field_engagement_resolved", "battle_resolved", "loot_taken"}
                    for event in world.events)
+
+
+def test_same_contact_on_open_ground_changes_material_losses(tmp_path):
+    forest, own_id, _, _ = prepared_challenger_world()
+    open_ground = deepcopy(forest)
+    settlement = open_ground.society.settlements[TARGET]
+    coordinates = open_ground.map._region_coordinates(settlement.region_id)
+    assert coordinates and all(not open_ground.map.get_water_bodies_at(*cell) for cell in coordinates)
+    geography = open_ground.map.geography
+    terrain_rows = [list(row) for row in geography.terrain_rows]
+    for x, y in coordinates:
+        terrain_rows[y][x] = TileType.PLAIN
+    open_ground.map.set_geography(GeographyLayer(
+        geography.width, geography.height, terrain_rows,
+        geography.elevation_rows, geography.water_bodies))
+
+    # Both actors have the same bounded contact reading and make the same
+    # independent offer/join decisions; only the authored ground differs.
+    assert forest.knowledge.force_contacts_for_actor(OWNER) == open_ground.knowledge.force_contacts_for_actor(OWNER)
+    forest_result = resolve_offer(forest)
+    open_result = resolve_offer(open_ground)
+    assert forest_result.winner_ref == open_result.winner_ref == OWNER
+    assert forest_result.challenger_casualties < open_result.challenger_casualties
+    forest_fact = next(event for event in forest.events if event.event_type == "field_engagement_resolved")
+    open_fact = next(event for event in open_ground.events if event.event_type == "field_engagement_resolved")
+    forest_terrain = next(delta.after for delta in forest_fact.deltas
+                          if delta.aspect == f"terrain_modifier:{own_id}")
+    open_terrain = next(delta.after for delta in open_fact.deltas
+                        if delta.aspect == f"terrain_modifier:{own_id}")
+    assert (int(forest_terrain), int(open_terrain)) == (-1, 0)
+    from tools.medieval_causal_audit import audit
+    for label, world in (("forest", forest), ("plain", open_ground)):
+        path = tmp_path / f"field-{label}.mws"
+        save_world(world, path)
+        assert world_snapshot(load_world(path)) == world_snapshot(world)
+        assert audit(path)["ok"] is True
+
+
+def test_real_days_of_deployment_change_later_field_losses(tmp_path):
+    fresh, fresh_id, _, _ = prepared_challenger_world(deployment_days=40, extra_food=2000)
+    veteran, veteran_id, _, _ = prepared_challenger_world(
+        deployment_days=40, wait_days=30, extra_food=2000)
+    assert fresh.society.detachments[fresh_id].count == veteran.society.detachments[veteran_id].count == 30
+    assert veteran.society.detachments[veteran_id].provisions >= 3 * 30
+    assert sum(event.event_type == "detachment_supplied" and any(
+        delta.owner_kind == "detachment" and delta.owner_id == veteran_id and delta.aspect == "provisions"
+        for delta in event.deltas) for event in veteran.events) >= 30
+
+    fresh_result = resolve_offer(fresh)
+    veteran_result = resolve_offer(veteran)
+    assert fresh_result.winner_ref == veteran_result.winner_ref == OWNER
+    assert veteran_result.challenger_casualties > fresh_result.challenger_casualties
+    fresh_fact = next(event for event in fresh.events if event.event_type == "field_engagement_resolved")
+    veteran_fact = next(event for event in veteran.events if event.event_type == "field_engagement_resolved")
+    assert [int(next(delta.after for delta in fact.deltas if delta.aspect == f"fatigue_level:{identity}"))
+            for fact, identity in ((fresh_fact, fresh_id), (veteran_fact, veteran_id))] == [0, 1]
+    from tools.medieval_causal_audit import audit
+    for label, world in (("fresh", fresh), ("veteran", veteran)):
+        path = tmp_path / f"field-{label}.mws"
+        save_world(world, path)
+        assert world_snapshot(load_world(path)) == world_snapshot(world)
+        assert audit(path)["ok"] is True
 
 
 def test_tie_is_symmetric_and_stale_or_provider_off_cannot_start_combat(monkeypatch):

@@ -1,15 +1,17 @@
 # Pesquisa e aplicação de técnicas
 
-Implementação parcial da etapa 4, não encerramento da árvore tecnológica ou da meta.
-O catálogo contém irrigação, metalurgia, aço e engenharia a vapor; projetos mensais podem surgir
-pela política determinística das instituições. Não há chamadas de IA nessa política.
+Implementação parcial da etapa tecnológica, não encerramento da árvore ou da meta.
+O catálogo contém irrigação, rotação, metalurgia, aço, vapor, treino de campo,
+cerco, fortificação, logística e barreiras defensivas. Os recortes abaixo preservam provas históricas;
+o estado atual e suas limitações estão em `docs/handoff/medieval-current-state.md`.
 
 ## Fronteiras e execução
 
 ResearchState possui catálogo versionado e projetos; KnowledgeState possui o
 conhecimento por instituição. Economia continua dona de estoques, salários, contas,
-receitas e obras. O mapa possui as instalações. Save schema11/economy6 persiste esses
-contratos, rejeita schemas experimentais1–10 e preserva os arquivos antigos.
+receitas e obras. O mapa possui as instalações. O save medieval atual usa schema 66
+(Economy 15, Research 3), rejeita schemas anteriores e preserva os arquivos
+antigos sem migração ou sobrescrita.
 
 O patrocinador e o especialista registram consentimentos independentes, exatos e
 atuais. Pesquisa exige autoridade research/trade/supply, instalação capaz e íntegra,
@@ -37,18 +39,43 @@ O vendedor mantém seu conhecimento e a aplicação posterior ainda exige obra e
 materiais próprios.
 Roubo V1 é um caminho separado e material: a instituição precisa de um agente
 nomeado por ofício atual, presença física no assentamento, sighting vigente da
-técnica e relatório atual da instalação. O resultado engine-owned é `success`,
+técnica, relatório atual da instalação e produção recente de uma linha cuja
+receita operacional exige a técnica do detentor. Conhecimento ou obra parada
+não abre a affordance. O resultado engine-owned é `success`,
 `failure` ou `discovered`; somente `success` cria conhecimento `stolen` a partir
 do recibo canônico do detentor. Finding, observação e decisão ficam privados e
 persistidos; nenhum resultado inventa técnica, receita, capacidade ou efeito.
 Se ensinar torna conhecido um experimento ativo, ele é encerrado sem trabalho fictício.
 
-`field_drill` é a primeira aplicação defensiva da mesma regra: o catálogo
-engine-owned exige pesquisa, ensino ou aprendizado material em um site com
-`military_training`; quando o proprietário de uma coluna conhece essa técnica,
-`field_strength` recebe somente +1 por combatente. O efeito é bounded,
-determinístico e registrado pela cadeia de conhecimento, não por texto ou
-intenção narrativa.
+`field_drill` é uma aplicação defensiva datada: conhecimento adquirido torna
+disponível a opção de treinar uma coluna própria, mas não altera sua força.
+A decisão consome ferramentas locais; a coluna precisa completar três dias
+estacionários e abastecidos. Só então `field_strength` aplica o bônus limitado
+àquela coluna. `siegecraft` exige treino próprio posterior; `field_logistics`
+exige treino próprio para ampliar bagagem física e limite de provisões, sem
+criar alimentos. Combate e bagagem citam os fatos de aplicação, não prosa.
+
+Quando um experimento autorizado tem líder, materiais, caixa e instalação
+válidos, mas nenhum assistente disponível, seu recibo emite `labor_shortfall`
+tipado. A administração recebe uma demanda datada; um grupo elegível recebe
+oferta privada com ocupação, quantidade e bolsa calculadas pela engine. Só uma
+decisão atual desse grupo paga a bolsa e reserva os participantes por 30 dias;
+Society conclui a mudança de ocupação, sem criar habitantes. Pesquisa precisa
+de novo fechamento, recursos e salário para avançar. Na prova militar, os
+soldados locais saíram por mobilização paga; um grupo civil aceitou virar
+`soldier` e a pesquisa avançou apenas depois da conversão. Esta é reposição de
+assistentes de pesquisa, não recrutamento geral de campanha nem treinamento de
+campo da coluna.
+
+`defensive_barriers` depende de `fortification`. Conhecimento apenas habilita
+uma obra no próprio assentamento; a paliçada só existe após madeira, pedra,
+ferramentas, trabalhadores e salários efetivos. Um cerco lê a paliçada Map-owned
+do defensor apenas se estiver íntegra e operante; sua resistência limita o
+desgaste diário da guarnição em uma unidade, sem cancelar a fome ou criar
+soldados. O fato do cerco cita o último fato material do site. Dano abaixo de
+0,50 remove esse efeito; um maintainer autorizado pode restaurá-lo por obra
+de reparo com insumos e pagamento reais. A prova atual usa conhecimento e dano
+como premissas explícitas de fixture, não descoberta natural ou hazard autônomo.
 
 Aplicação exige uma obra própria: canais (alimento100→120 por lote) ou fornos
 (ferro5→7). Cada adaptação custa20madeiras,10ferramentas e40salários em duas etapas
@@ -117,8 +144,13 @@ adaptação150, depois produz420ferro (60lotes×7).
 
 ## Trabalho ainda necessário
 
-Conservação, pólvora, artilharia, barreiras e logística continuam no
-plano integral. Também faltam segredo, difusão por migração, ensino com
-tempo/custos e vínculos estratégicos com diplomacia/campanhas. O catálogo é finito
+Conservação, pólvora e artilharia continuam no plano integral;
+logística de coluna já tem aplicação material. Difusão por migração possui uma
+fatia de apprenticeship pago e datado; ensino institucional geral ainda é
+imediato e não possui curso/custo. Segredo e vínculos estratégicos amplos com
+diplomacia/campanhas continuam parciais. O catálogo é finito
 por versão e expansível por conteúdo, sem inventar regras durante execução.
-Demografia, mobilidade de especialistas e calibração financeira seguem abertas.
+Demografia, mobilidade de especialistas, recrutamento militar fora da falta de
+assistentes de pesquisa e calibração financeira seguem abertas. O mundo inicial inclui pequenas coortes
+com ocupação militar como premissa populacional, sem criar destacamento, salário ou
+ordem de marcha automática; elas preservam o total de habitantes do catálogo.

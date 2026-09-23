@@ -77,7 +77,11 @@ def _observe(world, actor, route_id, day, causes):
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("route_report", key, "observation",
                                         previous.observation() if previous else None, observation),),
-                         cause_ids=_causes(*causes))
+                         # A new dated observation remains grounded in the
+                         # latest physical route/site fact, while an unchanged
+                         # recurring reading also retains its prior receipt.
+                         # The latter is evidence lineage, not an actor action.
+                         cause_ids=_causes(*causes, previous.event_id if previous else None))
     report = RouteReport(id=key, recipient_ref=actor, publisher_ref=actor, route_id=route_id, observed_day=day,
                          operational_capacity=capacity, travel_days=travel_days,
                          daily_flow_bulk=daily_flow_bulk,
@@ -249,7 +253,10 @@ def _local_site_observers(world, site):
         if facility is not None and facility.site_id == site.id:
             observers.add(world.economy.stocks[facility.stock_id].owner_ref)
         project = world.economy.expansions.get(payroll.id)
-        if project is not None and world.economy.facilities[project.facility_id].site_id == site.id:
+        anchor = (world.economy.facilities.get(project.facility_id)
+                  if project is not None and project.facility_id is not None else None)
+        if (project is not None and (project.site_id == site.id or project.new_site_id == site.id
+                                     or (anchor is not None and anchor.site_id == site.id))):
             observers.add(project.owner_ref)
         repair = world.economy.repairs.get(payroll.id)
         if repair is not None and repair.site_id == site.id:
@@ -292,7 +299,11 @@ def refresh_site_reports(world, *, site_ids=None):
                                  fact_kind=FactKind.STATE_TRANSITION,
                                  deltas=(_delta("site_report", key, "observation",
                                                 previous.observation() if previous else None, observation),),
-                                 cause_ids=_causes(site.last_event_id))
+                                 # A pristine site has an authored baseline;
+                                 # later monthly observations must still retain
+                                 # the preceding receipt when no site mutation
+                                 # occurred in between.
+                                 cause_ids=_causes(site.last_event_id, previous.event_id if previous else None))
             world.knowledge.site_reports[key] = SiteReport(
                 id=key, recipient_ref=actor, publisher_ref=actor, site_id=site_id, observed_day=day,
                 integrity=site.integrity, enabled=site.enabled, service_suspended=site.service_suspended,

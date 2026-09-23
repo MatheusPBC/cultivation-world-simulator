@@ -109,6 +109,16 @@ def strategic_evidence(world, actor=None):
 
 def diplomatic_context(world, actor):
     from .actor_dossier import provider_strategic_capacity
+    last_identity = id(world.events[-1]) if world.events else 0
+    knowledge_size = sum(len(getattr(world.knowledge, name)) for name in world.knowledge.registries)
+    signature = (len(world.events), last_identity, knowledge_size)
+    cached = world._diplomatic_context_cache
+    if cached is None or cached[0] != signature:
+        cached = (signature, {})
+        world._diplomatic_context_cache = cached
+    cache_key = (actor.kind, actor.id)
+    if cache_key in cached[1]:
+        return cached[1][cache_key]
     accounts = sorted((a for a in world.economy.accounts.values() if a.owner_ref == actor), key=lambda a:a.id)
     account = accounts[0] if accounts else None
     stocks = sorted((s for s in world.economy.stocks.values() if s.owner_ref == actor), key=lambda s:s.id)
@@ -121,7 +131,7 @@ def diplomatic_context(world, actor):
     # periods made a legitimate counteroffer disappear in otherwise solvent
     # fixtures as facility capacity grew; the owner still revalidates the
     # actual account before any payment executes.
-    return DiplomaticContext(actor=actor, account_id=account.id if account else None,
+    context = DiplomaticContext(actor=actor, account_id=account.id if account else None,
         balance=account.balance if account else 0, budget=max(0, account.balance - wages) if account else 0,
         techniques=frozenset(k.technology_id for k in world.knowledge.technologies.values() if k.owner_ref == actor),
         capabilities=frozenset(c for s in world.map.infrastructure_sites.values()
@@ -133,3 +143,5 @@ def diplomatic_context(world, actor):
         institutional_views=institutional_views(world, actor),
         strategic_capacity=provider_strategic_capacity(world, actor),
         strategic_evidence=strategic_evidence(world, actor))
+    cached[1][cache_key] = context
+    return context

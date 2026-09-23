@@ -7,7 +7,7 @@ from .research import learn_technology
 
 def teach_technology(world, offer_id, acceptance_id, *, teacher_intent=None, learner_intent=None,
                      expected_terms=None):
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     offer, acceptance = events.get(offer_id), events.get(acceptance_id)
     keys = {'technology_id', 'teacher_ref', 'student_ref'}
     if (offer is None or acceptance is None or offer_id == acceptance_id

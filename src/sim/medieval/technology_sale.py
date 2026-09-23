@@ -204,17 +204,21 @@ def execute_technology_sale(world, buyer, option_id, request_event_id, acceptanc
     require_authority(candidate, option.buyer_ref, "trade")
     require_authority(candidate, option.seller_ref, "research")
     require_authority(candidate, option.seller_ref, "trade")
+    source = next((item for item in candidate.knowledge.technologies.values()
+                   if item.owner_ref == option.seller_ref and item.technology_id == option.technology_id), None)
+    if source is None:
+        raise ValueError("technology sale source knowledge is stale")
     transfer_money(candidate, option.buyer_account_id, option.seller_account_id, option.amount,
                    decision_event_id=request_event_id, decision_intent=request_event.decision)
     # transfer_money intentionally returns no event; recover its canonical receipt by the payment index.
     payment_event_id = candidate.economy.payments[request_event_id]
-    source = next(item for item in candidate.knowledge.technologies.values()
-                  if item.owner_ref == option.seller_ref and item.technology_id == option.technology_id)
     learn_technology(candidate, option.buyer_ref, option.technology_id, "sale",
                      _causes(request_event_id, acceptance_event_id, option.sighting_event_id,
                              option.source_event_id, source.event_id, payment_event_id))
-    knowledge = next(item for item in candidate.knowledge.technologies.values()
-                     if item.owner_ref == option.buyer_ref and item.technology_id == option.technology_id)
+    knowledge = next((item for item in candidate.knowledge.technologies.values()
+                      if item.owner_ref == option.buyer_ref and item.technology_id == option.technology_id), None)
+    if knowledge is None:
+        raise ValueError("technology sale did not record the learned technique")
     receipt = record_event(candidate, SALE_RECEIPT,
                            "Pagamento concluído e a técnica foi transferida ao comprador.",
                            fact_kind=FactKind.OCCURRENCE,

@@ -330,6 +330,54 @@ class Map():
         self.infrastructure_sites = site_registry
         self._infrastructure_site_updates.clear()
 
+    def commission_infrastructure_site(
+        self,
+        site_id: str,
+        *,
+        kind: str,
+        name: str,
+        region_id: int,
+        capability_ids: Iterable[str],
+        owner_ref,
+        last_event_id: str,
+        track_update: bool = True,
+    ) -> InfrastructureSite:
+        """Register a newly built site on ground the map already declares.
+
+        The Map remains the sole owner of sites. Nothing spatial is invented
+        here: the works occupy a cell of an existing region, and the granted
+        capability comes from the caller's authored blueprint, never from an
+        actor's choice. Runtime condition stays at the same defaults an
+        authored site starts with.
+        """
+        if site_id in self.infrastructure_sites:
+            raise ValueError(f"infrastructure site already exists: {site_id}")
+        if region_id not in self.regions:
+            raise ValueError(f"unknown region for infrastructure site: {region_id}")
+        capabilities = tuple(capability_ids)
+        if not capabilities or any(not capability.strip() for capability in capabilities):
+            raise ValueError("a commissioned site requires its authored capability")
+        # Ground already occupied by another site is not buildable: two sites
+        # must never be commissioned onto the same cell.
+        occupied = {cell for site in self.infrastructure_sites.values() for cell in site.cell_refs}
+        cells = sorted(cell for cell in self._region_coordinates(region_id)
+                       if self.is_in_bounds(*cell) and cell not in occupied)
+        if not cells:
+            raise ValueError(f"region {region_id} has no free buildable cell")
+        site = InfrastructureSite(
+            id=site_id, kind=kind, name=name, cell_refs=(cells[0],), region_ids=(region_id,),
+            capability_ids=capabilities, owner_ref=owner_ref, maintainer_ref=owner_ref,
+            last_event_id=last_event_id,
+        )
+        # Revalidate the whole registry through the canonical spatial owner so
+        # a commissioned site can never be laxer than an authored one.
+        self.set_infrastructure_sites((*self.infrastructure_sites.values(), site))
+        if track_update:
+            self._infrastructure_site_updates.append(
+                {"op": "upsert", "id": site.id, "site": site.to_dict()}
+            )
+        return self.infrastructure_sites[site_id]
+
     def update_infrastructure_site_runtime(
         self,
         site_id: str,

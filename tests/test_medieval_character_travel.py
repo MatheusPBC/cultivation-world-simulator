@@ -2,12 +2,16 @@
 
 import json
 
+import pytest
+
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.character_travel import (REVIEW_KIND, TRAVEL_ACTION, is_traveling,
-                                               schedule_character_travel_reviews, travel_options)
+                                               review_character_travel, schedule_character_travel_reviews,
+                                               travel_options)
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force_command import detachment_command_options
@@ -18,7 +22,7 @@ from tests.test_medieval_creature_autonomy import provider
 def lone_world():
     """One named person, so a bounded provider budget reaches their turn."""
     world = create_medieval_world(73, character_count=1)
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8,
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 64,
                                                    "ai_max_calls": 10000})
     character = next(iter(world.society.characters.values()))
     world.society.characters[character.id] = character.model_copy(
@@ -176,3 +180,40 @@ async def test_a_closed_road_offers_nothing_and_holds_whoever_is_on_it(monkeypat
     await reach(world, engine, held.due_day)
     assert world.society.characters[character.id].location_id == journey.destination_id
     assert sum(item.event_type == "character_travel_started" for item in world.events) == 1
+
+
+async def test_scheduled_travel_pauses_when_provider_disappears(monkeypatch):
+    world, character = lone_world()
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+    scheduled = schedule_character_travel_reviews(world)
+    assert scheduled
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: False)
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    before = world_snapshot(world)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_character_travel(world, due)
+    assert world_snapshot(world) == before
+    assert not is_traveling(world, character.id)
+
+
+async def test_selected_travel_route_that_closes_pauses_instead_of_becoming_noop(monkeypatch):
+    world, character = lone_world()
+    leg = travel_options(world, character.id)[0]
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+
+    async def close_route_then_choose(prompt, *args, **kwargs):
+        world.map.routes[leg.route_id].update_runtime(enabled=False)
+        payload = json.loads(prompt[prompt.index("{"):])
+        return {"selected_id": payload["choices"][0]["id"]}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", close_route_then_choose)
+    scheduled = schedule_character_travel_reviews(world)
+    assert scheduled
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    before = world_snapshot(world)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_character_travel(world, due)
+    assert not is_traveling(world, character.id)
+    assert world_snapshot(world)["society"] == before["society"]

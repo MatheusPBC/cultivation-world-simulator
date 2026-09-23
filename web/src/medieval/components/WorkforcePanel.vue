@@ -19,6 +19,7 @@ const { demandReports, offers, transitions, source } = useWorkforce()
       <dl>
         <dt>{{ t('sponsor') }}</dt><dd>{{ item.sponsorName }}</dd>
         <dt>{{ t('location') }}</dt><dd>{{ item.location.settlementName }}</dd>
+        <dt>{{ t('targetOccupation') }}</dt><dd>{{ t('kinds.' + item.report.target_occupation) }}</dd>
         <dt>{{ t('workforcePeople') }}</dt><dd>{{ n(item.report.count) }}</dd>
         <dt>{{ t('stipend') }}</dt><dd>{{ n(item.report.stipend_per_person) }} {{ t('perPerson') }}</dd>
       </dl>
@@ -34,6 +35,7 @@ const { demandReports, offers, transitions, source } = useWorkforce()
         <dt>{{ t('location') }}</dt><dd>{{ item.settlement }}</dd>
         <dt>{{ t('sponsor') }}</dt><dd>{{ item.sponsorName }}</dd>
         <dt>{{ t('workforcePeople') }}</dt><dd>{{ n(item.notice.count) }}</dd>
+        <dt>{{ t('targetOccupation') }}</dt><dd>{{ t('kinds.' + item.notice.target_occupation) }}</dd>
         <dt>{{ t('stipend') }}</dt><dd>{{ n(item.notice.stipend_per_person) }} {{ t('perPerson') }}</dd>
       </dl>
       <p class="muted">{{ t('observedOn') }}: {{ calendar(item.notice.observed_day) }}</p>
@@ -47,7 +49,7 @@ const { demandReports, offers, transitions, source } = useWorkforce()
       <dl>
         <dt>{{ t('workers') }}</dt><dd>{{ n(item.transition.count) }}</dd>
         <dt>{{ t('from') }}</dt><dd>{{ item.source?.people }} · {{ item.sourceSettlement }}</dd>
-        <dt>{{ t('to') }}</dt><dd>{{ item.target?.occupation ?? item.transition.target_group_id }}</dd>
+        <dt>{{ t('to') }}</dt><dd>{{ t('kinds.' + item.transition.target_occupation) }} · {{ item.location.settlementName }}</dd>
         <dt>{{ t('sponsor') }}</dt><dd>{{ item.sponsorName }}</dd>
         <dt>{{ t('workforceDue') }}</dt><dd>{{ calendar(item.transition.due_day) }}</dd>
       </dl>

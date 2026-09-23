@@ -121,6 +121,8 @@ def execute_civic_tumult(world, group_id, option_id, decision_event_id):
         candidate, "civic_tumult_occurred",
         "Um tumulto cívico danificou uma instalação local observada pelo grupo.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": option.id, "site_id": site.id},
         deltas=(_delta("site", site.id, "integrity", before, after),),
         cause_ids=_causes(decision.id, option.report_event_id, option.site_report_event_id,
                           option.refusal_event_id, site.last_event_id))

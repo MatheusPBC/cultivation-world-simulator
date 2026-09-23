@@ -13,7 +13,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 28 (Society schema 4, economy schema 11) requires the current snapshot shape and rejects incomplete
+  save schema 66 (Society schema 21, economy schema 15, Strategy schema 2) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -73,6 +73,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   fresh stock without a second payment. No refund, tariff, automatic recovery,
   public UI/API or affordance dispatcher exists in this vertical. There is no
   force or military blockade here.
+- A freight order retains its source/destination settlement IDs from dispatch,
+  backed by the opening receipt. Historical routes validate against those
+  places even if an empty campaign bag later follows its column elsewhere;
+  any still-pending parcel requires the destination stock to remain at its
+  recorded place. A siege withdrawal/ceasefire affordance is absent while a
+  parcel still targets that bag. An open supply notice alone may be lapsed by
+  the withdrawal decision, but no cargo is teleported or discarded to make
+  negotiation succeed.
 - Economy owns expansion blueprints/projects, repairs, migration provisions and
   civil customs checkpoints/manifests (economy schema 11; older schema 10 references are
   historical). Construction and
@@ -97,13 +105,16 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   bindings before changing them. Inventory, balances and projects remain where
   they are. This V1 has no PropertyTitle, lease, inheritance, capture/war or UI
   control surface; it is not a generic property system.
-- Workforce transition is a Society-owned, dated V1 for local aggregate groups:
-  actual artisan labor limitation produces an engine-bounded demand report, and
-  a private dated offer can be accepted only by an eligible local farmer group.
+- Workforce transition is a Society-owned, dated V1 for aggregate groups:
+  an actual labor limitation produces an engine-bounded demand report, and
+  a private dated offer can be accepted only by an eligible group with current
+  availability and a payable sponsor account. The target occupation and any
+  reachable sponsor settlement come from that material demand, not the actor.
   Offers reserve neither people nor funds; an exact current decision is required.
   Acceptance pays a stipend, marks the selected people unavailable for 30 days,
-  and the resolver revalidates the source before transferring them to artisan.
-  This is not generic education, autonomous acceptance, or real-AI strategy.
+  and the resolver revalidates the source before changing occupation. The
+  monthly composed provider menu can select the current offer; this is not
+  generic education, automatic acceptance, or a free-form AI strategy.
 - Customs-to-workforce is narrowly bounded: an active checkpoint with paid
   inspection capacity actually exhausted today and no local available merchant
   emits typed `labor_shortfall`. The engine owns demand, offer, target occupation,
@@ -111,6 +122,23 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   the stipend, is reserved 30 days, then becomes `merchant` and the checkpoint's
   `staff_group` for later payroll. No generic education, population change,
   migration, autoacceptance, UI/API control or other occupation is introduced.
+- Research-to-workforce is a separate bounded path through the same Society
+  transition: an authorized experiment that actually stalls for assistants
+  emits a typed `labor_shortfall`. A current sponsor-only demand and direct
+  offer may invite a group to change to the experiment's authored assistant
+  occupation, including `soldier`; only that group's decision pays a stipend
+  and reserves 30 days before Society changes occupation. Research then still
+  needs its own materials, payroll and available people. This is not a general
+  recruitment command or an automatic replacement for campaign losses.
+- A defensive plan without an available column may observe a military
+  `labor_shortfall` only where its own current route, rations, account,
+  authority and potential local volunteers make a column otherwise feasible.
+  The dated demand is private to the sponsor; it never sends offers by itself.
+  The institution must select `authorize_military_recruitment` in its monthly
+  menu, then each local group independently accepts or declines a current
+  offer. Society owns the paid 30-day occupational transition; Force still
+  requires a later separate raise decision, food and payroll. No population,
+  force or victory is created by the plan or the invitation alone.
 - Institutional food aid is a prepared/direct-executor vertical. The requester
   uses only its own current causal `SettlementReport.missing_food` and selects a
   transient engine-enumerated option; the persisted notice contains only
@@ -123,21 +151,24 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   food freight, fulfills the obligation at dispatch, and leaves arrival to
   logistics. A missed dispatch persists as a breach; remediation requires a later
   provider decision, a private breach notice, current authority/stock/valid-route
-  revalidation, and opens a new freight without erasing the breach. There is no
-  automatic policy, real-AI decision, public mutation UI/API or foreign-inventory
-  disclosure. RelationsState persists only active InstitutionalMemory records
+  revalidation, and opens a new freight without erasing the breach. The composed
+  provider menu may select current aid options; `routine-rules` is a separate
+  declared offline fallback. Neither path forces a future material transfer,
+  exposes foreign inventory, or adds public mutation UI/API. RelationsState
+  persists only active InstitutionalMemory records
   (`id`, `institution_ref`, `event_id`, `recorded_day`, `last_reinforced_day`);
   KnowledgeState remains the owner of fact knowledge through DiplomaticNotice.
   Each memory must reference its canonical state-transition fact and its creation
   or reinforcement receipt delta. Salience/view are pure derived read models over
   360 days. V1 derives only the aid view (creditor sees breach -4, remediation
-  +2); there is no generic stored social score or LLM factor, UI/API, real-AI or
-  general-strategy surface. A deterministic `routine-rules` fallback allows at
+  +2); derived memory views may appear in actor context and the observer dossier,
+  but there is no generic stored social score, LLM-authored factor or
+  general-strategy owner. A deterministic `routine-rules` fallback allows at
   most one action per polity/review in priority `respond`, `fulfill`, `remediate`,
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 28 are rejected and preserved
+  older than schema 66 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
@@ -157,6 +188,37 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   Monthly paid research reserves the named leader inside cohort labor, not an extra
   person. Application is a knowledge-gated material construction project. Teaching
   requires current bilateral consent; see docs/specs/medieval-research.md for limits.
+- A technology-theft affordance requires a local agent, a current site report and
+  sighting, plus a recent paid `production_completed` receipt for a line whose
+  operating recipe requires that exact technique. Merely knowing a technique
+  or owning an idle site does not make it stealable; the theft receipt cites
+  the material operation. This does not reveal foreign stock quantities.
+- Military field instruction belongs to Society (`detachment_trainings`): a known
+  `field_drill`, `siegecraft` or `field_logistics` enables an affordance for one own, supplied,
+  stationary column, but does not grant strength by itself. The decision consumes
+  local tools; three dated rationed days must complete before that column gains
+  a bounded field bonus. Loss of presence/supply lapses unfinished training.
+  The battle receipt cites the completed training and technique. Completed
+  `field_logistics` equips that column's physical bag and expands only its own
+  provisioning limit; institutional knowledge alone expands neither. Fortification
+  and field logistics are separate applications, not generic field-strength steps.
+- A defense `StrategicPlan` persists after a real column is raised: `mobilized`
+  names that column and a dated review observes later reports. Losing the column
+  returns the plan to `adopted` for a new decision; an occupation ends the plan
+  only after the institution's own fresh report confirms no foreign occupier
+  (including a materially retaken city). Settlement reports
+  chain changed occupation readings to the material occupation fact and later
+  readings to their predecessor. A plan does not march, resupply or replace a
+  column automatically. An adopted plan left at `NO_ACTION`, or one blocked
+  without a column, schedules another dated review. It recomputes current
+  reports and material force options; neither restored supplies nor the passage
+  of time raises soldiers by itself.
+- A prepared column may invest an administered city only if its own fresh local
+  report confirms a foreign occupier. The pressure notice goes to that occupier,
+  and the investment receipt cites the local occupation report as well as the
+  route reports. An unoccupied home city remains ineligible; the owner
+  recomposes all evidence before acting. Breach and occupation remain separate
+  material steps and never transfer administration by prose.
 - The observatory includes research in its atomic snapshot; research queries are
   omniscient views, not actor knowledge. Finances distinguishes recipe improvement
   from capacity gain and names research payroll sources.
@@ -169,7 +231,9 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   KnowledgeState.notices disclose these facts only to the proposal participants.
   Saved pending diplomacy requires its agenda deadline. See medieval-diplomacy.md;
   deterministic autonomous bargaining, the `/api/v2/query/diplomacy` endpoint and
-  DiplomacyPanel are integrated; real AI-driven negotiation is not.
+  DiplomacyPanel are integrated. The composed provider menu can select current
+  diplomatic options; end-to-end multi-turn provider negotiation is not yet a
+  verified product gate.
 - GET `/api/v2/query/diplomacy` returns flat lists (proposals/obligations/notices);
   the same payload also appears in the `diplomacy` field of `query/observatory`.
   Grouping obligations per proposal/clause is the client's job (useDiplomacy.ts),

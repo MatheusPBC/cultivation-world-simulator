@@ -50,7 +50,14 @@ def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, 
     if parent:
         changes.append(_delta('diplomacy', parent.id, 'status', 'offered', 'superseded'))
     event = record_event(world, 'diplomatic_offer_delivered', 'Condições diplomáticas entregues à contraparte.',
-        fact_kind=FactKind.STATE_TRANSITION, deltas=changes,
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={
+            'proposal_id': p.id,
+            'parent_id': parent.id if parent else None,
+            'term_ids': [f'{p.id}:term:{index}' for index, _ in enumerate(p.clauses)],
+            'status': 'offered',
+        },
+        deltas=changes,
         cause_ids=tuple(dict.fromkeys(
             ((decision_event_id, parent.last_event_id) if parent else (decision_event_id,))
             + tuple(extra_cause_ids)
@@ -81,7 +88,15 @@ def respond_proposal(world, proposal_id, response, *, decision_event_id, intent=
         changes.extend(_delta('obligation', f'{p.id}:term:{i}', 'status', None, 'active') for i in range(len(p.clauses)))
     event = record_event(world, 'diplomatic_response_delivered',
         'Proposta aceita; obrigações ainda precisam ser cumpridas.' if response == 'accept' else 'Proposta recusada.',
-        fact_kind=FactKind.STATE_TRANSITION, deltas=changes, cause_ids=(p.last_event_id, decision_event_id))
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={
+            'proposal_id': p.id,
+            'response': response,
+            'status': status,
+            'term_ids': [f'{p.id}:term:{index}' for index, _ in enumerate(p.clauses)],
+        },
+        deltas=changes,
+        cause_ids=(p.last_event_id, decision_event_id))
     p = p.model_copy(update={'status': status, 'last_event_id':event.id})
     world.relations.proposals[p.id] = p
     if response == 'accept':

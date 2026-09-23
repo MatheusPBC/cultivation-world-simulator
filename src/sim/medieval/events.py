@@ -73,6 +73,13 @@ class WorldEvent(SocietyValue):
             raise ValueError("a state transition requires at least one material delta")
         if self.deltas and self.causal_origin == CausalOrigin.LLM_INTERPRETATION:
             raise ValueError("an interpretation cannot carry a state change")
+        if self.causal_origin == CausalOrigin.ACTOR_DECISION and self.deltas:
+            payload = self.causal_payload
+            if (not isinstance(payload, dict)
+                    or not isinstance(payload.get("decision_event_id"), str)
+                    or not isinstance(payload.get("actor_ref"), dict)
+                    or not isinstance(payload.get("selected_affordance_id"), str)):
+                raise ValueError("actor state transition requires causal authorship payload")
         if self.causal_origin == CausalOrigin.LLM_INTERPRETATION:
             payload_deltas = self.causal_payload.get("deltas") if self.causal_payload else None
             if payload_deltas:
@@ -124,6 +131,14 @@ def validate_history(events, day: int, *, from_sequence: int = 1) -> None:
         causes = [link.cause_event_id for link in event.causal_links]
         if len(set(causes)) != len(causes) or any(not _is_recorded(events, cause) for cause in causes):
             raise ValueError("unknown or repeated event cause")
+        if event.causal_origin == CausalOrigin.ACTOR_DECISION and event.deltas:
+            if not any((_cause := _recorded_event(events, cause)) is not None
+                       and _cause.fact_kind == FactKind.DECISION
+                       and _cause.decision is not None
+                       for cause in causes):
+                raise ValueError("actor state transition requires a real decision cause")
+            _validate_actor_authorship_payload(
+                events, causal_payload=event.causal_payload, cause_ids=causes)
         if event.deltas and any((_cause := _recorded_event(events, cause)) is not None
                                 and _interprets(_cause) for cause in causes):
             raise ValueError("a state change cannot be caused directly by an interpretation")
@@ -148,6 +163,33 @@ def _recorded_event(events, event_id):
     return events[int(event_id.partition(":")[2]) - 1]
 
 
+def _validate_actor_authorship_payload(events, *, causal_payload, cause_ids):
+    """Require an actor transition to carry the decision that authored it.
+
+    ``validate_history`` remains the complete-ledger guard, but callers also
+    need the invariant before the event is appended.  Otherwise a direct owner
+    invocation could briefly publish a material transition whose decision,
+    actor, or affordance was never recorded, bypassing the transactional
+    rollback boundary used by the monthly engine.
+    """
+    if not isinstance(causal_payload, dict):
+        raise ValueError("actor state transition requires causal authorship payload")
+    decision_event_id = causal_payload.get("decision_event_id")
+    actor_ref = causal_payload.get("actor_ref")
+    selected_affordance_id = causal_payload.get("selected_affordance_id")
+    if (not isinstance(decision_event_id, str)
+            or not isinstance(actor_ref, dict)
+            or not isinstance(selected_affordance_id, str)
+            or decision_event_id not in cause_ids):
+        raise ValueError("actor state transition has incomplete causal authorship payload")
+    decision_source = _recorded_event(events, decision_event_id)
+    if decision_source is None or decision_source.decision is None:
+        raise ValueError("actor state transition has invalid decision authorship payload")
+    if (decision_source.decision.get("actor_ref") != actor_ref
+            or decision_source.decision.get("selected_affordance_id") != selected_affordance_id):
+        raise ValueError("actor state transition authorship does not match its decision")
+
+
 def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCCURRENCE,
                  causal_origin=CausalOrigin.DETERMINISTIC, decision=None, causal_payload=None,
                  deltas=(), cause_ids=()) -> WorldEvent:
@@ -157,6 +199,14 @@ def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCC
         raise ValueError("unknown or repeated event cause")
     if deltas and any(_interprets(world.events[int(cause.partition(":")[2]) - 1]) for cause in cause_ids):
         raise ValueError("a state change cannot be caused directly by an interpretation")
+    if causal_origin == CausalOrigin.ACTOR_DECISION and deltas:
+        if not any((cause_event := _recorded_event(world.events, cause)) is not None
+                   and cause_event.fact_kind == FactKind.DECISION
+                   and cause_event.decision is not None
+                   for cause in cause_ids):
+            raise ValueError("actor state transition requires a real decision cause")
+        _validate_actor_authorship_payload(
+            world.events, causal_payload=causal_payload, cause_ids=cause_ids)
     event = WorldEvent(
         id=event_id, day=world.clock.absolute_day, sequence=sequence,
         event_type=event_type, content=content, fact_kind=fact_kind,
@@ -167,4 +217,8 @@ def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCC
                            for i, cause in enumerate(cause_ids)),
     )
     world.events.append(event)
+    world._event_index_cache = None
+    world._event_type_cache = None
+    if hasattr(world.knowledge, "_query_cache"):
+        world.knowledge._query_cache = None
     return event

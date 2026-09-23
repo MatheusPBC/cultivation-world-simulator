@@ -12,7 +12,7 @@ export const useObserverStore = defineStore('medieval-observer', () => {
   const updatedAt = ref<number | null>(null)
   const revision = ref(-1)
   const focusEventId = ref<string | null>(null)
-  const selection = ref<{ kind: 'settlement' | 'character' | 'site' | 'route'; id: string } | null>(null)
+  const selection = ref<{ kind: 'settlement' | 'character' | 'polity' | 'organization' | 'site' | 'route' | 'detachment'; id: string } | null>(null)
   let requestId = 0
   const selectedSettlement = computed(() => snapshot.value?.society.settlements.find(s => s.id === selection.value?.id))
   async function refresh() {

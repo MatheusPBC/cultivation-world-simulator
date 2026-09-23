@@ -25,6 +25,7 @@ from .events import record_event
 from .logistics import open_order
 from .routing import known_supply_path
 from .travel import route_duration
+from .ai_decider import ProviderDecisionRequired
 
 
 DISPATCH_ACTION = "dispatch_campaign_supply"
@@ -60,7 +61,7 @@ def campaign_stock_id(detachment_id):
     return f"stock:camp:{detachment_id}"
 
 
-def campaign_baggage_ready_for_departure(world, detachment):
+def campaign_baggage_ready_for_departure(world, detachment, *, ignore_notice=False):
     """An empty, uncommitted bag may physically travel with its own column.
 
     Pending supply remains at its existing place until ordinary freight
@@ -79,19 +80,47 @@ def campaign_baggage_ready_for_departure(world, detachment):
         world.economy.freight_orders[parcel.order_id].destination_id == campaign_stock_id(detachment.id)
         for parcel in world.economy.parcels.values()
     )
-    return not active_notice and not active_parcel
+    return (ignore_notice or not active_notice) and not active_parcel
 
 
 def _bag_capacity(world, detachment):
     days = MAX_BAG_DAYS + (FIELD_LOGISTICS_BONUS_DAYS
-                           if world.knowledge.knows(detachment.owner_ref, "field_logistics") else 0)
+                           if _logistics_training(world, detachment) is not None else 0)
     return detachment.count * days * world.economy.resources["food"].bulk
 
 
 def _provision_capacity(world, detachment):
     days = LOAD_SUPPLY_DAYS + (FIELD_LOGISTICS_BONUS_DAYS
-                               if world.knowledge.knows(detachment.owner_ref, "field_logistics") else 0)
+                               if _logistics_training(world, detachment) is not None else 0)
     return detachment.count * days * RATIONS_PER_SOLDIER_DAY
+
+
+def _logistics_training(world, detachment):
+    return next((item for item in world.society.detachment_trainings.values()
+                 if item.detachment_id == detachment.id and item.technology_id == "field_logistics"
+                 and item.stage == "completed"), None)
+
+
+def apply_logistics_training(world, detachment, completion_event_id):
+    """Equip an existing physical bag only after its column finishes instruction."""
+    training = _logistics_training(world, detachment)
+    if training is None or training.last_event_id != completion_event_id:
+        raise ValueError("campaign baggage requires completed logistics training")
+    stock = world.economy.stocks.get(campaign_stock_id(detachment.id))
+    if stock is None:
+        return None  # A later bag creation reads this same completed training.
+    if stock.owner_ref != detachment.owner_ref or stock.location_id != detachment.location_id:
+        raise ValueError("campaign baggage is not co-located with its trained column")
+    capacity = max(stock.capacity, _bag_capacity(world, detachment))
+    if capacity == stock.capacity:
+        return None
+    event = record_event(
+        world, "campaign_baggage_equipped", "A bagagem da coluna recebeu capacidade material de campanha.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("stock", stock.id, "capacity", stock.capacity, capacity),),
+        cause_ids=_causes(completion_event_id, stock.last_event_ids.get("food")))
+    world.economy.stocks[stock.id] = stock.model_copy(update={"capacity": capacity})
+    return event
 
 
 def _threshold(detachment):
@@ -160,11 +189,13 @@ def ensure_campaign_stock(world, detachment):
             raise ValueError("campaign bag is not co-located with its detachment")
         return stock
     capacity = _bag_capacity(world, detachment)
+    training = _logistics_training(world, detachment)
     event = record_event(
         world, "campaign_baggage_established", "Uma bagagem limitada foi preparada junto à coluna.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta("stock", identity, "capacity", 0, capacity),),
-        cause_ids=_causes(detachment.last_event_id),
+        cause_ids=_causes(detachment.last_event_id,
+                          training.last_event_id if training is not None else None),
     )
     stock = Stock(id=identity, owner_ref=detachment.owner_ref, location_id=detachment.location_id,
                   capacity=capacity, goods={}, last_event_ids={"food": event.id})
@@ -403,9 +434,16 @@ def _lapse_campaign_notices(world, detachment_id, cause_event_id):
 
 
 async def review_campaign_supplies(world, situations):
-    """One real-provider turn per owner; no provider means no shipment."""
+    """One real-provider turn per owner; an unavailable provider pauses AI mode.
+
+    Campaign supply is a discretionary decision for an active dated process.
+    It must not silently disappear when the provider is unavailable: the
+    shared decision contract raises ``ProviderDecisionRequired`` and the
+    simulator discards the candidate, just like the monthly institutional
+    turn. Offline worlds still keep this optional vertical inactive.
+    """
     due = [item for item in situations if item.kind == REVIEW_KIND and item.id.startswith(_PREFIX)]
-    if not due or not (ai_decider.provider_available() and ai_decider.within_budget(world)):
+    if not due or not world.config.ai_enabled:
         return
     reviewed = set()
     for situation in sorted(due, key=lambda item: item.id):
@@ -431,13 +469,23 @@ async def review_campaign_supplies(world, situations):
             continue
         option = next((item for item in campaign_supply_options(world, notice.recipient_ref) if item.id == selected), None)
         if option is None:
-            continue
+            raise ProviderDecisionRequired(
+                f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+                "campaign supply affordance became stale"
+            )
         decision = record_event(world, "campaign_supply_decided", "A instituição escolheu uma opção de abastecimento.",
                                 fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,))
         try:
             dispatch_campaign_supply(world, notice.recipient_ref, option.id, decision.id)
-        except ValueError:
-            continue
+        except ValueError as exc:
+            # A provider-selected option that no longer revalidates is a
+            # technical decision wait.  The simulator owns the transaction
+            # rollback; swallowing this would commit the decision and let a
+            # later family advance around the failed campaign owner.
+            raise ProviderDecisionRequired(
+                f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+                "campaign supply affordance became stale"
+            ) from exc
 
 
 from . import ai_decider

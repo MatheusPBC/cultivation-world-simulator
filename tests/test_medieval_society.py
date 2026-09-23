@@ -41,11 +41,13 @@ def test_recruiting_a_named_worker_preserves_population_and_removes_the_worker()
     character = next(iter(society.characters.values()))
     group = society.population[character.population_group_id]
     original_count = group.count
+    soldier_id = f"pop:{group.settlement_id}:{group.people}:soldier"
+    original_soldiers = society.population[soldier_id].count
     total = society.total_population
     target = society.transfer_people(group.id, group.settlement_id, "soldier", 1, (character.id,))
     assert society.total_population == total
     assert society.population[group.id].count == original_count - 1
-    assert society.population[target].count == 1
+    assert society.population[target].count == original_soldiers + 1
     assert society.characters[character.id].population_group_id == target
     society.validate()
 

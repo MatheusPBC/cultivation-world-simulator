@@ -84,6 +84,8 @@ def withdrawal_provider(monkeypatch, prompts):
     async def call_llm_json(prompt, *args, **kwargs):
         prompts.append(prompt)
         payload = json.loads(prompt[prompt.index("{"):])
+        if payload["you_are"]["id"] == RIVAL.id:
+            return {"selected_id": ai_decider.NO_ACTION}
         return {"selected_id": next(choice["id"] for choice in payload["choices"]
                                if choice["label"].startswith("Retirar"))}
 
@@ -93,7 +95,8 @@ def withdrawal_provider(monkeypatch, prompts):
 
 async def test_contact_provider_withdraws_occupied_force_home_with_real_upkeep(tmp_path, monkeypatch):
     world, own_id, rival_id, standoff_id = withdrawal_world()
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1, "ai_max_calls": 10})
+    # Both institutions receive independent contact turns on this day.
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2, "ai_max_calls": 10})
     prompts = []
     withdrawal_provider(monkeypatch, prompts)
     before_food = food_total(world)

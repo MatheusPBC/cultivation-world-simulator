@@ -1,5 +1,7 @@
 """Provider choices for the bounded civic-demand vertical."""
 
+import json
+
 import pytest
 
 from src.classes.event import FactKind
@@ -7,6 +9,7 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.civic_protest import civic_protest_options
 from src.sim.medieval.civic_protest_policy import review_civic_protests_with_provider
 from src.sim.medieval.institutional_decision_turn import DECLINED_DECISION_EVENT_TYPE
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
 from src.run.medieval_world import create_medieval_world
 
@@ -31,8 +34,9 @@ async def test_provider_selects_an_existing_civic_affordance(monkeypatch):
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
 
     async def call_llm_json(prompt, *args, **kwargs):
-        assert option.id in prompt
-        return {"selected_id": option.id}
+        payload = json.loads(prompt[prompt.index("{"):])
+        selected = option.id if option.id in {item["id"] for item in payload["choices"]} else ai_decider.NO_ACTION
+        return {"selected_id": selected}
 
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
     assert await review_civic_protests_with_provider(world)
@@ -61,11 +65,18 @@ async def test_provider_invalid_or_no_action_does_not_open_protest(monkeypatch, 
         return answer
 
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
-    assert not await review_civic_protests_with_provider(world)
+    if not refusal_is_a_decision:
+        with pytest.raises(ProviderDecisionRequired):
+            await review_civic_protests_with_provider(world)
+    else:
+        assert not await review_civic_protests_with_provider(world)
     assert not world.society.civic_protests
     receipts = [event for event in world.events[before:]
                 if event.event_type in ai_decider.RECEIPT_EVENTS]
-    assert receipts and all(event.deltas == () for event in receipts)
+    if refusal_is_a_decision:
+        assert receipts and all(event.deltas == () for event in receipts)
+    else:
+        assert not receipts
     decisions = [event for event in world.events[before:] if event.fact_kind == FactKind.DECISION]
     if refusal_is_a_decision:
         # Answering NO_ACTION is a deliberate refusal: the actor saw the menu

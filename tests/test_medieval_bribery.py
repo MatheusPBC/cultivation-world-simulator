@@ -9,7 +9,11 @@ from src.sim.medieval.bribery import (
     execute_bribery_offer, execute_bribery_payment, execute_bribery_response,
 )
 from src.sim.medieval.institutional_agenda import monthly_actors
+from src.sim.medieval.institutional_memory import (BRIBERY_VIEW, FULFILLMENT_VIEW, MEMORY_SPAN_DAYS,
+                                                    effective_salience, institutional_view, institutional_views,
+                                                    memories_of)
 from src.sim.medieval.events import record_event
+from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from tests.test_medieval_diplomacy import BUYER, SELLER, world_with_knowledge
 
 
@@ -26,7 +30,7 @@ def _offer(world):
     return proposal
 
 
-def test_bribery_acceptance_is_independent_and_payment_is_later():
+def test_bribery_acceptance_is_independent_and_payment_is_later(tmp_path):
     world = world_with_knowledge()
     original_authority = dict(world.authority.offices)
     before = world.economy.accounts["treasury:escarlia"].balance
@@ -45,9 +49,34 @@ def test_bribery_acceptance_is_independent_and_payment_is_later():
     assert world.economy.accounts["treasury:escarlia"].balance == before - payment.amount
     assert world.relations.obligations[payment.obligation_id].status == "fulfilled"
     assert world.authority.offices == original_authority
+    receipt = world.relations.obligations[payment.obligation_id].last_event_id
+    assert memories_of(world, SELLER, receipt) is not None
+    assert memories_of(world, BUYER, receipt) is not None
+    # The recipient remembers the material bribe as its own qualitative
+    # reading, never as generic "commitment fulfilled" credit.
+    assert institutional_view(world, BUYER, SELLER) == BRIBERY_VIEW
+    assert institutional_view(world, BUYER, SELLER) != FULFILLMENT_VIEW
+    assert (SELLER, BRIBERY_VIEW, (receipt,)) in institutional_views(world, BUYER)
+    # Preserve the V1 asymmetry: only the paid party reads anything at all.
+    assert institutional_view(world, SELLER, BUYER) == 0
+
+    path = tmp_path / "bribery-memory.mws"
+    save_world(world, path)
+    restored = load_world(path)
+    assert world_snapshot(restored) == world_snapshot(world)
+    assert restored.relations.memories == world.relations.memories
+    assert institutional_view(restored, BUYER, SELLER) == BRIBERY_VIEW
+
+    world.clock = world.clock.advance(MEMORY_SPAN_DAYS // 2)
+    memory = memories_of(world, BUYER, receipt)
+    half = effective_salience(world, memory)
+    assert 400 <= half <= 600
+    assert institutional_view(world, BUYER, SELLER) == BRIBERY_VIEW * half // 1000
+    world.clock = world.clock.advance(MEMORY_SPAN_DAYS)
+    assert institutional_view(world, BUYER, SELLER) == 0
 
 
-def test_bribery_rejection_creates_no_obligation():
+def test_bribery_rejection_creates_no_obligation_and_no_memory():
     world = world_with_knowledge()
     proposal = _offer(world)
     response = next(item for item in bribery_response_options(world, BUYER)
@@ -55,6 +84,23 @@ def test_bribery_rejection_creates_no_obligation():
     execute_bribery_response(world, BUYER, response.id, _decision(world, response))
     assert world.relations.proposals[proposal.id].status == "rejected"
     assert not world.relations.obligations
+    assert not world.relations.memories
+    assert institutional_view(world, BUYER, SELLER) == 0
+    assert institutional_view(world, SELLER, BUYER) == 0
+
+
+def test_bribery_acceptance_without_payment_creates_no_memory():
+    world = world_with_knowledge()
+    proposal = _offer(world)
+    response = next(item for item in bribery_response_options(world, BUYER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    execute_bribery_response(world, BUYER, response.id, _decision(world, response))
+    assert world.relations.proposals[proposal.id].status == "accepted"
+    assert world.relations.obligations[
+        next(iter(world.relations.obligations))].status == "active"
+    assert not world.relations.memories
+    assert institutional_view(world, BUYER, SELLER) == 0
+    assert institutional_view(world, SELLER, BUYER) == 0
 
 
 def test_organization_with_a_bribery_affordance_is_included_in_monthly_turn():

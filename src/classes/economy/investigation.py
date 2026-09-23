@@ -44,7 +44,7 @@ class Investigation(SocietyValue):
 def validate_investigations(economy, world=None):
     """The paid obligation is auditable even though its finding is private."""
     active_sites = set()
-    events = {event.id: event for event in world.events} if world is not None else {}
+    events = world.event_index() if world is not None else {}
     for investigation in economy.investigations.values():
         stock = economy.stocks.get(investigation.stock_id)
         account = economy.accounts.get(investigation.account_id)

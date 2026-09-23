@@ -20,8 +20,8 @@ PositiveCount = Annotated[int, Field(strict=True, gt=0)]
 # against an intact garrison; only its existing material conditions can reduce
 # this value.
 SIEGE_GARRISON_ENDURANCE = 12
-# A known fortification doctrine adds a bounded defensive step; the default
-# remains 12 so existing campaigns and worlds do not gain power implicitly.
+# Fortification knowledge combined with a prepared, supplied defensive
+# position adds one bounded step; knowledge alone grants no material defense.
 MAX_SIEGE_GARRISON_ENDURANCE = 14
 
 
@@ -73,9 +73,9 @@ class ForceStandoff(SocietyValue):
 class ForcePosition(SocietyValue):
     """A detachment's dated preparation at the place where it stands.
 
-    It is neither terrain control nor a combat modifier.  The record names an
-    optional already-existing map site only as an anchor for later evidence;
-    it creates no site and grants no material benefit in this vertical.
+    It is neither terrain control nor a combat modifier by itself. The record
+    names an optional existing map site as an evidence anchor; a supplied
+    defender can combine the preparation with fortification knowledge in a siege.
     """
     id: Identity
     detachment_id: Identity
@@ -90,6 +90,27 @@ class ForcePosition(SocietyValue):
     def valid_timing(self):
         if self.id != f"force-position:{self.detachment_id}" or self.ready_day != self.started_day + 3:
             raise ValueError("force position identity or preparation time is inconsistent")
+        return self
+
+
+class DetachmentTraining(SocietyValue):
+    """Dated instruction of one real column, not institution-wide combat power."""
+    id: Identity
+    detachment_id: Identity
+    technology_id: Literal["field_drill", "siegecraft", "field_logistics"]
+    settlement_id: Identity
+    stage: Literal["training", "completed", "lapsed"]
+    started_day: Count
+    ready_day: Count
+    decision_event_id: Identity
+    knowledge_event_id: Identity
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_timing(self):
+        if (self.id != f"detachment-training:{self.detachment_id}:{self.technology_id}:{self.decision_event_id}"
+                or self.ready_day != self.started_day + 3):
+            raise ValueError("detachment training identity or duration is inconsistent")
         return self
 
 

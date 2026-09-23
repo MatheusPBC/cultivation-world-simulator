@@ -7,6 +7,7 @@ from the owner's current service choice.
 
 from typing import Literal
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -118,6 +119,12 @@ def set_site_service(world, option_id, *, decision_event_id):
         (f"{site.name}: o proprietário suspendeu o serviço próprio."
          if target else f"{site.name}: o proprietário retomou o serviço próprio."),
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": option.actor_ref.to_dict(),
+            "selected_affordance_id": option.id,
+        },
         deltas=(_delta("site", site.id, "service_suspended", site.service_suspended, target),),
         cause_ids=_causes(decision.id, report.event_id, site.last_event_id),
     )

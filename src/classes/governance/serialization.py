@@ -30,6 +30,13 @@ class RegistrySerialization:
         return state
 
     def validate(self, world=None):
+        self.validate_registry_structure()
+        for name, model in self.registries.items():
+            for value in getattr(self, name).values():
+                model.model_validate(value.model_dump(mode="json"))
+
+    def validate_registry_structure(self):
+        """Check registry ownership without serializing every frozen value."""
         for name, model in self.registries.items():
             registry = getattr(self, name)
             if not isinstance(registry, dict):
@@ -37,7 +44,6 @@ class RegistrySerialization:
             for key, value in registry.items():
                 if not isinstance(value, model) or key != value.id:
                     raise ValueError("invalid governance registry identity")
-                model.model_validate(value.model_dump(mode="json"))
 
 
 def validate_actor(world, ref):

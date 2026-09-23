@@ -12,6 +12,7 @@ from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
+from .ai_decider import ProviderDecisionRequired
 from .events import record_event
 from .rites import record_rite_offer, rite_offer_options, rite_sponsor_options, sponsor_rite
 
@@ -49,13 +50,13 @@ def _parse_sponsor_review(situation):
 
 
 def _actor_turn_available(world):
-    """Avoid failed receipts when a real provider turn cannot be made."""
+    """Whether a provider slot exists to schedule an individual turn."""
     return ai_decider.provider_available() and ai_decider.within_budget(world)
 
 
 def schedule_character_rite_offers(world):
     """A fresh local report earns a future turn; it never chooses an action."""
-    if not _actor_turn_available(world):
+    if not world.config.ai_enabled or not _actor_turn_available(world):
         return ()
     scheduled = []
     due_day = world.clock.absolute_day + 1
@@ -112,13 +113,19 @@ def _sponsor_situation(world, sponsor, option):
 
 async def _select(world, actor, situation, choices, *, causes):
     """Return a selection and only interpretation receipt IDs from this turn."""
-    if not _actor_turn_available(world):
+    if not choices:
         return None, ()
     start = len(world.events)
     selected = await ai_decider.select_option(world, actor, situation, choices, causes=causes)
     receipts = tuple(event.id for event in world.events[start:]
                      if event.causal_origin.value == "llm_interpretation")
     return selected, receipts
+
+
+def _stale(actor):
+    return ProviderDecisionRequired(
+        f"provider decision required for {actor.kind}:{actor.id}: character rite affordance became stale"
+    )
 
 
 def _decision(world, option, event_type, content, *, causes):
@@ -150,7 +157,7 @@ async def _offer_turn(world, situation):
         return False
     option = next((item for item in rite_offer_options(world, character_id) if item.id == selected), None)
     if option is None or option.report_event_id != source_event_id:
-        return False
+        raise _stale(EntityRef("character", character_id))
     offer = record_rite_offer(world, character_id, option.id, cause_ids=interpretation_ids)
     world.agenda.schedule(ScheduledSituation(_sponsor_review_id(offer.id), SPONSOR_REVIEW_KIND,
                                              world.clock.absolute_day + 1))
@@ -184,11 +191,14 @@ async def _sponsor_turn(world, situation):
                 continue
             option = next((item for item in rite_sponsor_options(world, sponsor) if item.id == selected), None)
             if option is None or option.offer_event_id != offer_event_id:
-                continue
+                raise _stale(sponsor)
             decision = _decision(world, option, "rite_sponsorship_decided",
                                  "A instituição escolheu uma resposta para o rito local.",
                                  causes=(*interpretation_ids, offer_event.id))
-            sponsor_rite(world, sponsor, option.id, decision.id)
+            try:
+                sponsor_rite(world, sponsor, option.id, decision.id)
+            except ValueError as exc:
+                raise _stale(sponsor) from exc
             acted = True
     return acted
 

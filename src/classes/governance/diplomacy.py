@@ -257,7 +257,17 @@ class RelationsState(RegistrySerialization):
         super().validate(world)
         if world is None:
             return
-        events = {e.id: e for e in world.events}
+        # This is an integrity boundary, not a query path.  The world index is
+        # intentionally optimized for an append-only ledger, but validation
+        # must also reject a malformed loaded or externally tampered event in
+        # the middle of an otherwise unchanged list.
+        events = {event.id: event for event in world.events}
+        aid_requests_by_cause_decision = {}
+        for event in events.values():
+            if event.event_type != 'institutional_aid_requested':
+                continue
+            for cause_event_id in {link.cause_event_id for link in event.causal_links}:
+                aid_requests_by_cause_decision.setdefault(cause_event_id, []).append(event)
         for recognition in self.authority_recognitions.values():
             validate_actor(world, recognition.recognizer_ref)
             claim = world.authority.claims.get(recognition.claim_id)
@@ -421,11 +431,9 @@ class RelationsState(RegistrySerialization):
                     if settlement.administrator_id != transfer.creditor_ref.id:
                         raise ValueError('fulfilled administration transfer requires its new administrator')
             if is_aid:
-                request_events = [item for item in events.values()
-                                  if item.event_type == 'institutional_aid_requested'
-                                  and p.decision_event_id in {link.cause_event_id for link in item.causal_links}
-                                  and any(delta.owner_kind == 'aid_request' and delta.aspect == 'option_id'
-                                          and delta.after == p.request_affordance_id for delta in item.deltas)]
+                request_events = [item for item in aid_requests_by_cause_decision.get(p.decision_event_id, ())
+                                  if any(delta.owner_kind == 'aid_request' and delta.aspect == 'option_id'
+                                         and delta.after == p.request_affordance_id for delta in item.deltas)]
                 provider_events = [item for item in request_events
                                    if any(delta.owner_kind == 'aid_request' and delta.aspect == 'provider_ref'
                                           and delta.after == json.dumps(p.counterparty_ref.to_dict(), sort_keys=True,
@@ -538,7 +546,8 @@ class RelationsState(RegistrySerialization):
                 if (breach is None or breach.event_type != 'commitment_breached'
                         or not material_ok
                         or final is None or final.event_type not in {
-                            'institutional_aid_remediated', 'payment_obligation_remediated'}
+                            'institutional_aid_remediated', 'resource_transfer_remediated',
+                            'payment_obligation_remediated'}
                         or obligation.breach_event_id not in {link.cause_event_id for link in final.causal_links}
                         or obligation.remediation_material_event_id not in {link.cause_event_id for link in final.causal_links}
                         or not any(d.owner_kind == 'obligation' and d.owner_id == obligation.id
@@ -572,12 +581,12 @@ class RelationsState(RegistrySerialization):
                     # own fulfillment decision differs.
                     fulfillment_causes = ({link.cause_event_id for link in material.causal_links}
                                           & {link.cause_event_id for link in final.causal_links})
-                    decisions = [event for event in events.values()
-                                 if event.id in fulfillment_causes
-                                 and event.fact_kind.name == 'DECISION'
-                                 and event.decision and event.decision.get('action') in {
+                    decisions = [decision for cause_event_id in fulfillment_causes
+                                 if (decision := events.get(cause_event_id)) is not None
+                                 and decision.fact_kind.name == 'DECISION'
+                                 and decision.decision and decision.decision.get('action') in {
                                      'fulfill_institutional_aid', 'fulfill_resource_transfer'}
-                                 and event.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
+                                 and decision.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
                     freight = [order for order in world.economy.freight_orders.values()
                                if (order.source_id == clause.source_stock_id
                                    and order.destination_id == clause.destination_stock_id
@@ -640,7 +649,8 @@ class RelationsState(RegistrySerialization):
                 else:
                     decisions = [event for event in events.values()
                              if event.fact_kind.name == 'DECISION'
-                             and event.decision and event.decision.get('action') == 'remediate_institutional_aid'
+                             and event.decision and event.decision.get('action') in {
+                                 'remediate_institutional_aid', 'remediate_resource_transfer'}
                              and event.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
                     freight = [order for order in world.economy.freight_orders.values()
                            if (order.destination_id == clause.destination_stock_id

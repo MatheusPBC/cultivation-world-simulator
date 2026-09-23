@@ -11,7 +11,7 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
 
-from .ai_decider import NO_ACTION, select_option
+from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
 from .creatures import (creature_options, execute_creature_option, offer_creature_tribute,
                         tribute_options)
 from .events import record_event
@@ -37,6 +37,12 @@ def _decide(world, option, event_type, content, *, cause_ids):
                         cause_ids=tuple(cause_ids))
 
 
+def _stale(actor):
+    return ProviderDecisionRequired(
+        f"provider decision required for {actor.kind}:{actor.id}: creature affordance became stale"
+    )
+
+
 _CREATURE_LABELS = {
     "maintain": "Permanecer como está.",
     "request": "Exigir tributo em alimento para manter a passagem.",
@@ -53,7 +59,7 @@ async def _creature_turn(world, creature_id):
     if creature is None or len(options) <= 1:
         return False
     # The drake knows its own body and what crossed its river; nothing else.
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     remembered = [{"event_id": event.id, "event_type": event.event_type, "day": event.day}
                   for event_id in creature.memory_event_ids
                   if (event := events.get(event_id)) is not None]
@@ -82,11 +88,14 @@ async def _creature_turn(world, creature_id):
         return False
     chosen = next((item for item in creature_options(world, creature_id) if item.id == selected), None)
     if chosen is None:
-        return False
+        raise _stale(EntityRef("creature", creature_id))
     factual_cause = (creature.last_event_id,) if creature.last_event_id else ()
-    execute_creature_option(world, creature_id, chosen.id, _decide(
-        world, chosen, "creature_decided", "O habitante do rio escolheu entre suas opções.",
-        cause_ids=factual_cause).id)
+    decision = _decide(world, chosen, "creature_decided", "O habitante do rio escolheu entre suas opções.",
+                       cause_ids=factual_cause)
+    try:
+        execute_creature_option(world, creature_id, chosen.id, decision.id)
+    except ValueError as exc:
+        raise _stale(EntityRef("creature", creature_id)) from exc
     updated = world.creatures.creatures[creature_id]
     if chosen.kind == "request":
         demand = next(item for item in world.creatures.open_demands(creature_id)
@@ -122,10 +131,13 @@ async def _tribute_turn(world, actor):
         return False
     chosen = next((item for item in tribute_options(world, actor) if item.id == selected), None)
     if chosen is None:
-        return False
-    offer_creature_tribute(world, actor, chosen.id, _decide(
-        world, chosen, "creature_tribute_decided", "A instituição respondeu à exigência do rio.",
-        cause_ids=(notices[chosen.demand_id].event_id,)).id)
+        raise _stale(actor)
+    decision = _decide(world, chosen, "creature_tribute_decided", "A instituição respondeu à exigência do rio.",
+                       cause_ids=(notices[chosen.demand_id].event_id,))
+    try:
+        offer_creature_tribute(world, actor, chosen.id, decision.id)
+    except ValueError as exc:
+        raise _stale(actor) from exc
     return True
 
 

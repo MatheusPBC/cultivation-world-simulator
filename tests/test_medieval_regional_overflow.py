@@ -56,6 +56,58 @@ def _provision_repair(world):
     )
 
 
+def test_site_overflow_reading_is_geography_only_before_any_assessment():
+    world = create_medieval_world(73)
+    reading = regional_overflow.site_overflow_reading(world, SITE_ID)
+
+    assert reading["site_id"] == SITE_ID
+    assert reading["vulnerability"] == regional_overflow.site_overflow_vulnerability(
+        world, world.map.infrastructure_sites[SITE_ID])
+    region = next(item for item in reading["regions"] if item["region_id"] == REGION_ID)
+    assert region["last_assessed_load"] is None
+    assert region["last_assessed_streak"] is None
+    assert region["last_assessed_day"] is None
+    assert region["assessment_event_id"] is None
+    assert region["open_occurrence"] is None
+
+
+def test_site_overflow_reading_of_an_unknown_site_is_none():
+    world = create_medieval_world(73)
+    assert regional_overflow.site_overflow_reading(world, "not-a-real-site") is None
+
+
+@pytest.mark.asyncio
+async def test_site_overflow_reading_projects_the_last_assessment_and_open_occurrence(monkeypatch):
+    world = create_medieval_world(73)
+    _force_load(monkeypatch, high=True)
+
+    await _advance_to(world, 60)
+
+    reading = regional_overflow.site_overflow_reading(world, SITE_ID)
+    region = next(item for item in reading["regions"] if item["region_id"] == REGION_ID)
+    assessment = world.regional_overflow.assessment(REGION_ID)
+    occurrence = world.regional_overflow.occurrence(REGION_ID)
+
+    assert region["last_assessed_load"] == assessment.load
+    assert region["last_assessed_streak"] == assessment.streak
+    assert assessment.streak >= regional_overflow.OVERFLOW_CONSECUTIVE_MONTHS
+    assert region["last_assessed_day"] == 60
+    assessment_event = next(item for item in world.events if item.id == region["assessment_event_id"])
+    assert assessment_event.event_type == "regional_hydrologic_load_assessed"
+
+    assert occurrence is not None
+    assert region["open_occurrence"] == {
+        "started_day": occurrence.started_day, "load": occurrence.load,
+        "assessment_event_id": occurrence.assessment_event_id,
+        "started_event_id": occurrence.started_event_id,
+    }
+    started_event = next(item for item in world.events if item.id == occurrence.started_event_id)
+    assert started_event.event_type == "regional_overflow_started"
+    # Only this site's own regions are read; nothing foreign or predicted.
+    assert {item["region_id"] for item in reading["regions"]} == set(
+        world.map.infrastructure_sites[SITE_ID].region_ids)
+
+
 @pytest.mark.asyncio
 async def test_nonrecurring_water_load_never_opens_an_overflow(monkeypatch):
     world = create_medieval_world(73)
@@ -64,11 +116,30 @@ async def test_nonrecurring_water_load_never_opens_an_overflow(monkeypatch):
     await _advance_to(world, 60)
 
     assert world.regional_overflow.active_occurrences == {}
-    # No overflow occurred, but the settlement's own genuine food trade (no
-    # longer papered over by automatic relief) still moves real cargo across
-    # this site's dependent route, so ordinary monthly operating wear applies.
-    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.99)
+    # A real cargo departure of 90 crossed this route, but ordinary operating
+    # wear has an explicit 100-bulk monthly threshold.  Neither low activity
+    # nor the absence of an overflow may manufacture physical damage.
+    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(1.0)
+    assert not any(
+        event.event_type == "site_worn"
+        and any(delta.owner_kind == "site" and delta.owner_id == SITE_ID for delta in event.deltas)
+        for event in world.events
+    )
     assert not any(event.event_type == "regional_overflow_started" for event in world.events)
+
+
+@pytest.mark.asyncio
+async def test_later_hydrologic_assessment_retains_the_prior_month_receipt(monkeypatch):
+    world = create_medieval_world(73)
+    _force_load(monkeypatch, high=False)
+    await _advance_to(world, 30)
+    first = world.regional_overflow.assessment(REGION_ID).evidence_event_id
+
+    await _advance_to(world, 60)
+    second = next(event for event in world.events
+                  if event.id == world.regional_overflow.assessment(REGION_ID).evidence_event_id)
+
+    assert first in {link.cause_event_id for link in second.causal_links}
 
 
 @pytest.mark.asyncio
@@ -87,10 +158,10 @@ async def test_sustained_load_damages_one_water_site_is_observed_and_enters_exis
 
     occurrence = world.regional_overflow.occurrence(REGION_ID)
     assert occurrence is not None and occurrence.damaged_site_id == SITE_ID
-    # The overflow's own fixed loss (0.15) plus the same month's ordinary
-    # operating wear (0.01) from the settlement's genuine, no-longer-subsidized
-    # food trade over this site's dependent route.
-    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.84)
+    # The registered flood interaction owns the bounded loss (0.075 here).
+    # Cargo did traverse the dependent route, but only 90 bulk moved and the
+    # independent operating-wear law requires 100, so it contributes no loss.
+    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.925)
     assert route.capacity == nominal
     assert world.map.get_route_operational_capacity(route.id) < intact_operational
     start = next(event for event in world.events if event.id == occurrence.started_event_id)
@@ -99,12 +170,15 @@ async def test_sustained_load_damages_one_water_site_is_observed_and_enters_exis
     assert occurrence.started_event_id in {link.cause_event_id for link in damage.causal_links}
     assert any(delta.owner_kind == "site" and delta.owner_id == SITE_ID
                and delta.aspect == "integrity" for delta in damage.deltas)
+    assert damage.causal_payload["hazard_kind"] == "regional_flood"
+    assert damage.causal_payload["target_id"] == SITE_ID
+    assert damage.causal_payload["magnitude"] == pytest.approx(0.075)
 
     # Reports were refreshed after the damage in the same boundary. The legacy
     # repair executor is merely offered/authorized by its standing policy; this
     # overflow code itself made neither a decision nor a repair mutation.
     report = world.knowledge.site_report(world.map.infrastructure_sites[SITE_ID].maintainer_ref, SITE_ID)
-    assert report is not None and report.observed_day == 60 and report.integrity == pytest.approx(0.84)
+    assert report is not None and report.observed_day == 60 and report.integrity == pytest.approx(0.925)
     from src.server.medieval.queries import world_view
 
     observer = world_view(world)
@@ -128,7 +202,7 @@ async def test_overflow_never_repairs_when_the_maintainer_has_no_current_authori
     world.authority.offices[office.id] = office.model_copy(update={"ends_day": 0})
 
     await _advance_to(world, 60)
-    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.84)
+    assert world.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.925)
     assert not any(project.site_id == SITE_ID for project in world.economy.repairs.values())
 
     # No overflow-specific decision/project was created. A later normal use
@@ -158,7 +232,7 @@ async def test_overflow_assessment_round_trips_before_the_second_month(tmp_path,
     await _advance_to(restored, 60)
     occurrence = restored.regional_overflow.occurrence(REGION_ID)
     assert occurrence is not None and occurrence.damaged_site_id == SITE_ID
-    assert restored.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.84)
+    assert restored.map.infrastructure_sites[SITE_ID].integrity == pytest.approx(0.925)
 
 
 def test_schema_twenty_one_is_explicitly_rejected_without_migration(tmp_path):

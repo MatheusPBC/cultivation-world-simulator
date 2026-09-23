@@ -7,7 +7,7 @@ from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 
 from .models import (FreightRecoveryCase, Market, MoneyAccount, Payroll, PermanentEmploymentContract,
-                     ProductionFacility, Recipe, Resource, SettlementNeeds, Stock)
+                     ProductionFacility, ProductionPriority, Recipe, Resource, SettlementNeeds, Stock)
 from .serialization import EconomySerialization, REGISTRIES
 from .logistics import CargoParcel, FreightOrder, RouteFlow, validate_logistics
 from .expansion import ExpansionBlueprint, ExpansionProject, validate_expansions
@@ -24,6 +24,7 @@ class EconomyState(EconomySerialization):
     stocks: dict[str, Stock] = field(default_factory=dict)
     accounts: dict[str, MoneyAccount] = field(default_factory=dict)
     facilities: dict[str, ProductionFacility] = field(default_factory=dict)
+    production_priorities: dict[str, ProductionPriority] = field(default_factory=dict)
     payrolls: dict[str, Payroll] = field(default_factory=dict)
     needs: dict[str, SettlementNeeds] = field(default_factory=dict)
     payments: dict[str, str] = field(default_factory=dict)
@@ -83,6 +84,18 @@ class EconomyState(EconomySerialization):
             account = self.accounts.get(facility.payroll_account_id)
             if account is None or account.owner_ref != self.stocks[facility.stock_id].owner_ref:
                 raise ValueError("payroll requires the employer's account")
+        for priority in self.production_priorities.values():
+            facility = self.facilities.get(priority.facility_id)
+            account = self.accounts.get(priority.payroll_account_id)
+            stock = self.stocks.get(facility.stock_id) if facility is not None else None
+            recipe = self.recipes.get(facility.recipe_id) if facility is not None else None
+            if (facility is None or account is None or stock is None or recipe is None
+                    or priority.owner_ref != account.owner_ref
+                    or priority.owner_ref != stock.owner_ref
+                    or facility.payroll_account_id != priority.payroll_account_id
+                    or stock.location_id != priority.settlement_id
+                    or recipe.occupation != priority.occupation):
+                raise ValueError("production priority does not match its economic records")
         if len({contract.cohort_id for contract in self.employment_contracts.values()}) != len(self.employment_contracts):
             raise ValueError("a cohort cannot hold multiple permanent employment contracts")
         for contract in self.employment_contracts.values():
@@ -119,7 +132,35 @@ class EconomyState(EconomySerialization):
         owners = {"polity": world.society.polities, "organization": world.society.organizations,
                   "character": world.society.characters, "settlement": world.society.settlements,
                   "population_group": world.society.population}
-        events = {e.id: e for e in world.events}
+        events = world.event_index()
+        for priority in self.production_priorities.values():
+            owner = owners.get(priority.owner_ref.kind, {}).get(priority.owner_ref.id)
+            facility = self.facilities[priority.facility_id]
+            stock = self.stocks[facility.stock_id]
+            recipe = self.recipes[facility.recipe_id]
+            decision = events.get(priority.decision_event_id)
+            last = events.get(priority.last_event_id)
+            expected_owner = priority.owner_ref.to_dict()
+            if (owner is None
+                    or facility.payroll_account_id != priority.payroll_account_id
+                    or stock.location_id != priority.settlement_id
+                    or recipe.occupation != priority.occupation
+                    or decision is None or last is None
+                    or decision.fact_kind != FactKind.DECISION
+                    or decision.day >= priority.effective_day
+                    or decision.day > world.clock.absolute_day
+                    or last.day > world.clock.absolute_day
+                    or decision.decision is None
+                    or decision.decision.get("action") != "set_production_priority"
+                    or decision.decision.get("actor_ref") != expected_owner
+                    or decision.decision.get("selected_affordance_id") != priority.selected_affordance_id
+                    or last.event_type != "production_priority_selected"
+                    or priority.decision_event_id not in {link.cause_event_id for link in last.causal_links}
+                    or not any(delta.owner_kind == "production_priority" and delta.owner_id == priority.id
+                               and delta.aspect == "selected_affordance_id"
+                               and delta.after == priority.selected_affordance_id
+                               for delta in last.deltas)):
+                raise ValueError("invalid production priority provenance")
         if any(group.last_event_id is not None and group.last_event_id not in events
                for group in world.society.population.values()):
             raise ValueError("unknown population provenance")
@@ -230,11 +271,9 @@ class EconomyState(EconomySerialization):
                     or events[event_id].event_type not in {"payment_completed", "export_tariff_collected", "household_purchase_completed", "household_provisions_purchased", "customs_fee_paid"}
                     or decision_id not in {link.cause_event_id for link in events[event_id].causal_links}):
                 raise ValueError("invalid payment history")
-        for event in world.events:
-            if event.event_type not in {"household_purchase_completed", "household_provisions_purchased"}:
-                continue
-            actions = ({"buy_rations", "sell_rations"} if event.event_type == "household_purchase_completed"
-                       else {"buy_household_provisions", "sell_household_provisions"})
+        for event_type, actions in (("household_purchase_completed", {"buy_rations", "sell_rations"}),
+                                    ("household_provisions_purchased", {"buy_household_provisions", "sell_household_provisions"})):
+          for event in world.events_of_type(event_type):
             parties = [events[link.cause_event_id] for link in event.causal_links
                        if link.cause_event_id in events and events[link.cause_event_id].decision is not None
                        and events[link.cause_event_id].decision.get("action") in actions]
@@ -246,9 +285,7 @@ class EconomyState(EconomySerialization):
                     or any(p.day != event.day for p in parties)
                     or len({tuple(p.decision.get(key) for key in terms) for p in parties}) != 1):
                 raise ValueError("household purchase requires both decision receipts")
-        for event in world.events:
-            if event.event_type != "export_tariff_collected":
-                continue
+        for event in world.events_of_type("export_tariff_collected"):
             parties = [events[link.cause_event_id] for link in event.causal_links
                        if link.cause_event_id in events and events[link.cause_event_id].decision is not None
                        and events[link.cause_event_id].decision.get("action") in {"buy", "sell"}]

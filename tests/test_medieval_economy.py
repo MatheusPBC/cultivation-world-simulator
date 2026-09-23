@@ -8,6 +8,57 @@ from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from tests.medieval_relief_helpers import relieve_all_settlements
 
 
+def test_equivalent_cohorts_rotate_wage_access_across_months():
+    """The production owner must not starve one cohort by ID ordering."""
+    from src.sim.medieval.economy import produce_monthly
+    from src.systems.time import WorldClock
+
+    world = create_medieval_world(73)
+    facility = world.economy.facilities["works:campos-do-lume"]
+    stock = world.economy.stocks[facility.stock_id]
+    # Keep the production line materially executable while making storage
+    # irrelevant to the labor-allocation assertion.
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={"goods": {"food": 0}, "capacity": 100_000}
+    )
+    facility = facility.model_copy(update={"max_batches": 4})
+    world.economy.facilities[facility.id] = facility
+
+    world.clock = WorldClock(30)
+    produce_monthly(world)
+    first = world.economy.payrolls[facility.id].workers_by_group
+    assert sum(first.values()) == 40
+
+    world.clock = WorldClock(60)
+    produce_monthly(world)
+    second = world.economy.payrolls[facility.id].workers_by_group
+    assert sum(second.values()) == 40
+    assert first != second
+    assert set(first) != set(second), "a later month must rotate the starting cohort"
+
+
+def test_shared_payroll_facilities_rotate_budget_order_across_months():
+    """A shared treasury must not privilege the first facility by ID forever."""
+    from src.sim.medieval.economy import _rotated_facilities
+    from src.systems.time import WorldClock
+
+    world = create_medieval_world(73)
+    shared = [facility for facility in world.economy.facilities.values()
+              if facility.payroll_account_id == "treasury:auren"]
+    assert len(shared) > 1
+
+    world.clock = WorldClock(30)
+    first = tuple(item.id for item in _rotated_facilities(world)
+                  if item.payroll_account_id == "treasury:auren")
+    world.clock = WorldClock(60)
+    second = tuple(item.id for item in _rotated_facilities(world)
+                   if item.payroll_account_id == "treasury:auren")
+
+    assert first != second
+    assert set(first) == {item.id for item in shared}
+    assert set(second) == set(first)
+
+
 def test_world_has_owned_located_stocks_and_a_complete_resource_catalog():
     world = create_medieval_world(73)
     assert hasattr(world, "economy"), "medieval world needs canonical material economy"
@@ -98,9 +149,14 @@ async def test_month_consumes_each_person_once_and_daily_interrupt_does_not_cons
     assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
     assert sum(need.missing_food for need in world.economy.needs.values()) == 10900
     # The administration now chooses, settlement by settlement, to give its
-    # own stored food away -- the only way anyone actually eats.
+    # own stored food away -- the only way anyone actually eats.  The food
+    # leaves public granaries and enters canonical household pantries; it is
+    # not destroyed by the relief receipt.
     relieve_all_settlements(world)
-    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before - 10900
+    public_food = sum(s.goods.get("food", 0) for s in world.economy.stocks.values()
+                      if not s.id.startswith("household-stock:"))
+    assert public_food == before - 10900
+    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
     assert sum(need.missing_food for need in world.economy.needs.values()) == 0
 
 
@@ -222,6 +278,22 @@ def test_partial_site_integrity_limits_batches_before_consuming_inputs():
     world.map.infrastructure_sites[facility.site_id].update_runtime(integrity=0.5)
     produce_monthly(world)
     assert world.economy.stocks[stock_id].goods == {"iron": 3, "wood": 7, "tools": 1}
+
+
+def test_production_receipt_explains_engine_owned_limitation():
+    from src.sim.medieval.economy import produce_monthly
+
+    world = create_medieval_world(73)
+    produce_monthly(world)
+
+    limited = next(event for event in world.events if event.event_type == "production_limited")
+    reading = limited.causal_payload["production"]
+    assert reading["facility_id"] in world.economy.facilities
+    assert reading["observed_day"] == world.clock.absolute_day
+    assert reading["limitations"]
+    assert reading["limits"][reading["limitations"][0]] == reading["batches"]
+    assert any(delta.owner_kind == "production" and delta.owner_id == reading["facility_id"]
+               for delta in limited.deltas)
 
 
 @pytest.mark.parametrize("mutation", ["owner", "location", "resource", "capacity", "provenance"])

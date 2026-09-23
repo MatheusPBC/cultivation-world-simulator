@@ -90,6 +90,14 @@ def grant_civic_amnesty(world, actor, option_id, decision_event_id):
         candidate, "civic_amnesty_granted",
         "A administração concedeu anistia formal após a negociação cívica.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": decision_actor.to_dict(),
+            "selected_affordance_id": option.id,
+            "amnesty_id": f"civic-amnesty:{decision.id}",
+            "movement_id": movement.id,
+            "negotiation_event_id": option.negotiation_event_id,
+        },
         deltas=(_delta("civic_amnesty", f"civic-amnesty:{decision.id}", "stage", None, "granted"),),
         cause_ids=_causes(decision.id, option.negotiation_event_id, option.report_event_id),
     )

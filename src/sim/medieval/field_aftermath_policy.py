@@ -9,6 +9,7 @@ from src.classes.event import FactKind
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
+from .ai_decider import ProviderDecisionRequired
 from .events import record_event
 from .force import (OCCUPY_ACTION, PREPARE_POSITION_ACTION, WITHDRAW_ACTION,
                     force_options, force_position_options, occupy_settlement,
@@ -47,12 +48,6 @@ def _notice_id(situation):
         return None
     identity = situation.id[len(_PREFIX):]
     return identity or None
-
-
-def _turn_available(world):
-    # Calling select_option while unavailable would write a failed receipt.
-    # An unavailable provider is deliberately not a decision in this vertical.
-    return ai_decider.provider_available() and ai_decider.within_budget(world)
 
 
 def field_aftermath_options(world, actor, *, outcome_notice_id=None):
@@ -148,7 +143,12 @@ def _label(option):
 
 async def _aftermath_turn(world, outcome_notice_id):
     notice = world.knowledge.field_engagement_outcome_notices.get(outcome_notice_id)
-    if notice is None or notice.outcome != "won" or not _turn_available(world):
+    if notice is None or notice.outcome != "won":
+        return False
+    # Field aftermath is an optional provider-driven decision. Offline worlds
+    # leave the review inert; provider mode must reach select_option so its
+    # fail-closed ProviderDecisionRequired behavior remains authoritative.
+    if not world.config.ai_enabled:
         return False
     options = _current_options(world, notice)
     if not options:
@@ -181,17 +181,21 @@ async def _aftermath_turn(world, outcome_notice_id):
         return False
     option = next((item for item in _current_options(world, notice) if item.id == selected), None)
     if option is None:
-        return False
+        raise ProviderDecisionRequired(
+            f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+            "field aftermath affordance became stale"
+        )
     decision = record_event(
         world, "field_aftermath_decided", "O vencedor escolheu uma consequência possível após o combate de campo.",
         fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,),
     )
     try:
         execute_field_aftermath_option(world, notice.recipient_ref, notice.id, option.id, decision.id)
-    except ValueError:
-        # A material owner rejected a stale situation. The decision itself is
-        # still an auditable fact; it never creates an implicit fallback.
-        return False
+    except ValueError as exc:
+        raise ProviderDecisionRequired(
+            f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+            "field aftermath affordance became stale"
+        ) from exc
     return True
 
 

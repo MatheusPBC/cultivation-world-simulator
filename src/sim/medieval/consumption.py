@@ -54,7 +54,7 @@ def buy_rations(world, *, group_id, stock_id, quantity, unit_price,
         raise ValueError("ration price, stock or funds changed")
     terms = {"group_id": group_id, "stock_id": stock_id, "quantity": quantity,
              "unit_price": unit_price, "seller_account_id": seller_account_id}
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     for eid, action, actor in ((buyer_decision_id, "buy_rations", buyer.owner_ref),
                                (seller_decision_id, "sell_rations", seller.owner_ref)):
         event = events.get(eid)
@@ -87,11 +87,11 @@ def purchase_monthly_rations(world, need, consumed, requirements=None):
     shares = requirement_shares(requirements, consumed) if requirements is not None else ration_shares(groups, consumed)
     accounts = sorted((a for a in economy.accounts.values() if a.owner_ref == stock.owner_ref), key=lambda a: a.id)
     if not accounts or not can_actor_act_for(world, stock.owner_ref, stock.owner_ref, "trade"):
-        return 0, ()  # No authorized commercial supplier; nothing is paid, so it stays missing.
+        return 0, (), {}  # No authorized supplier; every unpaid ration stays missing.
     seller_id = accounts[0].id
     market = economy.markets[need.id]
     price = market.prices["food"]
-    paid, receipts = 0, []
+    paid, receipts, paid_by_group = 0, [], {}
     for group in sorted(groups, key=lambda g: g.id):
         buyer = economy.accounts.get(f"household:{group.id}")
         quantity = min(shares.get(group.id, 0), buyer.balance // price) if buyer else 0
@@ -112,5 +112,6 @@ def purchase_monthly_rations(world, need, consumed, requirements=None):
                                                  economy.stocks[stock.id].last_event_ids.get("food")))
         receipt = buy_rations(world, **terms, buyer_decision_id=decision.id, seller_decision_id=consent.id)
         paid += quantity
+        paid_by_group[group.id] = quantity
         receipts.append(receipt.id)
-    return paid, tuple(receipts)
+    return paid, tuple(receipts), paid_by_group

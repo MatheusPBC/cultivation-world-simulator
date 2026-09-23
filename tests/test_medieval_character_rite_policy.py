@@ -7,6 +7,7 @@ import pytest
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.actions import start_practice
 from src.sim.medieval.character_rite_policy import (OFFER_REVIEW_KIND, SPONSOR_REVIEW_KIND,
                                                      review_character_rites,
@@ -36,7 +37,7 @@ def prepared_world():
 
 
 def enable(world):
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
                                                    "ai_max_calls": 10})
     return world
 
@@ -148,3 +149,45 @@ async def test_character_offer_refuses_or_rejects_all_invalid_local_states_witho
         record_rite_offer(invalid, invalid_healer.id, option.id + ":forged")
     assert (len(invalid.events), dict(invalid.economy.needs), dict(invalid.research.rites)) == before
     assert invalid.economy.needs[PLACE].health < HEALTH_THRESHOLD
+
+
+async def test_scheduled_rite_pauses_when_provider_disappears(monkeypatch):
+    world, healer = prepared_world()
+    enable(world)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    scheduled = schedule_character_rite_offers(world)
+    assert scheduled
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    before = world_snapshot(world)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_character_rites(world, due)
+    assert world_snapshot(world) == before
+    assert not world.research.rites
+
+
+async def test_rite_offer_that_goes_stale_pauses_instead_of_noop(monkeypatch):
+    from src.sim.medieval import character_rite_policy as policy
+
+    world, healer = prepared_world()
+    enable(world)
+    initial = policy.rite_offer_options(world, healer.id)
+    assert initial
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    scheduled = schedule_character_rite_offers(world)
+    assert scheduled
+    calls = 0
+
+    def options(current, character_id):
+        nonlocal calls
+        calls += 1
+        return initial if calls == 1 else ()
+
+    monkeypatch.setattr(policy, "rite_offer_options", options)
+    select_first(monkeypatch, [])
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_character_rites(world, due)
+    assert not any(event.event_type == "rite_offered" for event in world.events)

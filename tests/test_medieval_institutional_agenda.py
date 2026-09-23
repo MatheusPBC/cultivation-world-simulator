@@ -7,6 +7,7 @@ import pytest
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.institutional_agenda import (monthly_actors, monthly_adapters,
                                                    review_monthly_institutional_turn)
 from src.sim.medieval.institutional_decision_turn import _by_id
@@ -38,6 +39,7 @@ def test_one_menu_carries_several_families_at_once():
 
 async def test_each_institution_answers_at_most_one_consultation_per_boundary(monkeypatch):
     world = civil_pressure_world()
+    world.config = world.config.model_copy(update={"ai_calls_per_step": 256, "ai_max_calls": 1000})
     prompts = []
     _provider(monkeypatch, ai_decider.NO_ACTION, prompts)
 
@@ -52,10 +54,17 @@ async def test_each_institution_answers_at_most_one_consultation_per_boundary(mo
 
 async def test_the_single_decision_names_one_affordance_and_runs_its_own_executor(monkeypatch):
     world = civil_pressure_world()
+    world.config = world.config.model_copy(update={"ai_calls_per_step": 256, "ai_max_calls": 1000})
     by_id = _by_id(world, AUREN, monthly_adapters())
     chosen = sorted(by_id)[0]
     prompts = []
-    _provider(monkeypatch, chosen, prompts)
+    async def choose_for_auren(prompt, *args, **kwargs):
+        prompts.append(prompt)
+        payload = json.loads(prompt[prompt.index("{"):])
+        return {"selected_id": chosen if payload["you_are"] == AUREN.to_dict() else ai_decider.NO_ACTION}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_for_auren)
 
     claims, covered = await review_monthly_institutional_turn(world)
 
@@ -71,9 +80,8 @@ async def test_never_asked_actors_claim_nothing_so_automatic_passes_still_run(mo
     world = civil_pressure_world()
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
 
-    claims, covered = await review_monthly_institutional_turn(world)
-
-    assert claims == {} and covered == set()
+    with pytest.raises(ProviderDecisionRequired):
+        await review_monthly_institutional_turn(world)
 
 
 def test_every_actor_of_every_family_is_included_once():

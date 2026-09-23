@@ -1,5 +1,6 @@
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.economy.models import Stock
 from src.classes.governance.models import StrategicPlan
@@ -23,7 +24,13 @@ def tariff_world():
     option = next(item for item in tariff_options(world, "auren") if item.export_rate_permille == 50)
     decision = record_event(world, "export_tariff_decided", "Escolha fiscal atual.",
                             fact_kind=FactKind.DECISION, decision=option.decision())
-    set_export_tariff(world, option.id, decision_event_id=decision.id)
+    event = set_export_tariff(world, option.id, decision_event_id=decision.id)
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert event.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": {"kind": "polity", "id": option.polity_id},
+        "selected_affordance_id": option.id,
+    }
     refresh_trade_reports(world, replace_today=True)
     return world
 

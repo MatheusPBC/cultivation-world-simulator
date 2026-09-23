@@ -23,7 +23,10 @@ from .events import record_event
 from .labor import settle_work
 
 OBSERVATION_DAYS = 30
-REPAIR_AUTHORIZATION_ACTION = "authorize_infrastructure_repair"
+# The transient affordance is the maintainer's material restoration choice.
+# The owner still creates the persisted repair project and private payment
+# intent after revalidation; the provider never receives those terms.
+REPAIR_AUTHORIZATION_ACTION = "restore_infrastructure_site"
 REACTIVATE_ACTION = "reactivate_infrastructure_site"
 
 
@@ -260,7 +263,7 @@ class RepairAuthorizationOption:
 
     def decision(self):
         return {"action": REPAIR_AUTHORIZATION_ACTION, "actor_ref": self.actor_ref.to_dict(),
-                "site_id": self.site_id}
+                "selected_affordance_id": self.id}
 
 
 @dataclass(frozen=True)
@@ -324,6 +327,12 @@ def execute_site_reactivation(world, actor, option_id, decision_event_id):
         world, "site_reactivated",
         f"{site.name}: o maintainer retomou a operação após a recuperação física.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": actor.to_dict(),
+            "selected_affordance_id": option.id,
+        },
         deltas=(_delta("site", site.id, "enabled", False, True),),
         cause_ids=_causes(decision.id, report.event_id, site.last_event_id),
     )

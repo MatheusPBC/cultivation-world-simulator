@@ -1,12 +1,14 @@
 """A real provider may choose; it may never mutate, leak or be required."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
-from src.sim.medieval.ai_decider import DECLINED_EVENT, FAILED_EVENT, INTERPRETED_EVENT
+from src.sim.medieval.ai_decider import (DECLINED_EVENT, FAILED_EVENT, INTERPRETED_EVENT,
+                                         ProviderDecisionRequired)
 from src.sim.medieval.institutional_aid_policy import (review_institutional_aid,
                                                        review_institutional_aid_with_provider)
 from src.sim.medieval.institutional_aid import aid_request_options
@@ -30,6 +32,30 @@ def provider(monkeypatch, answer, *, seen=None):
         return answer
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+
+
+def test_provider_availability_reads_the_nested_llm_profile(monkeypatch):
+    """The application settings own a container, not the runtime profile itself."""
+    from src.config import settings_service
+
+    profile = SimpleNamespace(has_api_key=True, model_name="provider-model",
+                              base_url="https://provider.example", api_format="openai")
+    # The suite fixture clears the real function's cache during teardown, so
+    # restore it before that lifecycle hook runs.
+    with monkeypatch.context() as scoped:
+        scoped.setattr(settings_service, "get_settings_service",
+                       lambda: SimpleNamespace(get_llm_runtime_config=lambda: (profile, "provider-key")))
+        assert ai_decider.provider_available() is True
+
+
+def test_codex_oauth_provider_does_not_require_an_api_key(monkeypatch):
+    from src.config import settings_service
+
+    profile = SimpleNamespace(model_name="gpt-5.6-luna", base_url="codex://local", api_format="codex_cli")
+    with monkeypatch.context() as scoped:
+        scoped.setattr(settings_service, "get_settings_service",
+                       lambda: SimpleNamespace(get_llm_runtime_config=lambda: (profile, "")))
+        assert ai_decider.provider_available() is True
 
 
 async def requested_world():
@@ -74,6 +100,28 @@ async def test_a_provider_choice_becomes_a_canonical_decision_without_leaking(tm
     assert "prosa que deve ser descartada" not in payload
     assert "selected_id" not in payload and "api_key" not in payload
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+async def test_aid_response_that_goes_stale_pauses_instead_of_becoming_noop(monkeypatch):
+    from src.sim.medieval import institutional_aid_policy as policy
+
+    world, notice = await requested_world()
+    actor = notice.recipient_ref
+    initial = policy._response_candidates(world, actor)
+    assert initial[1] is not None
+    calls = 0
+
+    def response_candidates(current, current_actor):
+        nonlocal calls
+        calls += 1
+        return initial if calls == 1 else ((), None, None)
+
+    monkeypatch.setattr(policy, "_response_candidates", response_candidates)
+    provider(monkeypatch, {"selected_id": initial[1].id})
+    with pytest.raises(ProviderDecisionRequired):
+        await policy._respond_with_provider(world, actor)
+    assert not any(item.event_type in {"institutional_aid_accepted", "institutional_aid_rejected"}
+                   for item in world.events)
 
 
 async def test_provider_can_select_a_current_request_option(monkeypatch):
@@ -125,6 +173,13 @@ async def test_private_affordance_handle_is_opaque_in_prompt_but_maps_back_to_ca
 async def test_a_failed_or_invalid_answer_does_not_fabricate_an_aid_action(answer, monkeypatch):
     world, notice = await requested_world()
     provider(monkeypatch, answer)
+    if isinstance(answer, Exception) or answer.get("selected_id") == "forged:option":
+        with pytest.raises(ProviderDecisionRequired):
+            await review_institutional_aid_with_provider(world, allow_requests=False)
+        assert not any(item.event_type in {"institutional_aid_accepted", "institutional_aid_rejected",
+                                           "institutional_aid_fulfilled", "institutional_aid_remediated"}
+                       for item in world.events)
+        return
     await review_institutional_aid_with_provider(world, allow_requests=False)
 
     receipts = [item for item in world.events
@@ -152,3 +207,37 @@ async def test_a_decline_is_its_own_event_type_not_a_sentence(monkeypatch):
     assert DECLINED_EVENT not in {INTERPRETED_EVENT, FAILED_EVENT}
     # A decline still spends the shared budget, exactly as before.
     assert ai_decider.spent_calls(world) == 1
+
+
+async def test_aid_no_action_stops_later_family_consultations(monkeypatch):
+    """An explicit decline is a complete actor turn, not an empty menu."""
+    from src.sim.medieval import institutional_aid_policy as policy
+
+    world = enable(pressured_world())
+    calls = []
+
+    async def response(_world, actor):
+        calls.append(("response", actor.id))
+        return False  # consulted, then NO_ACTION
+
+    async def fulfillment(_world, actor):
+        calls.append(("fulfillment", actor.id))
+        return True
+
+    async def remediation(_world, actor):
+        calls.append(("remediation", actor.id))
+        return True
+
+    async def request(_world, actor):
+        calls.append(("request", actor.id))
+        return True
+
+    monkeypatch.setattr(policy, "_respond_with_provider", response)
+    monkeypatch.setattr(policy, "_fulfill_with_provider", fulfillment)
+    monkeypatch.setattr(policy, "_remediate_with_provider", remediation)
+    monkeypatch.setattr(policy, "_request_with_provider", request)
+
+    await policy.review_institutional_aid_with_provider(world, allow_requests=True)
+
+    assert calls
+    assert {family for family, _actor in calls} == {"response"}

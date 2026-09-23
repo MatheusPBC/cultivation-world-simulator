@@ -74,6 +74,11 @@ class TaxPolicy(SocietyValue):
     income_rate: Permille = 100
     export_rate_permille: Permille = 0
     export_policy_event_id: Identity | None = None
+    # A directed, revocable economic closure. It names the polities this
+    # administration refuses at its own checkpoints; it never touches the Map,
+    # a route's capacity, or anyone else's trade.
+    embargoed_ids: tuple[Identity, ...] = ()
+    embargo_policy_event_id: Identity | None = None
     last_event_id: Identity | None = None
 
 
@@ -185,11 +190,11 @@ class WorkforceDemandReport(SocietyValue):
     recipient_ref: EntityRef
     publisher_ref: EntityRef
     sponsor_ref: EntityRef
-    work_kind: Literal["facility", "repair", "customs"]
+    work_kind: Literal["facility", "repair", "customs", "research", "military_recruitment"]
     work_id: Identity
     # The engine derives this from the material work.  It is never selected by
     # a sponsor or a population group.
-    target_occupation: Literal["farmer", "artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant", "soldier"]
     account_id: Identity
     count: Annotated[int, Field(strict=True, gt=0)]
     stipend_per_person: Annotated[int, Field(strict=True, gt=0)]
@@ -222,7 +227,7 @@ class WorkforceOfferNotice(SocietyValue):
     sponsor_ref: EntityRef
     demand_id: Identity
     source_group_id: Identity
-    target_occupation: Literal["farmer", "artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant", "soldier"]
     count: Annotated[int, Field(strict=True, gt=0)]
     stipend_per_person: Annotated[int, Field(strict=True, gt=0)]
     observed_day: Count
@@ -468,7 +473,8 @@ class CustomsNotice(SocietyValue):
     learned_day: Count
     event_id: Identity
     state_event_id: Identity
-    state: Literal["presented", "fee_due", "detected", "evaded_undetected", "cleared", "returned", "seized"]
+    state: Literal["presented", "fee_due", "detected", "evaded_undetected", "cleared", "returned",
+                   "seized", "refused"]
     manifest_id: Identity | None = None
     channel: Literal["direct_customs_notice"] = "direct_customs_notice"
 
@@ -692,7 +698,12 @@ class Objective(SocietyValue):
     settlement_id: Identity
     stock_id: Identity
     resource_id: Identity = "food"
-    kind: Literal["maintain_food_reserve", "maintain_production_inputs", "defend_occupied_settlement"] = "maintain_food_reserve"
+    kind: Literal["maintain_food_reserve", "maintain_production_inputs", "defend_occupied_settlement",
+                  "maintain_garrison_supply"] = "maintain_food_reserve"
+    # A standing military duty an institution chose to sustain. It only names
+    # the garrison whose rations this objective reserves; it never recruits,
+    # marches, buys, or keeps the duty alive by itself.
+    garrison_id: Identity | None = None
     reserve_months: int = Field(default=2, strict=True, ge=1, le=12)
     motivation: Identity = "Proteger o abastecimento dos habitantes."
 
@@ -700,8 +711,9 @@ class Objective(SocietyValue):
 class StrategicPlan(SocietyValue):
     id: Identity
     objective_id: Identity
-    stage: Literal["acquire", "await_delivery", "satisfied", "adopted", "closed", "blocked"]
+    stage: Literal["acquire", "await_delivery", "satisfied", "adopted", "mobilized", "closed", "blocked"]
     order_ids: tuple[Identity, ...] = ()
+    detachment_id: Identity | None = None
     blocker: Identity | None = None
     last_review_day: Count
     last_event_id: Identity

@@ -1,6 +1,8 @@
 import pytest
 
+from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.actions import start_practice, start_travel
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -99,6 +101,67 @@ async def test_persistence_failure_does_not_publish_a_partial_step(tmp_path, mon
     assert world_snapshot(world) == before
     assert [e.model_dump(mode="json") for e in world.events] == before_events
     assert world_snapshot(load_world(path)) == before
+
+
+async def test_provider_stale_affordance_pauses_and_discards_monthly_candidate(monkeypatch):
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 8, "ai_max_calls": 100,
+    })
+    before = world_snapshot(world)
+    before_events = [event.model_dump(mode="json") for event in world.events]
+
+    async def stale_menu(candidate, *, allow_offers=True):
+        from src.sim.medieval.institutional_decision_turn import STALE_AFFORDANCE_EVENT_TYPE
+        from src.sim.medieval.events import record_event
+        record_event(candidate, STALE_AFFORDANCE_EVENT_TYPE,
+                     "A opção escolhida ficou obsoleta durante a revalidação.",
+                     fact_kind=FactKind.OCCURRENCE)
+        return {}, True
+
+    monkeypatch.setattr("src.sim.medieval.engine.review_monthly_institutional_turn", stale_menu)
+    with pytest.raises(ProviderDecisionRequired, match="stale"):
+        await MedievalSimulator(world).step()
+
+    assert world_snapshot(world) == before
+    assert [event.model_dump(mode="json") for event in world.events] == before_events
+
+
+async def test_provider_budget_exhaustion_discards_the_monthly_candidate(monkeypatch):
+    """A later unconsulted institution must not publish earlier provider work."""
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 32, "ai_max_calls": 1,
+    })
+    before = world_snapshot(world)
+    before_events = [event.model_dump(mode="json") for event in world.events]
+
+    async def choose_first(prompt, *args, **kwargs):
+        import json
+        return {"selected_id": json.loads(prompt.rsplit("\n", 1)[1])["choices"][0]["id"]}
+
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_first)
+    with pytest.raises(ProviderDecisionRequired, match="budget"):
+        await MedievalSimulator(world).step()
+
+    assert world_snapshot(world) == before
+    assert [event.model_dump(mode="json") for event in world.events] == before_events
+
+
+async def test_offline_monthly_boundary_can_execute_only_an_enumerated_relief_choice():
+    """The engine wires the declared offline policy through the normal owner."""
+    world = create_medieval_world(73)
+    world.economy.facilities.clear()
+
+    await MedievalSimulator(world).step()
+
+    relief = next(event for event in world.events if event.event_type == "relief_distributed")
+    decision = next(event for event in world.events
+                    if event.fact_kind == FactKind.DECISION
+                    and event.id in {link.cause_event_id for link in relief.causal_links})
+    assert decision.decision["selected_affordance_id"].startswith("relief-distribute:")
+    assert decision.causal_origin.value == "actor_decision"
 
 
 def test_an_actor_cannot_train_and_travel_simultaneously():

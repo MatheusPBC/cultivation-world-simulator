@@ -3,6 +3,7 @@
 from collections import defaultdict
 import copy
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from .economy import _causes, _delta
@@ -31,12 +32,6 @@ def update_markets(world):
             if economy.stocks[facility.stock_id].location_id == market.id:
                 for rid, amount in economy.recipes[facility.recipe_id].inputs.items():
                     demand[rid] += amount * facility.max_batches
-        # Freeze the readings as sorted dictionaries.  The price is a bounded
-        # response to these readings; the readings themselves are useful
-        # evidence for an actor deciding whether to trade, produce or request
-        # relief, so they must survive the event and save/load boundary.
-        observed_supply = {rid: supply[rid] for rid in sorted(economy.resources)}
-        observed_demand = {rid: demand[rid] for rid in sorted(economy.resources)}
         prices = {}
         from .demand import construction_demand, repair_demand, research_demand
         for stock in economy.stocks.values():
@@ -52,6 +47,13 @@ def update_markets(world):
                     report = world.knowledge.site_report(project.maintainer_ref, project.site_id)
                     if report is not None:
                         causes.append(report.event_id)
+        # Freeze the readings only after every engine-owned demand component
+        # used by the quote has been accumulated.  Otherwise actors would
+        # receive a public demand reading that disagreed with the price they
+        # were asked to evaluate (notably for repair/research/construction
+        # inputs).
+        observed_supply = {rid: supply[rid] for rid in sorted(economy.resources)}
+        observed_demand = {rid: demand[rid] for rid in sorted(economy.resources)}
         for rid, resource in economy.resources.items():
             desired = resource.base_price * (2 * max(1, demand[rid]) + 1) // (supply[rid] + 1)
             desired = min(resource.base_price * 4, max((resource.base_price + 3) // 4, desired))
@@ -76,7 +78,7 @@ def update_markets(world):
 
 
 def _purchase_terms(world, buy_id, sell_id):
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     buy, sell = events.get(buy_id), events.get(sell_id)
     if (buy_id == sell_id or buy is None or sell is None or buy.fact_kind != FactKind.DECISION
             or sell.fact_kind != FactKind.DECISION or buy.decision is None or sell.decision is None):
@@ -149,13 +151,15 @@ def _purchase_terms(world, buy_id, sell_id):
     return terms, fee, collector
 
 
-def purchase(world, buy_decision_id, sell_decision_id):
+def purchase(world, buy_decision_id, sell_decision_id, *,
+             causal_origin=CausalOrigin.DETERMINISTIC, causal_payload=None):
     """Publish cash and cargo together; a later delivery is independent of payment."""
     world.economy.validate(world)
     terms, fee, collector = _purchase_terms(world, buy_decision_id, sell_decision_id)
     candidate = copy.deepcopy(world)
     order = open_order(candidate, terms["source_id"], terms["destination_id"], terms["resource_id"], terms["quantity"],
-                       terms["route_ids"], decision_ids=(buy_decision_id, sell_decision_id))
+                       terms["route_ids"], decision_ids=(buy_decision_id, sell_decision_id),
+                       causal_origin=causal_origin, causal_payload=causal_payload)
     economy = candidate.economy
     buyer, seller = economy.accounts[terms["buyer_account_id"]], economy.accounts[terms["seller_account_id"]]
     amount = terms["quantity"] * terms["unit_price"]
@@ -167,13 +171,15 @@ def purchase(world, buy_decision_id, sell_decision_id):
                          (f"Compra à vista: {amount} unidades monetárias pagas."
                           if not fee else f"Compra à vista: {amount} ao vendedor e {fee} de tarifa de exportação."),
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=causal_origin, causal_payload=causal_payload,
                          deltas=tuple(_delta("account", account_id, "balance", economy.accounts[account_id].balance,
                                              economy.accounts[account_id].balance + change)
                                       for account_id, change in sorted(deltas_by_account.items()) if change),
                          cause_ids=_causes(buy_decision_id, sell_decision_id, order.last_event_id,
                                            buyer.last_event_id, seller.last_event_id,
                                            collector.last_event_id if collector else None,
-                                           terms["export_policy_event_id"]))
+                                           terms["export_policy_event_id"],
+                                           (causal_payload or {}).get("decision_event_id")))
     for account_id, change in deltas_by_account.items():
         account = economy.accounts[account_id]
         economy.accounts[account_id] = account.model_copy(update={"balance": account.balance + change, "last_event_id": event.id})

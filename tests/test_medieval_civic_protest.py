@@ -6,14 +6,17 @@ import pytest
 
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
+from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.civic_protest import (civic_protest_options, civic_refusal_options,
                                             open_civic_protest, refuse_civic_demand)
 from src.sim.medieval.civic_tumult import civic_tumult_options, execute_civic_tumult
 from src.sim.medieval.civic_movement import (civic_movement_dissolve_options,
                                              civic_movement_options,
+                                             civic_movement_join_options,
                                              dissolve_civic_movement,
                                              form_civic_movement,
+                                             join_civic_movement,
                                              civic_rebellion_options,
                                              declare_civic_rebellion,
                                              civic_revolution_options,
@@ -52,11 +55,37 @@ def _pressured(world):
     return group
 
 
+def _join_second_group(world, movement):
+    candidate = next(
+        group for group in sorted(world.society.population.values(), key=lambda item: item.id)
+        if group.settlement_id == movement.settlement_id
+        and group.id not in movement.member_group_ids
+        and civic_movement_join_options(world, group.id)
+    )
+    option = civic_movement_join_options(world, candidate.id)[0]
+    decision = record_event(world, "civic_movement_join_decided", "Um grupo consentiu em entrar.",
+                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            cause_ids=(movement.last_event_id, option.report_event_id))
+    return join_civic_movement(world, candidate.id, option.id, decision.id)
+
+
 def _tick(world):
     world.clock = world.clock.advance(1)
     due = world.agenda.pop_due(world.clock.absolute_day)
     resolve_dated(world, due)
     return due
+
+
+def test_protest_does_not_reserve_a_group_already_committed_elsewhere(monkeypatch):
+    world = create_medieval_world(73)
+    group = _pressured(world)
+    original = world.society.available_count
+
+    def partially_reserved(group_id):
+        return (group.count - 1 if group_id == group.id else original(group_id))
+
+    monkeypatch.setattr(world.society, "available_count", partially_reserved)
+    assert civic_protest_options(world, group.id) == ()
 
 
 def test_administrator_civic_context_contains_only_known_institutional_memory():
@@ -118,6 +147,13 @@ def test_opening_requires_own_reading_reserves_only_work_and_notifies_admin_priv
     assert sum(account.balance for account in world.economy.accounts.values()) == money
     assert {stock.id: dict(stock.goods) for stock in world.economy.stocks.values()} == stocks
     assert world.society.settlements[PLACE].administrator_id == government
+
+    # The participation count remains historical after closure. A later
+    # workforce/migration change may shrink the same cohort below five without
+    # making the closed protest invalid.
+    closed_group = world.society.population[group.id]
+    world.society.population[group.id] = closed_group.model_copy(update={"count": 4})
+    world.society.validate(set(world.map.regions), world)
 
 
 def test_high_unrest_exposes_a_bounded_organized_strike_without_creating_authority():
@@ -235,15 +271,23 @@ def test_refusal_and_multiple_local_groups_form_a_limited_civic_movement(tmp_pat
                             fact_kind=FactKind.DECISION, decision=option.decision(),
                             cause_ids=(option.catalyst_event_id, *option.report_event_ids))
     movement = form_civic_movement(world, group.id, option.id, decision.id)
+    assert len(movement.member_group_ids) == 1
+    movement = _join_second_group(world, movement)
+    available.update({group_id: world.society.available_count(group_id)
+                      + movement.participants_by_group[group_id]
+                      for group_id in movement.member_group_ids
+                      if group_id not in available})
 
     assert movement.stage == "active"
-    assert len(movement.member_group_ids) >= 2
+    assert len(movement.member_group_ids) == 2
     assert movement.leader_character_id == "character:005"
     assert all(world.society.available_count(group_id)
                == available[group_id] - movement.participants_by_group[group_id]
                for group_id in movement.member_group_ids)
-    formed = next(event for event in world.events if event.id == movement.last_event_id)
+    formed = next(event for event in world.events if event.event_type == "civic_movement_formed")
     assert formed.event_type == "civic_movement_formed"
+    assert formed.causal_payload["movement_id"] == movement.id
+    assert formed.causal_payload["initial_participant_count"] == movement.participants_by_group[movement.initiator_group_id]
     assert option.catalyst_event_id in {link.cause_event_id for link in formed.causal_links}
     assert any(delta.owner_kind == "civic_movement" and delta.owner_id == movement.id
                and delta.aspect == "stage" and delta.after == "active" for delta in formed.deltas)
@@ -280,6 +324,7 @@ def test_civic_movement_can_start_and_materially_end_a_bounded_general_strike(tm
                                      fact_kind=FactKind.DECISION, decision=movement_option.decision(),
                                      cause_ids=(movement_option.catalyst_event_id, *movement_option.report_event_ids))
     movement = form_civic_movement(world, group.id, movement_option.id, movement_decision.id)
+    movement = _join_second_group(world, movement)
 
     world.clock = world.clock.advance(3)
     world.economy.needs[PLACE] = world.economy.needs[PLACE].model_copy(update={"unrest": 700})
@@ -326,6 +371,7 @@ def test_completed_mobilization_exposes_rebellion_without_transferring_administr
                                      fact_kind=FactKind.DECISION, decision=movement_option.decision(),
                                      cause_ids=(movement_option.catalyst_event_id, *movement_option.report_event_ids))
     movement = form_civic_movement(world, group.id, movement_option.id, movement_decision.id)
+    movement = _join_second_group(world, movement)
     world.clock = world.clock.advance(3)
     world.economy.needs[PLACE] = world.economy.needs[PLACE].model_copy(update={"unrest": 850})
     refresh_settlement_reports(world)
@@ -351,6 +397,21 @@ def test_completed_mobilization_exposes_rebellion_without_transferring_administr
     pressure = next(item for item in world.events if item.event_type == "civic_rebellion_pressure")
     assert event.id in {link.cause_event_id for link in pressure.causal_links}
     refresh_settlement_reports(world)
+    soldier_group = next(item for item in world.society.population.values()
+                         if item.settlement_id == PLACE and item.count >= 5)
+    soldiers = soldier_group.model_copy(update={
+        "id": "pop:pedraclara:civic-suppression:soldier",
+        "occupation": "soldier", "count": 5,
+    })
+    world.society.population[soldiers.id] = soldiers
+    fixture_event = record_event(world, "suppression_force_fixture",
+                                 "Premissa material da força de repressão.")
+    world.society.detachments["detachment:civic-suppression"] = Detachment(
+        id="detachment:civic-suppression", owner_ref=ADMIN,
+        source_group_id=soldiers.id, count=5, location_id=PLACE,
+        destination_id=PLACE, provisions=3, stage="present", started_day=world.clock.absolute_day,
+        due_day=world.clock.absolute_day + 30, decision_event_id=fixture_event.id,
+        last_event_id=fixture_event.id)
     response = civic_rebellion_response_options(world, ADMIN)[0]
     response_decision = record_event(world, "civic_rebellion_response_decided", "A administração decidiu reprimir a rebelião.",
                                      fact_kind=FactKind.DECISION, decision=response.decision(),
@@ -364,6 +425,14 @@ def test_completed_mobilization_exposes_rebellion_without_transferring_administr
     pressure = next(item for item in world.events if item.event_type == "civic_suppression_pressure")
     suppression = next(item for item in world.events if item.event_type == "civic_movement_suppressed")
     assert pressure.id in {link.cause_event_id for link in suppression.causal_links}
+    assert suppression.causal_payload == {
+        "decision_event_id": response_decision.id,
+        "actor_ref": ADMIN.to_dict(),
+        "selected_affordance_id": response.id,
+        "movement_id": result.id,
+        "suppression_detachment_id": "detachment:civic-suppression",
+        "provisions_consumed": 1,
+    }
     assert world.events[-1].event_type == "civic_movement_suppressed"
 
 
@@ -383,6 +452,7 @@ def test_administration_can_offer_negotiation_and_leader_can_accept_with_relief(
                                      fact_kind=FactKind.DECISION, decision=movement_option.decision(),
                                      cause_ids=(movement_option.catalyst_event_id, *movement_option.report_event_ids))
     movement = form_civic_movement(world, group.id, movement_option.id, movement_decision.id)
+    movement = _join_second_group(world, movement)
     world.clock = world.clock.advance(3)
     world.economy.needs[PLACE] = world.economy.needs[PLACE].model_copy(update={"unrest": 850})
     refresh_settlement_reports(world)
@@ -450,6 +520,14 @@ def test_administration_can_offer_negotiation_and_leader_can_accept_with_relief(
     assert world.society.available_count(group.id) == world.society.population[group.id].count
     assert world.events[-1].event_type == "civic_amnesty_granted"
     assert amnesty.negotiation_event_id in {link.cause_event_id for link in world.events[-1].causal_links}
+    assert world.events[-1].causal_payload == {
+        "decision_event_id": amnesty_decision.id,
+        "actor_ref": ADMIN.to_dict(),
+        "selected_affordance_id": amnesty.id,
+        "amnesty_id": granted.id,
+        "movement_id": dissolved.id,
+        "negotiation_event_id": amnesty.negotiation_event_id,
+    }
     assert world.society.settlements[PLACE].administrator_id == ADMIN.id
     assert not civic_amnesty_options(world, ADMIN)
     path = Path(tmp_path) / "civic-amnesty.mws"
@@ -474,6 +552,7 @@ def test_administration_can_persuade_an_active_movement_before_rebellion():
         record_event(world, "civic_movement_decided", "Movimento organizado.",
                      fact_kind=FactKind.DECISION, decision=movement_option.decision(),
                      cause_ids=(movement_option.catalyst_event_id, *movement_option.report_event_ids)).id)
+    movement = _join_second_group(world, movement)
     refresh_settlement_reports(world)
     negotiation = next(item for item in civic_rebellion_response_options(world, ADMIN)
                        if item.action == "offer_civic_negotiation")

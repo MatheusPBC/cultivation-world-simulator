@@ -46,6 +46,8 @@ def _label(option):
         return "Rotacionar a coluna da guarnição por uma presença própria abastecida."
     if option.kind == "withdraw":
         return "Retirar voluntariamente o dever da guarnição."
+    if option.kind == "defend":
+        return "Estabelecer uma guarnição defensiva paga no próprio assentamento administrado."
     return "Estabelecer uma guarnição paga para sustentar a ocupação."
 
 

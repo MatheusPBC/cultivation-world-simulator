@@ -162,7 +162,7 @@ class OccupationView(SocietyValue):
 class PoliticalSettlementView(SocietyValue):
     """A live material campaign settlement proposal, never an instruction."""
     id: str
-    proposal_kind: Literal["force_deescalation", "administration_concession"]
+    proposal_kind: Literal["force_deescalation", "administration_concession", "campaign_ceasefire"]
     settlement_id: str | None = None
     proposer_ref: EntityRef
     counterparty_ref: EntityRef

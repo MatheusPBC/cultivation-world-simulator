@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.economy.models import Stock
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -11,7 +12,7 @@ from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
 from src.sim.medieval.infrastructure import damage_site
 from src.sim.medieval.persistence import load_world, restore_snapshot, save_world, world_snapshot
-from src.sim.medieval.route_intelligence import refresh_site_reports
+from src.sim.medieval.route_intelligence import refresh_route_reports, refresh_site_reports
 from src.sim.medieval.site_services import review_site_services, service_options, set_site_service
 from src.systems.time import WorldClock
 
@@ -26,13 +27,39 @@ def _world():
     return world
 
 
+def test_recurring_site_and_route_observations_retain_their_previous_receipts():
+    world = create_medieval_world(73)
+    refresh_site_reports(world, site_ids=(SITE,))
+    refresh_route_reports(world, route_ids=(RIVER,))
+    site_owner = world.map.infrastructure_sites[SITE].owner_ref
+    route_owner = next(iter(world.knowledge.route_reports.values())).recipient_ref
+    first_site = world.knowledge.site_report(site_owner, SITE).event_id
+    first_route = world.knowledge.route_report(route_owner, RIVER).event_id
+
+    world.clock = WorldClock(30)
+    refresh_site_reports(world, site_ids=(SITE,))
+    refresh_route_reports(world, route_ids=(RIVER,))
+
+    second_site = next(event for event in world.events if event.id == world.knowledge.site_report(site_owner, SITE).event_id)
+    second_route = next(event for event in world.events if event.id == world.knowledge.route_report(route_owner, RIVER).event_id)
+    assert first_site in {link.cause_event_id for link in second_site.causal_links}
+    assert first_route in {link.cause_event_id for link in second_route.causal_links}
+
+
 def _decide(world, site_id=SITE):
     owner = world.map.infrastructure_sites[site_id].owner_ref
     option, = service_options(world, site_id, owner)
     decision = record_event(world, "site_service_decided", "Decisão do proprietário.",
                             fact_kind=FactKind.DECISION, decision=option.decision(),
                             cause_ids=(world.knowledge.site_report(owner, site_id).event_id,))
-    return set_site_service(world, option.id, decision_event_id=decision.id)
+    event = set_site_service(world, option.id, decision_event_id=decision.id)
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert event.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": option.actor_ref.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    return event
 
 
 async def test_suspension_holds_the_same_parcel_then_resumption_delivers(tmp_path):

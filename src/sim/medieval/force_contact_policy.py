@@ -8,6 +8,7 @@ from src.classes.event import FactKind
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
+from .ai_decider import ProviderDecisionRequired
 from .events import record_event
 from .force import (STAND_DOWN_ACTION, WITHDRAW_ACTION, stand_down_from_standoff,
                     standoff_options, withdraw_detachment, withdrawal_options,
@@ -89,7 +90,14 @@ def contact_sighting_for_provider(world, notice):
 
 async def _contact_turn(world, notice_id):
     notice = world.knowledge.force_contact_notices.get(notice_id)
-    if notice is None or not _turn_available(world):
+    if notice is None:
+        return False
+    # Offline/test worlds may intentionally leave this optional review
+    # inactive.  In AI-enabled worlds, however, an available material menu
+    # must reach ``select_option`` so a missing provider or exhausted budget
+    # raises the typed pause instead of silently turning an actor decision
+    # into no action.
+    if not world.config.ai_enabled and not _turn_available(world):
         return False
     # A received offer must be answered independently before this actor opens
     # another one.  An accepted own promise similarly gets a later, separate
@@ -169,7 +177,10 @@ async def _contact_turn(world, notice_id):
         return False
     option = next((item for item in _current_options(world, notice) if item.id == selected), None)
     if option is None:
-        return False
+        raise ProviderDecisionRequired(
+            f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+            "force contact affordance became stale"
+        )
     decision = record_event(
         world, "force_standoff_decided", "A instituição escolheu uma opção diante do contato armado.",
         fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,),
@@ -222,10 +233,13 @@ async def _contact_turn(world, notice_id):
             execute_detachment_command_option(world, notice.recipient_ref, option.id, decision.id)
         else:
             return False
-    except ValueError:
-        # The decision remains factual history, but an obsolete affordance can
-        # never turn into a material mutation.
-        return False
+    except ValueError as exc:
+        # The engine owns rollback; a direct policy call must still expose the
+        # stale provider choice instead of silently completing the turn.
+        raise ProviderDecisionRequired(
+            f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
+            "force contact affordance became stale"
+        ) from exc
     return True
 
 

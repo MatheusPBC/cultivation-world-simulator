@@ -1,4 +1,6 @@
 """Repudiating a promise is a choice; a known breach shapes the next deal."""
+import json
+
 import pytest
 
 from src.classes.event import FactKind
@@ -10,7 +12,10 @@ from src.sim.medieval.diplomacy_policy import (REPUDIATE_ACTION, _diplomacy_situ
                                                _known_counterparty_breaches, _repudiation_options)
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
+from src.sim.medieval.institutional_memory import REPUDIATION_VIEW, institutional_view, memories_of
+from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.recourse_policy import review_id
+from tests.test_medieval_creature_autonomy import provider
 from tests.test_medieval_diplomacy import BUYER, SELLER, offer, respond, world_with_knowledge
 from tests.test_medieval_recourse import AUREN, ESCARLIA, breached, wronged_world
 
@@ -54,6 +59,60 @@ def test_repudiation_is_a_decision_then_a_separate_transition_and_grants_recours
     # creditor's own turn tomorrow, exactly like a deadline breach would.
     review = world.agenda.get(review_id(world.clock.absolute_day + 1))
     assert review is not None and review.kind == 'recourse_review'
+
+
+@pytest.mark.asyncio
+async def test_known_deliberate_breach_can_shape_a_later_material_choice(tmp_path, monkeypatch):
+    world = wronged_world(due_day=90, expires_day=80)
+    proposal = next(iter(world.relations.proposals.values()))
+    obligation_id = f'{proposal.id}:term:0'
+    option = next(item for item in _repudiation_options(world, ESCARLIA)
+                  if item.obligation_id == obligation_id)
+    decision = _decision(world, option)
+    repudiate_obligation(world, obligation_id, decision_event_id=decision.id,
+                         decision_intent=option.decision())
+    breach = world.events[-1]
+
+    assert not world.society.detachments
+    assert memories_of(world, AUREN, breach.id) is not None
+    assert institutional_view(world, AUREN, ESCARLIA) == REPUDIATION_VIEW
+    assert any(notice.recipient_ref == AUREN and notice.event_id == breach.id
+               for notice in world.knowledge.notices.values())
+    assert any(item['obligation_id'] == obligation_id and item['kind'] == 'repudiated'
+               for item in _diplomacy_situation(world, AUREN, ())['known_counterparty_breaches'])
+    assert world.agenda.get(review_id(1)) is not None
+
+    def choose_known_breach(prompt):
+        payload = json.loads(prompt[prompt.index('{'):])
+        context = payload.get('situation', {}).get('recourse', {})
+        if (context.get('broken_promise', {}).get('debtor') != ESCARLIA.to_dict()
+                or context.get('your_reading_of_them') != REPUDIATION_VIEW):
+            return {'selected_id': 'NO_ACTION'}
+        option = next((item for item in payload['choices']
+                       if 'marchar até Ferroalto' in item['label']), None)
+        return {'selected_id': option['id'] if option is not None else 'NO_ACTION'}
+
+    prompts = provider(monkeypatch, choose_known_breach)
+    await MedievalSimulator(world).step()
+    contexts = [json.loads(prompt[prompt.index('{'):]).get('situation', {}).get('recourse', {})
+                for prompt in prompts]
+    assert any(context.get('broken_promise', {}).get('debtor') == ESCARLIA.to_dict()
+               and context.get('your_reading_of_them') == REPUDIATION_VIEW
+               for context in contexts)
+    detachment = next(iter(world.society.detachments.values()))
+    assert detachment.stage == 'marching' and detachment.destination_id == 'ferroalto'
+    recourse = next(event for event in world.events if event.id == detachment.decision_event_id)
+    assert recourse.event_type == 'institutional_decision_turn_decided'
+    assert breach.id in {link.cause_event_id for link in recourse.causal_links}
+    assert any(event.event_type == 'detachment_raised' and
+               recourse.id in {link.cause_event_id for link in event.causal_links}
+               for event in world.events)
+    path = tmp_path / 'deliberate-breach-recourse.mws'
+    save_world(world, path)
+    restored = load_world(path)
+    assert world_snapshot(restored) == world_snapshot(world) and restored.events == world.events
+    from tools.medieval_causal_audit import audit
+    assert audit(path)['ok'] is True
 
 
 def test_repudiation_of_a_concluded_obligation_or_stale_option_has_no_effect():
@@ -125,6 +184,10 @@ def test_a_notified_party_sees_a_breach_a_stranger_never_negotiated_with_does_no
 
 async def test_an_unrepudiated_deadline_lapse_reads_as_breached_by_deadline_not_a_choice():
     world = wronged_world(due_day=28, expires_day=20)
+    # This scenario verifies the dated, engine-owned deadline transition.  It
+    # must not open an optional repudiation consultation, so make the test's
+    # policy explicit instead of relying on a provider that is not under test.
+    world.config = world.config.model_copy(update={"ai_enabled": False})
     engine = MedievalSimulator(world)
     obligation = await breached(world, engine)
     assert obligation.status == 'breached'

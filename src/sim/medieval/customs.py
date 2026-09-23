@@ -336,6 +336,58 @@ def inspect_waiting_parcel(world, parcel, route_id):
         classification=classification,
         learned_day=world.clock.absolute_day, event_id=event.id, state_event_id=event.id, state="presented",
     )
+    # A standing closure is applied by the post that holds the cargo, right
+    # after the canonical presentation. The refusal is the only thing that
+    # tells the owner it is embargoed: nothing was announced to it.
+    return _refuse_if_embargoed(world, notice_id) or event
+
+
+def _refuse_if_embargoed(world, notice_id):
+    """Turn back one presented parcel whose owner this post currently refuses.
+
+    The goods go home to their own source stock and no fee is charged, so the
+    closure costs the owner a journey and nothing else. Logistics accounts for
+    every unit (delivered + resolved + in flight == ordered), so a cargo that
+    leaves the road must be resolved; the order stays history, exactly as a
+    blocked one does, and ``freight_recovery`` recognises the refusal as its
+    own canonical reason to offer a successor over another passage.
+    """
+    from .embargo import is_embargoed
+
+    notice = world.knowledge.customs_notices[notice_id]
+    checkpoint = world.economy.customs_checkpoints[notice.checkpoint_id]
+    parcel = world.economy.parcels.get(notice.parcel_id)
+    order = world.economy.freight_orders.get(notice.order_id)
+    if (parcel is None or order is None or notice.state != "presented"
+            or not is_embargoed(world, checkpoint.operator_ref, order.owner_ref)):
+        return None
+    source = world.economy.stocks.get(order.source_id)
+    if source is None:
+        return None
+    before = source.goods.get(order.resource_id, 0)
+    resolved = order.resolved_quantity + parcel.quantity
+    event = record_event(
+        world, "customs_refused",
+        "O posto recusou a carga desta contraparte; a mercadoria retornou ao estoque de origem.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(
+            _delta("stock", source.id, order.resource_id, before, before + parcel.quantity),
+            _delta("cargo", parcel.id, "quantity", parcel.quantity, 0),
+            _delta("freight", order.id, "resolved_quantity", order.resolved_quantity, resolved),
+            _delta("customs_notice", notice.id, "state", notice.state, "refused"),
+        ),
+        cause_ids=_causes(notice.event_id, parcel.last_event_id, order.last_event_id,
+                          checkpoint.last_event_id, source.last_event_ids.get(order.resource_id)),
+    )
+    world.economy.stocks[source.id] = source.model_copy(update={
+        "goods": {**source.goods, order.resource_id: before + parcel.quantity},
+        "last_event_ids": {**source.last_event_ids, order.resource_id: event.id},
+    })
+    world.economy.parcels.pop(parcel.id)
+    world.economy.freight_orders[order.id] = order.model_copy(update={
+        "resolved_quantity": resolved, "resolution_event_id": event.id, "last_event_id": event.id})
+    world.knowledge.customs_notices[notice.id] = notice.model_copy(
+        update={"state": "refused", "state_event_id": event.id})
     return event
 
 

@@ -1,4 +1,5 @@
 import copy
+import json
 
 import pytest
 
@@ -11,6 +12,8 @@ from src.sim.medieval.events import record_event
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.migration import _resolve, consume_travel_provisions, recover_migration, start_migration
 from src.sim.medieval.migration_policy import migration_options, recovery_options, review_migration
+from src.sim.medieval.institutional_agenda import review_monthly_institutional_turn
+from src.sim.medieval import ai_decider
 from src.sim.medieval.persistence import load_world, restore_snapshot, save_world, world_snapshot
 from src.systems.calendar_agenda import ScheduledSituation
 from src.systems.calendar_scheduler import CalendarScheduler
@@ -83,6 +86,37 @@ async def test_known_pressure_moves_household_with_its_own_cash_and_rations(tmp_
     assert resumed.economy.accounts[f"household:{target.id}"].balance >= source_balance * journey.count // group.count
     assert resumed.economy.stocks[f"household-stock:{target.id}"].goods["food"] == option.food
     assert sum(account.balance for account in resumed.economy.accounts.values()) == total_money
+
+
+@pytest.mark.asyncio
+async def test_ai_turn_selects_migration_affordance_instead_of_dated_fallback(monkeypatch):
+    world, group, _ = pressured_household()
+    world.config = world.config.model_copy(update={"ai_enabled": True,
+                                                   "ai_calls_per_step": 256,
+                                                   "ai_max_calls": 1000})
+    selected = []
+
+    async def choose_migration(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        migration = next((item["id"] for item in payload.get("choices", ())
+                          if item.get("label", "").startswith("Migrar ")), None)
+        if migration is not None:
+            selected.append(migration)
+            return {"selected_id": migration}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_migration)
+
+    await review_monthly_institutional_turn(world)
+
+    assert selected
+    journey = next(item for item in world.society.migrations.values()
+                   if item.source_group_id == group.id)
+    assert journey.count > 0
+    assert any(event.event_type == "migration_started" and journey.id in {
+        delta.owner_id for delta in event.deltas
+    } for event in world.events)
 
 
 @pytest.mark.asyncio

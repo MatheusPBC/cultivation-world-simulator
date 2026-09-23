@@ -65,6 +65,25 @@ def blocking_routes(world, order):
     return tuple(sorted(held))
 
 
+def refused_routes(world, order):
+    """Passages whose post currently turns this owner's cargo back.
+
+    A customs refusal is as material a reason to try another way as a closed
+    road: the cargo went home, nothing was paid, and the same passage would
+    refuse it again. The owner reads only its own dated customs notice.
+    """
+    held = set()
+    for notice in world.knowledge.customs_notices.values():
+        if notice.order_id != order.id or notice.state != "refused":
+            continue
+        checkpoint = world.economy.customs_checkpoints.get(notice.checkpoint_id)
+        if checkpoint is None:
+            continue
+        held.update(route_id for route_id in order.route_ids
+                    if route_id in world.map.infrastructure_sites[checkpoint.site_id].route_ids)
+    return tuple(sorted(held))
+
+
 def _recoverable(world, order, actor_ref):
     """Only the owner's own unpaid, undelivered internal transfer qualifies."""
     economy = world.economy
@@ -91,7 +110,7 @@ def freight_recovery_options(world, actor_ref):
     for _, order in sorted(world.economy.freight_orders.items()):
         if not _recoverable(world, order, actor_ref):
             continue
-        blocked = blocking_routes(world, order)
+        blocked = tuple(sorted({*blocking_routes(world, order), *refused_routes(world, order)}))
         if not blocked:
             continue
         base = f"freight_recovery:{order.id}:{order.last_event_id}"

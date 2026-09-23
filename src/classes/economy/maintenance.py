@@ -58,7 +58,7 @@ def batch_intent(maintainer_ref, project_id, units):
 
 
 def validate_repairs(economy, world=None):
-    events = {e.id: e for e in world.events} if world is not None else {}
+    events = world.event_index() if world is not None else {}
     for blueprint in economy.repair_blueprints.values():
         if not blueprint.inputs or set(blueprint.inputs) - set(economy.resources):
             raise ValueError('repair requires known materials')

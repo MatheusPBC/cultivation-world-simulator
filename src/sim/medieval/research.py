@@ -44,7 +44,7 @@ def start_research(world, technology_id, site_id, stock_id, account_id, research
         raise ValueError('unknown technology or research stock')
     owner = stock.owner_ref
     terms = dict(technology_id=technology_id, site_id=site_id, stock_id=stock_id, account_id=account_id, researcher_id=researcher_id)
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     for eid, action, actor in ((sponsor_decision_id, 'research', owner),
             (researcher_decision_id, 'research_work', EntityRef('character', researcher_id))):
         decision = events.get(eid)
@@ -104,6 +104,7 @@ def progress_research(world, available):
         account = world.economy.accounts[project.account_id]
         lead = world.society.characters[project.researcher_id]
         units = 0
+        assistant_shortfall = 0
         if blocker is None:
             assistants = sum(available[g.id] for g in world.society.population.values()
                              if g.settlement_id == stock.location_id and g.occupation == tech.assistant_occupation)
@@ -118,6 +119,10 @@ def progress_research(world, available):
                 limits['labor'] = 0
             units = min(limits.values())
             blocker = next((key for key in sorted(limits) if limits[key] == 0), None)
+            if (units == 0 and limits['labor'] == 0
+                    and available.get(lead.population_group_id, 0) >= 1
+                    and all(value > 0 for key, value in limits.items() if key != 'labor')):
+                assistant_shortfall = max(0, tech.assistants_per_unit - assistants)
         done = project.completed_units + units
         stage = 'superseded' if known else 'completed' if done == tech.required_units else 'researching' if units else 'blocked'
         goods = dict(stock.goods)
@@ -127,7 +132,9 @@ def progress_research(world, available):
         description = 'encerrada por conhecimento já adquirido' if known else 'concluída' if stage == 'completed' else 'em andamento' if units else 'impedida'
         event = _apply_stock(world, stock, goods, 'research_progressed', f'{tech.name}: pesquisa {done}/{tech.required_units}, {description}.',
             extra_deltas=(_delta('research', project.id, 'completed_units', project.completed_units, done),
-                          _delta('research', project.id, 'stage', project.stage, stage)),
+                          _delta('research', project.id, 'stage', project.stage, stage),
+                          *((_delta('research', project.id, 'labor_shortfall', 0, assistant_shortfall),)
+                            if assistant_shortfall else ())),
             cause_ids=_causes(project.last_event_id, account.last_event_id, world.map.infrastructure_sites[project.site_id].last_event_id))
         if units:
             settle_work(world, work_id=project.id, account_id=account.id, stock_id=stock.id,

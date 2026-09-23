@@ -9,7 +9,11 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.espionage import execute_espionage, espionage_options
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
+from src.sim.medieval.settlement_intelligence import (
+    refresh_existing_local_settlement_reports,
+    refresh_settlement_reports,
+)
+from src.systems.time import WorldClock
 
 
 OWNER = EntityRef("polity", "auren")
@@ -36,22 +40,97 @@ def decide(world, option):
                         fact_kind=FactKind.DECISION, decision=option.decision())
 
 
-def test_espionage_success_only_records_existing_evidence_and_survives_save(tmp_path):
+def test_espionage_success_brings_home_its_own_local_observation_and_survives_save(tmp_path):
     world, agent, option = prepared_world()
     before = copy.deepcopy(world.society.settlements)
+    assert world.knowledge.settlement_report(OWNER, TARGET) is None
     decision = decide(world, option)
 
     finding = execute_espionage(world, OWNER, option.id, decision.id)
 
+    # What the mission brings home is the dated local observation its own
+    # agent could make standing there, not a pointer to the target's bulletin.
     assert finding.result == "success"
-    assert finding.evidence_event_id == option.evidence_event_id
+    learned = world.knowledge.settlement_report(OWNER, TARGET)
+    assert learned is not None
+    assert learned.channel == "local_settlement_report"
+    assert learned.recipient_ref == learned.publisher_ref == OWNER
+    assert learned.observed_day == world.clock.absolute_day
+    assert finding.evidence_event_id == learned.event_id
+    assert finding.evidence_event_id != option.evidence_event_id
+
+    # The observation is a receipt of its own, recorded before the resolution
+    # and cited by it together with the canonical evidence the mission targeted.
+    resolution = world.events[-1]
+    assert resolution.event_type == "espionage_resolved"
+    assert not resolution.decision
+    causes = {link.cause_event_id for link in resolution.causal_links}
+    assert {learned.event_id, option.evidence_event_id, decision.id} <= causes
+    observation = next(event for event in world.events if event.id == learned.event_id)
+    assert observation.event_type == "settlement_observed"
+    assert decision.id in {link.cause_event_id for link in observation.causal_links}
+
+    # Knowledge only: the target settlement itself is untouched.
     assert world.society.settlements == before
-    assert world.events[-1].event_type == "espionage_resolved"
-    assert not world.events[-1].decision
     world.knowledge.validate(world)
     path = tmp_path / "espionage.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_a_mission_that_learns_nothing_publishes_no_report(monkeypatch):
+    for outcome, skill, detected in (("failure", 10, False), ("discovered", 60, True)):
+        world, _agent, option = prepared_world(skill=skill)
+        if detected:
+            monkeypatch.setattr("src.sim.medieval.espionage._target_detects", lambda *_args: True)
+        finding = execute_espionage(world, OWNER, option.id, decide(world, option).id)
+        assert finding.result == outcome
+        assert finding.evidence_event_id is None
+        assert world.knowledge.settlement_report(OWNER, TARGET) is None
+        world.knowledge.validate(world)
+
+
+def test_a_past_mission_is_not_a_standing_watch_over_the_target():
+    """The agent leaves; the local reading stops being renewed for its owner."""
+    world, agent, option = prepared_world()
+    execute_espionage(world, OWNER, option.id, decide(world, option).id)
+    learned = world.knowledge.settlement_report(OWNER, TARGET)
+    assert learned is not None
+
+    world.clock = WorldClock(world.clock.absolute_day + 1)
+    world.society.characters[agent.id] = world.society.characters[agent.id].model_copy(
+        update={"location_id": "auren-alta"})
+    refresh_existing_local_settlement_reports(world, TARGET)
+
+    assert world.knowledge.settlement_report(OWNER, TARGET) == learned
+    world.knowledge.validate(world)
+
+
+def test_local_report_refresh_matches_after_save_load(tmp_path):
+    world = create_medieval_world(73)
+    refresh_settlement_reports(world)
+    target = next(
+        settlement_id
+        for settlement_id in sorted(world.society.settlements)
+        if sum(
+            report.settlement_id == settlement_id
+            and report.channel == "local_settlement_report"
+            and report.recipient_ref == report.publisher_ref
+            and report.recipient_ref.kind == "character"
+            for report in world.knowledge.settlement_reports.values()
+        ) >= 2
+    )
+    path = tmp_path / "local-reports.mws"
+    save_world(world, path)
+    resumed = load_world(path)
+    next_day = WorldClock(world.clock.absolute_day + 1)
+    world.clock = next_day
+    resumed.clock = next_day
+
+    refresh_existing_local_settlement_reports(world, target)
+    refresh_existing_local_settlement_reports(resumed, target)
+
+    assert world_snapshot(resumed) == world_snapshot(world)
 
 
 def test_low_capability_is_a_factual_failure_without_evidence():
@@ -63,17 +142,6 @@ def test_low_capability_is_a_factual_failure_without_evidence():
     assert finding.result == "failure"
     assert finding.evidence_event_id is None
     assert not any(event.event_type == "story" for event in world.events)
-
-
-def test_target_detection_is_a_distinct_outcome_without_evidence(monkeypatch):
-    world, _agent, option = prepared_world()
-    decision = decide(world, option)
-    monkeypatch.setattr("src.sim.medieval.espionage._target_detects", lambda *_args: True)
-
-    finding = execute_espionage(world, OWNER, option.id, decision.id)
-
-    assert finding.result == "discovered"
-    assert finding.evidence_event_id is None
 
 
 def test_owner_revalidates_agent_before_materializing_finding():

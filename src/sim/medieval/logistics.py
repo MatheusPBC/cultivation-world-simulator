@@ -3,6 +3,7 @@
 import math
 
 from src.classes.economy.logistics import CargoParcel, FreightOrder, RouteFlow, path_regions
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import require_authority
 from src.systems.calendar_agenda import ScheduledSituation
@@ -19,7 +20,8 @@ def check_freight(world, source_id, destination_id, resource_id, quantity, route
         raise ValueError("insufficient goods")
 
 
-def open_order(world, source_id, destination_id, resource_id, quantity, route_ids, *, decision_ids, cause_ids=()):
+def open_order(world, source_id, destination_id, resource_id, quantity, route_ids, *, decision_ids, cause_ids=(),
+               causal_origin=CausalOrigin.DETERMINISTIC, causal_payload=None):
     """Private material operation shared by approved internal transfers and purchases.
 
     ``cause_ids`` lets a caller link this shipment to the facts that motivated
@@ -32,8 +34,10 @@ def open_order(world, source_id, destination_id, resource_id, quantity, route_id
         raise ValueError("freight decision already executed")
     seq = len(world.events) + 1
     source = economy.stocks[source_id]
+    destination = economy.stocks[destination_id]
     order = FreightOrder(id=f"freight:{seq}", source_id=source_id, destination_id=destination_id,
-                         resource_id=resource_id, quantity=quantity, owner_ref=economy.stocks[destination_id].owner_ref,
+                         source_location_id=source.location_id, destination_location_id=destination.location_id,
+                         resource_id=resource_id, quantity=quantity, owner_ref=destination.owner_ref,
                          route_ids=tuple(route_ids), decision_ids=tuple(decision_ids),
                          created_day=world.clock.absolute_day, priority=seq)
     parcel = CargoParcel(id=f"parcel:{seq}", order_id=order.id, quantity=quantity,
@@ -42,10 +46,15 @@ def open_order(world, source_id, destination_id, resource_id, quantity, route_id
         raise ValueError("cargo identity collision")
     available = source.goods.get(resource_id, 0)
     event = record_event(world, "freight_opened", f"Remessa de {quantity} unidades preparada.",
-                         fact_kind=FactKind.STATE_TRANSITION,
+                         fact_kind=FactKind.STATE_TRANSITION, causal_origin=causal_origin,
+                         causal_payload=causal_payload,
                          deltas=(_delta("stock", source.id, resource_id, available, available - quantity),
+                                 _delta("freight", order.id, "source_location_id", None, source.location_id),
+                                 _delta("freight", order.id, "destination_location_id", None, destination.location_id),
                                  _delta("cargo", parcel.id, "quantity", 0, quantity)),
-                         cause_ids=_causes(*decision_ids, *cause_ids, source.last_event_ids.get(resource_id)))
+                         cause_ids=_causes(*decision_ids, *cause_ids,
+                                           (causal_payload or {}).get("decision_event_id"),
+                                           source.last_event_ids.get(resource_id)))
     order = order.model_copy(update={"last_event_id": event.id})
     parcel = parcel.model_copy(update={"last_event_id": event.id})
     economy.stocks[source.id] = source.model_copy(update={

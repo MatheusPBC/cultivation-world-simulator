@@ -23,6 +23,26 @@ from .institutional_decision_turn import DiscretionaryAdapter
 ESPIONAGE_ACTION = "espionage_mission"
 MIN_INVESTIGATION_SKILL = 1
 SUCCESS_INVESTIGATION_SKILL = 50
+# A named agent caught somewhere stays known there for a short while. This is
+# read from the finding a mission already persisted, never from a timer, an
+# agenda entry or a record of its own.
+DISCOVERY_MARK_DAYS = 30
+
+
+def agent_is_marked(world, agent_ref, place_id, findings, place_of):
+    """Whether a recent discovery still marks this agent at this place.
+
+    Shared by every mission vertical that resolves through ``_target_detects``:
+    each one passes its own persisted findings and says how a finding names the
+    place it happened at. The reading is engine-owned, pure in the day, and
+    scoped to the pair -- another agent of the same institution, and the same
+    agent elsewhere, are untouched.
+    """
+    day = world.clock.absolute_day
+    return any(item.agent_ref == agent_ref and item.result == "discovered"
+               and place_of(item) == place_id
+               and 0 <= day - item.learned_day < DISCOVERY_MARK_DAYS
+               for item in findings)
 
 
 @dataclass(frozen=True)
@@ -68,9 +88,18 @@ def _agents(world, owner_ref):
 
 
 def _already_resolved(world, actor_ref, agent_ref, target_ref):
+    """One mission per agent/target per day, plus the discovery mark.
+
+    A failed or successful attempt only spends the day. Being caught is what
+    costs the agent that place for a while, so a defended settlement finally
+    buys its owner something more than denying one piece of evidence.
+    """
+    findings = world.knowledge.espionage_findings.values()
+    if agent_is_marked(world, agent_ref, target_ref, findings, lambda item: item.target_ref):
+        return True
     return any(item.recipient_ref == actor_ref and item.agent_ref == agent_ref
                and item.target_ref == target_ref and item.learned_day == world.clock.absolute_day
-               for item in world.knowledge.espionage_findings.values())
+               for item in findings)
 
 
 def _target_detects(world, target_ref, target_owner_ref):
@@ -133,21 +162,31 @@ def execute_espionage(world, actor_ref, option_id, decision_event_id):
     detected = _target_detects(candidate, option.target_ref, option.target_owner_ref)
     result = "discovered" if detected else (
         "success" if agent.skills.investigation >= SUCCESS_INVESTIGATION_SKILL else "failure")
+    # Only a mission that actually succeeded brings anything home.  What it
+    # brings is the ordinary dated local observation its own agent could make
+    # standing there -- published by the settlement-intelligence owner, before
+    # this resolution, so the receipt it produces can be cited as the evidence
+    # this finding rests on.  A failed or discovered mission learns nothing.
+    learned = None
+    if result == "success":
+        from .settlement_intelligence import observe_present_agent
+        learned = observe_present_agent(candidate, actor_ref, target.id,
+                                        presence_causes=_causes(decision.id, evidence_event_id))
     finding_id = f"espionage_finding:{decision.id}"
-    causes = _causes(decision.id, evidence_event_id)
+    causes = _causes(decision.id, evidence_event_id, learned.event_id if learned else None)
     event = record_event(
         candidate, "espionage_resolved",
         "Uma missão de espionagem foi resolvida como fato institucional limitado.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta("espionage_finding", finding_id, "result", None, result),
                 _delta("espionage_finding", finding_id, "evidence_event_id", None,
-                       evidence_event_id if result == "success" else None)),
+                       learned.event_id if learned else None)),
         cause_ids=causes)
     finding = EspionageFinding(
         id=finding_id, mission_id=option.id, decision_event_id=decision.id,
         recipient_ref=actor_ref, agent_ref=option.agent_ref, target_ref=option.target_ref,
         target_owner_ref=option.target_owner_ref, result=result,
-        evidence_event_id=evidence_event_id if result == "success" else None,
+        evidence_event_id=learned.event_id if learned else None,
         learned_day=candidate.clock.absolute_day, event_id=event.id)
     candidate.knowledge.espionage_findings[finding.id] = finding
     candidate.knowledge.validate(candidate)
@@ -166,5 +205,5 @@ def espionage_adapters():
     ),)
 
 
-__all__ = ["ESPIONAGE_ACTION", "EspionageOption", "espionage_options", "execute_espionage",
-           "espionage_adapters"]
+__all__ = ["DISCOVERY_MARK_DAYS", "ESPIONAGE_ACTION", "EspionageOption", "agent_is_marked",
+           "espionage_options", "execute_espionage", "espionage_adapters"]

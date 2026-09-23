@@ -4,6 +4,7 @@ import copy
 from dataclasses import dataclass
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.models import StrategicPlan
 from src.classes.mechanical_language import EntityRef
@@ -369,8 +370,24 @@ def market_purchase_options(world, actor):
     return tuple(sorted(result, key=lambda item: item.id))
 
 
-def execute_market_purchase_option(world, actor, option_id, decision_event_id):
-    """Execute one selected market option; no monthly or narrative fallback."""
+def market_purchase_terms(option):
+    """Return the engine-owned bilateral terms for a current market option."""
+    terms = {"source_id": option.source_id, "destination_id": option.destination_id,
+             "resource_id": option.resource_id, "quantity": option.quantity,
+             "unit_price": option.unit_price, "quote_day": option.quote_day,
+             "route_ids": list(option.route_ids), "seller_account_id": option.seller_account_id,
+             "buyer_account_id": option.buyer_account_id,
+             "export_rate_permille": option.export_rate_permille,
+             "export_policy_event_id": option.export_policy_event_id,
+             "export_collector_ref": option.export_collector_ref,
+             "total_price": option.total_price}
+    if option.route_option_id is not None:
+        terms["route_option_id"] = option.route_option_id
+    return terms
+
+
+def execute_market_purchase_option(world, actor, option_id, decision_event_id, *, seller_decision_id):
+    """Execute one selected market option after bilateral seller consent."""
     decision = next((event for event in world.events if event.id == decision_event_id), None)
     option = next((item for item in market_purchase_options(world, actor) if item.id == option_id), None)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
@@ -384,26 +401,18 @@ def execute_market_purchase_option(world, actor, option_id, decision_event_id):
         physical = world.knowledge.route_report(actor, route_id)
         fiscal = world.knowledge.fiscal_route_report(actor, route_id)
         route_causes.extend(item.event_id for item in (physical, fiscal) if item is not None)
-    terms = {"source_id": option.source_id, "destination_id": option.destination_id,
-             "resource_id": option.resource_id, "quantity": option.quantity,
-             "unit_price": option.unit_price, "quote_day": option.quote_day,
-             "route_ids": list(option.route_ids), "seller_account_id": option.seller_account_id,
-             "buyer_account_id": option.buyer_account_id,
-             "export_rate_permille": option.export_rate_permille,
-             "export_policy_event_id": option.export_policy_event_id,
-             "export_collector_ref": option.export_collector_ref,
-             "total_price": option.total_price}
-    if option.route_option_id is not None:
-        terms["route_option_id"] = option.route_option_id
+    terms = market_purchase_terms(option)
     buy_decision = record_event(
         world, "buy_decided", "O ator aceitou uma oferta de mercado enumerada pelo engine.",
         fact_kind=FactKind.DECISION,
         decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},
         cause_ids=_causes(decision.id, offer.event_id, *route_causes))
-    seller_decision_id = consider_sale(world, terms, buy_decision.id)
-    if seller_decision_id is None:
-        return None
-    order = purchase(world, buy_decision.id, seller_decision_id)
+    causal_payload = {"decision_event_id": decision.id,
+                      "actor_ref": decision.decision["actor_ref"],
+                      "selected_affordance_id": decision.decision["selected_affordance_id"]}
+    order = purchase(world, buy_decision.id, seller_decision_id,
+                     causal_origin=CausalOrigin.ACTOR_DECISION,
+                     causal_payload=causal_payload)
     objective = world.strategy.objectives[option.objective_id]
     previous = world.strategy.plans.get(f"plan:{objective.id}")
     _set_plan(world, objective, "await_delivery", order_ids=(*((previous.order_ids if previous else ())), order.id),

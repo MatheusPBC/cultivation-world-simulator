@@ -61,6 +61,7 @@ class StrategicCapacity:
 
 @dataclass
 class StrategyState(RegistrySerialization):
+    schema_version = 2
     objectives: dict[str, Objective] = field(default_factory=dict)
     plans: dict[str, StrategicPlan] = field(default_factory=dict)
     registries = {"objectives": Objective, "plans": StrategicPlan}
@@ -81,7 +82,7 @@ class StrategyState(RegistrySerialization):
                 status = "unavailable"
             elif any(plan.stage == "blocked" for plan in plans):
                 status = "blocked"
-            elif any(plan.stage in {"acquire", "await_delivery", "adopted"} for plan in plans):
+            elif any(plan.stage in {"acquire", "await_delivery", "adopted", "mobilized"} for plan in plans):
                 status = "committed"
             elif plans and all(plan.stage in {"satisfied", "closed"} for plan in plans):
                 status = "ready"
@@ -159,7 +160,7 @@ class StrategyState(RegistrySerialization):
                 raise ValueError("invalid plan objective or duplicate order")
         if world is None:
             return
-        events = {e.id: e for e in world.events}
+        events = world.event_index()
         for objective in self.objectives.values():
             validate_actor(world, objective.actor_ref)
             if objective.settlement_id not in world.society.settlements:
@@ -168,14 +169,39 @@ class StrategyState(RegistrySerialization):
             if (stock is None or stock.location_id != objective.settlement_id
                     or objective.resource_id not in world.economy.resources):
                 raise ValueError("unknown strategic stock or resource")
+            if objective.kind == "maintain_garrison_supply":
+                garrison = world.society.garrisons.get(objective.garrison_id) if objective.garrison_id else None
+                detachment = (world.society.detachments.get(garrison.detachment_id)
+                              if garrison is not None else None)
+                account = world.economy.accounts.get(garrison.account_id) if garrison is not None else None
+                settlement = world.society.settlements[objective.settlement_id]
+                # The persisted objective may never assert more than the owner
+                # would revalidate: an active duty, its own column physically
+                # standing there, and the occupation that duty exists to hold.
+                if (garrison is None or garrison.stage != "active" or detachment is None
+                        or detachment.owner_ref != objective.actor_ref
+                        or detachment.stage != "present"
+                        or detachment.location_id != objective.settlement_id
+                        or garrison.settlement_id != objective.settlement_id
+                        or settlement.occupier_id != objective.actor_ref.id
+                        or account is None or account.owner_ref != objective.actor_ref
+                        or objective.resource_id != "food"
+                        or world.economy.needs[objective.settlement_id].stock_id != stock.id):
+                    raise ValueError("garrison objective requires its own active duty and public stock")
+            elif objective.garrison_id is not None:
+                raise ValueError("only a garrison objective names a garrison")
             if objective.kind == "maintain_food_reserve" and (
                     objective.resource_id != "food" or world.economy.needs[objective.settlement_id].stock_id != stock.id):
                 raise ValueError("food objective requires the public subsistence stock")
             if objective.kind == "defend_occupied_settlement" and (
                     objective.resource_id != "food" or world.economy.needs[objective.settlement_id].stock_id != stock.id):
                 raise ValueError("defense objective requires the observed settlement stock")
+        # Uniqueness binds only the objectives that set a stock's reserve
+        # window. A defence or a garrison duty adds its own material term and
+        # never competes for that window, so it may share the same stock.
         supply_objectives = [objective for objective in self.objectives.values()
-                             if objective.kind != "defend_occupied_settlement"]
+                             if objective.kind not in {"defend_occupied_settlement",
+                                                       "maintain_garrison_supply"}]
         if len({(o.stock_id, o.resource_id) for o in supply_objectives}) != len(supply_objectives):
             raise ValueError("duplicate stock-resource objective")
         for plan in self.plans.values():
@@ -188,8 +214,34 @@ class StrategyState(RegistrySerialization):
                         or order.destination_id != objective.stock_id):
                     raise ValueError("plan references another objective's freight")
             if objective.kind == "defend_occupied_settlement":
-                if plan.order_ids or plan.stage not in {"adopted", "closed", "blocked"}:
+                if (plan.order_ids or plan.stage not in {"adopted", "mobilized", "closed", "blocked"}
+                        or (plan.stage == "mobilized" and plan.detachment_id is None)
+                        or (plan.stage == "adopted" and plan.detachment_id is not None)
+                        or plan.detachment_id is not None and (
+                            (detachment := world.society.detachments.get(plan.detachment_id)) is None
+                            or detachment.owner_ref != objective.actor_ref)):
                     raise ValueError("invalid defense plan material state")
+                current = events[plan.last_event_id]
+                if plan.stage != "adopted" and (
+                        current.event_type != "strategy_defense_plan_updated"
+                        or not any(delta.owner_kind == "strategy_plan" and delta.owner_id == plan.id
+                                   and delta.aspect == "stage" and delta.after == plan.stage
+                                   for delta in current.deltas)):
+                    raise ValueError("defense plan lacks its current review receipt")
+                if plan.detachment_id is not None:
+                    assignments = (event for event in events.values()
+                                   if event.event_type == "strategy_defense_plan_updated"
+                                   and any(delta.owner_kind == "strategy_plan" and delta.owner_id == plan.id
+                                           and delta.aspect == "detachment_id"
+                                           and delta.after == plan.detachment_id for delta in event.deltas))
+                    if not any(any((source := events.get(link.cause_event_id)) is not None
+                                   and source.event_type == "detachment_raised"
+                                   and any(delta.owner_kind == "detachment"
+                                           and delta.owner_id == plan.detachment_id
+                                           for delta in source.deltas)
+                                   for link in assignment.causal_links)
+                               for assignment in assignments):
+                        raise ValueError("defense plan lacks its mobilization source")
                 adopted = [event for event in events.values() if event.event_type == "strategy_defense_adopted"
                            and any(delta.owner_kind == "strategy_objective" and delta.owner_id == objective.id
                                    for delta in event.deltas)]

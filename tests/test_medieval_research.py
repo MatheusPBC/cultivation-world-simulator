@@ -9,6 +9,33 @@ from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 from src.systems.time import WorldClock
 
 
+def test_opening_soldiers_can_assist_paid_military_research_without_fixture_cohorts(tmp_path):
+    from src.sim.medieval.economy import monthly_workforce
+    from src.sim.medieval.research import progress_research
+    from src.sim.medieval.research_policy import research_options, execute_research_option
+
+    world = create_medieval_world(73)
+    actor = EntityRef("polity", "auren")
+    option = next(item for item in research_options(world, actor)
+                  if item.technology_id == "field_drill")
+    stock_before = world.economy.stocks[option.stock_id].goods["tools"]
+    money_before = world.economy.accounts[option.account_id].balance
+    decision = record_event(world, "research_option_decided", "Financiar pesquisa militar.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    execute_research_option(world, actor, option.id, decision.id)
+    assert not world.knowledge.knows(actor, "field_drill")
+    for day in (30, 60, 90, 120, 150, 180):
+        world.clock = WorldClock(day)
+        progress_research(world, monthly_workforce(world))
+    assert world.knowledge.knows(actor, "field_drill")
+    assert world.economy.stocks[option.stock_id].goods["tools"] == stock_before - 6
+    assert world.economy.accounts[option.account_id].balance < money_before
+    assert len([event for event in world.events if event.event_type == "wages_paid"]) == 6
+    path = tmp_path / "opening-military-research.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
 def prepared():
     world = create_medieval_world(73)
     lead = world.society.characters['character:011']
@@ -58,6 +85,16 @@ def test_research_costs_time_materials_and_wages_without_changing_production(tmp
     before = world_snapshot(world)
     work(world, 90)
     assert world_snapshot(world) == before
+
+
+def test_income_tax_rounding_is_applied_to_gross_payroll():
+    from src.sim.medieval.labor import _income_withholding
+
+    taxes, total = _income_withholding({"household:a": 2, "household:b": 8}, 100)
+
+    assert total == 1
+    assert sum(taxes.values()) == total
+    assert taxes == {"household:a": 0, "household:b": 1}
 
 
 @pytest.mark.parametrize('reason', ['materials', 'funds', 'absent', 'unskilled', 'authority'])

@@ -115,6 +115,11 @@ def civic_protest_options(world, group_id):
         return ()
     group, report = current
     if ((report.missing_food <= 0 and report.unrest < 300 and report.health > HEALTH_FLOOR)
+            # A group already committed to another dated occupation cannot
+            # reserve the same people for a protest.  Requiring the complete
+            # cohort here prevents a later workforce completion from reducing
+            # its count below the protest's fixed participant reservation.
+            or world.society.available_count(group.id) != group.count
             or world.society.available_count(group.id) < PROTEST_QUORUM
             or any(item.stage == "open" and item.settlement_id == group.settlement_id
                    for item in world.society.civic_protests.values())):

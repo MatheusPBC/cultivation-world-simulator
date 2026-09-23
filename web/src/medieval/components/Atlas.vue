@@ -7,6 +7,15 @@ const { t }=useI18n(), store=useObserverStore(), host=ref<HTMLElement|null>(null
 const {layer,showRoutes,showSites,unavailable,fit,zoomBy,down,move,up}=useAtlas(host)
 const threats = computed(() => store.snapshot?.campaigns.threats ?? [])
 const politicalSettlements = computed(() => store.snapshot?.campaigns.political_settlements ?? [])
+const detachments = computed(() => (store.snapshot?.campaigns.detachments ?? []).filter(item => item.stage !== 'disbanded'))
+const settlementName = (id: string) => store.snapshot?.society.settlements.find(item => item.id === id)?.name ?? id
+const ownerName = (id: string) => {
+  const snapshot = store.snapshot
+  if (!snapshot) return id
+  return snapshot.society.polities.find(item => item.id === id)?.name
+    ?? snapshot.society.organizations.find(item => item.id === id)?.name
+    ?? id
+}
 function threatTarget(threat: (typeof threats.value)[number]) {
   const snapshot = store.snapshot
   if (threat.settlement_id) return snapshot?.society.settlements.find(item => item.id === threat.settlement_id)?.name ?? threat.settlement_id
@@ -42,6 +51,15 @@ function threatTarget(threat: (typeof threats.value)[number]) {
       <span>{{proposal.proposer_ref.id}} → {{proposal.counterparty_ref.id}} · {{proposal.settlement_id ?? '—'}} · {{t('politicalSettlementStatuses.' + proposal.status)}}</span>
       <button class="text-button" @click="store.focusEventId=proposal.last_event_id">{{t('source')}}</button>
     </article>
+  </section>
+  <section v-if="detachments.length" class="threat-list detachment-list" :aria-label="t('detachments')">
+    <h3>{{t('detachments')}}</h3>
+    <button v-for="detachment in detachments" :key="detachment.id" class="detachment-row" :data-detachment="detachment.id"
+      :aria-pressed="store.selection?.kind === 'detachment' && store.selection.id === detachment.id"
+      @click="store.selection={kind:'detachment',id:detachment.id}">
+      <span><strong>{{ownerName(detachment.owner_ref.id)}}</strong><small>{{detachment.id}} · {{settlementName(detachment.location_id)}}</small></span>
+      <span>{{detachment.count}} · {{t('detachmentStages.' + detachment.stage)}}</span>
+    </button>
   </section>
   <nav class="settlement-list" :aria-label="t('settlements')"><button v-for="s in store.snapshot!.society.settlements" :key="s.id" :data-settlement="s.id" :aria-pressed="store.selection?.id===s.id" @click="store.selection={kind:'settlement',id:s.id}">{{s.name}}<span v-if="s.missing_food" class="shortage-mark"> · {{t('missing')}}</span></button></nav>
 </template>

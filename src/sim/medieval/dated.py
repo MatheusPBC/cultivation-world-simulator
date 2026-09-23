@@ -7,6 +7,7 @@ from .migration import resolve_migrations
 from .workforce import resolve_workforce_transitions
 from .apprenticeship import resolve_apprenticeships
 from .force import resolve_force_positions, resolve_forces
+from .force_training import resolve_trainings
 from .rites import resolve_rites
 from .campaign_supply import load_campaign_baggage, observe_campaign_supply_needs
 from .field_engagement import resolve_field_engagements
@@ -22,7 +23,7 @@ from .technique_copy import resolve_technique_copies
 
 def resolve_dated(world, situations):
     if any(s.kind not in {"activity", "cargo", "migration", "workforce_transition", "apprenticeship",
-                          "force", "force_preparation", "rite", "rite_interruption", "creature_review", "recourse_review",
+                          "force", "force_preparation", "force_training", "rite", "rite_interruption", "creature_review", "recourse_review",
                           "character_rite_offer_review", "character_rite_sponsor_review", "character_travel_review",
                           "force_contact_review",
                           "strategy_response_review",
@@ -51,6 +52,7 @@ def resolve_dated(world, situations):
     # Sustained access is judged on the day it ends, never sampled.
     resolve_technique_copies(world, [s for s in situations if s.kind == "technique_copy"])
     resolve_forces(world, [s for s in situations if s.kind == "force"])
+    resolve_trainings(world, [s for s in situations if s.kind == "force_training"])
     revoke_invalid_settlement_investments(world)
     resolve_siege_campaigns(world, [s for s in situations if s.kind == "siege_campaign"])
     resolve_force_positions(world, [s for s in situations if s.kind == "force_preparation"])

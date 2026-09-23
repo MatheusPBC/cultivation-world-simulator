@@ -1,6 +1,8 @@
 """A breach earns its creditor a turn; only a choice produces a consequence."""
 
-from src.classes.causal_origin import CausalOrigin
+import pytest
+
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.classes.event import FactKind
 from src.classes.governance.diplomacy import ResourceTransferClause, offer_intent
 from src.classes.mechanical_language import EntityRef
@@ -67,16 +69,14 @@ async def breached(world, engine):
     return next(item for item in world.relations.obligations.values() if item.status == "breached")
 
 
-def ai_receipts(world):
-    return tuple(item for item in world.events
-                 if item.event_type in {"ai_decision_interpreted", "ai_decision_declined",
-                                        "ai_decision_failed"})
-
-
 async def test_a_breach_earns_a_turn_that_a_provider_can_answer_with_a_real_column(tmp_path, monkeypatch):
     world = wronged_world(due_day=28, expires_day=20)
+    enable(world, per_step=256)
     people = people_total(world)
     engine = MedievalSimulator(world)
+    # Repudiation is now a valid pre-deadline option. The debtor explicitly
+    # declines it here, leaving the deadline lapse as the fact under test.
+    provider(monkeypatch, lambda prompt: {"selected_id": "NO_ACTION"})
     obligation = await breached(world, engine)
 
     # The breach alone produced a turn and nothing else.
@@ -148,6 +148,7 @@ async def test_a_breach_earns_a_turn_that_a_provider_can_answer_with_a_real_colu
 async def test_without_a_provider_choice_a_breach_moves_nobody(monkeypatch):
     world = wronged_world(due_day=20, expires_day=12)
     engine = MedievalSimulator(world)
+    provider(monkeypatch, lambda prompt: {"selected_id": "NO_ACTION"})
     await breached(world, engine)
     observe(world)
     assert world.agenda.get(review_id(22)) is not None
@@ -155,23 +156,29 @@ async def test_without_a_provider_choice_a_breach_moves_nobody(monkeypatch):
     proposals = set(world.relations.proposals)
     goods = {key: dict(item.goods) for key, item in world.economy.stocks.items()}
     balances = {key: item.balance for key, item in world.economy.accounts.items()}
-    receipts = len(ai_receipts(world))
     logs = []
 
-    # Deliberate inaction, a disabled provider, a failing one and a forged
-    # answer are all the same to the world: the turn passes and nothing moves.
+    # Inaction and offline mode can advance without a material recourse.
+    # Technical failure or an invented ID instead pauses the whole candidate
+    # transaction; neither is recorded as a strategic refusal.
     logs.append(provider(monkeypatch, lambda prompt: {"selected_id": "NO_ACTION"}))
     await engine.step()
     world.config = world.config.model_copy(update={"ai_enabled": False})
     await engine.step()
-    enable(world)
+    enable(world, per_step=256)
+    before = world_snapshot(world)
+    history = list(world.events)
     logs.append(provider(monkeypatch, lambda prompt: RuntimeError("provedor fora do ar")))
-    await engine.step()
+    with pytest.raises(ProviderDecisionRequired):
+        await engine.step()
+    assert world_snapshot(world) == before and world.events == history
     logs.append(provider(monkeypatch, lambda prompt: {"selected_id": "recourse:forjado"}))
-    await engine.step()
+    with pytest.raises(ProviderDecisionRequired):
+        await engine.step()
+    assert world_snapshot(world) == before and world.events == history
     prompts = [prompt for log in logs for prompt in log]
 
-    assert world.clock.absolute_day == 25 and prompts, "every open turn was offered"
+    assert world.clock.absolute_day == 23 and prompts, "every open turn was offered"
     assert not world.society.detachments
     assert set(world.relations.proposals) == proposals
     assert all(item.occupier_id is None for item in world.society.settlements.values())
@@ -179,10 +186,6 @@ async def test_without_a_provider_choice_a_breach_moves_nobody(monkeypatch):
     assert {key: item.balance for key, item in world.economy.accounts.items()} == balances
     assert not any(item.event_type == "recourse_decided" for item in world.events)
 
-    new_receipts = ai_receipts(world)[receipts:]
-    assert any(item.event_type == "ai_decision_failed" for item in new_receipts)
-    assert all(not item.deltas and item.causal_origin == CausalOrigin.LLM_INTERPRETATION
-               for item in new_receipts)
     for prompt in prompts:
         assert f"stock:{TARGET}" not in prompt and "treasury:escarlia" not in prompt
         assert "source_stock_id" not in prompt and "route_ids" not in prompt

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import json
 from typing import Literal
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.diplomacy import (
@@ -110,7 +111,7 @@ class AidRemediationOption:
 
 
 def _event(world, event_id):
-    return next((item for item in world.events if item.id == event_id), None)
+    return world.event_index().get(event_id)
 
 
 def _actor(value):
@@ -135,6 +136,17 @@ def _decision(world, decision_event_id, action):
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("institutional aid decision has an invalid actor") from exc
     return event, actor
+
+
+def _material_authorship(world, decision, actor, option):
+    """Keep routine aid deterministic while preserving a provider's choice."""
+    if decision.causal_origin is not CausalOrigin.ACTOR_DECISION:
+        return CausalOrigin.DETERMINISTIC, None
+    return CausalOrigin.ACTOR_DECISION, {
+        "decision_event_id": decision.id,
+        "actor_ref": actor.to_dict(),
+        "selected_affordance_id": option.id,
+    }
 
 
 def _own_reports(world, actor):
@@ -180,10 +192,81 @@ def _provider_terms(world, provider, notice):
     return None
 
 
+def _answered_request_ids(world):
+    return {link.cause_event_id
+            for event_type in ("institutional_aid_accepted", "institutional_aid_rejected")
+            for event in world.events_of_type(event_type)
+            for link in event.causal_links}
+
+
 def _answered(world, request_event_id):
-    return any(event.event_type in {"institutional_aid_accepted", "institutional_aid_rejected"}
-               and request_event_id in {link.cause_event_id for link in event.causal_links}
-               for event in world.events)
+    return request_event_id in _answered_request_ids(world)
+
+
+def _request_providers_with_pending_aid(world):
+    answered = _answered_request_ids(world)
+    events = world.event_index()
+    pending = set()
+    for event in world.events_of_type("institutional_aid_requested"):
+        if event.id in answered or event.fact_kind != FactKind.STATE_TRANSITION:
+            continue
+        # Only the receipt written by request_institutional_aid is canonical.
+        # A matching event name or a provider_ref delta alone is insufficient:
+        # unrelated/partial facts must not hide a real option from the actor.
+        decision = next((events.get(link.cause_event_id) for link in event.causal_links
+                         if events.get(link.cause_event_id) is not None
+                         and events[link.cause_event_id].fact_kind == FactKind.DECISION), None)
+        if (decision is None or decision.day > event.day or decision.decision is None
+                or set(decision.decision) != {"action", "actor_ref", "selected_affordance_id"}
+                or decision.decision.get("action") != REQUEST_ACTION):
+            continue
+        try:
+            requester = EntityRef.from_dict(decision.decision["actor_ref"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if requester.kind != "polity":
+            continue
+
+        owner_id = f"aid-request:{decision.id}"
+        receipt = {delta.aspect: delta for delta in event.deltas
+                   if delta.owner_kind == "aid_request" and delta.owner_id == owner_id}
+        expected_aspects = {"status", "option_id", "requester_settlement_id", "report_id",
+                            "requested_food", "provider_ref"}
+        if (len(receipt) != len(event.deltas) or set(receipt) != expected_aspects
+                or receipt["status"].before != "None"
+                or receipt["status"].after != "requested"
+                or receipt["option_id"].after != decision.decision.get("selected_affordance_id")):
+            continue
+        try:
+            provider_data = json.loads(receipt["provider_ref"].after)
+            provider = EntityRef.from_dict(provider_data)
+            requested_food = int(receipt["requested_food"].after)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if provider.kind != "polity" or provider == requester or requested_food <= 0:
+            continue
+
+        report_id = receipt["report_id"].after
+        settlement_id = receipt["requester_settlement_id"].after
+        report_causes = [events.get(link.cause_event_id) for link in event.causal_links
+                         if link.cause_event_id != decision.id]
+        if len(report_causes) != 1 or report_causes[0] is None:
+            continue
+        report_event = report_causes[0]
+        if (report_event.event_type != "settlement_observed"
+                or not any(delta.owner_kind == "settlement_report" and delta.owner_id == report_id
+                           and delta.aspect == "observation" for delta in report_event.deltas)):
+            continue
+        expected_option_id = (
+            f"institutional-aid-request:{requester.kind}:{requester.id}:{provider.id}:"
+            f"{report_id}:{report_event.id}"
+        )
+        if (receipt["option_id"].after != expected_option_id
+                or _actor_key(provider) != receipt["provider_ref"].after
+                or not settlement_id):
+            continue
+        pending.add(_actor_key(provider))
+    return pending
 
 
 def aid_request_options(world, requester):
@@ -193,6 +276,7 @@ def aid_request_options(world, requester):
         return ()
     reports = [report for report in _own_reports(world, requester) if report.missing_food > 0]
     options = []
+    pending_provider_keys = _request_providers_with_pending_aid(world)
     for report in reports:
         for provider_id in sorted(world.society.polities):
             provider = EntityRef("polity", provider_id)
@@ -200,11 +284,7 @@ def aid_request_options(world, requester):
                 continue
             option_id = f"institutional-aid-request:{requester.kind}:{requester.id}:{provider.id}:{report.id}:{report.event_id}"
             option = AidRequestOption(option_id, requester, provider, report.settlement_id, report.id)
-            if any(event.event_type == "institutional_aid_requested"
-                   and not _answered(world, event.id)
-                   and any(d.owner_kind == "aid_request" and d.owner_id == f"aid-request:{event.id}"
-                           and d.aspect == "provider_ref" and d.after == _actor_key(provider) for d in event.deltas)
-                   for event in world.events):
+            if _actor_key(provider) in pending_provider_keys:
                 continue
             options.append(option)
     return tuple(options)
@@ -248,7 +328,8 @@ def request_institutional_aid(world, requester, option_id, decision_event_id):
 
 
 def _pending_requests(world, provider):
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
+    answered = _answered_request_ids(world)
     for notice in world.knowledge.institutional_aid_for_actor(provider):
         if notice.kind != "request":
             continue
@@ -257,7 +338,7 @@ def _pending_requests(world, provider):
         except ValueError:
             continue
         request = events.get(notice.request_event_id)
-        if request is None or _answered(world, request.id):
+        if request is None or request.id in answered:
             continue
         decision = next((events[link.cause_event_id] for link in request.causal_links
                          if link.cause_event_id in events and events[link.cause_event_id].fact_kind == FactKind.DECISION), None)
@@ -416,11 +497,14 @@ def fulfill_institutional_aid(world, provider, option_id, decision_event_id):
     proposal = candidate.relations.proposals[obligation.proposal_id]
     validate_fiscal_route_option(candidate, option.route_option_id, actor, option.source_stock_id,
                                  option.destination_stock_id, option.resource_id, option.quantity)
+    causal_origin, causal_payload = _material_authorship(candidate, decision, actor, option)
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id, option.resource_id,
                         option.quantity, option.route_ids, decision_ids=(decision.id,),
-                        cause_ids=(obligation.last_event_id, proposal.decision_event_id))
+                        cause_ids=(obligation.last_event_id, proposal.decision_event_id),
+                        causal_origin=causal_origin, causal_payload=causal_payload)
     receipt = record_event(candidate, "institutional_aid_fulfilled", "Remessa de ajuda institucional preparada.",
                            fact_kind=FactKind.STATE_TRANSITION,
+                           causal_origin=causal_origin, causal_payload=causal_payload,
                            deltas=(_delta("obligation", obligation.id, "status", "active", "fulfilled"),
                                    _delta("obligation", obligation.id, "material_event_id", None, opened.last_event_id),
                                    *memory_creation_deltas(candidate, (proposal.proposer_ref,
@@ -525,9 +609,11 @@ def remediate_institutional_aid(world, provider, option_id, decision_event_id):
         raise ValueError("institutional aid remediation route is stale") from exc
     if not _has_breach_notice(candidate, proposal.id, actor, obligation.breach_event_id):
         raise ValueError("institutional aid remediation requires the private breach notice")
+    causal_origin, causal_payload = _material_authorship(candidate, decision, actor, option)
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id, option.resource_id,
                         option.quantity, option.route_ids, decision_ids=(decision.id,),
-                        cause_ids=(obligation.breach_event_id,))
+                        cause_ids=(obligation.breach_event_id,), causal_origin=causal_origin,
+                        causal_payload=causal_payload)
     # The same receipt declares what each party will remember about the repair
     # and reinforces the breach they already remember; the breach itself stays.
     parties = (proposal.proposer_ref, proposal.counterparty_ref)
@@ -536,6 +622,7 @@ def remediate_institutional_aid(world, provider, option_id, decision_event_id):
     receipt = record_event(candidate, "institutional_aid_remediated",
                            "Remessa de ajuda institucional repara a obrigação descumprida.",
                            fact_kind=FactKind.STATE_TRANSITION,
+                           causal_origin=causal_origin, causal_payload=causal_payload,
                            deltas=(_delta("obligation", obligation.id, "status", "breached", "remediated"),
                                    _delta("obligation", obligation.id, "remediation_material_event_id", None,
                                           opened.last_event_id),

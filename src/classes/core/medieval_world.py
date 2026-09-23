@@ -45,6 +45,14 @@ class MedievalWorld:
     agenda: WorldAgenda = field(default_factory=WorldAgenda)
     events: list["WorldEvent"] = field(default_factory=list)
     activities: dict[str, "Activity"] = field(default_factory=dict)
+    _event_index_cache: tuple[int, int, dict[str, "WorldEvent"]] | None = field(
+        default=None, repr=False, compare=False)
+    _event_type_cache: tuple[int, int, dict[str, tuple["WorldEvent", ...]]] | None = field(
+        default=None, repr=False, compare=False)
+    _strategic_capacity_cache: tuple[tuple[int, int], dict[tuple[str, str], dict]] | None = field(
+        default=None, repr=False, compare=False)
+    _diplomatic_context_cache: tuple[tuple[int, int, int], dict[tuple[str, str], object]] | None = field(
+        default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.society.validate(set(self.map.regions), self)
@@ -86,13 +94,22 @@ class MedievalWorld:
         for name in self.__dataclass_fields__:
             if name == "events":
                 setattr(candidate, name, list(self.events))
+            elif name == "_event_index_cache":
+                setattr(candidate, name, self._event_index_cache)
+            elif name == "_event_type_cache":
+                setattr(candidate, name, self._event_type_cache)
+            elif name == "_strategic_capacity_cache":
+                setattr(candidate, name, self._strategic_capacity_cache)
+            elif name == "_diplomatic_context_cache":
+                setattr(candidate, name, self._diplomatic_context_cache)
             elif name == "map":
                 setattr(candidate, name, self.map.transaction_copy())
             elif name in {
                 "society", "economy", "authority", "strategy", "research",
                 "relations", "knowledge", "regional_overflow", "creatures",
             }:
-                setattr(candidate, name, _copy_transaction_container(getattr(self, name)))
+                setattr(candidate, name, _copy_transaction_container(
+                    getattr(self, name), share_values=name == "knowledge"))
             elif name == "activities":
                 setattr(candidate, name, dict(self.activities))
             elif name == "agenda":
@@ -110,6 +127,28 @@ class MedievalWorld:
                 setattr(candidate, name, copy.deepcopy(getattr(self, name)))
         return candidate
 
+    def event_index(self) -> dict[str, "WorldEvent"]:
+        """Return a transient index for the append-only canonical event ledger."""
+        last_identity = id(self.events[-1]) if self.events else 0
+        cached = self._event_index_cache
+        if cached is None or cached[0] != len(self.events) or cached[1] != last_identity:
+            cached = (len(self.events), last_identity, {event.id: event for event in self.events})
+            self._event_index_cache = cached
+        return cached[2]
+
+    def events_of_type(self, event_type: str) -> tuple["WorldEvent", ...]:
+        """Return a transient type index over the append-only event ledger."""
+        last_identity = id(self.events[-1]) if self.events else 0
+        cached = self._event_type_cache
+        if cached is None or cached[0] != len(self.events) or cached[1] != last_identity:
+            grouped = {}
+            for event in self.events:
+                grouped.setdefault(event.event_type, []).append(event)
+            cached = (len(self.events), last_identity,
+                      {kind: tuple(items) for kind, items in grouped.items()})
+            self._event_type_cache = cached
+        return cached[2].get(event_type, ())
+
     def __deepcopy__(self, memo):
         """Use the transactional clone for the medieval world's atomic forks."""
         candidate = self.transaction_copy()
@@ -117,7 +156,7 @@ class MedievalWorld:
         return candidate
 
 
-def _copy_transaction_container(value):
+def _copy_transaction_container(value, *, share_values=False):
     """Copy a domain state and its registries without validation/serialization.
 
     Registry values are immutable at the model boundary.  Their nested
@@ -130,17 +169,24 @@ def _copy_transaction_container(value):
     result = copy.copy(value)
     for item in fields(value):
         current = getattr(value, item.name)
-        setattr(result, item.name, _copy_transaction_value(current))
+        setattr(result, item.name, _copy_transaction_value(current, share_values=share_values))
+    # KnowledgeState registries are tracked dictionaries.  Rebind them to the
+    # candidate and clear transient validation/query projections after the
+    # shallow dataclass copy; they must never share an epoch or cache with the
+    # published world.
+    bind = getattr(result, "_bind_registry_epoch", None)
+    if bind is not None:
+        bind(preserve_query=True)
     return result
 
 
-def _copy_transaction_value(value):
+def _copy_transaction_value(value, *, share_values=False):
     if isinstance(value, dict):
-        return {key: _copy_transaction_value(item) for key, item in value.items()}
+        return {key: _copy_transaction_value(item, share_values=share_values) for key, item in value.items()}
     if isinstance(value, list):
-        return [_copy_transaction_value(item) for item in value]
+        return [_copy_transaction_value(item, share_values=share_values) for item in value]
     if isinstance(value, set):
-        return {_copy_transaction_value(item) for item in value}
+        return {_copy_transaction_value(item, share_values=share_values) for item in value}
     if isinstance(value, tuple):
         # Most authored tuple fields are identity/enum scalars.  They are
         # immutable, so keep the tuple object instead of recursively visiting
@@ -148,17 +194,23 @@ def _copy_transaction_value(value):
         # mutable/model value still take the isolated path below.
         if all(isinstance(item, (str, int, float, bool, type(None), bytes)) for item in value):
             return value
-        return tuple(_copy_transaction_value(item) for item in value)
+        return tuple(_copy_transaction_value(item, share_values=share_values) for item in value)
     if isinstance(value, frozenset):
         if all(isinstance(item, (str, int, float, bool, type(None), bytes)) for item in value):
             return value
-        return frozenset(_copy_transaction_value(item) for item in value)
+        return frozenset(_copy_transaction_value(item, share_values=share_values) for item in value)
     # Frozen Pydantic values are replaced by owners, but their dictionaries
     # and lists are not deep-frozen by Pydantic.  Clone those fields without
     # re-validating every value during a transaction fork.
     if hasattr(value, "__pydantic_fields__") and hasattr(value, "__dict__"):
+        if share_values:
+            # Frozen scalar SocietyValue models are replaced by owners rather
+            # than mutated in place.  Knowledge registries contain only these
+            # scalar observation/notice values, so sharing them avoids
+            # re-walking the historical index on every transaction.
+            return value
         result = copy.copy(value)
         for key, item in value.__dict__.items():
-            object.__setattr__(result, key, _copy_transaction_value(item))
+            object.__setattr__(result, key, _copy_transaction_value(item, share_values=share_values))
         return result
     return value

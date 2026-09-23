@@ -12,9 +12,26 @@ from .routing import supply_path
 
 def _sources(world, settlement_id):
     need = world.economy.needs[settlement_id]
+    stock = world.economy.stocks[need.stock_id]
     resident_events = [group.last_event_id for group in world.society.population.values()
                        if group.settlement_id == settlement_id]
-    return _causes(need.last_event_id, *resident_events)
+    # A settlement report reads the condition *and* the public granary that
+    # supports its next legal relief affordance.  Freight can replenish that
+    # granary without changing ``SettlementNeeds`` until a later distribution
+    # or monthly consumption.  Keeping the stock receipt here preserves
+    # ``cargo_delivered -> observation -> decision`` rather than making a
+    # newly observed material arrival disappear from Why.
+    return _causes(need.last_event_id, stock.last_event_ids.get("food"), *resident_events)
+
+
+def _occupation_source(world, settlement_id, occupier_id):
+    """Find the latest material occupation fact for a changed local reading."""
+    for event in reversed(world.events):
+        if any(delta.owner_kind == "settlement" and delta.owner_id == settlement_id
+               and delta.aspect == "occupier_id" and delta.after == str(occupier_id)
+               for delta in event.deltas):
+            return event.id
+    return None
 
 
 def _observe(world, actor, settlement_id, *, presence_causes=()):
@@ -54,12 +71,17 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
                               # that raised them and its sponsor are not.
                               warded=warded,
                               channel="local_settlement_report", event_id="pending")
+    occupation_source = (_occupation_source(world, settlement_id, settlement.occupier_id)
+                         if previous is None or previous.occupier_id != settlement.occupier_id else None)
     event = record_event(world, "settlement_observed",
                          f"{settlement.name}: {report.present_population}/{report.population} presentes, saúde {report.health}/1000.",
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("settlement_report", key, "observation",
                                         previous.observation() if previous else None, report.observation()),),
-                         cause_ids=_causes(*_sources(world, settlement_id), *presence_causes))
+                         cause_ids=_causes(*_sources(world, settlement_id),
+                                           previous.event_id if previous is not None else None,
+                                           occupation_source,
+                                           *presence_causes))
     report = report.model_copy(update={"event_id": event.id})
     world.knowledge.settlement_reports[key] = report
     return report
@@ -74,6 +96,62 @@ def observe_present_household(world, group_id, settlement_id, journey_event_id):
         raise ValueError("settlement observation requires the household's stranded journey")
     return _observe(world, EntityRef("population_group", group_id), settlement_id,
                     presence_causes=(journey_event_id,))
+
+
+def _present_observer(world, recipient_ref, settlement_id):
+    """Whether this observer still stands where its own local report was made.
+
+    A local observation is a fact about presence, not a standing subscription.
+    Residents, a located person, the administration, an institution operating
+    a site here, a present detachment and a current office holder standing in
+    the settlement are all really here; anyone else has only been here.
+    """
+    settlement = world.society.settlements.get(settlement_id)
+    if settlement is None:
+        return False
+    if recipient_ref.kind == "population_group":
+        group = world.society.population.get(recipient_ref.id)
+        return group is not None and group.settlement_id == settlement_id
+    if recipient_ref.kind == "character":
+        person = world.society.characters.get(recipient_ref.id)
+        return person is not None and person.death_day is None and person.location_id == settlement_id
+    if (settlement.administrator_id is not None
+            and recipient_ref == EntityRef("polity", settlement.administrator_id)):
+        return True
+    if any(site.owner_ref == recipient_ref and settlement.region_id in site.region_ids
+           for site in world.map.infrastructure_sites.values()):
+        return True
+    if any(detachment.owner_ref == recipient_ref and detachment.location_id == settlement_id
+           and detachment.stage == "present" for detachment in world.society.detachments.values()):
+        return True
+    day = world.clock.absolute_day
+    for office in world.authority.offices.values():
+        if (office.institution_ref != recipient_ref or office.holder_ref.kind != "character"
+                or office.starts_day > day or (office.ends_day is not None and day >= office.ends_day)):
+            continue
+        holder = world.society.characters.get(office.holder_ref.id)
+        if holder is not None and holder.death_day is None and holder.location_id == settlement_id:
+            return True
+    return False
+
+
+def observe_present_agent(world, actor, settlement_id, presence_causes=()):
+    """An institution's own person standing somewhere observes it for the institution.
+
+    This is the ordinary dated local observation any present actor makes --
+    ``local_settlement_report``, recipient and publisher alike, derived from
+    presence and from nobody else's bulletin. It reads the same aggregate
+    condition a resident reads and never a foreign stock, account or plan.
+    The caller owns whatever put the person there and passes its dated
+    receipts as the presence cause.
+    """
+    if (not isinstance(actor, EntityRef) or settlement_id not in world.society.settlements
+            or not _present_observer(world, actor, settlement_id)):
+        raise ValueError("settlement observation requires the institution's present agent")
+    report = _observe(world, actor, settlement_id, presence_causes=tuple(presence_causes))
+    if report.channel != "local_settlement_report" or report.recipient_ref != report.publisher_ref:
+        raise ValueError("a present agent produces its institution's own local observation")
+    return report
 
 
 def observe_present_force(world, detachment_id):
@@ -183,8 +261,13 @@ def refresh_existing_local_settlement_reports(world, settlement_id):
     actors who already held a direct local observation.  This helper therefore
     never publishes a new bulletin and never turns mere reachability into
     knowledge; it only replaces an existing own local report.
+
+    It also does not renew one for an observer that has since left. A past
+    visit -- an agent's mission, a detachment that marched on -- is history,
+    not a standing watch over someone else's town.
     """
-    for report in tuple(world.knowledge.settlement_reports.values()):
+    for report in sorted(world.knowledge.settlement_reports.values(), key=lambda item: item.id):
         if (report.settlement_id == settlement_id and report.recipient_ref == report.publisher_ref
-                and report.channel == "local_settlement_report"):
+                and report.channel == "local_settlement_report"
+                and _present_observer(world, report.recipient_ref, settlement_id)):
             _observe(world, report.recipient_ref, settlement_id)

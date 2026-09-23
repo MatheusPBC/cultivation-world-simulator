@@ -12,6 +12,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from src.classes.economy.models import MoneyAccount
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -53,6 +54,7 @@ class RaiseOption:
     account_id: Identity
     count: int
     provisions: int
+    days: int
     destination_id: Identity
     route_ids: tuple[Identity, ...]
 
@@ -89,7 +91,7 @@ class GarrisonOption:
     kind: str = "garrison"
 
     def decision(self):
-        action = GARRISON_ACTION if self.kind == "garrison" else WITHDRAW_GARRISON_ACTION
+        action = GARRISON_ACTION if self.kind in {"garrison", "defend"} else WITHDRAW_GARRISON_ACTION
         return {"action": action, "actor_ref": self.actor_ref.to_dict(),
                 "selected_affordance_id": self.id}
 
@@ -196,6 +198,43 @@ def _own_account(world, actor):
     return next((item for _, item in sorted(world.economy.accounts.items()) if item.owner_ref == actor), None)
 
 
+def recruitment_capacity(world, actor, destination_id, *, days=10):
+    """Sources that could equip recruits, with people as the binding constraint.
+
+    The future stipend and first military wage both need cash.  This reading
+    never reserves either means or people; the existing owners revalidate both
+    when a group accepts and when a column is eventually raised.
+    """
+    if not _commands(world, actor):
+        return ()
+    account = _own_account(world, actor)
+    if account is None:
+        return ()
+    sources = []
+    for settlement in sorted(world.society.settlements.values(), key=lambda item: item.id):
+        if settlement.id == destination_id or settlement.administrator_id != actor.id:
+            continue
+        stock = _own_stock(world, actor, settlement.id)
+        if stock is None or not known_supply_path(world, actor, settlement.id, destination_id, "food"):
+            continue
+        if any(group.settlement_id == settlement.id and group.occupation == "soldier"
+               and world.society.available_count(group.id) > 0
+               for group in world.society.population.values()):
+            continue
+        if not any(group.settlement_id == settlement.id and group.occupation != "soldier"
+                   and group.count >= 5 and world.society.available_count(group.id) == group.count
+                   for group in world.society.population.values()):
+            continue
+        free_food = max(0, stock.goods.get("food", 0) - reserve_quantity(world, stock.id, "food"))
+        # The same canonical wage is used as a signing stipend; keep enough
+        # money for the later first payroll instead of funding only an offer.
+        count = min(free_food // (RATIONS_PER_SOLDIER_DAY * days),
+                    account.balance // (2 * WAGE_PER_SOLDIER))
+        if count > 0:
+            sources.append((settlement.id, account.id, count))
+    return tuple(sorted(sources, key=lambda item: (-item[2], item[0])))
+
+
 def raise_options(world, actor, days=10):
     """Detachments this institution could raise today from its own means."""
     if not _commands(world, actor):
@@ -226,7 +265,8 @@ def raise_options(world, actor, days=10):
                 id=(f"raise-detachment:{actor.id}:{group_id}:{destination_id}:{count}:{provisions}:"
                     f"{'-'.join(route)}"),
                 actor_ref=actor, group_id=group_id, settlement_id=group.settlement_id, stock_id=stock.id,
-                account_id=account.id, count=count, provisions=provisions, destination_id=destination_id,
+                account_id=account.id, count=count, provisions=provisions, days=days,
+                destination_id=destination_id,
                 route_ids=tuple(route)))
     return tuple(sorted(options, key=lambda item: item.id))
 
@@ -505,11 +545,15 @@ def force_options(world, actor):
 
 
 def garrison_options(world, actor):
-    """A supplied occupation may become a durable duty by explicit choice.
+    """A supplied occupation, or the actor's own settlement, may take a duty.
 
-    The choice does not grant occupation: the settlement must already be
-    occupied by this column.  Food is the column's current ration reserve and
-    money is the owner's current account; both are checked again by the owner.
+    An occupied settlement's duty ("garrison") does not itself grant
+    occupation: the settlement must already be occupied by this column.  A
+    "defend" duty at the actor's own administered settlement requires no
+    occupation and changes none; it only lets an already-present, already-paid
+    column become a durable defensive presence at home.  Food is the column's
+    current ration reserve and money is the owner's current account; both are
+    checked again by the owner.
     """
     if not _commands(world, actor):
         return ()
@@ -543,15 +587,21 @@ def garrison_options(world, actor):
                         replacement_detachment_id=replacement.id, settlement_id=settlement.id,
                         account_id=account.id, daily_wage=wage))
             continue
+        if settlement.occupier_id == actor.id:
+            kind = "garrison"
+        elif settlement.administrator_id == actor.id:
+            kind = "defend"
+        else:
+            continue
         account = _own_account(world, actor)
-        if (settlement.occupier_id != actor.id or detachment.provisions < detachment.count
-                or account is None or account.balance < detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY
+        wage = detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY
+        if (detachment.provisions < detachment.count or account is None or account.balance < wage
                 or existing is not None):
             continue
         options.append(GarrisonOption(
-            id=f"garrison:{detachment.id}:{detachment.last_event_id}:{account.id}",
+            id=f"garrison:{detachment.id}:{detachment.last_event_id}:{account.id}:{kind}",
             actor_ref=actor, detachment_id=detachment.id, settlement_id=settlement.id,
-            account_id=account.id, daily_wage=detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY))
+            account_id=account.id, daily_wage=wage, kind=kind))
     return tuple(options)
 
 
@@ -587,16 +637,14 @@ def withdrawal_options(world, actor, *, detachment_id=None, allow_open_campaign_
     # was appointed. Ordinary force withdrawal still requires a command.
     if not _commands(world, actor) and not campaign_authorized:
         return ()
-    from .campaign_supply import campaign_baggage_ready_for_departure, campaign_stock_id
+    from .campaign_supply import campaign_baggage_ready_for_departure
 
     options = []
     for _, detachment in sorted(world.society.detachments.items()):
         if (detachment.owner_ref != actor or detachment.stage != "present" or detachment.provisions <= 0
                 or (detachment_id is not None and detachment.id != detachment_id)
-                or (not campaign_baggage_ready_for_departure(world, detachment)
-                    and not (allow_open_campaign_supply and not any(
-                        world.economy.freight_orders[parcel.order_id].destination_id == campaign_stock_id(detachment.id)
-                        for parcel in world.economy.parcels.values())))):
+                or not campaign_baggage_ready_for_departure(
+                    world, detachment, ignore_notice=allow_open_campaign_supply)):
             continue
         for destination_id, settlement in sorted(world.society.settlements.items()):
             if destination_id == detachment.location_id or settlement.administrator_id != actor.id:
@@ -734,6 +782,11 @@ def _record(world, detachment, updated, event_type, content, *, deltas=(), cause
     lifted = ()
     assembly_lifted = ()
     command_released = None
+    training_lapsed = ()
+    if (updated.stage != "present" or updated.location_id != detachment.location_id
+            or updated.provisions < updated.count * RATIONS_PER_SOLDIER_DAY):
+        from .force_training import lapse_training_for
+        training_lapsed = lapse_training_for(world, detachment, cause_ids=causes)
     # A command is a real person's local duty, never a passenger hidden inside
     # a marching or dissolved record.  End it before the force transition so
     # both receipts explain the same physical change and the person remains at
@@ -760,6 +813,7 @@ def _record(world, detachment, updated, event_type, content, *, deltas=(), cause
                          cause_ids=_causes(detachment.last_event_id, *causes,
                                             *(item.id for item in lifted),
                                             *(item.id for item in assembly_lifted),
+                                            *(item.id for item in training_lapsed),
                                             *((command_released.id,) if command_released is not None else ()),
                                             *((abandoned.id,) if abandoned is not None else ())))
     world.society.detachments[detachment.id] = updated.model_copy(update={"last_event_id": event.id})
@@ -850,7 +904,11 @@ def collapse_garrison_for_siege(world, garrison_id, *, campaign_event_id):
 
 
 def _maintain_garrison(world, detachment):
-    """Charge one dated payroll after the column consumed today's ration."""
+    """Charge one dated payroll after the column consumed today's ration.
+
+    Continuity holds for either an occupied duty or a defensive duty at the
+    owner's own administered settlement; neither implies automatic defense.
+    """
     identity = f"garrison:{detachment.id}"
     garrison = world.society.garrisons.get(identity)
     if garrison is None or garrison.stage != "active":
@@ -859,7 +917,9 @@ def _maintain_garrison(world, detachment):
     account = world.economy.accounts.get(garrison.account_id)
     source_group = world.society.population.get(detachment.source_group_id)
     wage = detachment.count * GARRISON_WAGE_PER_SOLDIER_DAY
-    if (settlement is None or settlement.occupier_id != detachment.owner_ref.id
+    authorized = settlement is not None and (settlement.occupier_id == detachment.owner_ref.id
+                                             or settlement.administrator_id == detachment.owner_ref.id)
+    if (not authorized
             or detachment.stage != "present" or detachment.location_id != settlement.id
             or account is None or account.owner_ref != detachment.owner_ref or account.balance < wage
             or source_group is None):
@@ -903,6 +963,9 @@ def _withdraw_garrison(world, actor, option, decision):
         world, "garrison_withdrawn",
         "A instituição retirou voluntariamente o dever da guarnição; a coluna permaneceu no local.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": decision.decision["selected_affordance_id"]},
         deltas=(_delta("garrison", identity, "stage", "active", "withdrawn"),),
         cause_ids=_causes(decision.id, garrison.last_event_id, detachment.last_event_id),
     )
@@ -970,6 +1033,9 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
             candidate, "garrison_rotated",
             "A instituição substituiu a coluna da guarnição por outra presença abastecida; o controle permaneceu.",
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                            "selected_affordance_id": option.id},
             deltas=(_delta("garrison", current_garrison.id, "stage", "active", "withdrawn"),
                     _delta("garrison", new_identity, "stage", None, "active"),
                     _delta("garrison", new_identity, "detachment_id", None, replacement.id),
@@ -982,12 +1048,14 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
             id=new_identity, detachment_id=replacement.id, settlement_id=option.settlement_id,
             account_id=account.id, decision_event_id=decision.id,
             started_day=candidate.clock.absolute_day, last_event_id=event.id)
-    elif option.kind == "garrison":
+    elif option.kind in {"garrison", "defend"}:
         if action != GARRISON_ACTION:
             raise ValueError("garrison action mismatch")
         settlement = candidate.society.settlements[detachment.location_id]
         account = candidate.economy.accounts.get(option.account_id)
-        if (settlement.occupier_id != actor.id or detachment.stage != "present"
+        authorized = (settlement.occupier_id == actor.id if option.kind == "garrison"
+                     else settlement.administrator_id == actor.id)
+        if (not authorized or detachment.stage != "present"
                 or detachment.location_id != option.settlement_id
                 or detachment.provisions < detachment.count or account is None
                 or account.owner_ref != actor
@@ -997,9 +1065,15 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
         garrison = Garrison(id=identity, detachment_id=detachment.id, settlement_id=settlement.id,
                             account_id=account.id, decision_event_id=decision.id,
                             started_day=candidate.clock.absolute_day, last_event_id="pending")
+        content = ("A coluna estabeleceu uma guarnição material no assentamento ocupado."
+                  if option.kind == "garrison" else
+                  "A coluna estabeleceu uma guarnição defensiva no próprio assentamento administrado.")
         event = record_event(
-            candidate, "garrison_established", "A coluna estabeleceu uma guarnição material no assentamento ocupado.",
+            candidate, "garrison_established", content,
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                            "selected_affordance_id": option.id},
             deltas=(_delta("garrison", identity, "stage", None, "active"),
                     _delta("garrison", identity, "settlement_id", None, settlement.id),
                     _delta("garrison", identity, "detachment_id", None, detachment.id)),

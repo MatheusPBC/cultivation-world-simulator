@@ -31,7 +31,10 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-SCHEMA = 60
+# Freight now retains the factual endpoint locations from its opening, so a
+# later mobile campaign bag cannot rewrite a completed order's route. Older
+# saves lack those endpoints and are rejected without rewriting real data.
+SCHEMA = 66
 
 
 def world_snapshot(world: MedievalWorld) -> dict:

@@ -21,6 +21,10 @@ from src.classes.event import FactKind
 
 from .economy import _causes, _delta
 from .events import record_event
+from src.systems.material_hazard_impacts import (
+    REGIONAL_FLOOD_SITE_INTERACTION,
+    ward_resistance_capabilities,
+)
 
 
 MONTH_DAYS = 30
@@ -102,7 +106,11 @@ def _assessment(world, region_id: int, *, load: int, streak: int, prior, clears_
         # overflow owner's monthly assessment/streak, so it is a material state
         # transition rather than a prose-only derived condition.
         fact_kind=FactKind.STATE_TRANSITION,
+        # The initial reading is an engine-owned physical baseline.  Each
+        # later assessment is a dated continuation of the prior reading, not
+        # an uncaused replacement of it.
         deltas=tuple(deltas),
+        cause_ids=_causes(prior.evidence_event_id if prior else None),
     )
     state.assessments[assessment_id] = RegionalOverflowAssessment(
         id=assessment_id,
@@ -146,7 +154,6 @@ def _damage_one_exposed_site(world, occurrence: RegionalOverflowOccurrence):
         for site in world.map.infrastructure_sites.values()
         if occurrence.region_id in site.region_ids
         and site.water_body_ids
-        and site.maintainer_ref is not None
         and site.integrity > 0.0
     ]
     candidates = [item for item in candidates if item[0] >= MIN_SITE_VULNERABILITY]
@@ -154,7 +161,14 @@ def _damage_one_exposed_site(world, occurrence: RegionalOverflowOccurrence):
         return None
     _, site = min(candidates, key=lambda item: (-item[0], item[1].id))
     before = float(site.integrity)
-    after = max(0.0, before - MAX_OVERFLOW_INTEGRITY_LOSS)
+    exposure = min(1.0, site_overflow_vulnerability(world, site) / 100.0)
+    resistance_capabilities = tuple(site.capability_ids) + ward_resistance_capabilities(world, site)
+    magnitude = REGIONAL_FLOOD_SITE_INTERACTION.magnitude(
+        exposure, resistance_capabilities
+    )
+    if magnitude is None:
+        return None
+    after = max(0.0, before - magnitude)
     if after >= before:
         return None
     event = record_event(
@@ -162,6 +176,15 @@ def _damage_one_exposed_site(world, occurrence: RegionalOverflowOccurrence):
         "site_overflow_damaged",
         f"{site.name}: transbordamento regional reduziu a integridade para {round(after * 100)}%.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={
+            "hazard_kind": REGIONAL_FLOOD_SITE_INTERACTION.hazard_kind,
+            "target_kind": REGIONAL_FLOOD_SITE_INTERACTION.target_kind,
+            "target_id": site.id,
+            "occurrence_id": occurrence.id,
+            "exposure": exposure,
+            "magnitude": magnitude,
+            "resistance_capabilities": list(resistance_capabilities),
+        },
         deltas=(
             _delta("site", site.id, "integrity", before, after),
             _delta("regional_overflow", occurrence.id, "damaged_site_id", None, site.id),
@@ -175,6 +198,47 @@ def _damage_one_exposed_site(world, occurrence: RegionalOverflowOccurrence):
         update={"damaged_site_id": site.id, "damage_event_id": event.id}
     )
     return site.id
+
+
+def site_overflow_reading(world, site_id):
+    """Engine-owned, read-only overflow context for one already-known site.
+
+    This derives only what is already true: the site's immutable geography
+    exposure, the last monthly assessment already recorded for each of its
+    regions, and any still-open occurrence -- never a future, unassessed
+    month.  It exposes no foreign site, stock, account, route or
+    recommendation.  The caller is responsible for only calling this for a
+    site the actor already holds its own current ``SiteReport`` for; nothing
+    here checks actor knowledge, and nothing is persisted by a read.
+    """
+    site = world.map.infrastructure_sites.get(site_id)
+    if site is None:
+        return None
+    state = world.regional_overflow
+    regions = []
+    for region_id in sorted(site.region_ids):
+        assessment = state.assessment(region_id)
+        occurrence = state.occurrence(region_id)
+        regions.append({
+            "region_id": region_id,
+            "last_assessed_load": assessment.load if assessment is not None else None,
+            "last_assessed_streak": assessment.streak if assessment is not None else None,
+            "last_assessed_day": assessment.assessed_day if assessment is not None else None,
+            "assessment_event_id": assessment.evidence_event_id if assessment is not None else None,
+            "open_occurrence": (
+                None if occurrence is None else {
+                    "started_day": occurrence.started_day,
+                    "load": occurrence.load,
+                    "assessment_event_id": occurrence.assessment_event_id,
+                    "started_event_id": occurrence.started_event_id,
+                }
+            ),
+        })
+    return {
+        "site_id": site.id,
+        "vulnerability": site_overflow_vulnerability(world, site),
+        "regions": tuple(regions),
+    }
 
 
 def apply_monthly_regional_overflow(world) -> tuple[str, ...]:
@@ -223,5 +287,6 @@ __all__ = [
     "OVERFLOW_LOAD_THRESHOLD",
     "apply_monthly_regional_overflow",
     "regional_hydrologic_load",
+    "site_overflow_reading",
     "site_overflow_vulnerability",
 ]

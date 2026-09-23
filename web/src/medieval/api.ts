@@ -1,5 +1,5 @@
 import type { CausalView, CreateRequest, EventsView, LoadRequest, ObservatoryView, OptionsView,
-  SaveRequest, SaveView, SpeedRequest, StatusView, ResearchView, DiplomacyView } from '../types/medieval-api'
+  SaveRequest, SaveView, SpeedRequest, StatusView, ResearchView, DiplomacyView, DossierView } from '../types/medieval-api'
 
 type Queries = { status: StatusView; options: OptionsView; observatory: ObservatoryView; research: ResearchView; diplomacy: DiplomacyView; saves: SaveView[]; events: EventsView }
 type Commands = { create: CreateRequest; step: Record<string, never>; pause: Record<string, never>;
@@ -35,5 +35,8 @@ async function request<T>(path: string, body?: unknown): Promise<Reply<T>> {
 export const api = {
   query<K extends keyof Queries>(name: K, params = '') { return request<Queries[K]>('query/' + name + params) },
   causal(id: string, after = 0) { return request<CausalView>('query/causal/' + encodeURIComponent(id) + '?after=' + after) },
+  dossier(actorKind: string, actorId: string) {
+    return request<DossierView>('query/dossier/' + encodeURIComponent(actorKind) + '/' + encodeURIComponent(actorId))
+  },
   command<K extends Command>(name: K, body: Commands[K]) { return request<StatusView>('command/' + name, body) },
 }

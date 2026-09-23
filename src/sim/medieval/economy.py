@@ -1,9 +1,11 @@
 """Material executors. Caller owns the world mutation transaction, not prose."""
 
 from collections import defaultdict
+import hashlib
 import math
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import require_authority, can_actor_act_for
 from src.classes.state_delta import StateDelta
 from .events import record_event
@@ -18,7 +20,8 @@ def _causes(*values):
     return tuple(sorted({value for value in values if value}))
 
 
-def _apply_stock(world, stock, goods, event_type, content, *, extra_deltas=(), cause_ids=()):
+def _apply_stock(world, stock, goods, event_type, content, *, extra_deltas=(), cause_ids=(),
+                 causal_origin=CausalOrigin.DETERMINISTIC, causal_payload=None):
     changed = sorted(r for r in set(stock.goods) | set(goods) if stock.goods.get(r, 0) != goods.get(r, 0))
     deltas = tuple(_delta("stock", stock.id, r, stock.goods.get(r, 0), goods.get(r, 0)) for r in changed)
     causes = _causes(*cause_ids, *(stock.last_event_ids.get(r) for r in changed))
@@ -29,6 +32,7 @@ def _apply_stock(world, stock, goods, event_type, content, *, extra_deltas=(), c
         raise ValueError("storage capacity exceeded")
     event = record_event(world, event_type, content,
                          fact_kind=FactKind.STATE_TRANSITION if deltas or extra_deltas else FactKind.OCCURRENCE,
+                         causal_origin=causal_origin, causal_payload=causal_payload,
                          deltas=(*deltas, *extra_deltas), cause_ids=causes)
     provenance = {**stock.last_event_ids, **{r: event.id for r in changed}}
     world.economy.stocks[stock.id] = updated.model_copy(update={"last_event_ids": provenance})
@@ -44,6 +48,73 @@ def monthly_workforce(world):
     return available
 
 
+def _priority_competitors(world, facilities, priority):
+    """Facilities in precisely the local workforce conflict an owner chose."""
+    result = []
+    for facility in facilities:
+        stock = world.economy.stocks.get(facility.stock_id)
+        recipe = world.economy.recipes.get(facility.recipe_id)
+        if (stock is not None and recipe is not None
+                and (stock.owner_ref, stock.location_id, recipe.occupation)
+                == (priority.owner_ref, priority.settlement_id, priority.occupation)):
+            result.append(facility)
+    return result
+
+
+def _rotated_facilities(world):
+    """Return facilities in a stable, monthly-rotated payroll order.
+
+    Production lines that share an employer account compete for the same
+    material cash.  A permanent ID sort made the first line consume the
+    treasury every month, starving later lines regardless of their local
+    demand or stock.  Rotation is an engine-owned allocation rule: it creates
+    no output, does not inspect private strategy, and leaves every line's own
+    limits and owner revalidation unchanged.
+    """
+    grouped = defaultdict(list)
+    for facility in world.economy.facilities.values():
+        grouped[facility.payroll_account_id].append(facility)
+    month = world.clock.absolute_day // 30
+    ordered = []
+    for account_id in sorted(grouped):
+        facilities = sorted(grouped[account_id], key=lambda item: item.id)
+        if len(facilities) > 1:
+            digest = hashlib.sha256(f"{account_id}:{month}".encode("utf-8")).digest()
+            offset = int.from_bytes(digest[:8], "big") % len(facilities)
+            facilities = facilities[offset:] + facilities[:offset]
+        # A chosen priority can affect only the exact local workforce conflict
+        # it named, and only on the one future boundary it was selected for.
+        # It is an owned instruction, not a deficit response: without a live
+        # decision-backed record the monthly fair rotation above remains whole.
+        active = []
+        for priority in world.economy.production_priorities.values():
+            if priority.payroll_account_id != account_id or priority.effective_day != world.clock.absolute_day:
+                continue
+            if not can_actor_act_for(world, priority.owner_ref, priority.owner_ref, "trade"):
+                continue
+            selected = next((item for item in facilities if item.id == priority.facility_id), None)
+            if selected is None:
+                continue
+            stock = world.economy.stocks.get(selected.stock_id)
+            recipe = world.economy.recipes.get(selected.recipe_id)
+            if (stock is None or recipe is None
+                    or (stock.owner_ref, stock.location_id, recipe.occupation)
+                    != (priority.owner_ref, priority.settlement_id, priority.occupation)):
+                continue
+            competitors = _priority_competitors(world, facilities, priority)
+            if len(competitors) > 1:
+                active.append((priority, selected, competitors))
+        # Registry identity is one conflict key, so ties cannot exist in
+        # valid state.  Still keep a deterministic order for malformed direct
+        # callers before validation rejects them.
+        for _priority, selected, competitors in sorted(active, key=lambda item: item[0].id):
+            facilities.remove(selected)
+            first_competitor = min(facilities.index(item) for item in competitors if item in facilities)
+            facilities.insert(first_competitor, selected)
+        ordered.extend(facilities)
+    return tuple(ordered)
+
+
 def produce_monthly(world, available=None) -> None:
     from .labor import settle_labor
     economy = world.economy
@@ -53,13 +124,22 @@ def produce_monthly(world, available=None) -> None:
         available = monthly_workforce(world)
     for group in world.society.population.values():
         workers[group.settlement_id, group.occupation] += available[group.id]
-    for facility in sorted(economy.facilities.values(), key=lambda item: item.id):
+    active_priorities = {
+        priority.facility_id: priority
+        for priority in economy.production_priorities.values()
+        if priority.effective_day == world.clock.absolute_day
+        and can_actor_act_for(world, priority.owner_ref, priority.owner_ref, "trade")
+    }
+    for facility in _rotated_facilities(world):
         payroll = economy.payrolls.get(facility.id)
         if payroll is not None and payroll.day == world.clock.absolute_day:
             continue
         site = world.map.infrastructure_sites[facility.site_id]
         recipe = economy.recipes[facility.recipe_id]
         stock = economy.stocks[facility.stock_id]
+        knowledge = next((item for item in world.knowledge.technologies.values()
+                          if item.owner_ref == stock.owner_ref
+                          and item.technology_id == recipe.required_technology_id), None)
         workforce = (stock.location_id, recipe.occupation)
         limits = {"capacity": facility.max_batches,
                   "site_integrity": math.floor(facility.max_batches * site.integrity),
@@ -69,7 +149,7 @@ def produce_monthly(world, available=None) -> None:
             limits["employer_authority"] = 0
         if not site.enabled:
             limits["site_disabled"] = 0
-        if recipe.required_technology_id and not world.knowledge.knows(stock.owner_ref, recipe.required_technology_id):
+        if recipe.required_technology_id and knowledge is None:
             limits['knowledge'] = 0
         for rid, amount in recipe.inputs.items():
             limits[f"input:{rid}"] = stock.goods.get(rid, 0) // amount
@@ -93,14 +173,43 @@ def produce_monthly(world, available=None) -> None:
             # workers this line still lacks to raise its output by one batch.
             changes += (_delta("production", facility.id, "labor_shortfall", 0,
                                recipe.workers * (batches + 1) - workers[workforce]),)
+        labor_shortfall_value = (
+            recipe.workers * (batches + 1) - workers[workforce]
+            if "labor" in limitations else 0
+        )
+        priority = active_priorities.get(facility.id)
         event = _apply_stock(world, stock, goods, "production_completed" if batches else "production_limited",
                              f"{site.name}: {batches} lotes de produção concluídos.",
                              cause_ids=_causes(site.last_event_id, facility.last_event_id,
+                                               knowledge.event_id if knowledge is not None else None,
                                                economy.accounts[facility.payroll_account_id].last_event_id,
                                                *(group.last_event_id for group in world.society.population.values()
                                                  if group.settlement_id == stock.location_id and group.occupation == recipe.occupation),
-                                               *(stock.last_event_ids.get(r) for r in recipe.inputs)),
+                                               *(stock.last_event_ids.get(r) for r in recipe.inputs),
+                                               priority.last_event_id if priority is not None else None),
                              extra_deltas=changes)
+        # Keep the engine's calculation alongside the scalar deltas.  Why views
+        # and diagnostics can now explain the binding limit without reparsing
+        # prose or guessing from a later state snapshot; the payload is not an
+        # instruction and never changes the owner-side execution.
+        event = event.model_copy(update={"causal_payload": {
+            "production": {
+                "facility_id": facility.id,
+                "site_id": facility.site_id,
+                "stock_id": facility.stock_id,
+                "settlement_id": stock.location_id,
+                "recipe_id": facility.recipe_id,
+                "occupation": recipe.occupation,
+                "batches": batches,
+                "capacity": facility.max_batches,
+                "limits": dict(sorted(limits.items())),
+                "limitations": list(limitations),
+                "labor_shortfall": max(0, labor_shortfall_value),
+                "production_priority_event_id": priority.last_event_id if priority is not None else None,
+                "observed_day": world.clock.absolute_day,
+            }
+        }})
+        world.events[-1] = event
         economy.facilities[facility.id] = updated.model_copy(update={"last_event_id": event.id})
         settle_labor(world, facility, batches, available, event.id)
         workers[workforce] -= batches * recipe.workers
@@ -113,7 +222,7 @@ def consume_monthly(world) -> None:
     economy = world.economy
     economy.validate(world)
     consume_travel_provisions(world)
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     for need in sorted(economy.needs.values(), key=lambda item: item.id):
         previous = events.get(need.last_event_id)
         if previous is not None and previous.day == world.clock.absolute_day and previous.event_type == "subsistence_resolved":
@@ -126,7 +235,24 @@ def consume_monthly(world) -> None:
         required = sum(required_by_group.values()) + domestic
         public_required = sum(required_by_group.values())
         pool = min(public_required, stock.goods.get("food", 0))
-        paid, receipts = purchase_monthly_rations(world, need, pool, required_by_group)
+        # Keep the affordability bottleneck explicit in the canonical reading.
+        # Public stock can be abundant while a household cannot buy its share;
+        # that is a real economic cause for missing food, not a reason to
+        # manufacture a subsidy or to infer one from prose.
+        from src.sim.medieval.consumption import requirement_shares
+        public_shares = requirement_shares(required_by_group, pool)
+        price = economy.markets[need.id].prices["food"]
+        unaffordable = {
+            group_id: max(0, quantity - min(quantity,
+                                             (economy.accounts.get(f"household:{group_id}").balance // price
+                                              if economy.accounts.get(f"household:{group_id}") is not None else 0)))
+            for group_id, quantity in public_shares.items()
+            if quantity > 0
+        }
+        paid, receipts, paid_by_group = purchase_monthly_rations(world, need, pool, required_by_group)
+        unmet_by_group = {group_id: required - paid_by_group.get(group_id, 0)
+                          for group_id, required in required_by_group.items()
+                          if required > paid_by_group.get(group_id, 0)}
         stock = economy.stocks[need.stock_id]
         # Whatever public demand went unpaid is a real shortfall, not a
         # standing subsidy: only a later, explicit relief act can cover it.
@@ -176,6 +302,9 @@ def consume_monthly(world) -> None:
                 "purchased_quantity": paid,
                 "missing_food": missing,
                 "household_group_ids": sorted(required_by_group),
+                "unaffordable_by_group": {group_id: amount for group_id, amount in sorted(unaffordable.items())
+                                          if amount > 0},
+                "unmet_by_group": dict(sorted(unmet_by_group.items())),
             }
         }})
         world.events[-1] = event

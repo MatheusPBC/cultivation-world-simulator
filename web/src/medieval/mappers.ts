@@ -129,8 +129,9 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
       || !report.recipient_ref || typeof report.recipient_ref.kind !== 'string' || typeof report.recipient_ref.id !== 'string' || !report.recipient_ref.id
       || !report.publisher_ref || typeof report.publisher_ref.kind !== 'string' || typeof report.publisher_ref.id !== 'string' || !report.publisher_ref.id
       || !report.sponsor_ref || typeof report.sponsor_ref.kind !== 'string' || typeof report.sponsor_ref.id !== 'string' || !report.sponsor_ref.id
-      || !['facility', 'repair'].includes(report.work_kind)
+      || !['facility', 'repair', 'customs', 'research', 'military_recruitment'].includes(report.work_kind)
       || typeof report.work_id !== 'string' || !report.work_id
+      || !['farmer', 'artisan', 'merchant', 'soldier'].includes(report.target_occupation)
       || typeof report.account_id !== 'string' || !report.account_id
       || !Number.isInteger(report.count) || report.count <= 0
       || !Number.isInteger(report.stipend_per_person) || report.stipend_per_person <= 0
@@ -145,6 +146,7 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
         || !notice.sponsor_ref || typeof notice.sponsor_ref.kind !== 'string' || typeof notice.sponsor_ref.id !== 'string' || !notice.sponsor_ref.id
         || typeof notice.demand_id !== 'string' || !notice.demand_id
         || typeof notice.source_group_id !== 'string' || !notice.source_group_id
+        || !['farmer', 'artisan', 'merchant', 'soldier'].includes(notice.target_occupation)
         || !Number.isInteger(notice.count) || notice.count <= 0
         || !Number.isInteger(notice.stipend_per_person) || notice.stipend_per_person <= 0
         || !Number.isInteger(notice.observed_day) || notice.observed_day < 0
@@ -155,8 +157,10 @@ export function acceptSnapshot(data: ObservatoryView): ObservatoryView {
         || !transition.sponsor_ref || typeof transition.sponsor_ref.kind !== 'string' || typeof transition.sponsor_ref.id !== 'string' || !transition.sponsor_ref.id
         || typeof transition.source_group_id !== 'string' || !transition.source_group_id
         || typeof transition.target_group_id !== 'string' || !transition.target_group_id
-        || !['facility', 'repair'].includes(transition.work_kind)
+        || !['facility', 'repair', 'customs', 'research', 'military_recruitment'].includes(transition.work_kind)
         || typeof transition.work_id !== 'string' || !transition.work_id
+        || !['farmer', 'artisan', 'merchant', 'soldier'].includes(transition.target_occupation)
+        || typeof transition.destination_settlement_id !== 'string' || !transition.destination_settlement_id
         || !Number.isInteger(transition.count) || transition.count <= 0
         || !Number.isInteger(transition.stipend_per_person) || transition.stipend_per_person <= 0
         || !Number.isInteger(transition.started_day) || transition.started_day < 0

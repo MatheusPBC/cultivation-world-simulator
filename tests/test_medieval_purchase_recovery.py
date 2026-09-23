@@ -6,6 +6,7 @@ import pytest
 
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
+from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
@@ -18,6 +19,7 @@ from src.sim.medieval.purchase_recovery import (
     request_purchase_recovery,
     respond_purchase_recovery,
 )
+from src.sim.medieval import purchase_recovery as purchase_recovery_module
 from tests.test_medieval_markets import consent, market_world, terms
 
 
@@ -66,6 +68,50 @@ async def request_case(world, order):
                   if item.order_id == order.id)
     return request_purchase_recovery(world, option.id, decision_event_id=decide(
         world, "purchase_recovery_requested_decision", option).id)
+
+
+async def test_request_enumeration_skips_foreign_order_reconstruction(monkeypatch):
+    world, order = await blocked_paid_purchase()
+    buyer = world.economy.stocks[order.destination_id].owner_ref
+    expected = purchase_recovery_request_options(world, buyer)
+    assert expected
+
+    # This order has the same expensive evidence shape but belongs to another
+    # polity. Enumeration for the buyer must discard it before reconstruction.
+    foreign = order.model_copy(update={"id": "foreign-purchase-order",
+                                       "owner_ref": EntityRef("polity", "auren")})
+    world.economy.freight_orders[foreign.id] = foreign
+    unpaid = order.model_copy(update={"id": "unpaid-purchase-order", "decision_ids": ()})
+    world.economy.freight_orders[unpaid.id] = unpaid
+    reconstructed = []
+    original = purchase_recovery_module._purchase_parts
+
+    def track_reconstruction(current_world, current_order):
+        reconstructed.append(current_order.id)
+        return original(current_world, current_order)
+
+    monkeypatch.setattr(purchase_recovery_module, "_purchase_parts", track_reconstruction)
+    actual = purchase_recovery_request_options(world, buyer)
+
+    assert actual == expected
+    assert reconstructed == [order.id]
+
+
+async def test_request_enumeration_skips_orders_with_an_active_case_before_reconstruction(monkeypatch):
+    world, order = await blocked_paid_purchase()
+    buyer = world.economy.stocks[order.destination_id].owner_ref
+    await request_case(world, order)
+    reconstructed = []
+    original = purchase_recovery_module._purchase_parts
+
+    def track_reconstruction(current_world, current_order):
+        reconstructed.append(current_order.id)
+        return original(current_world, current_order)
+
+    monkeypatch.setattr(purchase_recovery_module, "_purchase_parts", track_reconstruction)
+
+    assert purchase_recovery_request_options(world, buyer) == ()
+    assert reconstructed == []
 
 
 async def test_seller_can_re_ship_a_paid_blocked_purchase_without_second_payment_or_lost_goods(tmp_path):

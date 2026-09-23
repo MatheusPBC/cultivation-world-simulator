@@ -66,6 +66,14 @@ def test_counteroffer_preserves_history_and_acceptance_moves_no_assets(tmp_path)
     accounts, stocks, knowledge = dict(world.economy.accounts), dict(world.economy.stocks), dict(world.knowledge.technologies)
     respond(world, revised)
     assert len(world.relations.obligations) == 2
+    response_event = next(item for item in world.events
+                          if item.event_type == 'diplomatic_response_delivered')
+    assert response_event.causal_payload == {
+        'proposal_id': revised.id,
+        'response': 'accept',
+        'status': 'accepted',
+        'term_ids': [f'{revised.id}:term:0', f'{revised.id}:term:1'],
+    }
     assert world.economy.accounts == accounts and world.economy.stocks == stocks
     assert world.knowledge.technologies == knowledge
     assert {n.recipient_ref for n in world.knowledge.notices.values()} == {SELLER, BUYER}

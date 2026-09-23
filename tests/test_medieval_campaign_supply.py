@@ -1,11 +1,13 @@
 """Campaign food travels by ordinary freight or the column simply lapses."""
 
 import json
+import pytest
 
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import force_options, occupy_settlement, raise_detachment, raise_options
@@ -86,7 +88,7 @@ async def make_low(world, detachment_id):
                 if item.detachment_id == detachment_id and item.state == "open")
 
 
-async def test_field_logistics_expands_only_the_known_owner_column_supply_capacity():
+async def test_field_logistics_knowledge_alone_does_not_expand_column_capacity():
     world, detachment_id = await campaign_world()
     detachment = world.society.detachments[detachment_id]
     before = _provision_capacity(world, detachment)
@@ -100,7 +102,7 @@ async def test_field_logistics_expands_only_the_known_owner_column_supply_capaci
                           decision={"action": "research", "actor_ref": OWNER.to_dict(),
                                     "technology_id": "field_logistics"})
     learn_technology(world, OWNER, "field_logistics", "teaching", (second.id, first.id))
-    assert _provision_capacity(world, detachment) == before + detachment.count * 5
+    assert _provision_capacity(world, detachment) == before
 
 
 async def test_campaign_supply_freight_arrives_loads_bag_and_round_trips(tmp_path, monkeypatch):
@@ -167,3 +169,30 @@ async def test_noaction_or_blocked_cargo_never_forces_supply_and_the_force_lapse
     assert delayed.society.detachments[delayed_id].stage == "disbanded"
     assert not any(event.event_type in {"battle_resolved", "casualties_taken", "loot_taken"}
                    for event in delayed.events)
+
+
+async def test_campaign_supply_does_not_silently_skip_an_unavailable_provider(monkeypatch):
+    world, detachment_id = await campaign_world()
+    enable(world)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
+    await make_low(world, detachment_id)
+
+    with pytest.raises(ProviderDecisionRequired):
+        await advance(world)
+
+    assert not world.economy.freight_orders
+
+
+async def test_campaign_supply_stale_owner_rejection_pauses_and_rolls_back(monkeypatch):
+    world, detachment_id = await campaign_world()
+    enable(world)
+    prompts = []
+    provider(monkeypatch, "first", prompts)
+    notice = await make_low(world, detachment_id)
+    def reject(*_args, **_kwargs):
+        raise ValueError("campaign supply option is stale")
+
+    monkeypatch.setattr("src.sim.medieval.campaign_supply.dispatch_campaign_supply", reject)
+    with pytest.raises(ProviderDecisionRequired, match="campaign supply affordance became stale"):
+        await advance(world)
+    assert not world.economy.freight_orders

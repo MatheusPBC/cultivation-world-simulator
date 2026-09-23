@@ -1,5 +1,7 @@
 """A narrow, persistent siege built from existing force and garrison owners."""
 
+from copy import deepcopy
+
 import pytest
 
 from src.classes.event import FactKind
@@ -9,8 +11,8 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import (establish_garrison, force_position_options, garrison_options,
-                                    prepare_force_position)
+from src.sim.medieval.force import (disband_detachment, establish_garrison, force_options,
+                                    force_position_options, garrison_options, prepare_force_position)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_investment import (execute_settlement_investment_option,
@@ -33,6 +35,7 @@ from src.sim.medieval.research import learn_technology
 from src.sim.medieval.territorial_control import (establish_territorial_control,
                                                    territorial_control_options, withdraw_territorial_control)
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
+from src.sim.medieval.strategy_response import defense_adoption_options
 from src.systems.calendar_agenda import ScheduledSituation
 
 
@@ -120,12 +123,20 @@ def _defending_garrison(world, *, count=20, provisions=160):
     return garrison.id
 
 
-def siege_world(*, attacker_count=40, defender_count=20, defender_provisions=160):
+def siege_world(*, attacker_count=40, defender_count=20, defender_provisions=160,
+                defender_prepared=False):
     world = create_medieval_world(211)
     refresh_settlement_reports(world)
     refresh_route_reports(world)
     attacker_id = _prepared_attacker(world, count=attacker_count)
     garrison_id = _defending_garrison(world, count=defender_count, provisions=defender_provisions)
+    if defender_prepared:
+        defender_id = world.society.garrisons[garrison_id].detachment_id
+        position = next(item for item in force_position_options(world, DEFENDER, detachment_id=defender_id)
+                        if item.anchor_site_id is None)
+        prepare_force_position(world, DEFENDER, position.id, decide(world, position).id)
+        for _ in range(3):
+            tick(world)
     investment = next(item for item in settlement_investment_options(world, ATTACKER, detachment_id=attacker_id)
                       if item.kind == "invest")
     execute_settlement_investment_option(world, ATTACKER, investment.id, decide(world, investment).id)
@@ -152,8 +163,82 @@ def test_post_breach_occupation_and_control_share_the_campaign_menu():
     assert {"siege_occupation", "territorial_control"} <= names
 
 
-def test_fortification_knowledge_adds_one_bounded_defensive_siege_step():
-    world, _, _, option = siege_world()
+def test_own_administered_city_can_pressure_foreign_occupier_then_retake_it(tmp_path):
+    world = create_medieval_world(211)
+    refresh_settlement_reports(world)
+    refresh_route_reports(world)
+    attacker_id = _prepared_attacker(world)
+    settlement = world.society.settlements[TARGET]
+    assert settlement.administrator_id == DEFENDER.id and settlement.occupier_id is None
+    record_event(world, "test_city_administration_premise", "Fixture factual de administração própria.",
+                 fact_kind=FactKind.STATE_TRANSITION,
+                 deltas=(_delta("settlement", TARGET, "administrator_id", DEFENDER.id, ATTACKER.id),))
+    world.society.settlements[TARGET] = settlement.model_copy(update={"administrator_id": ATTACKER.id})
+    refresh_settlement_reports(world)
+    assert not settlement_investment_options(world, ATTACKER, detachment_id=attacker_id)
+
+    occupation = record_event(
+        world, "test_foreign_occupation_premise", "Fixture factual de ocupação estrangeira.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("settlement", TARGET, "occupier_id", None, DEFENDER.id),))
+    garrison_id = _defending_garrison(world)
+    refresh_settlement_reports(world)
+    refresh_route_reports(world)
+    report = world.knowledge.settlement_report(ATTACKER, TARGET)
+    assert report.occupier_id == DEFENDER.id
+    assert occupation.id in {link.cause_event_id
+                             for link in world.event_index()[report.event_id].causal_links}
+    option = next(item for item in settlement_investment_options(world, ATTACKER,
+                                                                  detachment_id=attacker_id)
+                  if item.kind == "invest")
+    stale = deepcopy(world)
+    stale_decision = decide(stale, option)
+    stand_down = next(item for item in force_options(stale, DEFENDER)
+                      if item.kind == "disband" and item.detachment_id ==
+                      stale.society.garrisons[garrison_id].detachment_id)
+    disband_detachment(stale, DEFENDER, stand_down.id, decide(stale, stand_down).id)
+    assert stale.society.settlements[TARGET].occupier_id is None
+    before_refusal = world_snapshot(stale)
+    with pytest.raises(ValueError, match="stale or unknown"):
+        execute_settlement_investment_option(stale, ATTACKER, option.id, stale_decision.id)
+    assert world_snapshot(stale) == before_refusal
+    assert not stale.society.settlement_investments
+
+    investment = execute_settlement_investment_option(world, ATTACKER, option.id,
+                                                      decide(world, option).id)
+    investment_event = world.event_index()[investment.last_event_id]
+    assert report.event_id in {link.cause_event_id for link in investment_event.causal_links}
+    notice = next(item for item in world.knowledge.settlement_pressures_for_actor(DEFENDER)
+                  if item.investment_id == investment.id)
+    assert notice.recipient_ref == DEFENDER
+    assert not any(item.investment_id == investment.id
+                   for item in world.knowledge.settlement_pressures_for_actor(ATTACKER))
+    siege = next(item for item in siege_campaign_options(world, ATTACKER)
+                 if item.investment_id == investment.id and item.defender_garrison_id == garrison_id)
+    campaign = begin_siege_campaign(world, ATTACKER, siege.id, decide(world, siege).id)
+    for _ in range(8):
+        if world.society.siege_campaigns[campaign.id].phase == "breached":
+            break
+        tick(world)
+    assert world.society.siege_campaigns[campaign.id].phase == "breached"
+    refresh_settlement_reports(world)
+    recovery = next(item for item in siege_occupation_options(world, ATTACKER)
+                    if item.campaign_id == campaign.id)
+    occupied = occupy_after_siege_breach(world, ATTACKER, recovery.id,
+                                         decide(world, recovery).id)
+    assert world.society.settlements[TARGET].occupier_id == ATTACKER.id
+    assert any(link.cause_event_id == world.society.siege_campaigns[campaign.id].last_event_id
+               for link in occupied.causal_links)
+    refresh_settlement_reports(world)
+    assert not defense_adoption_options(world, ATTACKER)
+    path = tmp_path / "recaptured-own-city.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
+
+
+def _teach_fortification(world):
     for technology_id, action in (("field_drill", "teach field drill"),
                                   ("siegecraft", "teach siegecraft"),
                                   ("fortification", "teach fortification")):
@@ -166,10 +251,35 @@ def test_fortification_knowledge_adds_one_bounded_defensive_siege_step():
             item.id for item in world.events
             if item.event_type == "technology_discovered" and item.id != decision.id)[-2:]
         learn_technology(world, DEFENDER, technology_id, "teaching", causes)
+
+
+def test_fortification_requires_prepared_supplied_position_for_bounded_defensive_step(tmp_path):
+    world, _, _, option = siege_world()
+    _teach_fortification(world)
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    assert campaign.garrison_endurance == 12
+
+    world, _, _, option = siege_world(defender_prepared=True)
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    assert campaign.garrison_endurance == 12
+
+    world, _, garrison_id, option = siege_world(defender_prepared=True)
+    position_id = f"force-position:{world.society.garrisons[garrison_id].detachment_id}"
+    position = world.society.force_positions[position_id]
+    assert position.stage == "prepared"
+    _teach_fortification(world)
+    knowledge = next(item for item in world.knowledge.technologies.values()
+                     if item.owner_ref == DEFENDER and item.technology_id == "fortification")
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
     assert campaign.garrison_endurance == 14
     start = next(item for item in world.events if item.id == campaign.last_event_id)
     assert any(delta.aspect == "garrison_endurance" and delta.after == "14" for delta in start.deltas)
+    causes = {link.cause_event_id for link in start.causal_links}
+    assert {position.last_event_id, knowledge.event_id} <= causes
+    path = tmp_path / "fortified-siege.mws"
+    save_world(world, path)
+    loaded = load_world(path)
+    assert loaded.society.siege_campaigns[campaign.id].garrison_endurance == 14
 
 
 def test_siege_campaign_persists_daily_progress_and_breach_collapses_garrison_without_control_transfer(tmp_path):
@@ -318,6 +428,35 @@ def test_campaign_ceasefire_is_accepted_then_each_owner_fulfills_its_own_withdra
     assert all(clause.kind == "campaign_withdrawal" for clause in restored_proposal.clauses)
 
 
+def test_defender_can_initiate_a_ceasefire_when_its_own_exit_is_current(monkeypatch):
+    world, _, garrison_id, option = siege_world()
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    defender_detachment = world.society.garrisons[garrison_id].detachment_id
+    from src.sim.medieval.force import WithdrawalOption
+
+    exit_option = WithdrawalOption(
+        id=f"withdraw:{defender_detachment}:fixture",
+        actor_ref=DEFENDER,
+        detachment_id=defender_detachment,
+        destination_id="brumafria",
+        route_ids=(OTHER_EXIT,),
+    )
+    monkeypatch.setattr(
+        "src.sim.medieval.campaign_ceasefire.withdrawal_options",
+        lambda *_args, **_kwargs: (exit_option,),
+    )
+
+    offer = next(item for item in campaign_ceasefire_offer_options(world, DEFENDER)
+                 if item.kind == "mutual")
+    proposal = offer_campaign_ceasefire(world, DEFENDER, offer.id, decide(world, offer).id)
+
+    assert proposal.proposer_ref == DEFENDER
+    assert {clause.debtor_ref for clause in proposal.clauses} == {ATTACKER, DEFENDER}
+    assert {clause.detachment_id for clause in proposal.clauses} == {
+        campaign.attacker_detachment_id, defender_detachment,
+    }
+
+
 def test_breach_exposes_a_separate_occupation_choice_without_transferring_administration():
     world, _, _, option = siege_world()
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
@@ -385,6 +524,48 @@ def test_breached_campaign_can_offer_unilateral_ceasefire_before_occupation():
     assert world.society.siege_campaigns[campaign.id].phase == "withdrawn"
     assert world.society.detachments[attacker_id].stage == "marching"
     assert world.society.settlements[TARGET].administrator_id == DEFENDER.id
+
+
+def test_defender_ceasefire_affordance_disappears_once_the_garrison_collapses():
+    """A collapsed garrison has no executable withdrawal for the ceasefire.
+
+    The affordance must vanish instead of being offered/fulfilled and
+    raising, and the stale disappearance must not mutate the campaign or the
+    garrison by itself.
+    """
+    world, _, garrison_id, option = siege_world()
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    offer = next(item for item in campaign_ceasefire_offer_options(world, ATTACKER)
+                 if item.campaign_id == campaign.id and item.kind == "mutual")
+    proposal = offer_campaign_ceasefire(world, ATTACKER, offer.id, decide(world, offer).id)
+    response = next(item for item in campaign_ceasefire_response_options(world, DEFENDER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    proposal = respond_campaign_ceasefire(world, DEFENDER, response.id, decide(world, response).id)
+    assert proposal.status == "accepted"
+
+    # The siege keeps progressing after acceptance; the garrison collapses
+    # under blockade pressure before either owner fulfils its withdrawal.
+    for _ in range(3):
+        tick(world)
+    assert world.society.siege_campaigns[campaign.id].phase == "breached"
+    assert world.society.garrisons[garrison_id].stage == "collapsed"
+
+    # The defender's own withdrawal is no longer materially executable: no
+    # new offer and no fulfillment option for its already-accepted clause.
+    assert not any(item.campaign_id == campaign.id and item.actor_ref == DEFENDER
+                   for item in campaign_ceasefire_offer_options(world, DEFENDER))
+    assert campaign_ceasefire_fulfillment_options(world, DEFENDER) == ()
+
+    # The stale affordance disappearing did not mutate anything: the
+    # obligation stays active/unfulfilled and the campaign/garrison are the
+    # same collapsed facts observed above.
+    obligation = next(item for item in world.relations.obligations.values()
+                      if item.proposal_id == proposal.id and item.clause_index == 1)
+    assert obligation.status == "active"
+    assert world.society.siege_campaigns[campaign.id].phase == "breached"
+    assert world.society.garrisons[garrison_id].stage == "collapsed"
 
 
 def test_post_occupation_administration_concession_remains_a_current_affordance():

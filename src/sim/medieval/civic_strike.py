@@ -112,6 +112,8 @@ def start_general_strike(world, group_id, option_id, decision_event_id):
         candidate, "civic_general_strike_started",
         "Um movimento cívico iniciou uma greve geral limitada por três dias.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": option.id, "movement_id": movement.id},
         deltas=(
             _delta("civic_strike", strike_id, "stage", None, "active"),
             *(_delta("civic_strike", strike_id, f"participants:{member_id}", 0, count)

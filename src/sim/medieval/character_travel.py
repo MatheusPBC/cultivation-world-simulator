@@ -21,6 +21,7 @@ from src.classes.state_delta import StateDelta
 from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
+from .ai_decider import ProviderDecisionRequired
 from .activities import Activity, validate_activities
 from .events import record_event
 from .travel import route_duration
@@ -145,13 +146,13 @@ def _parse_review(situation):
 
 
 def _actor_turn_available(world):
-    """No provider turn, no receipt and no movement: staying is the default."""
+    """Whether a provider slot exists to schedule an individual turn."""
     return ai_decider.provider_available() and ai_decider.within_budget(world)
 
 
 def schedule_character_travel_reviews(world):
     """A free person with a road at hand earns a turn; it never chooses one."""
-    if not _actor_turn_available(world):
+    if not world.config.ai_enabled or not _actor_turn_available(world):
         return ()
     scheduled = []
     due_day = world.clock.absolute_day + 1
@@ -177,7 +178,7 @@ def _situation(world, character):
 async def _travel_turn(world, character_id):
     options = travel_options(world, character_id)
     character = _free(world, character_id)
-    if not options or character is None or not _actor_turn_available(world):
+    if not options or character is None:
         return False
     names = world.society.settlements
     choices = [{"id": option.id,
@@ -193,7 +194,9 @@ async def _travel_turn(world, character_id):
         return False
     option = next((item for item in travel_options(world, character_id) if item.id == selected), None)
     if option is None:
-        return False
+        raise ProviderDecisionRequired(
+            f"provider decision required for character:{character_id}: travel affordance became stale"
+        )
     # The interpretation may only cause this delta-free decision; the material
     # departure is caused by the decision alone.
     decision = record_event(world, "character_travel_decided", "Uma pessoa escolheu entre suas estradas.",
@@ -201,17 +204,17 @@ async def _travel_turn(world, character_id):
                             cause_ids=interpretations)
     try:
         travel_character(world, character_id, option.id, decision.id)
-    except ValueError:
-        # An option that became impossible between the turn and the execution
-        # leaves its decision as history and moves nobody.
-        return False
+    except ValueError as exc:
+        raise ProviderDecisionRequired(
+            f"provider decision required for character:{character_id}: travel affordance became stale"
+        ) from exc
     return True
 
 
 def note_arrivals(world):
     """Somebody who just arrived stands somewhere new and free: it earns the
     next turn from that fact, not from a clock that asks everyone every day."""
-    if not _actor_turn_available(world):
+    if not world.config.ai_enabled or not _actor_turn_available(world):
         return ()
     day = world.clock.absolute_day
     arrived = set()

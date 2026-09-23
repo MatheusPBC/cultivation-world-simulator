@@ -68,7 +68,7 @@ class RegionalOverflowState:
         if not isinstance(self.assessments, dict) or not isinstance(self.active_occurrences, dict):
             raise ValueError("invalid regional overflow registries")
         known_regions = set(world.map.regions) if world is not None else None
-        events = {event.id: event for event in world.events} if world is not None else {}
+        events = world.event_index() if world is not None else {}
         for key, item in self.assessments.items():
             if (not isinstance(item, RegionalOverflowAssessment)
                     or key != self.assessment_id(item.region_id)

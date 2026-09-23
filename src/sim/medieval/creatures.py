@@ -410,6 +410,11 @@ def _damage_site(world, creature, option, decision):
         f"{creature.name}: uma passagem aquática sofreu dano material.",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": decision.decision["actor_ref"],
+            "selected_affordance_id": option.id,
+        },
         deltas=(_delta("site", site.id, "integrity", before_integrity, after_integrity),
                 _delta("creature", creature.id, "condition", before_condition, after_condition),
                 _delta("creature", creature.id, "damaged_site_id", None, site.id),
@@ -417,6 +422,9 @@ def _damage_site(world, creature, option, decision):
         cause_ids=_causes(decision.id, demand.last_event_id, creature.last_event_id),
     )
     event = event.model_copy(update={"causal_payload": {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": option.id,
         "hazard_impact": {
             "proposal_type": "hazard_impact",
             "hazard_kind": creature.species,
@@ -465,6 +473,11 @@ def _attack_population(world, creature, option, decision):
         f"{creature.name}: atacou uma coorte anônima ligada à passagem que foi ignorada.",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": decision.decision["actor_ref"],
+            "selected_affordance_id": option.id,
+        },
         deltas=(
             _delta("population_group", group.id, "count", group.count, group.count - loss),
             _delta("creature_demand", demand.id, "stage", "open", "expired"),
@@ -473,6 +486,9 @@ def _attack_population(world, creature, option, decision):
         cause_ids=_causes(decision.id, demand.last_event_id, creature.last_event_id),
     )
     event = event.model_copy(update={"causal_payload": {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": option.id,
         "hazard_impact": {
             "proposal_type": "hazard_impact",
             "hazard_kind": creature.species,

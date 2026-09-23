@@ -12,7 +12,12 @@ class MedievalRunConfig(SocietyValue):
     locale: Literal["pt-BR"] = "pt-BR"
     decision_policy: Literal["routine-rules"] = "routine-rules"
     ai_enabled: bool = False
-    ai_calls_per_step: int = Field(default=1, strict=True, ge=0, le=8)
+    # The budget is per simulation step, not per actor.  The composed
+    # institutional boundary can legitimately contain polities, organizations
+    # and population groups, so the schema must allow a fixture/provider to
+    # fund all current actors while still permitting small explicit budgets for
+    # fail-closed tests and constrained runs.
+    ai_calls_per_step: int = Field(default=1, strict=True, ge=0, le=256)
     ai_max_calls: int = Field(default=0, strict=True, ge=0, le=10000)
     # An explicit, per-institution monthly ceiling on top of the shared daily
     # budget above: 0 means no ceiling (unchanged behaviour). It bounds how

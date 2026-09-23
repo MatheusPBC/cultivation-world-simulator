@@ -22,7 +22,7 @@ from .economy import _causes, _delta
 from .events import record_event
 from .force import (_begin_withdrawal, _decision as force_decision, collapse_garrison_for_siege,
                     withdrawal_options)
-from .campaign_supply import _lapse_campaign_notices
+from .campaign_supply import _lapse_campaign_notices, campaign_baggage_ready_for_departure
 from .settlement_investment import revoke_settlement_investments_for
 
 
@@ -187,19 +187,66 @@ def _current_parts(world, campaign):
     return attacker, garrison, investment, defender
 
 
-def _garrison_wear(campaign, attacker, defender):
+def _command_pressure(world, attacker, defender):
+    """What a named command changes about a siege, and nothing more.
+
+    The doctrine an institution already chose for a column is re-read here
+    through the same canonical owner the field resolution uses; this module
+    invents no morale, terrain or table of its own.  A column with no current
+    command contributes nothing, so an uncommanded siege wears exactly as it
+    did before this reading existed.
+
+    Fatigue only bites where it is materially about the attacker sustaining
+    effort: a column that has been deployed for long cannot press.  Supply is
+    deliberately untouched here -- it is already counted once by the caller.
+    """
+    from .field_engagement import _fatigue_level
+    from .force_command import effective_doctrine
+
+    pressure = 0
+    attacking = effective_doctrine(world, attacker.id)
+    if attacking == "press":
+        pressure += max(0, 1 - _fatigue_level(world, attacker))
+    elif attacking == "hold":
+        pressure -= 1
+    defending = effective_doctrine(world, defender.id)
+    if defending == "hold":
+        pressure -= 1
+    elif defending == "press":
+        pressure += 1
+    return pressure
+
+
+def _garrison_wear(world, campaign, attacker, defender):
     """One bounded material reading; no general morale or combat subsystem.
 
     A column can only keep applying pressure while it remains supplied.  The
     defender's current ration reserve gives a small concrete resistance, and
-    uninterrupted pressure becomes harder to absorb with time.  Every input
-    is an existing canonical force fact, never an LLM estimate.
+    uninterrupted pressure becomes harder to absorb with time.  A named
+    command's doctrine, and the attacker's fatigue when it presses, are read
+    through their existing owners.  Every input is an existing canonical force
+    fact, never an LLM estimate.
     """
     force_pressure = max(1, min(5, (attacker.count * 4) // max(1, defender.count)))
     supply_pressure = 1 if attacker.provisions >= attacker.count * 2 else 0
     elapsed_pressure = min(2, campaign.progress_days)
     defender_relief = 1 if defender.provisions >= defender.count * 4 else 0
-    return max(1, min(7, force_pressure + supply_pressure + elapsed_pressure - defender_relief))
+    command_pressure = _command_pressure(world, attacker, defender)
+    _, barrier_resistance = _barrier_reading(world, defender.owner_ref, campaign.settlement_id)
+    return max(1, min(7, force_pressure + supply_pressure + elapsed_pressure
+                      - defender_relief + command_pressure - barrier_resistance))
+
+
+def _barrier_reading(world, defender_ref, settlement_id):
+    """A built, maintained local wall resists pressure; a doctrine does not build it."""
+    settlement = world.society.settlements[settlement_id]
+    site = next((item for _, item in sorted(world.map.infrastructure_sites.items())
+                 if item.kind == "palisade" and "defensive_barrier" in item.capability_ids
+                 and item.owner_ref == defender_ref
+                 and settlement.region_id in item.region_ids), None)
+    resistance = int(site is not None and site.enabled and not site.service_suspended
+                     and site.integrity >= 0.5)
+    return site, resistance
 
 
 def siege_campaign_options(world, actor, *, detachment_id=None):
@@ -254,8 +301,14 @@ def begin_siege_campaign(world, actor, option_id, decision_event_id):
     if parts is None:
         raise ValueError("siege campaign is no longer materially possible")
     attacker, garrison, investment, defender = parts
+    position = candidate.society.force_positions.get(f"force-position:{defender.id}")
+    knowledge = next((item for item in candidate.knowledge.technologies.values()
+                      if item.owner_ref == defender.owner_ref and item.technology_id == "fortification"), None)
+    fortified = (knowledge is not None and position is not None and position.stage == "prepared"
+                 and position.settlement_id == campaign.settlement_id
+                 and defender.provisions >= defender.count)
     initial_endurance = SIEGE_GARRISON_ENDURANCE
-    if candidate.knowledge.knows(defender.owner_ref, "fortification"):
+    if fortified:
         initial_endurance = min(MAX_SIEGE_GARRISON_ENDURANCE,
                                 SIEGE_GARRISON_ENDURANCE + 2)
     campaign = campaign.model_copy(update={"garrison_endurance": initial_endurance})
@@ -268,7 +321,9 @@ def begin_siege_campaign(world, actor, option_id, decision_event_id):
                        initial_endurance),
                 _delta("siege_campaign", identity, "settlement_id", None, campaign.settlement_id)),
         cause_ids=_causes(decision.id, attacker.last_event_id, garrison.last_event_id,
-                          defender.last_event_id, investment.last_event_id))
+                          defender.last_event_id, investment.last_event_id,
+                          position.last_event_id if fortified else None,
+                          knowledge.event_id if fortified else None))
     candidate.society.siege_campaigns[identity] = campaign.model_copy(update={"last_event_id": event.id})
     candidate.agenda.schedule(ScheduledSituation(identity, PROGRESS_KIND, campaign.next_progress_day))
     candidate.society.validate(set(candidate.map.regions), candidate)
@@ -304,6 +359,8 @@ def siege_campaign_withdrawal_options(world, actor):
         # owner's investment and then starts the dated march.
         investment = world.society.settlement_investments.get(campaign.investment_id)
         if investment is None or investment.stage != "active":
+            continue
+        if not campaign_baggage_ready_for_departure(world, detachment, ignore_notice=True):
             continue
         settlement = world.society.settlements.get(campaign.settlement_id)
         if settlement is None:
@@ -442,7 +499,8 @@ def occupy_after_siege_breach(world, actor, option_id, decision_event_id):
 
 
 def _finish(world, campaign, phase, *, cause_ids=(), progress_days=None,
-            garrison_endurance=None, defender=None, defender_provisions=None):
+            garrison_endurance=None, defender=None, defender_provisions=None,
+            reading_deltas=()):
     if (defender is None) != (defender_provisions is None):
         raise ValueError("siege finish provision terms must be complete")
     deltas = [
@@ -457,6 +515,7 @@ def _finish(world, campaign, phase, *, cause_ids=(), progress_days=None,
     if defender is not None:
         deltas.append(_delta("detachment", defender.id, "provisions",
                              defender.provisions, defender_provisions))
+    deltas.extend(reading_deltas)
     event = record_event(
         world, f"siege_campaign_{phase}",
         ("A tentativa de cerco cessou porque sua base material deixou de existir."
@@ -488,7 +547,10 @@ def resolve_siege_campaigns(world, situations):
             continue
         attacker, garrison, investment, defender = parts
         progress = campaign.progress_days + 1
-        endurance = max(0, campaign.garrison_endurance - _garrison_wear(campaign, attacker, defender))
+        barrier, resistance = _barrier_reading(world, defender.owner_ref, campaign.settlement_id)
+        barrier_cause = barrier.last_event_id if barrier is not None else None
+        barrier_reading = _delta("siege_campaign", campaign.id, "barrier_resistance", None, resistance)
+        endurance = max(0, campaign.garrison_endurance - _garrison_wear(world, campaign, attacker, defender))
         blockade_rations = min(
             defender.provisions,
             defender.count * SIEGE_BLOCKADE_RATION_PER_SOLDIER,
@@ -497,9 +559,11 @@ def resolve_siege_campaigns(world, situations):
         if endurance == 0:
             breach = _finish(world, campaign, "breached",
                              cause_ids=(attacker.last_event_id, garrison.last_event_id,
-                                        defender.last_event_id, investment.last_event_id),
+                                        defender.last_event_id, investment.last_event_id,
+                                        barrier_cause),
                              progress_days=progress, garrison_endurance=endurance,
-                             defender=defender, defender_provisions=defender_provisions)
+                             defender=defender, defender_provisions=defender_provisions,
+                             reading_deltas=(barrier_reading,))
             collapse_garrison_for_siege(world, garrison.id, campaign_event_id=breach.id)
             continue
         event = record_event(
@@ -509,10 +573,11 @@ def resolve_siege_campaigns(world, situations):
             deltas=(_delta("siege_campaign", campaign.id, "progress_days", campaign.progress_days, progress),
                     _delta("siege_campaign", campaign.id, "garrison_endurance",
                            campaign.garrison_endurance, endurance),
+                    barrier_reading,
                     _delta("detachment", defender.id, "provisions", defender.provisions,
                            defender_provisions)),
             cause_ids=_causes(campaign.last_event_id, attacker.last_event_id, garrison.last_event_id,
-                              defender.last_event_id, investment.last_event_id))
+                              defender.last_event_id, investment.last_event_id, barrier_cause))
         world.society.detachments[defender.id] = defender.model_copy(
             update={"provisions": defender_provisions, "last_event_id": event.id})
         updated = campaign.model_copy(update={"progress_days": progress, "garrison_endurance": endurance,

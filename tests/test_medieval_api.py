@@ -3,6 +3,13 @@ import asyncio
 import httpx
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
+from src.classes.governance.models import DiplomaticNotice
+from src.classes.mechanical_language import EntityRef
+from src.classes.state_delta import StateDelta
+from src.sim.medieval.events import record_event
+
 
 @pytest.fixture
 def app(tmp_path):
@@ -156,6 +163,38 @@ async def test_paginated_events_and_causal_edges_return_canonical_facts(client):
     assert response.status_code == 422
 
 
+async def test_dossier_api_serializes_state_delta_from_known_material_event(client, app):
+    await command(client, "create", {"seed": 73})
+    world = app.state.runtime.world
+    actor = EntityRef("polity", "auren")
+    event = record_event(
+        world,
+        "known_material_fact",
+        "Auren recebeu uma alteração material conhecida.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.DETERMINISTIC,
+        deltas=(StateDelta(
+            owner_kind="region", owner_id="pedraclara", aspect="population",
+            before="10", after="9", magnitude=-1,
+        ),),
+    )
+    world.knowledge.notices["notice:known-material"] = DiplomaticNotice(
+        id="notice:known-material", proposal_id="proposal:known-material",
+        recipient_ref=actor, event_id=event.id, learned_day=world.clock.absolute_day,
+    )
+
+    response = await client.get("/api/v2/query/dossier/polity/auren")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()["data"]
+    entry = next(item for item in payload["entries"] if item["event_id"] == event.id)
+    assert entry["payload"]["deltas"] == [{
+        "id": f"{event.id}:delta:0", "event_id": event.id,
+        "owner_kind": "region", "owner_id": "pedraclara", "aspect": "population",
+        "before": "10", "after": "9", "magnitude": -1,
+    }]
+
+
 async def test_pause_waits_for_the_active_step_before_acknowledging(client, app, monkeypatch):
     from src.sim.medieval.engine import MedievalSimulator
     await command(client, "create")
@@ -193,6 +232,23 @@ async def test_failed_step_preserves_published_world_and_pauses(client, app, mon
     assert await query(client, "economy") == economics
     status = await query(client, "status")
     assert status["paused"] and status["last_error"]["code"] == "STEP_FAILED"
+
+
+async def test_provider_decision_failure_pauses_without_publishing_candidate(client, app, monkeypatch):
+    from src.sim.medieval.ai_decider import ProviderDecisionRequired
+    await command(client, "create", {"ai_enabled": True, "ai_calls_per_step": 1})
+    before = await query(client, "world")
+
+    async def fail_step(self):
+        raise ProviderDecisionRequired("provider unavailable")
+
+    monkeypatch.setattr("src.sim.medieval.engine.MedievalSimulator.step", fail_step)
+    response = await client.post("/api/v2/command/step", json={})
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "AI_DECISION_REQUIRED"
+    assert await query(client, "world") == before
+    status = await query(client, "status")
+    assert status["paused"] and status["last_error"]["code"] == "AI_DECISION_REQUIRED"
 
 
 async def test_observer_api_has_no_material_mutation_or_xianxia_routes(client):

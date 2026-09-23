@@ -56,15 +56,29 @@ def _eligible_routes(world, actor, detachment):
             or position.settlement_id != detachment.location_id or detachment.provisions < detachment.count):
         return None
     settlement = world.society.settlements[detachment.location_id]
-    # Pressure is directed at another administration.  A polity cannot use
-    # this force affordance to close its own city and manufacture a notice.
-    if settlement.administrator_id is None or settlement.administrator_id == actor.id:
+    # Pressure targets a foreign administration, or a foreign occupier of
+    # one's own city. An unoccupied home city cannot manufacture a notice.
+    if settlement.administrator_id is None:
         return None
+    occupation_report_id = None
+    if settlement.administrator_id == actor.id:
+        # An administration may try to dislodge an actual foreign occupier of
+        # its own city, but only when its present column has observed that
+        # occupation locally. A free home city remains ineligible.
+        report = world.knowledge.settlement_report(actor, settlement.id)
+        if (settlement.occupier_id in {None, actor.id} or report is None
+                or report.recipient_ref != actor or report.publisher_ref != actor
+                or report.channel != "local_settlement_report"
+                or report.occupier_id != settlement.occupier_id
+                or not 0 <= world.clock.absolute_day - report.observed_day < 31):
+            return None
+        occupation_report_id = report.event_id
     route_ids = _exits(world, settlement.id)
     if not route_ids or len(route_ids) > max(1, detachment.count // 20):
         return None
-    reports = tuple(_current_report(world, actor, route_id) for route_id in route_ids)
-    if any(report is None or report.operational_capacity <= 0 or report.travel_days is None for report in reports):
+    route_reports = tuple(_current_report(world, actor, route_id) for route_id in route_ids)
+    if any(report is None or report.operational_capacity <= 0 or report.travel_days is None
+           for report in route_reports):
         return None
     if any(world.map.get_route_operational_capacity(route_id) <= 0
            or route_id in world.map.force_route_interdictors for route_id in route_ids):
@@ -72,7 +86,8 @@ def _eligible_routes(world, actor, detachment):
     if any(item.stage == "active" and item.settlement_id == settlement.id
            for item in world.society.settlement_investments.values()):
         return None
-    return route_ids, tuple(report.event_id for report in reports)
+    sources = tuple(report.event_id for report in route_reports)
+    return route_ids, sources + ((occupation_report_id,) if occupation_report_id is not None else ())
 
 
 def settlement_investment_options(world, actor, *, detachment_id=None):
@@ -150,7 +165,9 @@ def _invest(world, option, decision):
         for interdiction_id, route_id in zip(route_interdiction_ids, option.route_ids))
     before = {route_id: world.map.get_route_operational_capacity(route_id) for route_id in option.route_ids}
     settlement = world.society.settlements[option.settlement_id]
-    recipient = EntityRef("polity", settlement.administrator_id)
+    recipient_id = (settlement.occupier_id if settlement.administrator_id == option.actor_ref.id
+                    else settlement.administrator_id)
+    recipient = EntityRef("polity", recipient_id)
     notice_id = settlement_pressure_notice_id(identity, recipient)
     event = record_event(
         world, "settlement_invested", "Uma coluna preparada restringiu todos os acessos operacionais do assentamento.",
@@ -228,6 +245,8 @@ def revoke_settlement_investments_for(world, detachment, *, cause_ids=()):
 
 def revoke_invalid_settlement_investments(world):
     """A new non-force closure ends pressure explicitly; it never coexists silently."""
+    from .logistics import _route_causes
+
     lifted = []
     for investment in tuple(world.society.settlement_investments.values()):
         if investment.stage != "active":
@@ -236,15 +255,24 @@ def revoke_invalid_settlement_investments(world):
         position = (world.society.force_positions.get(f"force-position:{investment.detachment_id}")
                     if detachment is not None else None)
         entries = tuple(world.society.route_interdictions[identity] for identity in investment.route_interdiction_ids)
+        lost_routes = tuple(entry.route_id for entry in entries
+                            if world.map.force_route_interdictors.get(entry.route_id) != entry.id
+                            or world.map.get_route_operational_capacity(
+                                entry.route_id, ignore_force_interdictor=True) <= 0)
         invalid = (detachment is None or detachment.stage != "present"
                    or detachment.location_id != investment.settlement_id
                    or detachment.provisions < detachment.count
                    or position is None or position.stage != "prepared"
-                   or any(world.map.force_route_interdictors.get(entry.route_id) != entry.id
-                      or world.map.get_route_operational_capacity(entry.route_id, ignore_force_interdictor=True) <= 0
-                          for entry in entries))
+                   or bool(lost_routes))
         if invalid:
-            lifted.append(_lift(world, investment, cause_ids=(investment.last_event_id,)))
+            route_causes = _route_causes(world, lost_routes)
+            lifted.append(_lift(world, investment, cause_ids=_causes(
+                investment.last_event_id,
+                detachment.last_event_id if detachment is not None and
+                (detachment.stage != "present" or detachment.location_id != investment.settlement_id
+                 or detachment.provisions < detachment.count) else None,
+                position.last_event_id if position is not None and position.stage != "prepared" else None,
+                *(event_id for route_id in lost_routes for event_id in route_causes[route_id]))))
     return tuple(lifted)
 
 

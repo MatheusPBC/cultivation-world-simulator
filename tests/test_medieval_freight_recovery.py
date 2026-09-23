@@ -1,5 +1,6 @@
 """A blocked shipment is history: recovery is a new order, never a rewrite."""
 
+import json
 import pytest
 
 from src.classes.causal_origin import CausalOrigin
@@ -75,6 +76,9 @@ async def test_blocked_freight_recovery_is_available_in_the_single_civil_menu(mo
                     and item.kind == "successor")
 
     async def choose(prompt, *args, **kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        if payload["you_are"] != OWNER.to_dict():
+            return {"selected_id": ai_decider.NO_ACTION}
         return {"selected_id": recovery.id}
 
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)

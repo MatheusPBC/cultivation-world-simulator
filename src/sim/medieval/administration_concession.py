@@ -277,10 +277,11 @@ def administration_concession_response_options(world, actor, *, notice_id=None):
     options = []
     known = tuple(notice for notice in world.knowledge.force_contacts_for_actor(actor)
                   if notice_id is None or notice.id == notice_id)
+    known_proposal_ids = {notice.proposal_id for notice in world.knowledge.notices.values()
+                          if notice.recipient_ref == actor and notice.proposal_id is not None}
     for proposal in world.relations.proposals.values():
         postwar = len(proposal.clauses) == 1 and proposal.clauses[0].kind == "administration_transfer"
-        known_proposal = any(notice.recipient_ref == actor and notice.proposal_id == proposal.id
-                             for notice in world.knowledge.notices.values())
+        known_proposal = proposal.id in known_proposal_ids
         if (proposal.proposal_kind != "administration_concession" or proposal.status != "offered"
                 or proposal.counterparty_ref != actor or proposal.expires_day <= world.clock.absolute_day
                 or not _proposal_still_current(world, proposal)

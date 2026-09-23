@@ -74,10 +74,11 @@ async def _prepare_through_contact_provider(world, monkeypatch, prompts):
     async def call_llm_json(prompt, *args, **kwargs):
         prompts.append(prompt)
         payload = json.loads(prompt[prompt.index("{"):])
-        return {"selected_id": next(choice["id"] for choice in payload["choices"]
-                               if choice["label"].startswith("Preparar"))}
+        preparation = next((choice["id"] for choice in payload["choices"]
+                            if choice["label"].startswith("Preparar")), None)
+        return {"selected_id": preparation or ai_decider.NO_ACTION}
 
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
                                                    "ai_max_calls": 10})
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)

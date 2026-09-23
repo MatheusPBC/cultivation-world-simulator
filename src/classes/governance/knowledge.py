@@ -14,6 +14,68 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.research.models import TechnicalKnowledge
 
 
+class _RegistryDict(dict):
+    """Dict that invalidates transient KnowledgeState projections on writes."""
+
+    def __init__(self, *args, owner=None, name=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._owner = owner
+        self._name = name
+
+    def _touch(self):
+        owner = self._owner
+        # ``copy.deepcopy`` rebuilds a dict subclass before it has restored the
+        # complete ``KnowledgeState`` instance it belongs to.  In that narrow
+        # reconstruction window, assigning copied entries must not turn into a
+        # registry mutation (nor require fields that have not been restored).
+        # A live owner always has both epoch fields, so real registry writes
+        # retain their normal invalidation semantics.
+        if owner is None or not hasattr(owner, "_registry_epoch") or not hasattr(owner, "_registry_epochs"):
+            return
+        owner._registry_epoch += 1
+        owner._registry_epochs[self._name] = owner._registry_epochs.get(self._name, 0) + 1
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self._touch()
+
+    def __delitem__(self, key):
+        super().__delitem__(key)
+        self._touch()
+
+    def clear(self):
+        if self:
+            super().clear()
+            self._touch()
+
+    def pop(self, key, *args):
+        result = super().pop(key, *args)
+        self._touch()
+        return result
+
+    def popitem(self):
+        result = super().popitem()
+        self._touch()
+        return result
+
+    def setdefault(self, key, default=None):
+        if key in self:
+            return self[key]
+        result = super().setdefault(key, default)
+        self._touch()
+        return result
+
+    def update(self, *args, **kwargs):
+        if args or kwargs:
+            super().update(*args, **kwargs)
+            self._touch()
+
+    def __ior__(self, other):
+        super().__ior__(other)
+        self._touch()
+        return self
+
+
 def route_report_id(recipient_ref, route_id):
     return f"route_report:{recipient_ref.kind}:{recipient_ref.id}:{route_id}"
 
@@ -94,6 +156,9 @@ def technology_sighting_id(recipient_ref, holder_ref, technology_id):
 @dataclass
 class KnowledgeState(RegistrySerialization):
     schema_version = 8
+    _registry_epoch: int = field(default=0, init=False, repr=False, compare=False)
+    _registry_epochs: dict[str, int] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _structural_validation_epoch: int | None = field(default=None, init=False, repr=False, compare=False)
     reports: dict[str, KnowledgeReport] = field(default_factory=dict)
     technologies: dict[str, TechnicalKnowledge] = field(default_factory=dict)
     notices: dict[str, DiplomaticNotice] = field(default_factory=dict)
@@ -143,21 +208,69 @@ class KnowledgeState(RegistrySerialization):
     registries["civic_demand_notices"] = CivicDemandNotice
     registries["technology_sightings"] = TechnologySighting
 
+    def __post_init__(self):
+        self._bind_registry_epoch()
+
+    def _bind_registry_epoch(self, *, preserve_query=False):
+        """Attach registries and isolate transient projections after a copy."""
+        previous_query = getattr(self, "_query_cache", None) if preserve_query else None
+        previous_epochs = (dict(getattr(self, "_registry_epochs", {}))
+                           if preserve_query else {})
+        previous_epoch = getattr(self, "_registry_epoch", 0) if preserve_query else 0
+        previous_structural = (getattr(self, "_structural_validation_epoch", None)
+                                if preserve_query else None)
+        object.__setattr__(self, "_registry_epoch", previous_epoch)
+        object.__setattr__(
+            self,
+            "_registry_epochs",
+            {name: previous_epochs.get(name, 0) for name in self.registries},
+        )
+        for name in self.registries:
+            registry = getattr(self, name)
+            if not isinstance(registry, _RegistryDict) or registry._owner is not self:
+                object.__setattr__(self, name, _RegistryDict(registry, owner=self, name=name))
+        object.__setattr__(self, "_structural_validation_epoch", previous_structural)
+        object.__setattr__(self, "_semantic_validation_key", None)
+        if previous_query is None:
+            object.__setattr__(self, "_query_cache", None)
+        else:
+            object.__setattr__(self, "_query_cache", {
+                name: (signature, dict(projections))
+                for name, (signature, projections) in previous_query.items()
+            })
+
     def knows(self, actor_ref, technology_id):
         return any(k.owner_ref == actor_ref and k.technology_id == technology_id for k in self.technologies.values())
 
+    def _actor_query(self, registry_name, actor_ref, predicate):
+        """Cache a read-only actor projection until that registry changes."""
+        registry = getattr(self, registry_name)
+        signature = self._registry_epochs.get(registry_name, 0)
+        cache = getattr(self, "_query_cache", None)
+        if cache is None:
+            cache = {}
+            object.__setattr__(self, "_query_cache", cache)
+        cached = cache.get(registry_name)
+        if cached is None or cached[0] != signature:
+            cached = (signature, {})
+            cache[registry_name] = cached
+        key = (actor_ref.kind, actor_ref.id)
+        if key not in cached[1]:
+            cached[1][key] = tuple(item for _, item in sorted(registry.items()) if predicate(item, actor_ref))
+        return cached[1][key]
+
     def for_actor(self, actor_ref):
-        return tuple(r for _, r in sorted(self.reports.items()) if r.recipient_ref == actor_ref)
+        return self._actor_query("reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
 
     def routes_for_actor(self, actor_ref):
         """Latest dated observation per route this actor was told about."""
-        return tuple(r for _, r in sorted(self.route_reports.items()) if r.recipient_ref == actor_ref)
+        return self._actor_query("route_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
 
     def route_report(self, actor_ref, route_id):
         return self.route_reports.get(route_report_id(actor_ref, route_id))
 
     def fiscal_routes_for_actor(self, actor_ref):
-        return tuple(r for _, r in sorted(self.fiscal_route_reports.items()) if r.recipient_ref == actor_ref)
+        return self._actor_query("fiscal_route_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
 
     def fiscal_route_report(self, actor_ref, route_id):
         return self.fiscal_route_reports.get(fiscal_route_report_id(actor_ref, route_id))
@@ -169,7 +282,7 @@ class KnowledgeState(RegistrySerialization):
         return tuple(item for _, item in sorted(self.customs_notices.items()) if item.recipient_ref == actor_ref)
 
     def settlements_for_actor(self, actor_ref):
-        return tuple(r for _, r in sorted(self.settlement_reports.items()) if r.recipient_ref == actor_ref)
+        return self._actor_query("settlement_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
 
     def settlement_report(self, actor_ref, settlement_id):
         return self.settlement_reports.get(settlement_report_id(actor_ref, settlement_id))
@@ -249,10 +362,35 @@ class KnowledgeState(RegistrySerialization):
         return item is not None and item.expires_day > day
 
     def validate(self, world=None):
-        super().validate(world)
+        # During a live transaction, registry values are frozen SocietyValue
+        # instances and owners replace entries instead of mutating them.  Keep
+        # the structural and semantic provenance checks, but avoid serializing
+        # every historical notice/report on each nested owner candidate.  Full
+        # model revalidation still runs through ``validate()`` on load/save.
+        if world is None:
+            super().validate(world)
+        else:
+            if self._structural_validation_epoch != self._registry_epoch:
+                self.validate_registry_structure()
+                object.__setattr__(self, "_structural_validation_epoch", self._registry_epoch)
         if world is None:
             return
-        events = {e.id: e for e in world.events}
+        events = world.event_index()
+        # A single owner transaction may validate the same knowledge snapshot
+        # more than once (for example after validating both economy and
+        # relations).  Canonical knowledge changes are event-backed, so the
+        # append-only ledger prefix plus current day is a sufficient transient
+        # invalidation key.  This is only an in-memory optimization: load/save
+        # still performs the complete model validation through ``world is
+        # None`` and every new fact invalidates the key.
+        validation_key = (
+            len(world.events),
+            id(world.events[-1]) if world.events else 0,
+            world.clock.absolute_day,
+            self._registry_epoch,
+        )
+        if getattr(self, "_semantic_validation_key", None) == validation_key:
+            return
         for notice in self.notices.values():
             p = world.relations.proposals.get(notice.proposal_id)
             event = events.get(notice.event_id)
@@ -422,6 +560,7 @@ class KnowledgeState(RegistrySerialization):
                     or not any(delta.owner_kind == "civic_demand_notice" and delta.owner_id == notice.id
                                and delta.aspect == "demand" for delta in event.deltas)):
                 raise ValueError("invalid civic demand notice provenance")
+        object.__setattr__(self, "_semantic_validation_key", validation_key)
 
     @staticmethod
     def _validate_investigation_finding(world, events, finding):
@@ -502,6 +641,21 @@ class KnowledgeState(RegistrySerialization):
         decision = events.get(finding.decision_event_id)
         receipt = events.get(finding.event_id)
         observation = events.get(finding.observation_event_id)
+        held = next((item for item in world.knowledge.technologies.values()
+                     if item.owner_ref == finding.target_owner_ref
+                     and item.technology_id == finding.technology_id), None)
+        operation = next((event for link in receipt.causal_links
+                          if (event := events.get(link.cause_event_id)) is not None
+                          and event.event_type == "production_completed"
+                          and isinstance((event.causal_payload or {}).get("production"), dict)
+                          and (event.causal_payload or {})["production"].get("site_id") == finding.site_id
+                          and (event.causal_payload or {})["production"].get("batches", 0) > 0
+                          and (recipe := world.economy.recipes.get(
+                              (event.causal_payload or {})["production"].get("recipe_id"))) is not None
+                          and recipe.required_technology_id == finding.technology_id
+                          and held is not None
+                          and held.event_id in {cause.cause_event_id for cause in event.causal_links}
+                          and 0 <= finding.learned_day - event.day < 30), None) if receipt else None
         if (site is None or site.owner_ref != finding.target_owner_ref
                 or finding.technology_id not in world.research.technologies
                 or decision is None or decision.fact_kind != FactKind.DECISION
@@ -509,6 +663,7 @@ class KnowledgeState(RegistrySerialization):
                                          "actor_ref": finding.recipient_ref.to_dict(),
                                          "selected_affordance_id": finding.mission_id}
                 or receipt is None or receipt.event_type != "technology_theft_resolved"
+                or operation is None
                 or finding.learned_day != receipt.day or finding.learned_day > world.clock.absolute_day
                 or finding.decision_event_id not in {link.cause_event_id for link in receipt.causal_links}
                 or observation is None or observation.event_type != "site_observed"
@@ -817,6 +972,37 @@ class KnowledgeState(RegistrySerialization):
                     or not 0 < report.count <= shortfall("repair")):
                 raise ValueError("workforce repair demand lacks a material labour receipt")
             return
+        if report.work_kind == "research":
+            project = world.research.projects.get(report.work_id)
+            technology = (world.research.technologies.get(project.technology_id)
+                          if project is not None else None)
+            if (source.event_type != "research_progressed" or project is None or technology is None
+                    or report.sponsor_ref != project.owner_ref
+                    or report.target_occupation != technology.assistant_occupation
+                    or report.account_id != project.account_id
+                    or not 0 < report.count <= shortfall("research")):
+                raise ValueError("workforce research demand lacks a material labour receipt")
+            return
+        if report.work_kind == "military_recruitment":
+            plans = (world.strategy.plans.get(delta.after) for delta in source.deltas
+                     if delta.owner_kind == "military_recruitment" and delta.owner_id == report.work_id
+                     and delta.aspect == "plan_id")
+            plan = next((item for item in plans if item is not None), None)
+            objective = world.strategy.objectives.get(plan.objective_id) if plan is not None else None
+            settlement = world.society.settlements.get(report.work_id)
+            account = world.economy.accounts.get(report.account_id)
+            if (source.event_type != "strategy_defense_plan_updated" or plan is None or objective is None
+                    or objective.kind != "defend_occupied_settlement"
+                    or objective.actor_ref != report.sponsor_ref
+                    or settlement is None or settlement.administrator_id != report.sponsor_ref.id
+                    or account is None or account.owner_ref != report.sponsor_ref
+                    or report.target_occupation != "soldier"
+                    or not 0 < report.count <= shortfall("military_recruitment")
+                    or not any(delta.owner_kind == "strategy_plan" and delta.owner_id == plan.id
+                               and delta.aspect == "stage" and delta.after == "blocked"
+                               for delta in source.deltas)):
+                raise ValueError("workforce military demand lacks a material plan receipt")
+            return
         if (report.target_occupation != "merchant" or report.work_id not in world.economy.customs_checkpoints
                 or not 0 < report.count <= shortfall("customs_checkpoint")):
             raise ValueError("workforce customs demand lacks a material labour receipt")
@@ -840,6 +1026,19 @@ class KnowledgeState(RegistrySerialization):
                            and delta.aspect == "observation" and delta.after == notice.observation()
                            for delta in receipt.deltas)):
             raise ValueError("invalid workforce offer provenance")
+        if demand.work_kind == "military_recruitment":
+            group = world.society.population.get(notice.source_group_id)
+            decision_id = receipt.causal_payload.get("decision_event_id") if receipt.causal_payload else None
+            decision = events.get(decision_id)
+            expected_id = f"military-recruitment:{demand.id}:{demand.event_id}"
+            if (group is None or group.settlement_id != demand.work_id
+                    or receipt.causal_origin.value != "actor_decision" or decision is None
+                    or decision.fact_kind != FactKind.DECISION
+                    or decision_id not in {link.cause_event_id for link in receipt.causal_links}
+                    or decision.decision != {"action": "authorize_military_recruitment",
+                                             "actor_ref": demand.sponsor_ref.to_dict(),
+                                             "selected_affordance_id": expected_id}):
+                raise ValueError("military recruitment offer lacks sponsor decision")
 
     @staticmethod
     def _validate_customs_notice(world, events, notice):
@@ -866,7 +1065,7 @@ class KnowledgeState(RegistrySerialization):
                 or (notice.state in {"fee_due", "cleared"} and (manifest is None or manifest.parcel_id != notice.parcel_id
                     or manifest.order_id != notice.order_id or manifest.resource_id != notice.resource_id
                     or manifest.quantity != notice.quantity or notice.fee is None))
-                or (notice.state in {"detected", "evaded_undetected", "returned", "seized"}
+                or (notice.state in {"detected", "evaded_undetected", "returned", "seized", "refused"}
                     and (notice.manifest_id is not None or notice.fee is not None))
                 or (notice.state != "presented" and notice.event_id not in {link.cause_event_id for link in transition.causal_links})
                 or (notice.state == "fee_due" and transition.event_type != "cargo_manifest_declared")
@@ -875,6 +1074,7 @@ class KnowledgeState(RegistrySerialization):
                 or (notice.state == "cleared" and transition.event_type != "customs_fee_paid")
                 or (notice.state == "returned" and transition.event_type != "contraband_returned")
                 or (notice.state == "seized" and transition.event_type != "contraband_seized")
+                or (notice.state == "refused" and transition.event_type != "customs_refused")
                 or (notice.state != "presented" and not any(delta.owner_kind == "customs_notice"
                     and delta.owner_id == notice.id and delta.aspect == "state" and delta.after == notice.state
                     for delta in transition.deltas))

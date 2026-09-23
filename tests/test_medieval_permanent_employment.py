@@ -87,6 +87,37 @@ def test_material_pressure_expands_the_engine_owned_employment_offer():
     assert pressured.workforce_limit == world.society.population[normal.cohort_id].count // 2
 
 
+def test_new_standing_employment_cannot_overcommit_existing_monthly_payroll():
+    world, contract = contracted_world()
+    employer = EntityRef("polity", "auren")
+    candidate = next(option for option in permanent_employment_options(world, employer)
+                     if option.cohort_id != contract.cohort_id)
+    account = world.economy.accounts[contract.account_id]
+    committed = contract.workforce_limit * contract.wage_per_worker
+    candidate_cost = candidate.workforce_limit * candidate.wage_per_worker
+    world.economy.accounts[account.id] = account.model_copy(
+        update={"balance": committed + candidate_cost - 1})
+
+    assert not any(option.cohort_id == candidate.cohort_id
+                   for option in permanent_employment_options(world, employer))
+
+
+def test_food_labor_shortfall_does_not_offer_a_reserving_farmer_contract():
+    from src.sim.medieval.economy import monthly_workforce, produce_monthly
+    from src.systems.time import WorldClock
+
+    world = create_medieval_world(73)
+    world.clock = WorldClock(30)
+    produce_monthly(world, monthly_workforce(world))
+    employer = EntityRef("polity", "escarlia")
+
+    assert any(event.event_type == "production_limited"
+               and any(delta.aspect == "labor_shortfall" for delta in event.deltas)
+               for event in world.events)
+    assert not any(option.settlement_id == "ferroalto" and option.occupation == "farmer"
+                   for option in permanent_employment_options(world, employer))
+
+
 @pytest.mark.parametrize(("available_workers", "balance", "outcome"), [
     (0, None, "unpaid_labor"),
     (None, 0, "unpaid_funds"),

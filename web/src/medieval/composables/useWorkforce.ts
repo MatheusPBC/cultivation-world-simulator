@@ -1,16 +1,25 @@
 import { computed } from 'vue'
 import { useObserverStore } from '../stores/world'
 import { entityName } from '../mappers'
+import type { WorkforceKind } from '../../types/medieval-api'
 
 export function useWorkforce() {
   const store = useObserverStore()
   const data = computed(() => store.snapshot!)
   const settlementName = (id: string) => data.value.society.settlements.find(item => item.id === id)?.name ?? id
   const group = (id: string) => data.value.society.population_groups.find(item => item.id === id)
-  const workLocation = (kind: 'facility' | 'repair', id: string) => {
+  const workLocation = (kind: WorkforceKind, id: string) => {
+    if (kind === 'military_recruitment') {
+      const name = settlementName(id)
+      return { siteName: name, settlementName: name, siteId: undefined }
+    }
     const siteId = kind === 'facility'
       ? data.value.economy.facilities.find(item => item.id === id)?.site_id
-      : data.value.economy.repairs.find(item => item.id === id)?.site_id
+      : kind === 'repair'
+        ? data.value.economy.repairs.find(item => item.id === id)?.site_id
+        : kind === 'research'
+          ? data.value.research.projects.find(item => item.id === id)?.site_id
+          : data.value.economy.customs_checkpoints.find(item => item.id === id)?.site_id
     const site = siteId ? data.value.map.sites.find(item => item.id === siteId) : undefined
     const settlement = site?.region_ids
       .map(regionId => data.value.society.settlements.find(item => item.region_id === regionId))

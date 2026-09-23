@@ -63,7 +63,7 @@ def _known_breaches(world, creditor, day=None):
     is learned here about why the debtor failed or what it still holds.
     """
     day = world.clock.absolute_day if day is None else day
-    events = {item.id: item for item in world.events}
+    events = world.event_index()
     for _, obligation in sorted(world.relations.obligations.items()):
         proposal = world.relations.proposals.get(obligation.proposal_id)
         if obligation.status != "breached" or proposal is None:

@@ -9,6 +9,7 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import (detect_force_standoffs, raise_detachment, raise_options,
@@ -64,7 +65,7 @@ def contact_world():
 
 
 def enable(world):
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
                                                    "ai_max_calls": 10})
     return world
 
@@ -92,7 +93,17 @@ async def test_force_contact_provider_stands_down_only_own_column_and_round_trip
     world, own_id, rival_id, standoff_id = contact_world()
     enable(world)
     prompts = []
-    provider(monkeypatch, "first", prompts)
+    calls = 0
+    async def first_then_no_action(prompt, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        prompts.append(prompt)
+        if calls == 1:
+            payload = json.loads(prompt[prompt.index("{"):])
+            return {"selected_id": payload["choices"][0]["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", first_then_no_action)
     notices = world.knowledge.force_contacts_for_actor(OWNER)
     assert len(notices) == 1
     assert notices[0].counterparty_ref == RIVAL and notices[0].own_detachment_id == own_id
@@ -155,3 +166,20 @@ async def test_contact_noaction_or_invalid_authority_cannot_mutate_and_lapse_res
     assert world.society.force_standoffs[standoff_id].stage == "resolved"
     assert not any(event.event_type in {"battle_resolved", "casualties_taken", "loot_taken"}
                    for event in world.events)
+
+
+async def test_contact_selection_that_resolves_standoff_pauses_instead_of_noop(monkeypatch):
+    world, _, _, standoff_id = contact_world()
+    enable(world)
+
+    async def resolve_then_choose(prompt, *args, **kwargs):
+        standoff = world.society.force_standoffs[standoff_id]
+        world.society.force_standoffs[standoff_id] = standoff.model_copy(update={"stage": "resolved"})
+        payload = json.loads(prompt[prompt.index("{"):])
+        return {"selected_id": payload["choices"][0]["id"]}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", resolve_then_choose)
+    with pytest.raises(ProviderDecisionRequired):
+        await advance_contact_review(world)
+    assert world.society.force_standoffs[standoff_id].stage == "resolved"

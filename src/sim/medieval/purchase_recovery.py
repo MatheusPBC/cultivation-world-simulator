@@ -54,7 +54,7 @@ class PurchaseRecoveryResponseOption(SocietyValue):
 
 
 def _event(world, event_id):
-    return next((item for item in world.events if item.id == event_id), None)
+    return world.event_index().get(event_id)
 
 
 def _purchase_parts(world, order):
@@ -63,11 +63,12 @@ def _purchase_parts(world, order):
     if (order.delivered_quantity != 0 or order.resolved_quantity != 0 or len(parcels) != 1
             or parcels[0].quantity != order.quantity or parcels[0].stage == "unloading"):
         return None
-    decisions = [_event(world, item) for item in order.decision_ids]
+    events = world.event_index()
+    decisions = [events.get(item) for item in order.decision_ids]
     buy = next((item for item in decisions if item is not None and (item.decision or {}).get("action") == "buy"), None)
     sell = next((item for item in decisions if item is not None and (item.decision or {}).get("action") == "sell"), None)
     payment_id = world.economy.payments.get(buy.id) if buy is not None else None
-    payment = _event(world, payment_id)
+    payment = events.get(payment_id)
     source, destination = world.economy.stocks.get(order.source_id), world.economy.stocks.get(order.destination_id)
     # This deliberately starts with the smallest bilateral recovery contract:
     # the original sale had no export tariff and the replacement route has no
@@ -81,10 +82,10 @@ def _purchase_parts(world, order):
             or not {buy.id, sell.id}.issubset({link.cause_event_id for link in payment.causal_links})):
         return None
     parcel = parcels[0]
-    opened = next((item for item in world.events if item.event_type == "freight_opened"
-                   and any(delta.owner_kind == "cargo" and delta.owner_id == parcel.id
-                           and delta.aspect == "quantity" and delta.after == str(order.quantity)
-                           for delta in item.deltas)), None)
+    opened = next((item for item in world.events_of_type("freight_opened")
+                   if any(delta.owner_kind == "cargo" and delta.owner_id == parcel.id
+                          and delta.aspect == "quantity" and delta.after == str(order.quantity)
+                          for delta in item.deltas)), None)
     if opened is None:
         return None
     blocked = blocking_routes(world, order)
@@ -114,11 +115,14 @@ def _free_route(world, option):
 
 
 def _request_options_for_order(world, actor_ref, order, *, include_active=False):
-    parts = _purchase_parts(world, order)
-    if (parts is None or parts[0].decision.get("actor_ref") != actor_ref.to_dict()
-            or order.owner_ref != actor_ref):
+    if order.owner_ref != actor_ref or (not include_active and _active_case(world, order.id)):
         return ()
-    if not include_active and _active_case(world, order.id):
+    # A purchase must have a recorded payment before its expensive bilateral
+    # receipts, parcel, and blocked-route evidence are reconstructed.
+    if not any(decision_id in world.economy.payments for decision_id in order.decision_ids):
+        return ()
+    parts = _purchase_parts(world, order)
+    if parts is None or parts[0].decision.get("actor_ref") != actor_ref.to_dict():
         return ()
     blocked = parts[5]
     options = []

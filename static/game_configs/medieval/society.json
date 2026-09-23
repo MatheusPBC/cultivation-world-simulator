@@ -17,6 +17,7 @@
     {"id": "cinzaverde", "region_id": 808, "name": "Cinzaverde", "kind": "village", "administrator_id": "escarlia", "housing_capacity": 1100}
   ],
   "population_totals": {"pedraclara": 2400, "portovelho": 2000, "ferroalto": 1800, "campomanso": 1100, "salgueiro": 1000, "pontenegro": 900, "brumafria": 900, "cinzaverde": 800},
+  "initial_soldier_counts": {"pedraclara": 24, "portovelho": 20, "ferroalto": 18, "campomanso": 11, "salgueiro": 10, "pontenegro": 9, "brumafria": 9, "cinzaverde": 8},
   "people_weights": {"human": 4, "elf": 2, "dwarf": 2, "orc": 2},
   "organizations": [
     {"id": "casa-alvor", "name": "Casa Alvor", "kind": "noble_house", "seat_id": "pedraclara", "interests": ["continuidade dinástica", "proteção de suas terras"]},

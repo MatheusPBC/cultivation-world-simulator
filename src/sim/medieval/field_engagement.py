@@ -61,14 +61,15 @@ def _prepared(world, detachment):
 
 
 def _military_training_bonus(world, detachment):
-    """Return the bounded effect of a learned field-training technology."""
-    trained = sum(
-        knowledge.owner_ref == detachment.owner_ref
-        and (technology := world.research.technologies.get(knowledge.technology_id)) is not None
-        and technology.capability_id == "military_training"
-        for knowledge in world.knowledge.technologies.values()
-    )
-    return min(2, trained)
+    """Only this supplied column's completed drills have bounded effect."""
+    if not _supplied(detachment):
+        return 0
+    return sum(
+        1 for technology_id in ("field_drill", "siegecraft")
+        if world.knowledge.knows(detachment.owner_ref, technology_id)
+        and any(training.detachment_id == detachment.id
+                and training.technology_id == technology_id and training.stage == "completed"
+                for training in world.society.detachment_trainings.values()))
 
 
 def _sighting_current(world, notice):
@@ -201,7 +202,8 @@ def _engagement_strength(world, detachment):
     doctrine = effective_doctrine(world, detachment.id)
     if doctrine == "press" and prepared:
         prepared = False
-        strength = detachment.count * (2 + 2 * int(supplied))
+        strength = detachment.count * (2 + _military_training_bonus(world, detachment)
+                                       + 2 * int(supplied))
     terrain = _terrain_modifier(world, detachment.location_id, doctrine)
     fatigue = _fatigue_level(world, detachment)
     morale = _morale_level(prepared=prepared, supplied=supplied, fatigue=fatigue)
@@ -298,6 +300,14 @@ def _participant_cause_ids(world, engagement, columns, anchor_id, counterparty_r
     evidence = []
     for column in columns:
         evidence.append(column.last_event_id)
+        position = world.society.force_positions.get(_position_id(column.id))
+        if position is not None and position.stage == "prepared":
+            evidence.append(position.last_event_id)
+        if _supplied(column):
+            for training in world.society.detachment_trainings.values():
+                if (training.detachment_id == column.id and training.stage == "completed"
+                        and world.knowledge.knows(column.owner_ref, training.technology_id)):
+                    evidence.extend((training.last_event_id, training.knowledge_event_id))
         if column.id == anchor_id:
             continue
         contact = _pre_offer_contact(world, engagement, column, counterparty_ref)

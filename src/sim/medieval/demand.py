@@ -11,9 +11,12 @@ def objective_target(world, objective):
         monthly = world.society.population_at(objective.settlement_id)
     else:
         monthly = productive_demand(world, objective.stock_id, objective.resource_id)
+    if objective.kind == "maintain_garrison_supply":
+        monthly = 0
     return (monthly * objective.reserve_months + construction_demand(world, objective.stock_id, objective.resource_id)
             + research_demand(world, objective.stock_id, objective.resource_id)
-            + repair_demand(world, objective.stock_id, objective.resource_id))
+            + repair_demand(world, objective.stock_id, objective.resource_id)
+            + garrison_demand(world, objective.stock_id, objective.resource_id))
 
 
 def research_demand(world, stock_id, resource_id):
@@ -49,11 +52,40 @@ def repair_demand(world, stock_id, resource_id):
     return total
 
 
+def garrison_demand(world, stock_id, resource_id):
+    """Rations an institution chose to hold for a standing duty of its own.
+
+    This reserves nothing by itself: it only raises the quantity the owner of
+    this stock treats as already spoken for, so the column's food is not the
+    first thing other demands consume. It never buys, recruits, marches, or
+    keeps the duty alive -- an unpaid garrison still lapses on its own owner.
+    """
+    from .campaign_supply import RATIONS_PER_SOLDIER_DAY
+
+    if resource_id != "food":
+        return 0
+    total = 0
+    for objective in world.strategy.objectives.values():
+        if objective.kind != "maintain_garrison_supply" or objective.stock_id != stock_id:
+            continue
+        garrison = world.society.garrisons.get(objective.garrison_id) if objective.garrison_id else None
+        detachment = world.society.detachments.get(garrison.detachment_id) if garrison is not None else None
+        if (garrison is None or garrison.stage != "active" or detachment is None
+                or detachment.stage != "present" or detachment.owner_ref != objective.actor_ref):
+            continue
+        total += detachment.count * RATIONS_PER_SOLDIER_DAY * 30 * objective.reserve_months
+    return total
+
+
 def construction_demand(world, stock_id, resource_id):
     return sum((world.economy.expansion_blueprints[p.blueprint_id].required_units - p.completed_units)
                * world.economy.expansion_blueprints[p.blueprint_id].inputs.get(resource_id, 0)
                for p in world.economy.expansions.values()
-               if p.stage != 'completed' and world.economy.facilities[p.facility_id].stock_id == stock_id)
+               # A foundation has no anchor facility yet and names its own
+               # feeding stock; an ordinary expansion reads its anchor's.
+               if p.stage != 'completed' and (
+                   p.stock_id if p.facility_id is None else world.economy.facilities[p.facility_id].stock_id
+               ) == stock_id)
 
 
 def reserve_quantity(world, stock_id, resource_id="food"):
@@ -62,7 +94,9 @@ def reserve_quantity(world, stock_id, resource_id="food"):
     if resource_id == "food" and world.economy.needs[stock.location_id].stock_id == stock.id:
         monthly += world.society.population_at(stock.location_id)
     months = max((o.reserve_months for o in world.strategy.objectives.values()
-                  if o.kind != "defend_occupied_settlement" and o.actor_ref == stock.owner_ref
+                  if o.kind not in {"defend_occupied_settlement", "maintain_garrison_supply"}
+                  and o.actor_ref == stock.owner_ref
                   and o.stock_id == stock_id and o.resource_id == resource_id), default=2)
     return (months * monthly + construction_demand(world, stock_id, resource_id)
-            + research_demand(world, stock_id, resource_id) + repair_demand(world, stock_id, resource_id))
+            + research_demand(world, stock_id, resource_id) + repair_demand(world, stock_id, resource_id)
+            + garrison_demand(world, stock_id, resource_id))

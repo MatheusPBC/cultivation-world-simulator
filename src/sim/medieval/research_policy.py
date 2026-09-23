@@ -1,4 +1,6 @@
 """Monthly institutional research and application, using only owned operations."""
+from copy import deepcopy
+
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.models import Objective
@@ -83,14 +85,29 @@ def _research_causes(world, option):
 
 
 def execute_research_option(world, actor, option_id, decision_event_id):
-    option = next((item for item in research_options(world, actor) if item.id == option_id), None)
+    # The authorization and acceptance receipts are only valid together with
+    # the project they open.  Compose them on an isolated candidate, like the
+    # other knowledge verticals, so an owner rejection inside start_research
+    # leaves no dated contract behind.
+    candidate = deepcopy(world)
+    option = next((item for item in research_options(candidate, actor) if item.id == option_id), None)
     if option is None:
         raise ValueError("research option is stale or unknown")
+    # Direct callers must provide the same dated actor decision that the
+    # composed menu would have recorded.  The detailed authorization below is
+    # an owner receipt for ``start_research``; it cannot replace the original
+    # affordance decision or turn an arbitrary event ID into authorship.
+    source = next((event for event in candidate.events if event.id == decision_event_id), None)
+    if (source is None or source.day != candidate.clock.absolute_day
+            or source.fact_kind != FactKind.DECISION
+            or source.decision != option.decision()
+            or source.decision.get("actor_ref") != actor.to_dict()):
+        raise ValueError("research requires the current actor decision for the selected affordance")
     # The menu decision carries only the affordance ID.  The owner recomposes
     # private terms into a separate dated authorization receipt before
     # start_research validates and persists the project.
     sponsor = record_event(
-        world, "research_authorized", "A instituição autorizou a pesquisa escolhida.",
+        candidate, "research_authorized", "A instituição autorizou a pesquisa escolhida.",
         fact_kind=FactKind.DECISION,
         decision={
             "action": "research", "actor_ref": actor.to_dict(),
@@ -100,7 +117,7 @@ def execute_research_option(world, actor, option_id, decision_event_id):
         },
         cause_ids=(decision_event_id,))
     accepted = record_event(
-        world, "research_accepted", "O pesquisador aceita participar da pesquisa.",
+        candidate, "research_accepted", "O pesquisador aceita participar da pesquisa.",
         fact_kind=FactKind.DECISION,
         decision={"action": "research_work", "actor_ref": EntityRef("character", option.researcher_id).to_dict(),
                   "technology_id": option.technology_id, "site_id": option.site_id,
@@ -108,9 +125,10 @@ def execute_research_option(world, actor, option_id, decision_event_id):
                   "researcher_id": option.researcher_id},
         cause_ids=(sponsor.id,))
     start_research(
-        world, option.technology_id, option.site_id, option.stock_id, option.account_id,
+        candidate, option.technology_id, option.site_id, option.stock_id, option.account_id,
         option.researcher_id, sponsor_decision_id=sponsor.id,
         researcher_decision_id=accepted.id)
+    world.__dict__.update(candidate.__dict__)
 
 
 def research_adapters():

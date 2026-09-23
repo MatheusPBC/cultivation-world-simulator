@@ -45,19 +45,36 @@ def create_medieval_society(
         priority = sorted(weights, key=lambda p: (-(total * weights[p] % weight_sum), p))
         for people in priority[:total - sum(allocated.values())]:
             allocated[people] += 1
-        occupation = "artisan" if settlement.kind == "city" else "farmer"
+        soldier_total = data["initial_soldier_counts"][settlement.id]
+        if type(soldier_total) is not int or not 0 <= soldier_total <= total:
+            raise ValueError("initial soldier count must fit the settlement population")
+        soldiers = {people: soldier_total * count // total for people, count in allocated.items()} if total else {
+            people: 0 for people in allocated
+        }
+        soldier_priority = sorted(allocated, key=lambda people: (
+            -(soldier_total * allocated[people] % total) if total else 0, people,
+        ))
+        for people in soldier_priority[:soldier_total - sum(soldiers.values())]:
+            soldiers[people] += 1
+        civilian_occupation = "artisan" if settlement.kind == "city" else "farmer"
         for people, count in allocated.items():
-            group_id = f"pop:{settlement.id}:{people}:{occupation}"
-            society.population[group_id] = PopulationGroup(
-                id=group_id, settlement_id=settlement.id, people=people,
-                occupation=occupation, count=count,
-            )
+            for occupation, cohort_count in ((civilian_occupation, count - soldiers[people]),
+                                             ("soldier", soldiers[people])):
+                if cohort_count <= 0:
+                    continue
+                group_id = f"pop:{settlement.id}:{people}:{occupation}"
+                society.population[group_id] = PopulationGroup(
+                    id=group_id, settlement_id=settlement.id, people=people,
+                    occupation=occupation, count=cohort_count,
+                )
     names = [f"{first} {family}" for family in data["family_names"] for first in data["first_names"]]
     rng.shuffle(names)
     count = data["character_count"] if character_count is None else character_count
     if type(count) is not int or count < 0 or count > len(names) or len(set(names)) != len(names):
         raise ValueError("invalid character count or duplicate names")
-    groups = list(society.population.values())
+    # Soldier cohorts are an aggregate opening premise, not active detachments.
+    # Named characters stay civilian until a later material career change.
+    groups = [group for group in society.population.values() if group.occupation != "soldier"]
     group_named_count = {group.id: 0 for group in groups}
     settlement_named_count = {settlement_id: 0 for settlement_id in society.settlements}
     skill_names = list(Skills.model_fields)

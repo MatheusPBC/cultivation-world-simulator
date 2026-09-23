@@ -32,6 +32,7 @@ from .mortality import apply_monthly_mortality
 from .regional_overflow import apply_monthly_regional_overflow
 from .workforce import refresh_workforce_notices, review_workforce_transition_fallback
 from .institutional_aid_policy import review_institutional_aid_with_provider
+from .relief_policy import review_relief_fallback
 from .creature_policy import review_creatures
 from .creatures import apply_monthly_creature_ecology
 from .recourse_policy import review_recourse
@@ -44,7 +45,27 @@ from .authority_claims import lapse_invalid_claims
 from .force_command import revoke_invalid_detachment_commands
 from .strategy_response import review_strategy_responses_with_provider
 from .institutional_agenda import review_monthly_institutional_turn
+from .institutional_decision_turn import STALE_AFFORDANCE_EVENT_TYPE
+from .ai_decider import ProviderDecisionRequired
 from src.classes.core.infrastructure import validate_infrastructure
+
+
+def _raise_if_provider_stale(world, history_start):
+    """Turn a provider-selected stale affordance into a transaction failure.
+
+    The composed decision turn keeps a zero-delta blocked receipt when called
+    directly, which is useful for read-only diagnostics.  At the simulator
+    boundary, however, a stale provider choice is a technical decision wait:
+    the isolated candidate must be discarded so no later monthly family can
+    commit around the failed revalidation.
+    """
+    if not world.config.ai_enabled:
+        return
+    if any(event.event_type == STALE_AFFORDANCE_EVENT_TYPE
+           for event in world.events[history_start - 1:]):
+        raise ProviderDecisionRequired(
+            "provider decision required: selected institutional affordance became stale"
+        )
 
 
 class MedievalSimulator:
@@ -107,7 +128,14 @@ class MedievalSimulator:
                 # columns have already eaten and moved, so a wronged creditor
                 # decides on today's real situation and never on a stale one.
                 await review_recourse(candidate, due)
-                review_migration(candidate)
+                _raise_if_provider_stale(candidate, history_start)
+                # In provider mode migration is already part of the single
+                # monthly population-group consultation.  The dated pass is
+                # only the explicit offline/test policy; calling it here in
+                # AI mode would let a deterministic chooser move households
+                # outside the actor's affordance decision.
+                if not candidate.config.ai_enabled:
+                    review_migration(candidate)
             # 3. Process monthly domains exactly once per month boundary.
             if jump.monthly_boundary:
                 advance_monthly_practice(candidate)
@@ -169,16 +197,16 @@ class MedievalSimulator:
                 # covered actors then skip their own pass below, so nothing
                 # second-guesses the single menu the actor already saw.
                 claims, covered = await review_monthly_institutional_turn(candidate)
+                _raise_if_provider_stale(candidate, history_start)
                 # These deterministic policies run only after the composed
                 # consultation.  A provider may have been available while a
                 # particular actor had no budget slot; ``covered`` tells the
                 # owners exactly who must not be asked a second time.
-                if candidate.config.ai_enabled and review_export_tariffs(candidate, excluded_actors=covered):
+                if not candidate.config.ai_enabled and review_export_tariffs(candidate):
                     # A changed policy republishes only affected market quotes;
                     # route/site/settlement observations remain single receipts.
                     refresh_trade_reports(candidate, replace_today=True)
-                changed_service_sites = (review_site_services(candidate, excluded_actors=covered)
-                                         if candidate.config.ai_enabled else ())
+                changed_service_sites = review_site_services(candidate) if not candidate.config.ai_enabled else ()
                 if changed_service_sites:
                     # Service changes are material state, so owners and connected
                     # recipients receive a new dated route/site observation today.
@@ -188,29 +216,32 @@ class MedievalSimulator:
                         route_ids=tuple(sorted({route_id for site_id in changed_service_sites
                                                 for route_id in candidate.map.infrastructure_sites[site_id].route_ids})),
                     )
-                if candidate.config.ai_enabled:
-                    review_household_provisions(candidate, excluded_actors=covered)
+                if not candidate.config.ai_enabled:
+                    review_household_provisions(candidate)
                 # Offline/test mode still uses the actor-facing employment
                 # affordance, but selects conservatively from public pressure
                 # when no real provider turn occurred.  The owner then
                 # revalidates the same option and creates the normal contract.
-                review_permanent_employment_fallback(candidate, excluded_actors=covered)
+                if not candidate.config.ai_enabled:
+                    review_permanent_employment_fallback(candidate)
                 # Offline mode may accept one already-published transition when
                 # observed pressure and a real labour shortfall make it useful.
                 # The workforce owner still revalidates the selected terms.
-                review_workforce_transition_fallback(candidate, excluded_actors=covered)
-                # Relief has no deterministic fallback: without a discretionary
-                # decision this boundary, no food moves as aid at all.
-                review_maintenance(candidate, exclude_site_ids=claims.get("site", set()),
-                                   excluded_actors=covered)
-                review_supply(candidate, exclude_objective_ids=claims.get("objective", set()),
-                              excluded_actors=covered)
+                if not candidate.config.ai_enabled:
+                    review_workforce_transition_fallback(candidate)
+                # Offline/test mode has one declared, urgency-bounded relief
+                # policy. It still records an actor decision and invokes the
+                # same owner executors as the provider-selected affordance.
+                if not candidate.config.ai_enabled:
+                    review_relief_fallback(candidate)
+                    review_maintenance(candidate)
+                    review_supply(candidate)
+                if not candidate.config.ai_enabled:
+                    review_diplomacy(candidate, allow_offers=True)
                 if candidate.config.ai_enabled:
                     # The learner's acceptance keeps its own ordered turn for
                     # whoever the composed menu left untouched.
                     await review_promised_teaching_turns(candidate, consulted=covered)
-                else:
-                    review_diplomacy(candidate, allow_offers=True)
                 # In provider mode, requests and the existing aid lifecycle
                 # (response, fulfillment, remediation) are already part of
                 # the single composed monthly menu.  Keeping this pass here
@@ -219,7 +250,7 @@ class MedievalSimulator:
                 # call the aid owner above when a real deadline is due.
                 if not candidate.config.ai_enabled:
                     await review_institutional_aid_with_provider(candidate, allow_requests=True)
-                review_migration(candidate, excluded_actors=covered)
+                    review_migration(candidate)
                 lapse_invalid_claims(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")
             # 4. Validate and durably commit the candidate before publishing any change.
@@ -227,7 +258,13 @@ class MedievalSimulator:
             candidate.economy.validate(candidate)
             candidate.authority.validate(candidate)
             candidate.strategy.validate(candidate)
-            candidate.knowledge.validate(candidate)
+            # Knowledge owners validate their own receipts immediately.  The
+            # global provenance walk is still required at monthly boundaries
+            # and dated turns (where knowledge can change), but repeating the
+            # full historical registry scan on an ordinary ten-day jump made
+            # long horizons superlinear without adding a new mutation guard.
+            if jump.monthly_boundary or jump.agenda_due or self.save_path is not None:
+                candidate.knowledge.validate(candidate)
             candidate.research.validate(candidate)
             candidate.relations.validate(candidate)
             candidate.regional_overflow.validate(candidate)

@@ -4,7 +4,8 @@ from tests.test_medieval_research import prepared, authorize, work
 from src.classes.event import FactKind
 from src.sim.medieval.events import record_event
 from src.sim.medieval.expansion import start_expansion, progress_expansions
-from src.sim.medieval.economy import monthly_workforce, produce_monthly
+from src.sim.medieval.economy import _delta, monthly_workforce, produce_monthly
+from src.sim.medieval.infrastructure import damage_site
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 from src.systems.time import WorldClock
 
@@ -60,6 +61,27 @@ def test_new_line_requires_knowledge_and_material_completion_and_survives_load(t
     assert world_snapshot(world) == world_snapshot(resumed)
     produce_monthly(resumed)
     assert resumed.economy.stocks[line.stock_id].goods['coal'] == 10
+    produced = resumed.event_index()[resumed.economy.facilities[line_id].last_event_id]
+    learned = next(item for item in resumed.knowledge.technologies.values()
+                   if item.owner_ref == resumed.economy.stocks[line.stock_id].owner_ref
+                   and item.technology_id == 'metallurgy')
+    assert learned.event_id in {link.cause_event_id for link in produced.causal_links}
+    resumed.clock = resumed.clock.advance(30)
+    no_available_workers = {group_id: 0 for group_id in monthly_workforce(resumed)}
+    produce_monthly(resumed, no_available_workers)
+    assert resumed.economy.facilities[line_id].last_batches == 0
+    assert 'labor' in resumed.economy.facilities[line_id].last_limitations
+    site = resumed.map.infrastructure_sites[line.site_id]
+    damage = record_event(resumed, 'fixture_site_damage', 'Instalação inutilizada no cenário pressionado.',
+                          fact_kind=FactKind.STATE_TRANSITION,
+                          deltas=(_delta('site', site.id, 'integrity', site.integrity, 0.0),))
+    damage_site(resumed, site.id, event_id=damage.id)
+    resumed.clock = resumed.clock.advance(30)
+    produce_monthly(resumed)
+    assert resumed.economy.facilities[line_id].last_batches == 0
+    assert 'site_integrity' in resumed.economy.facilities[line_id].last_limitations
+    save_world(resumed, tmp_path / 'industry-limited.mws')
+    assert world_snapshot(load_world(tmp_path / 'industry-limited.mws')) == world_snapshot(resumed)
     with pytest.raises(ValueError, match='line|existing'):
         build(resumed, 'charcoal-kilns')
 

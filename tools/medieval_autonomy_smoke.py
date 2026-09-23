@@ -48,7 +48,7 @@ continua sem rotina de protesto ou de ajuda, e "roteirizado" aqui significa
 "decisão determinística de um ator de teste explícito", nunca "condição
 automática dentro de src/sim/".
 
-Sete perfis de **governo**, todos deterministas e sem heurística de mercado
+Oito perfis de **governo**, todos deterministas e sem heurística de mercado
 nenhuma (o comportamento do povo acima é o mesmo nos seis, porque a pergunta
 desta medição é sobre o governo, não sobre o povo):
 
@@ -78,6 +78,10 @@ desta medição é sobre o governo, não sobre o povo):
 - ``mercado``: escolhe a primeira oferta bilateral ``market-purchase:*``
   enumerada antes de qualquer pedido de ajuda. A compra continua sujeita à
   resposta independente do vendedor, saldo, tarifa e rota do owner.
+- ``recuperacao``: compõe, nessa ordem, ajuda/suprimento, mercado, emprego e
+  transição de workforce quando cada affordance já foi enumerada. É uma
+  fixture pressionada de agência composta, não uma política embutida no
+  motor.
 
 Quando a família "relief" oferece mais de uma opção (o menu sempre inclui a
 fome inteira e a metade dela, cada uma limitada ao estoque físico real), os
@@ -105,6 +109,7 @@ import cProfile
 import json
 from pathlib import Path
 import pstats
+import resource
 import sys
 import time
 from unittest.mock import patch
@@ -115,7 +120,7 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 
-GOV_PROFILES = ("desatento", "reativo", "preventivo", "socorro", "alivio", "mercado", "mobilidade")
+GOV_PROFILES = ("desatento", "reativo", "preventivo", "socorro", "alivio", "mercado", "mobilidade", "recuperacao")
 REACTIVE_MISSING_FOOD_THRESHOLD = 100
 
 
@@ -132,6 +137,12 @@ def resource_totals(world):
         totals[world.economy.freight_orders[parcel.order_id].resource_id] += parcel.quantity
     totals["food"] += sum(provision.food for provision in world.economy.migration_provisions.values())
     return totals
+
+
+def process_high_water_bytes():
+    """Return this process' high-water RSS, normalized across Unix platforms."""
+    value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return int(value * (1024 if sys.platform.startswith("linux") else 1))
 
 
 RESOURCE_EFFECTS = {"production_completed", "production_limited", "subsistence_resolved",
@@ -271,9 +282,19 @@ def _alivio_decision(payload):
 
 
 def _market_decision(payload):
-    """Choose only an engine-enumerated bilateral market offer."""
-    choices = sorted(item["id"] for item in payload.get("choices", ())
-                     if item["id"].startswith("market-purchase:"))
+    """Choose only an engine-enumerated bilateral market offer.
+
+    Market affordance IDs contain private stock/account handles and are
+    therefore replaced at the provider seam by ``choice:N`` aliases.  The
+    fixture must select the public authored buyer or seller label in that case;
+    raw IDs remain supported for the small unit-test payloads that bypass the
+    prompt seam.
+    """
+    choices = sorted(
+        item["id"] for item in payload.get("choices", ())
+        if item.get("id", "").startswith(("market-purchase:", "market-purchase-accept:"))
+        or item.get("label", "").startswith(("Pedir compra ", "Aceitar pedido de compra de mercado."))
+    )
     return choices[0] if choices else ai_decider.NO_ACTION
 
 
@@ -297,17 +318,66 @@ def _workforce_choice(payload):
     return options[0] if options else None
 
 
+def _expansion_choice(payload):
+    """Choose an authored production-capacity investment when it exists.
+
+    The fixture does not name a facility or blueprint.  It only recognizes the
+    engine-authored label; expansion inputs, budget, technology, site
+    capability and construction terms remain private owner checks.
+    """
+    options = sorted(choice["id"] for choice in payload.get("choices", ())
+                     if choice.get("label", "").startswith("Investir na instalação "))
+    return options[0] if options else None
+
+
+def _relief_transfer_choice(payload):
+    """Prefer the largest currently enumerated inter-settlement transfer."""
+    options = sorted(choice["id"] for choice in payload.get("choices", ())
+                     if choice.get("id", "").startswith("relief-transfer:"))
+    return options[0] if options else None
+
+
 def _mobilidade_decision(payload):
     """Fixture profile for the employment/transition vertical only."""
     return (_employment_choice(payload) or _workforce_choice(payload)
             or _socorro_decision(payload))
 
 
+def _recuperacao_decision(payload):
+    """Compose only currently enumerated recovery affordances."""
+    choices = tuple(payload.get("choices", ()))
+    # Recovery first spends the actor's own observed surplus.  This is still a
+    # normal institutional choice: the transfer/distribution IDs, quantity,
+    # source, destination and route were all enumerated by the engine and are
+    # revalidated by the relief owner.  Requesting outside aid remains the next
+    # option when the actor cannot cover the current shortfall itself.
+    if _reported_missing_food(payload) > 0:
+        local = _relief_choice(payload)
+        if local is not None:
+            return local
+        transfer = _relief_transfer_choice(payload)
+        if transfer is not None:
+            return transfer
+    for marker in ("institutional-aid-response:", "institutional-aid-fulfill:",
+                   "institutional-aid-request:", "supply-objective:",
+                   "relief-transfer:"):
+        candidates = sorted(item["id"] for item in choices
+                            if item.get("id", "").startswith(marker)
+                            and not item["id"].endswith(":reject"))
+        if candidates:
+            return candidates[0]
+    market = _market_decision(payload)
+    return (market if market != ai_decider.NO_ACTION else _expansion_choice(payload)
+            or _employment_choice(payload)
+            or _workforce_choice(payload) or ai_decider.NO_ACTION)
+
+
 GOV_DECISIONS = {"desatento": _desatento_decision, "reativo": _reativo_decision,
                  "preventivo": _preventivo_decision, "socorro": _socorro_decision,
                  "alivio": _alivio_decision,
                  "mercado": _market_decision,
-                 "mobilidade": _mobilidade_decision}
+                 "mobilidade": _mobilidade_decision,
+                 "recuperacao": _recuperacao_decision}
 
 
 def _protest_open_choice(payload):
@@ -358,7 +428,7 @@ def _install_gov_profile(gov_profile):
     async def call_llm_json(prompt, *args, **kwargs):
         payload = _payload_of(prompt)
         if _actor_kind(payload) == "population_group":
-            return {"selected_id": _povo_decision(payload, workforce=gov_profile == "mobilidade")}
+            return {"selected_id": _povo_decision(payload, workforce=gov_profile in {"mobilidade", "recuperacao"})}
         return {"selected_id": decide(payload)}
 
     return (patch("src.sim.medieval.ai_decider.provider_available", return_value=True),
@@ -366,7 +436,8 @@ def _install_gov_profile(gov_profile):
 
 
 async def run(seed, days, output, profile=False, gov_profile=None, real_provider=False,
-              ai_calls_per_step=8):
+              ai_calls_per_step=256, ai_max_calls=0, checkpoint_days=None,
+              resume_save=None):
     # The CLI passes a Path, while callers such as release notebooks and
     # focused probes commonly pass a string.  Normalize at the public
     # boundary so persistence and the returned artifact path use one contract.
@@ -377,51 +448,132 @@ async def run(seed, days, output, profile=False, gov_profile=None, real_provider
         raise ValueError(f"gov_profile must be one of {GOV_PROFILES}")
     if type(ai_calls_per_step) is not int or ai_calls_per_step <= 0:
         raise ValueError("ai_calls_per_step must be a positive integer")
+    if type(ai_max_calls) is not int or ai_max_calls < 0:
+        raise ValueError("ai_max_calls must be a non-negative integer")
+    if checkpoint_days is not None and (type(checkpoint_days) is not int or checkpoint_days <= 0
+                                        or checkpoint_days % 30):
+        raise ValueError("checkpoint_days must be a positive multiple of 30")
+    if resume_save is not None:
+        resume_save = Path(resume_save)
+        if not resume_save.is_file():
+            raise ValueError(f"resume_save must point to an existing save: {resume_save}")
+        if resume_save.resolve() == output.resolve():
+            raise ValueError("resume_save and output must be different paths")
+        if output.exists():
+            raise ValueError(f"resume output already exists: {output}")
     if real_provider:
+        if not ai_max_calls:
+            raise ValueError("real_provider requires an explicit positive ai_max_calls budget")
         from src.sim.medieval.ai_decider import provider_available
         if not provider_available():
             raise RuntimeError("real provider is not configured or is disabled in this runtime")
         return await _run(seed, days, output, profile, None, real_provider=True,
-                          ai_calls_per_step=ai_calls_per_step)
+                          ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
+                          checkpoint_days=checkpoint_days, resume_save=resume_save)
     if gov_profile is None:
         return await _run(seed, days, output, profile, gov_profile,
-                          ai_calls_per_step=ai_calls_per_step)
+                          ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
+                          checkpoint_days=checkpoint_days, resume_save=resume_save)
     patches = _install_gov_profile(gov_profile)
     with patches[0], patches[1]:
         return await _run(seed, days, output, profile, gov_profile,
-                          ai_calls_per_step=ai_calls_per_step)
+                          ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
+                          checkpoint_days=checkpoint_days, resume_save=resume_save)
+
+
+async def advance_world(world, target_day, *, after_step=None):
+    """Advance a loaded world through the same canonical step path as the smoke.
+
+    ``after_step`` receives ``(world, event_count_before_step)`` after each
+    committed engine step.  It is deliberately tooling-only: callers may
+    observe the in-memory world but cannot alter the simulator's execution
+    policy, provider configuration, or material owners through this helper.
+    """
+    jumps = 0
+    simulator = MedievalSimulator(world)
+    while world.clock.absolute_day < target_day:
+        event_count_before_step = len(world.events)
+        await simulator.step()
+        jumps += 1
+        if after_step is not None:
+            after_step(world, event_count_before_step)
+    return jumps
 
 
 async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
-               ai_calls_per_step=8):
-    world = create_medieval_world(seed, bootstrap_household_income=True)
+               ai_calls_per_step=256, ai_max_calls=0, checkpoint_days=None,
+               resume_save=None):
+    world = (load_world(resume_save) if resume_save is not None
+             else create_medieval_world(seed, bootstrap_household_income=True))
+    # On resume the persisted run configuration, not the CLI default, owns
+    # provenance.  A mismatched --seed cannot change the loaded world.
+    seed = world.config.seed
+    if resume_save is not None and checkpoint_days:
+        # Check absolute-day artifact names after reading the source clock, and
+        # refuse replacing either the source save or prior evidence.
+        start_day = world.clock.absolute_day
+        for offset in range(checkpoint_days, days + 1, checkpoint_days):
+            checkpoint_path = output.with_name(
+                f"{output.stem}.checkpoint-day-{start_day + offset:05d}{output.suffix}")
+            if checkpoint_path.resolve() == Path(resume_save).resolve() or checkpoint_path.exists():
+                raise ValueError(f"resume checkpoint output already exists or is the source save: {checkpoint_path}")
     if gov_profile is not None or real_provider:
         # Consulted for real: enabled, with enough same-day budget that every
         # polity's monthly turn (plus any daily recourse turn sharing the same
         # boundary day) gets answered, and no artificial monthly ceiling.
         world.config = world.config.model_copy(update={"ai_enabled": True,
-                                                       "ai_calls_per_step": ai_calls_per_step})
+                                                       "ai_calls_per_step": ai_calls_per_step,
+                                                       "ai_max_calls": ai_max_calls})
+    start_day = world.clock.absolute_day
+    target_day = start_day + days
     initial_resources = resource_totals(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
-    elapsed, jumps, boundary, net_resources, metrics = time.perf_counter(), 0, 0, Counter(), []
+    elapsed, jumps, boundary, net_resources, metrics = time.perf_counter(), 0, start_day // 30, Counter(), []
     print(json.dumps({"phase": "start", "gov_profile": gov_profile, "seed": seed, "days": days,
+                      "start_day": start_day, "target_day": target_day,
                       "initial_population": world.society.total_population, "initial_money": initial_money,
                       "ai_enabled": world.config.ai_enabled, "policy": world.config.decision_policy,
                       "real_provider": real_provider}), flush=True)
-    while world.clock.absolute_day < days:
-        start = len(world.events)
-        await MedievalSimulator(world).step()
+    checkpoints = []
+    checkpointed_days = set()
+    def after_step(advanced_world, start):
+        nonlocal jumps, boundary
         jumps += 1
-        net_resources.update(ledger_resource_effects(world.events[start:], world.economy.resources))
-        assert resource_totals(world) == {rid: amount + net_resources[rid] for rid, amount in initial_resources.items()}, "unaccounted resource creation/loss"
-        assert sum(a.balance for a in world.economy.accounts.values()) == initial_money
-        if world.clock.absolute_day // 30 > boundary:
-            boundary = world.clock.absolute_day // 30
-            metric = monthly_metrics(world)
+        net_resources.update(ledger_resource_effects(advanced_world.events[start:], advanced_world.economy.resources))
+        assert resource_totals(advanced_world) == {rid: amount + net_resources[rid] for rid, amount in initial_resources.items()}, "unaccounted resource creation/loss"
+        assert sum(a.balance for a in advanced_world.economy.accounts.values()) == initial_money
+        if advanced_world.clock.absolute_day // 30 > boundary:
+            boundary = advanced_world.clock.absolute_day // 30
+            metric = monthly_metrics(advanced_world)
             metrics.append(metric)
-            print(json.dumps({**metric, "events": len(world.events),
-                              "orders": len(world.economy.freight_orders),
+            print(json.dumps({**metric, "events": len(advanced_world.events),
+                              "orders": len(advanced_world.economy.freight_orders),
                               "elapsed_s": round(time.perf_counter()-elapsed, 2)}), flush=True)
+        day = advanced_world.clock.absolute_day
+        if checkpoint_days and (day - start_day) % checkpoint_days == 0 and day not in checkpointed_days:
+            checkpointed_days.add(day)
+            checkpoint_path = output.with_name(
+                f"{output.stem}.checkpoint-day-{day:05d}{output.suffix}")
+            checkpoint_started = time.perf_counter()
+            before_snapshot = world_snapshot(advanced_world)
+            before_events = list(advanced_world.events)
+            before_resources = resource_totals(advanced_world)
+            save_world(advanced_world, checkpoint_path)
+            resumed_checkpoint = load_world(checkpoint_path)
+            equivalent = (before_snapshot == world_snapshot(resumed_checkpoint)
+                          and before_events == resumed_checkpoint.events)
+            checkpoint_elapsed = time.perf_counter() - checkpoint_started
+            checkpoints.append({
+                "day": day,
+                "path": str(checkpoint_path.resolve()),
+                "bytes": checkpoint_path.stat().st_size,
+                "elapsed_s": round(checkpoint_elapsed, 4),
+                "memory_high_water_bytes": process_high_water_bytes(),
+                "conservation": resource_totals(advanced_world) == before_resources,
+                "save_load_equivalent": equivalent,
+            })
+            assert equivalent, f"checkpoint save/load mismatch at day {day}"
+    await advance_world(world, target_day, after_step=after_step)
     final_metrics = monthly_metrics(world)
     measured_events = len(world.events)
     measured_orders = len(world.economy.freight_orders)
@@ -441,7 +593,8 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
     await MedievalSimulator(world).step()
     await MedievalSimulator(resumed).step()
     assert world_snapshot(world) == world_snapshot(resumed) and world.events == resumed.events
-    return {"scenario": "natural-autonomous-supply", "seed": seed, "saved_day": days,
+    return {"scenario": "natural-autonomous-supply", "seed": seed, "saved_day": target_day,
+"start_day": start_day, "advanced_days": days,
 "continuation_day": world.clock.absolute_day, "jumps": jumps, "events": measured_events,
              "money_total": initial_money, "orders": measured_orders,
              "gov_profile": gov_profile,
@@ -456,6 +609,7 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
             "balances": {key: a.balance for key, a in world.economy.accounts.items() if a.owner_ref.kind == "polity"},
             "food_conserved": True, "money_conserved": True, "all_resources_accounted": True,
              "save_load_equivalent": True,
+             "checkpoints": checkpoints,
              "real_ai_calls": (ai_decider.spent_calls(world) if real_provider else 0),
             "policy": world.config.decision_policy, "elapsed_s": round(time.perf_counter()-elapsed, 2),
             "save": str(output.resolve())}
@@ -471,11 +625,30 @@ if __name__ == "__main__":
                         help="Decisor roteirizado instalado no lugar do provider; omitido = nenhum ator (mundo sem governo).")
     parser.add_argument("--real-provider", action="store_true",
                         help="Usa o provider real configurado; falha explicitamente se ele não estiver disponível.")
-    parser.add_argument("--ai-calls-per-step", type=int, default=8,
-                        help="Limite diário de consultas no modo --real-provider (padrão: 8).")
+    parser.add_argument("--ai-calls-per-step", type=int, default=256,
+                        help="Limite diário de consultas no modo de provider (padrão: 256).")
+    parser.add_argument("--ai-max-calls", type=int, default=0,
+                        help="Teto total de consultas; obrigatório e positivo com --real-provider.")
+    parser.add_argument("--checkpoint-days", type=int, default=None,
+                        help="Escreve e valida um save distinto a cada intervalo múltiplo de 30 dias.")
+    parser.add_argument("--resume-save", type=Path,
+                        help="Retoma deste save e avança --days dias; --output deve ser um novo arquivo.")
     args = parser.parse_args()
     if args.days <= 0 or args.days % 30:
         parser.error("days must be a positive multiple of 30")
-    print(json.dumps(asyncio.run(run(args.seed, args.days, args.output, args.profile, args.gov_profile,
-                                   args.real_provider, args.ai_calls_per_step)),
+    if args.checkpoint_days is not None and (args.checkpoint_days <= 0 or args.checkpoint_days % 30):
+        parser.error("checkpoint-days must be a positive multiple of 30")
+    if args.resume_save is not None and not args.resume_save.is_file():
+        parser.error("resume-save must point to an existing save")
+    if args.resume_save is not None and args.resume_save.resolve() == args.output.resolve():
+        parser.error("resume-save and output must be different paths")
+    if args.resume_save is not None and args.output.exists():
+        parser.error("resume output must be a new file")
+    try:
+        result = asyncio.run(run(args.seed, args.days, args.output, args.profile, args.gov_profile,
+                                 args.real_provider, args.ai_calls_per_step, args.ai_max_calls,
+                                 args.checkpoint_days, args.resume_save))
+    except ValueError as exc:
+        parser.error(str(exc))
+    print(json.dumps(result,
                      ensure_ascii=False, indent=2), flush=True)

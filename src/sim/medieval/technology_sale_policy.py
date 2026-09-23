@@ -29,6 +29,9 @@ def _execute(world, actor, option_id, decision_event_id):
     option = next((item for item in _options(world, actor) if item.id == option_id), None)
     if option is None:
         raise ValueError("stale or unknown technology sale option")
+    # A buyer request has no executor of its own: the turn's own dated decision
+    # event *is* the request, and ``technology_sale_acceptance_options`` reads
+    # it back from the history.  Only the holder's consent moves money.
     if isinstance(option, TechnologySaleAcceptance):
         request = next((item for item in technology_sale_options(world, option.buyer_ref)
                         if item.id == option.request_option_id), None)

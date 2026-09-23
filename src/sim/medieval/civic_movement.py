@@ -1,6 +1,6 @@
 """Formation and explicit escalation of bounded civic movements.
 
-Movements reserve participants from existing cohorts and record a named leader.
+Movements reserve participants from consenting existing cohorts and record a named leader.
 An explicit rebellion declaration only records organized contestation and
 pressure; it grants no authority, territory or automatic victory.
 """
@@ -20,6 +20,7 @@ from .economy import _apply_stock, _causes, _delta
 from .events import record_event
 
 MOVEMENT_ACTION = "form_civic_movement"
+JOIN_MOVEMENT_ACTION = "join_civic_movement"
 MOVEMENT_MIN_UNREST = 650
 MEMBER_MIN_UNREST = 450
 MOVEMENT_MIN_PARTICIPANTS = 5
@@ -50,6 +51,20 @@ class CivicMovementOption:
             "actor_ref": EntityRef("population_group", self.initiator_group_id).to_dict(),
             "selected_affordance_id": self.id,
         }
+
+
+@dataclass(frozen=True)
+class CivicMovementJoinOption:
+    id: Identity
+    movement_id: Identity
+    actor_group_id: Identity
+    report_event_id: Identity
+    participant_count: int
+
+    def decision(self):
+        return {"action": JOIN_MOVEMENT_ACTION,
+                "actor_ref": EntityRef("population_group", self.actor_group_id).to_dict(),
+                "selected_affordance_id": self.id}
 
 
 @dataclass(frozen=True)
@@ -90,6 +105,7 @@ class CivicRebellionResponseOption:
     negotiation_stock_id: Identity | None = None
     negotiation_food: int = 0
     negotiation_stock_event_id: Identity | None = None
+    suppression_detachment_id: Identity | None = None
 
     def decision(self):
         return {"action": self.action,
@@ -149,36 +165,44 @@ def civic_movement_options(world, group_id):
     if catalyst is None or leader is None:
         return ()
 
-    members = []
-    reports = []
-    for candidate in sorted(world.society.population.values(), key=lambda item: item.id):
-        if candidate.settlement_id != group.settlement_id:
-            continue
-        own = _own_report(world, candidate.id)
-        if (own is None or own[1].unrest < MEMBER_MIN_UNREST
-                or world.society.available_count(candidate.id) < MOVEMENT_MIN_PARTICIPANTS):
-            continue
-        members.append(candidate)
-        reports.append(own[1])
-    if len(members) < 2 or group.id not in {item.id for item in members}:
+    if world.society.available_count(group.id) < MOVEMENT_MIN_PARTICIPANTS:
         return ()
-    participants = {
-        item.id: min(world.society.available_count(item.id),
-                     max(MOVEMENT_MIN_PARTICIPANTS, item.count // 20))
-        for item in members
-    }
-    if any(value < MOVEMENT_MIN_PARTICIPANTS for value in participants.values()):
-        return ()
-    report_ids = tuple(report.event_id for report in reports)
+    participants = {group.id: min(world.society.available_count(group.id),
+                                  max(MOVEMENT_MIN_PARTICIPANTS, group.count // 20))}
+    report_ids = (report.event_id,)
     option_id = (f"civic-movement:{group.id}:{group.settlement_id}:"
                  f"{catalyst.id}:{':'.join(report_ids)}")
     return (CivicMovementOption(id=option_id, initiator_group_id=group.id,
                                 settlement_id=group.settlement_id,
-                                member_group_ids=tuple(item.id for item in members),
+                                member_group_ids=(group.id,),
                                 participants_by_group=participants,
                                 leader_character_id=leader.id,
                                 report_event_ids=report_ids,
                                 catalyst_event_id=catalyst.id),)
+
+
+def civic_movement_join_options(world, group_id):
+    current = _own_report(world, group_id)
+    if current is None:
+        return ()
+    group, report = current
+    if (report.unrest < MEMBER_MIN_UNREST
+            or world.society.available_count(group.id) < MOVEMENT_MIN_PARTICIPANTS):
+        return ()
+    options = []
+    for movement in sorted(world.society.civic_movements.values(), key=lambda item: item.id):
+        if (movement.stage != "active" or movement.settlement_id != group.settlement_id
+                or group.id in movement.member_group_ids):
+            continue
+        participant_count = min(world.society.available_count(group.id),
+                                max(MOVEMENT_MIN_PARTICIPANTS, group.count // 20))
+        if participant_count < MOVEMENT_MIN_PARTICIPANTS:
+            continue
+        options.append(CivicMovementJoinOption(
+            id=f"civic-movement-join:{movement.id}:{group.id}:{movement.last_event_id}:{report.event_id}",
+            movement_id=movement.id, actor_group_id=group.id,
+            report_event_id=report.event_id, participant_count=participant_count))
+    return tuple(options)
 
 
 def _decision(world, decision_event_id, action=MOVEMENT_ACTION):
@@ -194,7 +218,8 @@ def _decision(world, decision_event_id, action=MOVEMENT_ACTION):
 def civic_rebellion_options(world, group_id):
     options = []
     for movement in sorted(world.society.civic_movements.values(), key=lambda item: item.id):
-        if movement.stage != "active" or movement.started_day + MOVEMENT_MIN_DAYS > world.clock.absolute_day:
+        if (movement.stage != "active" or len(movement.member_group_ids) < 2
+                or movement.started_day + MOVEMENT_MIN_DAYS > world.clock.absolute_day):
             continue
         leader = _leader(world, group_id, movement.settlement_id)
         if leader is None or leader.population_group_id != group_id or leader.id != movement.leader_character_id:
@@ -218,7 +243,8 @@ def civic_rebellion_options(world, group_id):
 def civic_revolution_options(world, group_id):
     options = []
     for movement in sorted(world.society.civic_movements.values(), key=lambda item: item.id):
-        if movement.stage != "rebellion" or movement.started_day + MOVEMENT_MIN_DAYS > world.clock.absolute_day:
+        if (movement.stage != "rebellion" or len(movement.member_group_ids) < 2
+                or movement.started_day + MOVEMENT_MIN_DAYS > world.clock.absolute_day):
             continue
         leader = _leader(world, group_id, movement.settlement_id)
         current = _own_report(world, group_id)
@@ -274,7 +300,18 @@ def civic_rebellion_response_options(world, actor):
             continue
         responses = ((OFFER_NEGOTIATION_ACTION, "negotiate"),) if movement.stage == "active" else (
             (SUPPRESS_REBELLION_ACTION, "suppress"), (OFFER_NEGOTIATION_ACTION, "negotiate"))
+        suppressors = tuple(sorted(
+            (detachment for detachment in world.society.detachments.values()
+             if detachment.owner_ref == actor
+             and detachment.location_id == movement.settlement_id
+             and detachment.stage == "present"
+             and detachment.provisions > 0),
+            key=lambda item: item.id,
+        ))
         for action, suffix in responses:
+            if action == SUPPRESS_REBELLION_ACTION and not suppressors:
+                continue
+            suppression_detachment_id = suppressors[0].id if action == SUPPRESS_REBELLION_ACTION else None
             stock_id = None
             food = 0
             stock_event_id = None
@@ -289,10 +326,11 @@ def civic_rebellion_response_options(world, actor):
                     stock_event_id = candidate_stock.last_event_ids.get("food")
             options.append(CivicRebellionResponseOption(
                 id=(f"civic-rebellion-{suffix}:{movement.id}:{movement.last_event_id}:{report.event_id}:"
-                    f"{stock_id or 'none'}:{food}:{stock_event_id or 'none'}"),
+                    f"{stock_id or 'none'}:{food}:{stock_event_id or 'none'}:{suppression_detachment_id or 'none'}"),
                 movement_id=movement.id, actor_ref=actor, report_event_id=report.event_id,
                 action=action, negotiation_stock_id=stock_id, negotiation_food=food,
-                negotiation_stock_event_id=stock_event_id))
+                negotiation_stock_event_id=stock_event_id,
+                suppression_detachment_id=suppression_detachment_id))
     return tuple(options)
 
 
@@ -315,6 +353,15 @@ def form_civic_movement(world, group_id, option_id, decision_event_id):
         candidate, "civic_movement_formed",
         "Grupos locais formaram um movimento cívico com liderança nomeada.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": actor.to_dict(),
+            "selected_affordance_id": option.id,
+            "movement_id": movement_id,
+            "initiator_group_id": option.initiator_group_id,
+            "initial_participant_count": sum(option.participants_by_group.values()),
+            "catalyst_event_id": option.catalyst_event_id,
+        },
         deltas=(
             _delta("civic_movement", movement_id, "stage", None, "active"),
             _delta("civic_movement", movement_id, "leader_character_id", None, option.leader_character_id),
@@ -338,6 +385,51 @@ def form_civic_movement(world, group_id, option_id, decision_event_id):
     return candidate.society.civic_movements[movement_id]
 
 
+def join_civic_movement(world, group_id, option_id, decision_event_id):
+    candidate = deepcopy(world)
+    option = next((item for item in civic_movement_join_options(candidate, group_id)
+                   if item.id == option_id), None)
+    if option is None:
+        raise ValueError("civic movement join option is stale or unknown")
+    decision, actor = _decision(candidate, decision_event_id, JOIN_MOVEMENT_ACTION)
+    if actor != EntityRef("population_group", group_id) or decision.decision != option.decision():
+        raise ValueError("civic movement join has the wrong decision")
+    movement = candidate.society.civic_movements.get(option.movement_id)
+    if movement is None or movement.stage != "active" or group_id in movement.member_group_ids:
+        raise ValueError("civic movement is no longer joinable")
+    if candidate.society.available_count(group_id) < option.participant_count:
+        raise ValueError("civic movement join participants are no longer available")
+    event = record_event(
+        candidate, "civic_movement_joined",
+        "Um grupo local consentiu e entrou no movimento cívico existente.",
+        fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": actor.to_dict(),
+            "selected_affordance_id": option.id,
+            "movement_id": movement.id,
+            "joining_group_id": group_id,
+            "participant_count": option.participant_count,
+            "report_event_id": option.report_event_id,
+        },
+        deltas=(_delta("civic_movement", movement.id, f"participants:{group_id}",
+                       0, option.participant_count),),
+        cause_ids=_causes(decision.id, movement.last_event_id, option.report_event_id),
+    )
+    candidate.society.civic_movements[movement.id] = movement.model_copy(update={
+        "member_group_ids": (*movement.member_group_ids, group_id),
+        "participants_by_group": {**movement.participants_by_group,
+                                   group_id: option.participant_count},
+        "report_event_ids": (*movement.report_event_ids, option.report_event_id),
+        "last_event_id": event.id,
+    })
+    candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return candidate.society.civic_movements[movement.id]
+
+
 def dissolve_civic_movement(world, group_id, option_id, decision_event_id):
     candidate = deepcopy(world)
     option = next((item for item in civic_movement_dissolve_options(candidate, group_id)
@@ -352,6 +444,8 @@ def dissolve_civic_movement(world, group_id, option_id, decision_event_id):
         candidate, "civic_movement_dissolved",
         "A liderança encerrou o movimento cívico e liberou seus participantes.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": option.id, "movement_id": movement.id},
         deltas=(_delta("civic_movement", movement.id, "stage", movement.stage, "dissolved"),
                 *(_delta("civic_movement", movement.id, f"participants:{member_id}", count, 0)
                   for member_id, count in sorted(movement.participants_by_group.items()))),
@@ -400,6 +494,8 @@ def declare_civic_rebellion(world, group_id, option_id, decision_event_id):
         candidate, "civic_rebellion_declared",
         "Um movimento cívico organizado declarou uma rebelião contra a administração local.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": option.id, "movement_id": movement.id},
         deltas=(_delta("civic_movement", movement.id, "stage", "active", "rebellion"),),
         cause_ids=_causes(decision.id, movement.last_event_id,
                           option.report_event_id, option.mobilization_event_id),
@@ -430,6 +526,8 @@ def declare_civic_revolution(world, group_id, option_id, decision_event_id):
         candidate, "civic_revolution_declared",
         "Uma rebelião organizada declarou uma revolução sob pressão material persistente.",
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                        "selected_affordance_id": option.id, "movement_id": movement.id},
         deltas=(_delta("civic_movement", movement.id, "stage", "rebellion", "revolution"),),
         cause_ids=_causes(decision.id, movement.last_event_id,
                           option.report_event_id, option.mobilization_event_id),
@@ -474,16 +572,35 @@ def respond_civic_rebellion(world, actor, option_id, decision_event_id):
         )
         offer_causes = tuple(item for item in (option.negotiation_stock_event_id,) if item)
     suppression_pressure = None
+    suppression_detachment = None
     if option.action == SUPPRESS_REBELLION_ACTION:
+        suppression_detachment = candidate.society.detachments.get(option.suppression_detachment_id)
+        if (suppression_detachment is None
+                or suppression_detachment.owner_ref != actor
+                or suppression_detachment.location_id != movement.settlement_id
+                or suppression_detachment.stage != "present"
+                or suppression_detachment.provisions <= 0):
+            raise ValueError("civic suppression requires a present supplied detachment")
         from .economy import apply_civic_suppression_pressure
         suppression_pressure = apply_civic_suppression_pressure(
             candidate, movement.settlement_id, suppression_event_id=decision.id)
+        deltas += (_delta("detachment", suppression_detachment.id, "provisions",
+                          suppression_detachment.provisions,
+                          suppression_detachment.provisions - 1),)
     event = record_event(
         candidate, event_type,
         ("A administração ofereceu uma negociação ao movimento cívico organizado."
          if next_stage == "negotiating" else
          "A administração suprimiu uma rebelião cívica organizada sob sua autoridade militar."),
         fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision.id,
+            "actor_ref": actor.to_dict(),
+            "selected_affordance_id": option.id,
+            "movement_id": movement.id,
+            **({"suppression_detachment_id": suppression_detachment.id,
+                "provisions_consumed": 1} if suppression_detachment is not None else {}),
+        },
         deltas=(*deltas, *offer_deltas),
         cause_ids=_causes(decision.id, movement.last_event_id, option.report_event_id,
                           *(offer_causes or (() if suppression_pressure is None else (suppression_pressure.id,)))),
@@ -496,8 +613,12 @@ def respond_civic_rebellion(world, actor, option_id, decision_event_id):
                 "negotiation_food": (option.negotiation_food
                                       if option.action == OFFER_NEGOTIATION_ACTION else 0),
                 "negotiation_offer_event_id": (event.id
-                                                if option.action == OFFER_NEGOTIATION_ACTION
-                                                and option.negotiation_food > 0 else None)})
+                                               if option.action == OFFER_NEGOTIATION_ACTION
+                                               and option.negotiation_food > 0 else None)})
+    if suppression_detachment is not None:
+        candidate.society.detachments[suppression_detachment.id] = suppression_detachment.model_copy(
+            update={"provisions": suppression_detachment.provisions - 1, "last_event_id": event.id}
+        )
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)
@@ -513,11 +634,11 @@ def suppress_civic_rebellion(world, actor, option_id, decision_event_id):
     return respond_civic_rebellion(world, actor, option.id, decision_event_id)
 
 
-__all__ = ["CivicMovementOption", "CivicMovementTerminalOption", "CivicRebellionOption", "CivicRevolutionOption",
+__all__ = ["CivicMovementOption", "CivicMovementJoinOption", "CivicMovementTerminalOption", "CivicRebellionOption", "CivicRevolutionOption",
            "CivicRebellionResponseOption", "MOVEMENT_ACTION", "REBELLION_ACTION",
            "SUPPRESS_REBELLION_ACTION", "OFFER_NEGOTIATION_ACTION", "REVOLUTION_ACTION",
            "civic_rebellion_options", "civic_revolution_options", "civic_rebellion_response_options",
            "declare_civic_rebellion", "declare_civic_revolution", "respond_civic_rebellion",
            "suppress_civic_rebellion",
-           "civic_movement_options", "civic_movement_dissolve_options",
-           "form_civic_movement", "dissolve_civic_movement"]
+           "civic_movement_options", "civic_movement_join_options", "civic_movement_dissolve_options",
+           "form_civic_movement", "join_civic_movement", "dissolve_civic_movement"]

@@ -36,7 +36,7 @@ class Activity(SocietyValue):
 
 def validate_activities(world) -> None:
     actors = set()
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     for activity_id, activity in world.activities.items():
         if not isinstance(activity, Activity) or activity_id != activity.id:
             raise ValueError("invalid activity registry")

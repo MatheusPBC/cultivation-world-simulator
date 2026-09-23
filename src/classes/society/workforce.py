@@ -31,9 +31,9 @@ class WorkforceTransition(SocietyValue):
     sponsor_ref: EntityRef
     demand_id: Identity
     notice_id: Identity
-    work_kind: Literal["facility", "repair", "customs"]
+    work_kind: Literal["facility", "repair", "customs", "research", "military_recruitment"]
     work_id: Identity
-    target_occupation: Literal["farmer", "artisan", "merchant"]
+    target_occupation: Literal["farmer", "artisan", "merchant", "soldier"]
     destination_settlement_id: Identity
     count: PositiveCount
     stipend_per_person: PositiveCount

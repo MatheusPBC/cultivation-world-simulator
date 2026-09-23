@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -15,9 +16,13 @@ from src.sim.medieval.force import (disband_detachment, establish_garrison, forc
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
+from src.sim.medieval.territorial_control import territorial_control_options
 
 OWNER = EntityRef("polity", "auren")
 HOME = "campomanso"
+# Auren already administers this settlement without occupying it: the seat
+# for a "defend" garrison that never needs an occupation fact.
+OWN_TARGET = "pedraclara"
 
 
 def decide(world, option):
@@ -60,6 +65,14 @@ TARGET = "salgueiro"
 def raised(world, destination=TARGET):
     option = next(item for item in raise_options(world, OWNER) if item.destination_id == destination)
     return option, raise_detachment(world, OWNER, option.id, decide(world, option).id)
+
+
+def marched_home(world, destination=OWN_TARGET):
+    option, detachment = raised(world, destination=destination)
+    while world.society.detachments[detachment.id].stage == "marching":
+        tick(world)
+    refresh_settlement_reports(world)
+    return option, world.society.detachments[detachment.id]
 
 
 def test_a_supplied_force_marches_and_occupies_without_taking_administration(tmp_path):
@@ -197,6 +210,17 @@ def test_supplied_occupation_can_establish_and_lose_garrison_for_lack_of_treasur
     establish_garrison(world, OWNER, garrison.id, decide(world, garrison).id)
     garrison_id = f"garrison:{detachment.id}"
     assert world.society.garrisons[garrison_id].stage == "active"
+    establish_event = next(item for item in reversed(world.events)
+                           if item.event_type == "garrison_established")
+    establish_decision = next(item for item in world.events
+                              if item.fact_kind is FactKind.DECISION
+                              and item.decision
+                              and item.decision.get("selected_affordance_id") == garrison.id)
+    assert establish_event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert establish_event.causal_payload == {
+        "decision_event_id": establish_decision.id,
+        "actor_ref": OWNER.to_dict(), "selected_affordance_id": garrison.id,
+    }
 
     tick(world)
     assert world.society.garrisons[garrison_id].stage == "active"
@@ -217,6 +241,69 @@ def test_supplied_occupation_can_establish_and_lose_garrison_for_lack_of_treasur
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
 
+def test_defend_garrison_is_available_at_the_actors_own_settlement_without_occupation(tmp_path):
+    world = soldier_world()
+    option, detachment = marched_home(world)
+
+    # No occupation is needed, offered or created at the actor's own,
+    # already-administered settlement.
+    assert world.society.settlements[OWN_TARGET].occupier_id is None
+    assert all(item.kind != "occupy" for item in force_options(world, OWNER))
+
+    garrison = next(item for item in garrison_options(world, OWNER) if item.kind == "defend")
+    assert garrison.decision()["action"] == "establish_garrison"
+    account = world.economy.accounts[garrison.account_id]
+    balance = account.balance
+    household_before = world.economy.accounts.get(
+        f"household:{detachment.source_group_id}",
+    ).balance
+    establish_garrison(world, OWNER, garrison.id, decide(world, garrison).id)
+    garrison_id = f"garrison:{detachment.id}"
+    assert world.society.garrisons[garrison_id].stage == "active"
+    # Establishing the defensive duty changed no occupation fact.
+    assert world.society.settlements[OWN_TARGET].occupier_id is None
+    # No administration is duplicated: an unoccupied, home-administered
+    # settlement never offers territorial control, defend duty or not.
+    assert not territorial_control_options(world, OWNER)
+
+    tick(world)
+    assert world.society.garrisons[garrison_id].stage == "active"
+    assert world.economy.accounts[garrison.account_id].balance == balance - garrison.daily_wage
+    household = world.economy.accounts[f"household:{detachment.source_group_id}"]
+    assert household.balance == household_before + garrison.daily_wage
+    assert any(item.event_type == "garrison_maintained" for item in world.events)
+
+    world.economy.accounts[garrison.account_id] = world.economy.accounts[garrison.account_id].model_copy(
+        update={"balance": 0})
+    tick(world)
+    assert world.society.garrisons[garrison_id].stage == "lapsed"
+    assert world.society.detachments[detachment.id].stage == "present"
+    assert any(item.event_type == "garrison_lapsed" for item in world.events)
+
+    path = tmp_path / "defend-garrison.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_defend_garrison_decays_once_the_actor_no_longer_administers_the_settlement():
+    world = soldier_world()
+    option, detachment = marched_home(world)
+    garrison = next(item for item in garrison_options(world, OWNER) if item.kind == "defend")
+    establish_garrison(world, OWNER, garrison.id, decide(world, garrison).id)
+    garrison_id = f"garrison:{detachment.id}"
+    assert world.society.garrisons[garrison_id].stage == "active"
+
+    # Administration of the settlement changes hands; the actor neither
+    # occupies nor administers it any more, and there is no automatic defense.
+    settlement = world.society.settlements[OWN_TARGET]
+    world.society.settlements[OWN_TARGET] = settlement.model_copy(update={"administrator_id": "escarlia"})
+
+    tick(world)
+    assert world.society.garrisons[garrison_id].stage == "lapsed"
+    assert world.society.detachments[detachment.id].stage == "present"
+    assert any(item.event_type == "garrison_lapsed" for item in world.events)
+
+
 def test_actor_can_withdraw_garrison_without_moving_column_or_administration():
     world = soldier_world()
     option, detachment = raised(world)
@@ -235,7 +322,17 @@ def test_actor_can_withdraw_garrison_without_moving_column_or_administration():
     assert world.society.detachments[detachment.id].stage == "present"
     assert world.society.settlements[current.location_id].occupier_id == OWNER.id
     assert world.society.settlements[current.location_id].administrator_id == administrator
-    assert any(item.event_type == "garrison_withdrawn" for item in world.events)
+    withdrawal_event = next(item for item in reversed(world.events)
+                            if item.event_type == "garrison_withdrawn")
+    withdrawal_decision = next(item for item in world.events
+                               if item.fact_kind is FactKind.DECISION
+                               and item.decision
+                               and item.decision.get("selected_affordance_id") == withdrawal.id)
+    assert withdrawal_event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert withdrawal_event.causal_payload == {
+        "decision_event_id": withdrawal_decision.id,
+        "actor_ref": OWNER.to_dict(), "selected_affordance_id": withdrawal.id,
+    }
 
 
 def test_actor_can_rotate_a_paid_garrison_without_changing_control(tmp_path):
@@ -250,7 +347,7 @@ def test_actor_can_rotate_a_paid_garrison_without_changing_control(tmp_path):
 
     group = next(item for item in world.society.population.values()
                  if item.settlement_id == HOME and item.occupation == "soldier")
-    replacement_group = group.model_copy(update={"id": "pop:campomanso:rotation:soldier", "people": "orc", "count": 5})
+    replacement_group = group.model_copy(update={"id": "pop:campomanso:orc:soldier", "people": "orc", "count": 5})
     world.society.population[replacement_group.id] = replacement_group
     arrival = record_event(world, "rotation_column_present", "Fixture de uma coluna de rotação abastecida.",
                            fact_kind=FactKind.STATE_TRANSITION,
@@ -271,6 +368,15 @@ def test_actor_can_rotate_a_paid_garrison_without_changing_control(tmp_path):
     assert world.society.settlements[TARGET].occupier_id == OWNER.id
     assert world.society.territorial_controls.get(f"territorial-control:{TARGET}") == old_control
     event = next(item for item in reversed(world.events) if item.event_type == "garrison_rotated")
+    rotation_decision = next(item for item in world.events
+                             if item.fact_kind is FactKind.DECISION
+                             and item.decision
+                             and item.decision.get("selected_affordance_id") == rotation.id)
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert event.causal_payload == {
+        "decision_event_id": rotation_decision.id,
+        "actor_ref": OWNER.to_dict(), "selected_affordance_id": rotation.id,
+    }
     assert any(delta.owner_id == f"garrison:{current.id}" and delta.after == "withdrawn"
                for delta in event.deltas)
     assert any(delta.owner_id == f"garrison:{replacement.id}" and delta.after == "active"

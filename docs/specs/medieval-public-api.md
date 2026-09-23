@@ -72,7 +72,7 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
 - GET query/economy: catálogo, estoques, contas, produção, últimas folhas salariais, necessidades, mercados,
   ordens pendentes, cargas, `customs_checkpoints` e `cargo_manifests`; ordens concluídas permanecem rastreáveis por eventos.
   O catálogo inclui `repair_blueprints`, `repairs`, contratos `employment_contracts`, postos civis de alfândega e manifestos
-  (economia schema 13); custos, limites de trabalhadores e salários são definidos pelo engine, não pelo cliente.
+  (economia schema 14); custos, limites de trabalhadores e salários são definidos pelo engine, não pelo cliente.
   Cada contrato também expõe o `work_site_id` próprio do empregador, a coorte,
   o resultado do último ciclo e os recibos causais; a projeção não cria nem
   renova vínculos.

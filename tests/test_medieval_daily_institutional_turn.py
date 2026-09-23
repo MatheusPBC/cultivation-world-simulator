@@ -6,8 +6,11 @@ owners and are deliberately not merged here.
 
 import json
 
+import pytest
+
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.institutional_agenda import daily_actors, review_daily_institutional_turn
 from src.sim.medieval.recourse_policy import REVIEW_KIND, _turn, recourse_adapters, review_id
@@ -30,6 +33,10 @@ def _provider(monkeypatch, answer, prompts):
 async def _world_with_due_review(monkeypatch, answer):
     world = wronged_world(due_day=28, expires_day=20)
     engine = MedievalSimulator(world)
+    # The setup itself crosses a diplomatic deadline.  Give that setup a
+    # declared provider response; the test's actual daily review is configured
+    # below and must not rely on an implicit deterministic fallback.
+    _provider(monkeypatch, ai_decider.NO_ACTION, [])
     await breached(world, engine)
     observe(world)
     prompts = []
@@ -57,6 +64,7 @@ async def test_a_scheduled_recourse_review_is_one_consultation_with_its_own_situ
 async def test_a_provider_answer_executes_through_the_own_executor(monkeypatch):
     world = wronged_world(due_day=28, expires_day=20)
     engine = MedievalSimulator(world)
+    _provider(monkeypatch, ai_decider.NO_ACTION, [])
     await breached(world, engine)
     observe(world)
     prompts = provider(monkeypatch, choose("marchar até Ferroalto"))
@@ -82,6 +90,7 @@ async def test_a_pending_creditor_is_rescheduled_for_tomorrow(monkeypatch):
 async def test_without_a_real_provider_nothing_is_claimed_or_consumed(monkeypatch):
     world = wronged_world(due_day=28, expires_day=20)
     engine = MedievalSimulator(world)
+    _provider(monkeypatch, ai_decider.NO_ACTION, [])
     await breached(world, engine)
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
     review = None
@@ -90,39 +99,37 @@ async def test_without_a_real_provider_nothing_is_claimed_or_consumed(monkeypatc
             review = item
     assert review is not None
 
-    claims, covered = await review_daily_institutional_turn(world, [review])
+    with pytest.raises(ProviderDecisionRequired, match="provider decision required"):
+        await review_daily_institutional_turn(world, [review])
 
-    assert claims == {} and covered == set()
 
-
-async def test_an_unavailable_provider_still_leaves_a_causal_receipt(monkeypatch):
+async def test_an_unavailable_provider_pauses_before_recording_a_turn(monkeypatch):
     world = wronged_world(due_day=28, expires_day=20)
     engine = MedievalSimulator(world)
+    _provider(monkeypatch, ai_decider.NO_ACTION, [])
     await breached(world, engine)
-    before = sum(1 for item in world.events if item.event_type == ai_decider.FAILED_EVENT)
+    before = tuple(world.events)
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
     review = next((item for item in world.agenda.pop_due(world.clock.absolute_day + 1)
                    if item.kind == REVIEW_KIND), None)
     assert review is not None
 
-    await review_daily_institutional_turn(world, [review])
-
-    receipts = [item for item in world.events if item.event_type == ai_decider.FAILED_EVENT]
-    assert len(receipts) == before + 1, "an un-asked day must still be visible in the causal record"
-    assert "indisponível" in receipts[-1].content
+    with pytest.raises(ProviderDecisionRequired, match="provider decision required"):
+        await review_daily_institutional_turn(world, [review])
+    assert tuple(world.events) == before
 
 
-async def test_the_standalone_turn_also_records_the_failed_receipt(monkeypatch):
+async def test_the_standalone_turn_also_pauses_without_a_provider(monkeypatch):
     world = wronged_world(due_day=28, expires_day=20)
     engine = MedievalSimulator(world)
+    _provider(monkeypatch, ai_decider.NO_ACTION, [])
     await breached(world, engine)
-    before = sum(1 for item in world.events if item.event_type == ai_decider.FAILED_EVENT)
+    before = tuple(world.events)
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
 
-    changed = await _turn(world, AUREN)
-
-    assert changed is False
-    assert sum(1 for item in world.events if item.event_type == ai_decider.FAILED_EVENT) == before + 1
+    with pytest.raises(ProviderDecisionRequired, match="provider decision required"):
+        await _turn(world, AUREN)
+    assert tuple(world.events) == before
 
 
 async def test_non_recourse_situations_start_no_daily_menu():

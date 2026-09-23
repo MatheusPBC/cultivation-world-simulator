@@ -8,6 +8,7 @@ import uuid
 from src.config.data_paths import get_data_paths
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval import persistence
 from .contracts import ErrorView, StatusView
 from .errors import RuntimeProblem
@@ -96,6 +97,12 @@ class MedievalRuntime:
             # Resolve the current configured directory at call time, not from a stale absolute path.
             self.simulator.save_path = self.save_path(self._auto_id)
             await self.simulator.step()
+        except ProviderDecisionRequired as exc:
+            raise self._fail(
+                "AI_DECISION_REQUIRED",
+                "A simulação foi pausada aguardando uma decisão válida do provedor de IA.",
+                exc,
+            ) from exc
         except Exception as exc:
             raise self._fail("STEP_FAILED", "O avanço falhou. O mundo anterior foi preservado e a simulação foi pausada.", exc) from exc
         self.last_error = None

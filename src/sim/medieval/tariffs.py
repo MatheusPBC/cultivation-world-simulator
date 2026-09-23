@@ -1,5 +1,6 @@
 """Origin-administered export tariffs over already-consented market sales."""
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -120,6 +121,12 @@ def set_export_tariff(world, option_id, *, decision_event_id):
     event = record_event(world, "export_tariff_changed",
                          f"Tarifa de exportação alterada para {option.export_rate_permille}/1000.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={
+                             "decision_event_id": decision.id,
+                             "actor_ref": actor.to_dict(),
+                             "selected_affordance_id": option.id,
+                         },
                          deltas=(_delta("tax_policy", policy.id, "export_rate_permille",
                                         policy.export_rate_permille, option.export_rate_permille),),
                          cause_ids=_causes(decision.id, policy.export_policy_event_id, policy.last_event_id, treasury.last_event_id,

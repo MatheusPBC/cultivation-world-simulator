@@ -19,7 +19,7 @@ from src.classes.society.models import Identity
 
 from .economy import _causes, _delta
 from .events import record_event
-from .espionage import _agents, _target_detects
+from .espionage import _agents, _target_detects, agent_is_marked
 from .institutional_decision_turn import DiscretionaryAdapter
 from .research import learn_technology
 
@@ -40,6 +40,7 @@ class TechnologyTheftOption:
     technology_id: Identity
     observation_event_id: Identity
     source_knowledge_event_id: Identity
+    operation_event_id: Identity
 
     def decision(self):
         return {"action": STEAL_ACTION, "actor_ref": self.actor_ref.to_dict(),
@@ -64,6 +65,7 @@ def _running_technology(world, site_id, owner_ref):
     if site is None or not site.enabled or site.integrity <= 0 or site.service_suspended:
         return ()
     result = []
+    events = world.event_index()
     known = {item.technology_id: item.event_id for item in world.knowledge.technologies.values()
              if item.owner_ref == owner_ref}
     for facility in sorted(world.economy.facilities.values(), key=lambda item: item.id):
@@ -73,17 +75,39 @@ def _running_technology(world, site_id, owner_ref):
         recipe = world.economy.recipes.get(facility.recipe_id)
         if stock is None or recipe is None or stock.owner_ref != owner_ref:
             continue
-        for technology_id, source_event_id in sorted(known.items()):
-            technology = world.research.technologies.get(technology_id)
-            if technology is not None and technology.capability_id in site.capability_ids:
-                result.append((technology_id, source_event_id))
+        if facility.max_batches <= 0 or facility.last_batches <= 0:
+            continue
+        technology_id = recipe.required_technology_id
+        technology = world.research.technologies.get(technology_id)
+        operation = events.get(facility.last_event_id)
+        production = (operation.causal_payload or {}).get("production") if operation is not None else None
+        if (technology_id not in known or technology is None
+                or technology.capability_id not in site.capability_ids
+                or operation is None or operation.event_type != "production_completed"
+                or not 0 <= world.clock.absolute_day - operation.day < REPORT_MAX_AGE
+                or not isinstance(production, dict)
+                or production.get("facility_id") != facility.id
+                or production.get("site_id") != site.id
+                or production.get("recipe_id") != recipe.id
+                or production.get("batches", 0) <= 0
+                or known[technology_id] not in {link.cause_event_id for link in operation.causal_links}):
+            continue
+        result.append((technology_id, known[technology_id], operation.id))
     return tuple(result)
 
 
 def _already_resolved(world, actor, agent, site_id, technology_id):
+    """Same rule as espionage, read through the same engine-owned helper.
+
+    A discovery marks the agent at that installation; an ordinary failure or
+    success only spends the day.
+    """
+    findings = world.knowledge.technology_theft_findings.values()
+    if agent_is_marked(world, agent, site_id, findings, lambda item: item.site_id):
+        return True
     return any(item.recipient_ref == actor and item.agent_ref == agent and item.site_id == site_id
                and item.technology_id == technology_id and item.learned_day == world.clock.absolute_day
-               for item in world.knowledge.technology_theft_findings.values())
+               for item in findings)
 
 
 def technology_theft_options(world, actor_ref):
@@ -108,7 +132,7 @@ def technology_theft_options(world, actor_ref):
             observation = _site_observation(world, actor_ref, site.id)
             if observation is None:
                 continue
-            for technology_id, source_event_id in _running_technology(world, site.id, target_owner):
+            for technology_id, source_event_id, operation_event_id in _running_technology(world, site.id, target_owner):
                 if world.knowledge.knows(actor_ref, technology_id):
                     continue
                 if not world.knowledge.has_current_technology_sighting(actor_ref, target_owner, technology_id, day):
@@ -116,10 +140,11 @@ def technology_theft_options(world, actor_ref):
                 if _already_resolved(world, actor_ref, agent_ref, site.id, technology_id):
                     continue
                 options.append(TechnologyTheftOption(
-                    id=f"technology-theft:{actor_ref.kind}:{actor_ref.id}:{agent.id}:{site.id}:{technology_id}:{observation[1].id}",
+                    id=f"technology-theft:{actor_ref.kind}:{actor_ref.id}:{agent.id}:{site.id}:{technology_id}:{observation[1].id}:{operation_event_id}",
                     actor_ref=actor_ref, agent_ref=agent_ref, site_id=site.id,
                     target_owner_ref=target_owner, technology_id=technology_id,
-                    observation_event_id=observation[1].id, source_knowledge_event_id=source_event_id))
+                    observation_event_id=observation[1].id, source_knowledge_event_id=source_event_id,
+                    operation_event_id=operation_event_id))
     return tuple(sorted(options, key=lambda item: item.id))
 
 
@@ -141,8 +166,11 @@ def execute_technology_theft(world, actor_ref, option_id, decision_event_id):
     require_authority(candidate, actor_ref, "diplomacy")
     agent = candidate.society.characters.get(option.agent_ref.id)
     site = candidate.map.infrastructure_sites.get(option.site_id)
-    if (agent is None or agent.death_day is not None or site is None or agent.location_id != next(
-            item.id for item in candidate.society.settlements.values() if item.region_id in site.region_ids)):
+    if agent is None or agent.death_day is not None or site is None:
+        raise ValueError("technology theft agent or site is no longer valid")
+    settlement = next((item for item in candidate.society.settlements.values()
+                       if item.region_id in site.region_ids), None)
+    if settlement is None or agent.location_id != settlement.id:
         raise ValueError("technology theft agent or site is no longer valid")
     observation = _site_observation(candidate, actor_ref, site.id)
     if observation is None or observation[1].id != option.observation_event_id:
@@ -153,16 +181,19 @@ def execute_technology_theft(world, actor_ref, option_id, decision_event_id):
     if source is None or not candidate.knowledge.has_current_technology_sighting(
             actor_ref, option.target_owner_ref, option.technology_id, candidate.clock.absolute_day):
         raise ValueError("technology theft source evidence is stale")
-    detected = _target_detects(candidate, EntityRef("settlement", next(
-        item.id for item in candidate.society.settlements.values() if item.region_id in site.region_ids)), option.target_owner_ref)
+    detected = _target_detects(candidate, EntityRef("settlement", settlement.id), option.target_owner_ref)
     result = "discovered" if detected else ("success" if agent.skills.investigation >= SUCCESS_STEAL_SKILL else "failure")
     finding_id = f"technology_theft_finding:{decision.id}"
-    causes = _causes(decision.id, option.observation_event_id, option.source_knowledge_event_id)
+    causes = _causes(decision.id, option.observation_event_id, option.source_knowledge_event_id,
+                     option.operation_event_id)
     learned_event_id = None
     if result == "success":
         learn_technology(candidate, actor_ref, option.technology_id, "stolen", causes)
-        learned_event_id = next(item.event_id for item in candidate.knowledge.technologies.values()
-                                if item.owner_ref == actor_ref and item.technology_id == option.technology_id)
+        learned = next((item for item in candidate.knowledge.technologies.values()
+                        if item.owner_ref == actor_ref and item.technology_id == option.technology_id), None)
+        if learned is None:
+            raise ValueError("technology theft did not record the learned technique")
+        learned_event_id = learned.event_id
     deltas = [_delta("technology_theft_finding", finding_id, "result", None, result)]
     if result == "success":
         deltas.extend((
@@ -192,7 +223,8 @@ def technology_theft_adapters():
     return (DiscretionaryAdapter(
         name="technology_theft", family="research", options_fn=technology_theft_options,
         label_fn=lambda option: f"Tentar obter a técnica {option.technology_id} na instalação observada.",
-        causes_fn=lambda _world, option: (option.observation_event_id, option.source_knowledge_event_id),
+        causes_fn=lambda _world, option: (option.observation_event_id, option.source_knowledge_event_id,
+                                          option.operation_event_id),
         execute_fn=lambda world, actor, option_id, decision_event_id:
             execute_technology_theft(world, actor, option_id, decision_event_id),
     ),)

@@ -17,6 +17,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+# The deterministic government profiles are provider-bound fixtures, not a
+# budget experiment.  The monthly menu now includes organizations and
+# population groups as well as polities, so the old eight-call allowance could
+# abort halfway through a valid fixture with ``ProviderDecisionRequired``.
+# Keep the allowance explicit and generous here; budget/latency behavior is
+# exercised by the separate provider probe and decision-turn tests.
+FIXTURE_AI_CALLS_PER_STEP = 256
 
 
 async def _run_smoke(*args, **kwargs):
@@ -38,21 +45,30 @@ def _audit(path: Path) -> dict:
         return audit(path)
 
 
+def _checkpoint_audits(result: dict) -> list[dict]:
+    return [_audit(Path(item["path"])) for item in result["checkpoints"]]
+
+
 async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, pressured: bool,
-                   economic: bool = False) -> dict:
+                   economic: bool = False, checkpoint_days: int | None = None) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     natural = []
     for seed in seeds:
         save = output_dir / f"natural-{seed}.mws"
-        result = await _run_smoke(seed, days, save)
-        natural.append({"result": result, "audit": _audit(save)})
+        result = await _run_smoke(seed, days, save, checkpoint_days=checkpoint_days)
+        checkpoint_audits = _checkpoint_audits(result)
+        natural.append({"result": result, "audit": _audit(save),
+                        "checkpoint_audits": checkpoint_audits})
 
     pressured_run = None
     if pressured:
         seed = seeds[0]
         save = output_dir / f"pressured-socorro-{seed}.mws"
-        result = await _run_smoke(seed, days, save, gov_profile="socorro")
-        pressured_run = {"result": result, "audit": _audit(save)}
+        result = await _run_smoke(seed, days, save, gov_profile="socorro",
+                                  ai_calls_per_step=FIXTURE_AI_CALLS_PER_STEP,
+                                  checkpoint_days=checkpoint_days)
+        pressured_run = {"result": result, "audit": _audit(save),
+                         "checkpoint_audits": _checkpoint_audits(result)}
 
     economic_run = None
     if economic:
@@ -64,8 +80,11 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
         for profile in ("desatento", "alivio", "mercado", "mobilidade"):
             save = output_dir / f"economic-{profile}-{seeds[0]}.mws"
             result = await _run_smoke(
-                seeds[0], days, save, gov_profile=profile)
-            comparison[profile] = {"result": result, "audit": _audit(save)}
+                seeds[0], days, save, gov_profile=profile,
+                ai_calls_per_step=FIXTURE_AI_CALLS_PER_STEP,
+                checkpoint_days=checkpoint_days)
+            comparison[profile] = {"result": result, "audit": _audit(save),
+                                   "checkpoint_audits": _checkpoint_audits(result)}
         quiet = comparison["desatento"]
         relief = comparison["alivio"]
         market = comparison["mercado"]
@@ -81,6 +100,9 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
             "resource_conserved": all(
                 item["result"]["money_conserved"] and item["result"]["all_resources_accounted"]
                 and item["result"]["save_load_equivalent"] and item["audit"]["ok"]
+                and all(audit["ok"] for audit in item["checkpoint_audits"])
+                and all(checkpoint["conservation"] and checkpoint["save_load_equivalent"]
+                        for checkpoint in item["result"]["checkpoints"])
                 for item in comparison.values()),
             "different_material_outcome": len({
                 (item["result"]["missing_food_total"], item["result"]["mean_health"],
@@ -94,17 +116,25 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
                                and economic_run["resource_conserved"]
                                and economic_run["different_material_outcome"])
 
-    natural_ok = all(item["audit"]["ok"] and item["result"]["save_load_equivalent"]
+    natural_ok = all(item["audit"]["ok"]
+                      and all(audit["ok"] for audit in item["checkpoint_audits"])
+                      and all(checkpoint["conservation"] and checkpoint["save_load_equivalent"]
+                              for checkpoint in item["result"]["checkpoints"])
+                      and item["result"]["save_load_equivalent"]
                       and item["result"]["money_conserved"]
                       and item["result"]["all_resources_accounted"] for item in natural)
     pressured_ok = (not pressured or (
         pressured_run["audit"]["ok"]
+        and all(audit["ok"] for audit in pressured_run["checkpoint_audits"])
+        and all(checkpoint["conservation"] and checkpoint["save_load_equivalent"]
+                for checkpoint in pressured_run["result"]["checkpoints"])
         and pressured_run["result"]["save_load_equivalent"]
         and pressured_run["result"]["aid_requests_total"] > 0
         and pressured_run["result"]["aid_fulfilled_total"] > 0
     ))
     return {
         "days": days,
+        "checkpoint_days": checkpoint_days,
         "seeds": list(seeds),
         "natural": natural,
         "pressured": pressured_run,
@@ -126,6 +156,8 @@ def main() -> int:
                         help="also run the socorro fixture and require aid request/fulfillment")
     parser.add_argument("--economic", action="store_true",
                         help="compare the same pressured seed with NO_ACTION and explicit relief policies")
+    parser.add_argument("--checkpoint-days", type=int, default=None,
+                        help="write and audit a distinct save at each positive multiple-of-30-day interval")
     args = parser.parse_args()
     try:
         seeds = tuple(int(item.strip()) for item in args.seeds.split(",") if item.strip())
@@ -133,8 +165,11 @@ def main() -> int:
         parser.error(f"invalid seed list: {exc}")
     if not seeds or args.days <= 0 or args.days % 30:
         parser.error("seeds must be non-empty and days must be a positive multiple of 30")
+    if args.checkpoint_days is not None and (args.checkpoint_days <= 0 or args.checkpoint_days % 30):
+        parser.error("checkpoint-days must be a positive multiple of 30")
     report = asyncio.run(run_gate(seeds, args.days, args.output_dir,
-                                  pressured=args.pressured, economic=args.economic))
+                                  pressured=args.pressured, economic=args.economic,
+                                  checkpoint_days=args.checkpoint_days))
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
 

@@ -70,7 +70,11 @@ def campaign_view(world):
                                 if getattr(clause, "settlement_id", None) is not None),
                                next((standoff.settlement_id for clause in proposal.clauses
                                      for standoff in world.society.force_standoffs.values()
-                                     if getattr(clause, "standoff_id", None) == standoff.id), None)),
+                                     if getattr(clause, "standoff_id", None) == standoff.id),
+                                    next((world.society.siege_campaigns[clause.campaign_id].settlement_id
+                                          for clause in proposal.clauses
+                                          if getattr(clause, "campaign_id", None) in world.society.siege_campaigns),
+                                         None))),
             proposer_ref=proposal.proposer_ref,
             counterparty_ref=proposal.counterparty_ref,
             status=proposal.status,
@@ -81,7 +85,7 @@ def campaign_view(world):
             last_event_id=proposal.last_event_id,
         )
         for proposal in ordered(world.relations.proposals)
-        if proposal.proposal_kind in {"force_deescalation", "administration_concession"}
+        if proposal.proposal_kind in {"force_deescalation", "administration_concession", "campaign_ceasefire"}
         and proposal.status in {"offered", "accepted"}
         and (proposal.status == "accepted" or proposal.expires_day >= world.clock.absolute_day)
     ]
@@ -409,7 +413,10 @@ def actor_dossier(world, actor_kind, actor_id):
         payload = {
             "id": event.id, "day": event.day, "event_type": event.event_type,
             "content": event.content, "fact_kind": event.fact_kind,
-            "deltas": [delta.model_dump(mode="json") for delta in event.deltas],
+            # StateDelta is a domain dataclass, not a Pydantic model.  Use its
+            # canonical wire representation so the actor-facing read model
+            # remains JSON-safe after a material event reaches the dossier.
+            "deltas": [delta.to_dict() for delta in event.deltas],
         }
         known_causes = [link.cause_event_id for link in event.causal_links
                         if link.cause_event_id in known_event_ids]

@@ -7,6 +7,7 @@ own bounded evidence, and all material authority remains in governance.authority
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.knowledge import authority_claim_notice_id
@@ -164,7 +165,8 @@ def all_options(world, actor):
 
 def _decision(world, event_id, action, actor):
     event = next((item for item in world.events if item.id == event_id), None)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.decision is None
+    if (event is None or event.day != world.clock.absolute_day
+            or event.fact_kind != FactKind.DECISION or event.decision is None
             or event.decision.get("action") != action
             or event.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("authority claim requires its exact canonical decision")
@@ -178,6 +180,14 @@ def _notice_targets(world, option, office):
         if settlement is not None:
             targets.update(EntityRef("polity", actor_id) for actor_id in settlement.claimant_ids)
     return tuple(sorted(targets, key=lambda item: (item.kind, item.id)))
+
+
+def _actor_transition_causality(option, decision):
+    return {
+        "decision_event_id": decision.id,
+        "actor_ref": option.actor_ref.to_dict(),
+        "selected_affordance_id": option.id,
+    }
 
 
 def _declare(world, option, decision):
@@ -199,6 +209,8 @@ def _declare(world, option, decision):
                     for recipient in targets)
     event = record_event(world, "authority_claim_declared", "Uma instituição declarou uma pretensão fundada em evidência canônica.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload=_actor_transition_causality(option, decision),
                          deltas=(_delta("authority_claim", claim.id, "stage", None, "declared"),
                                  *(_delta("authority_claim_notice", notice.id, "claim_id", None, claim.id)
                                    for notice in notices)),
@@ -214,6 +226,8 @@ def _withdraw(world, option, decision):
         raise ValueError("authority claim is no longer withdrawable")
     event = record_event(world, "authority_claim_withdrawn", "A instituição retirou sua própria pretensão.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload=_actor_transition_causality(option, decision),
                          deltas=(_delta("authority_claim", claim.id, "stage", "declared", "withdrawn"),),
                          cause_ids=(decision.id, claim.last_event_id))
     world.authority.claims[claim.id] = claim.model_copy(update={"stage": "withdrawn", "last_event_id": event.id})
@@ -235,6 +249,8 @@ def _recognize(world, option, decision):
                                        declared_day=world.clock.absolute_day, last_event_id="pending")
     event = record_event(world, "authority_claim_recognized", "Uma instituição reconheceu uma pretensão que recebeu diretamente.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload=_actor_transition_causality(option, decision),
                          deltas=(_delta("authority_recognition", identity, "stage",
                                         None if old is None else old.stage, "recognized"),),
                          cause_ids=(decision.id, option.evidence_event_id, claim.last_event_id))
@@ -249,6 +265,8 @@ def _withdraw_recognition(world, option, decision):
         raise ValueError("authority recognition is no longer withdrawable")
     event = record_event(world, "authority_recognition_withdrawn", "A instituição retirou seu reconhecimento de uma pretensão.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload=_actor_transition_causality(option, decision),
                          deltas=(_delta("authority_recognition", identity, "stage", "recognized", "withdrawn"),),
                          cause_ids=(decision.id, recognition.last_event_id))
     world.relations.authority_recognitions[identity] = recognition.model_copy(update={"stage": "withdrawn", "last_event_id": event.id})

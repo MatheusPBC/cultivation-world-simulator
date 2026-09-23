@@ -24,9 +24,23 @@ def conclude_obligation(world, obligation, status, material_event_id=None, extra
     # payment, teaching, freight, withdrawal or administration transition.
     remembering = ((proposal.proposer_ref, proposal.counterparty_ref)
                    if status in {'fulfilled', 'breached'} else ())
-    event = record_event(world, 'commitment_' + status, text, fact_kind=FactKind.STATE_TRANSITION,
+    event = record_event(
+        world,
+        'commitment_' + status,
+        text,
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={
+            'obligation_id': obligation.id,
+            'proposal_id': obligation.proposal_id,
+            'clause_index': obligation.clause_index,
+            'status': status,
+            'material_event_id': material_event_id,
+            'repudiated': repudiated,
+        },
         deltas=(_delta('obligation', obligation.id, 'status', obligation.status, status),
-                *memory_creation_deltas(world, remembering)), cause_ids=causes)
+                *memory_creation_deltas(world, remembering)),
+        cause_ids=causes,
+    )
     world.relations.obligations[obligation.id] = obligation.model_copy(update={
         'status':status, 'material_event_id':material_event_id,
         'breach_event_id': event.id if status == 'breached' else None,

@@ -8,7 +8,9 @@ from src.sim.medieval.institutional_memory import institutional_view
 from src.sim.medieval.procurement import review_supply
 from src.sim.medieval.reciprocal_supply import (fulfill_resource_transfer, reciprocal_response_options,
                                                 reciprocal_supply_options, offer_reciprocal_supply,
-                                                resource_transfer_options, respond_reciprocal_supply)
+                                                resource_transfer_options, respond_reciprocal_supply,
+                                                remediate_resource_transfer,
+                                                resource_transfer_remediation_options)
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.systems.calendar_agenda import ScheduledSituation
 from tests.test_medieval_institutional_aid import PROVIDER, REQUESTER, prepared_world
@@ -116,3 +118,28 @@ def test_an_unmet_delivery_breaches_with_evidence_and_closes_that_partner():
     # no longer offered while the remembered breach still weighs.
     refresh_route_reports(world)
     assert not any(item.counterparty_ref == PROVIDER for item in reciprocal_supply_options(world, REQUESTER))
+
+
+def test_non_aid_resource_transfer_can_be_repaired_by_a_fresh_owner_decision():
+    world = scarce_world()
+    _, agreement = accepted_commitment(world)
+    delivery = agreement.clauses[0]
+    obligation_id = f"{agreement.id}:term:0"
+    world.clock = world.clock.advance(delivery.due_day + 1 - world.clock.absolute_day)
+    resolve_diplomacy(world, [ScheduledSituation(obligation_id, "diplomacy", world.clock.absolute_day)])
+
+    refresh_route_reports(world)
+    options = resource_transfer_remediation_options(world, PROVIDER)
+    assert options and all(item.obligation_id == obligation_id for item in options)
+    option = options[0]
+    decision = decide(world, option)
+    before_breach = world.relations.obligations[obligation_id].breach_event_id
+    order = remediate_resource_transfer(world, PROVIDER, option.id, decision.id)
+
+    obligation = world.relations.obligations[obligation_id]
+    assert obligation.status == "remediated"
+    assert obligation.breach_event_id == before_breach
+    assert obligation.remediation_material_event_id == order.last_event_id
+    receipt = next(item for item in world.events if item.event_type == "resource_transfer_remediated")
+    assert decision.id in {link.cause_event_id for link in receipt.causal_links}
+    assert before_breach in {link.cause_event_id for link in receipt.causal_links}

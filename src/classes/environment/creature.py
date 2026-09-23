@@ -123,7 +123,7 @@ class CreatureState:
     def validate(self, world=None) -> None:
         if not isinstance(self.creatures, dict) or not isinstance(self.demands, dict):
             raise ValueError("invalid creature registries")
-        events = {event.id: event for event in world.events} if world is not None else {}
+        events = world.event_index() if world is not None else {}
         for key, creature in self.creatures.items():
             if not isinstance(creature, Creature) or key != creature.id or not creature.route_ids:
                 raise ValueError("invalid creature registry entry")

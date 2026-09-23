@@ -1,10 +1,64 @@
 """Monthly employment settlement over canonical population and money accounts."""
 
+import hashlib
+
 from src.classes.economy.models import MoneyAccount, Payroll
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from .events import record_event
+
+
+def _income_withholding(amounts, rate_permille):
+    """Allocate one aggregate income-tax rounding remainder deterministically.
+
+    Tax is defined over the gross payroll, not independently over each cohort.
+    Per-account floor division can otherwise erase a legitimate small tax
+    (for example, two households earning 2 and 8 with a 10% rate).  The
+    fractional remainders decide who receives the bounded final units; they do
+    not change the aggregate amount or create money.
+    """
+    if not amounts or rate_permille <= 0:
+        return {account_id: 0 for account_id in amounts}, 0
+    denominator = 1000
+    numerators = {account_id: amount * rate_permille for account_id, amount in amounts.items()}
+    total = sum(numerators.values()) // denominator
+    taxes = {account_id: numerator // denominator for account_id, numerator in numerators.items()}
+    remainder = total - sum(taxes.values())
+    if remainder:
+        ranked = sorted(
+            numerators,
+            key=lambda account_id: (-(numerators[account_id] % denominator), account_id),
+        )
+        for account_id in ranked[:remainder]:
+            taxes[account_id] += 1
+    return taxes, total
+
+
+def _rotated_groups(world, *, work_id, settlement_id, occupation, excluded=()):
+    """Return a stable, month-rotated order for flexible labor allocation.
+
+    Production is an Economy-owned material settlement, so it may choose a
+    deterministic allocation when several equivalent cohorts can fill the
+    same payroll.  Always sorting by cohort ID concentrated every wage in the
+    first cohort forever; rotating the starting point by the authored month
+    spreads the same real wage demand without creating labor, money, or food.
+    Required specialists remain handled separately by ``settle_work``.
+    """
+    excluded = set(excluded)
+    groups = sorted(
+        (group for group in world.society.population.values()
+         if group.id not in excluded
+         and group.settlement_id == settlement_id
+         and group.occupation == occupation),
+        key=lambda group: group.id,
+    )
+    if len(groups) <= 1:
+        return groups
+    month = world.clock.absolute_day // 30
+    digest = hashlib.sha256(f"{work_id}:{month}".encode("utf-8")).digest()
+    offset = int.from_bytes(digest[:8], "big") % len(groups)
+    return groups[offset:] + groups[:offset]
 
 
 def set_income_tax(world, polity_id, income_rate, *, decision_event_id):
@@ -56,12 +110,13 @@ def settle_work(world, *, work_id, account_id, stock_id, occupation, worker_coun
             raise ValueError('required specialist is not available for payroll')
         allocations[group_id] = count
         remaining -= count
-    for group in sorted(world.society.population.values(), key=lambda g: g.id):
-        if group.settlement_id == stock.location_id and group.occupation == occupation:
-            count = min(remaining, available[group.id] - allocations.get(group.id, 0))
-            if count:
-                allocations[group.id] = allocations.get(group.id, 0) + count
-                remaining -= count
+    for group in _rotated_groups(
+            world, work_id=work_id, settlement_id=stock.location_id,
+            occupation=occupation, excluded=allocations):
+        count = min(remaining, available[group.id] - allocations.get(group.id, 0))
+        if count:
+            allocations[group.id] = allocations.get(group.id, 0) + count
+            remaining -= count
     if remaining:
         raise ValueError("insufficient payroll workforce")
     gross = sum(allocations.values()) * wage
@@ -97,8 +152,7 @@ def settle_work(world, *, work_id, account_id, stock_id, occupation, worker_coun
         policy = world.authority.tax_policies.get(government)
         ref = EntityRef("polity", government) if government else None
         if policy and can_actor_act_for(world, ref, ref, "taxation"):
-            taxes = {aid: amount * policy.income_rate // 1000 for aid, amount in amounts.items()}
-            tax_total = sum(taxes.values())
+            taxes, tax_total = _income_withholding(amounts, policy.income_rate)
             if tax_total:
                 treasury = economy.accounts[policy.account_id]
                 event = record_event(world, "income_tax_collected", f"Imposto sobre salários: {tax_total} unidades arrecadadas.",

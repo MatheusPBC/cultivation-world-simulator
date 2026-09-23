@@ -10,6 +10,7 @@ from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.institutional_decision_turn import (
     DECLINED_DECISION_EVENT_TYPE,
     DiscretionaryAdapter,
@@ -175,32 +176,44 @@ async def test_claim_fn_aggregates_by_kind_across_adapters(monkeypatch):
     assert covered is True
 
 
-async def test_unavailable_provider_claims_nothing_generic(monkeypatch):
+async def test_unavailable_provider_requires_a_paused_decision(monkeypatch):
     world = enable(create_medieval_world(73))
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
     adapters = (toy_adapter("x", claim="kind_x"),)
 
-    claims, covered = await review_institutional_decision_turn(world, AUREN, adapters)
-
-    assert claims == {} and covered is False
+    with pytest.raises(ProviderDecisionRequired):
+        await review_institutional_decision_turn(world, AUREN, adapters)
 
 
 async def test_selected_option_dispatches_to_its_own_adapter_executor(monkeypatch):
     world = enable(create_medieval_world(73))
     executed = []
-    adapters = (toy_adapter("a", ids=("a:1",), executed=executed),
-               toy_adapter("b", ids=("b:1",), executed=executed))
+    recompositions = {"a": 0, "b": 0}
+    a = toy_adapter("a", ids=("a:1",), executed=executed)
+    b = toy_adapter("b", ids=("b:1",), executed=executed)
+    adapters = tuple(
+        DiscretionaryAdapter(
+            name=adapter.name,
+            options_fn=lambda world, actor, key=adapter.name, fn=adapter.options_fn:
+                (recompositions.__setitem__(key, recompositions[key] + 1) or fn(world, actor)),
+            label_fn=adapter.label_fn, causes_fn=adapter.causes_fn,
+            execute_fn=adapter.execute_fn, claim_fn=adapter.claim_fn,
+        )
+        for adapter in (a, b)
+    )
     provider(monkeypatch, {"selected_id": "b:1"})
 
     claims, covered = await review_institutional_decision_turn(world, AUREN, adapters)
 
     assert executed == ["b:1"], "only the chosen option's own adapter executes"
+    assert recompositions == {"a": 1, "b": 2}, \
+        "revalidation recomposes only the selected option's owner adapter"
     decision = next(e for e in world.events if e.event_type == "institutional_decision_turn_decided")
     assert decision.fact_kind == FactKind.DECISION
     assert decision.decision == {"action": "b", "toy_id": "b:1"}
 
 
-async def test_selected_id_that_becomes_stale_is_a_blocked_receipt_without_mutation(monkeypatch):
+async def test_selected_id_that_becomes_stale_pauses_ai_without_material_mutation(monkeypatch):
     world = enable(create_medieval_world(73))
     state = {"open": True}
     executed = []
@@ -225,12 +238,65 @@ async def test_selected_id_that_becomes_stale_is_a_blocked_receipt_without_mutat
                                    causes_fn=lambda world, option: (),
                                    execute_fn=lambda *args: executed.append(True))
 
-    claims, covered = await review_institutional_decision_turn(world, AUREN, (adapter,))
+    with pytest.raises(ProviderDecisionRequired, match="stale affordance"):
+        await review_institutional_decision_turn(world, AUREN, (adapter,))
 
-    assert claims == {} and covered is True and executed == []
-    blocked = [event for event in world.events if event.event_type == STALE_AFFORDANCE_EVENT_TYPE]
-    assert len(blocked) == 1 and blocked[0].deltas == ()
+    assert executed == []
+    assert not any(event.event_type == STALE_AFFORDANCE_EVENT_TYPE for event in world.events)
     assert not any(event.event_type == "institutional_decision_turn_decided" for event in world.events)
+
+
+async def test_invented_id_is_rejected_without_recomposing_any_owner(monkeypatch):
+    world = enable(create_medieval_world(73))
+    recompositions = {"a": 0, "b": 0}
+    executed = []
+
+    def adapter(name, option_id):
+        def options_fn(_world, _actor):
+            recompositions[name] += 1
+            class Option:
+                id = option_id
+
+                def decision(self):
+                    return {"action": name, "selected_affordance_id": self.id}
+            return (Option(),)
+
+        return DiscretionaryAdapter(
+            name=name, options_fn=options_fn, label_fn=lambda option: option.id,
+            causes_fn=lambda *_args: (),
+            execute_fn=lambda *_args: executed.append(name))
+
+    provider(monkeypatch, {"selected_id": "invented:999"})
+
+    with pytest.raises(ProviderDecisionRequired, match="selected affordance is unknown"):
+        await review_institutional_decision_turn(
+            world, AUREN, (adapter("a", "a:1"), adapter("b", "b:1")))
+
+    assert recompositions == {"a": 1, "b": 1}
+    assert executed == []
+    assert not any(event.deltas for event in world.events)
+    assert not any(event.event_type == "institutional_decision_turn_decided"
+                   for event in world.events)
+
+
+async def test_owner_rejection_pauses_ai_instead_of_becoming_silent_no_action(monkeypatch):
+    world = enable(create_medieval_world(73))
+    provider(monkeypatch, {"selected_id": "rejected:1"})
+
+    class Option:
+        id = "rejected:1"
+
+        def decision(self):
+            return {"action": "rejected", "selected_affordance_id": self.id}
+
+    adapter = DiscretionaryAdapter(
+        name="rejected", options_fn=lambda _world, _actor: (Option(),),
+        label_fn=lambda _option: "Opção rejeitada.", causes_fn=lambda *_args: (),
+        execute_fn=lambda *_args: (_ for _ in ()).throw(ValueError("owner rejected")),
+    )
+
+    with pytest.raises(ProviderDecisionRequired, match="stale affordance"):
+        await review_institutional_decision_turn(world, AUREN, (adapter,))
 
 
 async def test_no_action_records_decision_only_when_actually_askable(monkeypatch):
@@ -255,15 +321,14 @@ async def test_no_action_records_decision_only_when_actually_askable(monkeypatch
     # ai_decision_declined stays the receipt of the consultation, untouched.
     assert any(e.event_type == "ai_decision_declined" for e in world.events)
 
-    # Technical failure: no provider means the actor was never actually
-    # consulted -- no decision of either kind, and nothing is claimed.
+    # Technical failure now aborts the AI candidate; the runtime owns the
+    # pause/error surface instead of silently treating it as a missed turn.
     world2 = enable(create_medieval_world(73))
     monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
     adapters2 = (toy_adapter("a", ids=("a:1",), claim="kind_a"),)
 
-    claims2, covered2 = await review_institutional_decision_turn(world2, AUREN, adapters2)
-
-    assert claims2 == {} and covered2 is False
+    with pytest.raises(ProviderDecisionRequired):
+        await review_institutional_decision_turn(world2, AUREN, adapters2)
     assert not any(e.event_type == DECLINED_DECISION_EVENT_TYPE for e in world2.events)
     assert not any(e.fact_kind == FactKind.DECISION for e in world2.events)
 

@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import asyncio
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -416,9 +417,9 @@ def _call_codex(
     output_schema: dict[str, object] | None = None,
 ) -> str:
     """Call the authenticated Codex CLI without exposing OAuth tokens."""
-    codex_bin = os.environ.get("CWS_CODEX_BIN", "/usr/local/bin/codex")
+    codex_bin = os.environ.get("CWS_CODEX_BIN") or shutil.which("codex") or "/usr/local/bin/codex"
     node_bin = os.environ.get("CWS_CODEX_NODE", "")
-    codex_home = os.environ.get("CWS_CODEX_HOME", "/codex-home")
+    codex_home = os.environ.get("CWS_CODEX_HOME")
 
     with tempfile.NamedTemporaryFile(prefix="cws-codex-", suffix=".txt", delete=False) as output_file:
         output_path = output_file.name
@@ -454,7 +455,11 @@ def _call_codex(
         command.extend(["--output-schema", schema_path])
 
     environment = os.environ.copy()
-    environment["CODEX_HOME"] = codex_home
+    # Docker provides CWS_CODEX_HOME for its mounted OAuth volume.  A local
+    # invocation should retain the authenticated CLI's ordinary default
+    # instead of forcing the container-only /codex-home path.
+    if codex_home:
+        environment["CODEX_HOME"] = codex_home
 
     try:
         completed = subprocess.run(

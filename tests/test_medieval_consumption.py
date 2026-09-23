@@ -57,7 +57,17 @@ def test_families_pay_only_whole_received_rations_and_unpaid_demand_stays_missin
             group.id for group in world.society.population.values()
             if group.settlement_id == "pedraclara"
         ),
-    }
+            "unaffordable_by_group": {
+                group.id: (world.society.available_count(group.id) - (2 if account_id == f"household:{group.id}" else 0))
+                for group in world.society.population.values()
+                if group.settlement_id == "pedraclara"
+            },
+            "unmet_by_group": {
+                group.id: (world.society.available_count(group.id) - (2 if account_id == f"household:{group.id}" else 0))
+                for group in world.society.population.values()
+                if group.settlement_id == "pedraclara"
+            },
+        }
 
 
 def test_empty_granary_cannot_charge_savings():

@@ -35,6 +35,37 @@ def test_campaign_view_hides_expired_unanswered_political_offer():
     assert all(item.id != proposal.id for item in campaign_view(world).political_settlements)
 
 
+def test_campaign_view_exposes_ceasefire_as_live_material_settlement(monkeypatch):
+    from src.server.medieval.queries import campaign_view
+    from tests.test_medieval_siege_campaign import (
+        ATTACKER, DEFENDER, OTHER_EXIT, siege_world, decide,
+    )
+    from src.sim.medieval.campaign_ceasefire import (
+        campaign_ceasefire_offer_options, offer_campaign_ceasefire,
+    )
+    from src.sim.medieval.siege_campaign import begin_siege_campaign
+    from src.sim.medieval.force import WithdrawalOption
+    world, _, garrison_id, siege_option = siege_world()
+    begin_siege_campaign(world, ATTACKER, siege_option.id, decide(world, siege_option).id)
+    defender_id = world.society.garrisons[garrison_id].detachment_id
+    monkeypatch.setattr(
+        "src.sim.medieval.campaign_ceasefire.withdrawal_options",
+        lambda *_args, **_kwargs: (WithdrawalOption(
+            id=f"withdraw:{defender_id}:observatory", actor_ref=DEFENDER,
+            detachment_id=defender_id, destination_id="brumafria", route_ids=(OTHER_EXIT,)),),
+    )
+    offer = next(item for item in campaign_ceasefire_offer_options(world, DEFENDER)
+                 if item.kind == "mutual")
+    proposal = offer_campaign_ceasefire(world, DEFENDER, offer.id, decide(world, offer).id)
+
+    settlement = next(item for item in campaign_view(world).political_settlements
+                      if item.id == proposal.id)
+    assert settlement.proposal_kind == "campaign_ceasefire"
+    assert settlement.settlement_id == "ferroalto"
+    assert settlement.status == "offered"
+    assert settlement.clause_kinds == ["campaign_withdrawal", "campaign_withdrawal"]
+
+
 def test_campaign_view_projects_creature_habitat_stress_from_canonical_ecology():
     from src.classes.event import FactKind
     from src.classes.state_delta import StateDelta
@@ -187,6 +218,7 @@ async def test_route_reports_are_consistent_across_queries_and_reading_mutates_n
 @pytest.mark.asyncio
 async def test_observatory_projects_canonical_campaign_threat_and_claim_without_teaching_actors(tmp_path):
     """The Dao may inspect live campaign state without turning it into knowledge."""
+    from src.classes.causal_origin import CausalOrigin
     from src.classes.event import FactKind
     from src.run.medieval_creatures import DRAKE_ID
     from src.sim.medieval.authority_claims import authority_claim_options, execute_option as execute_claim
@@ -206,7 +238,16 @@ async def test_observatory_projects_canonical_campaign_threat_and_claim_without_
     world.society.detachments[detachment_id] = detachment.model_copy(update={"provisions": 1000})
     claim_option = next(option for option in authority_claim_options(world, OWNER)
                         if option.evidence_kind == "held_occupation")
-    execute_claim(world, OWNER, claim_option.id, decide(world, claim_option).id)
+    claim_decision = decide(world, claim_option)
+    execute_claim(world, OWNER, claim_option.id, claim_decision.id)
+    claim_event = next(item for item in reversed(world.events)
+                       if item.event_type == "authority_claim_declared")
+    assert claim_event.causal_origin == CausalOrigin.ACTOR_DECISION
+    assert claim_event.causal_payload == {
+        "decision_event_id": claim_decision.id,
+        "actor_ref": OWNER.to_dict(),
+        "selected_affordance_id": claim_option.id,
+    }
 
     # Build a validated pending threat from the same existing drake/site rules.
     # The observation endpoint must read it but never distribute its full state.
@@ -276,6 +317,28 @@ async def test_observatory_projects_canonical_campaign_threat_and_claim_without_
 
 
 @pytest.mark.asyncio
+async def test_authority_claim_rejects_a_prior_day_decision_without_mutation():
+    from src.sim.medieval.authority_claims import authority_claim_options, execute_option as execute_claim
+    from src.sim.medieval.force import force_options, occupy_settlement
+    from src.sim.medieval.persistence import world_snapshot
+    from tests.test_medieval_campaign_supply import OWNER, campaign_world, decide
+
+    world, _ = await campaign_world()
+    occupy = next(item for item in force_options(world, OWNER) if item.kind == "occupy")
+    occupy_settlement(world, OWNER, occupy.id, decide(world, occupy).id)
+    option = next(item for item in authority_claim_options(world, OWNER)
+                  if item.evidence_kind == "held_occupation")
+    decision = decide(world, option)
+    world.clock = world.clock.advance(1)
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="exact canonical decision"):
+        execute_claim(world, OWNER, option.id, decision.id)
+
+    assert world_snapshot(world) == before
+
+
+@pytest.mark.asyncio
 async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(tmp_path):
     """A Dao read joins completed sale evidence, without making it actor knowledge."""
     from src.sim.medieval.persistence import SCHEMA, load_world, save_world, world_snapshot
@@ -295,9 +358,9 @@ async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(
     payment_event_id = world.economy.payments[request.id]
     learned = next(item for item in world.knowledge.technologies.values()
                    if item.owner_ref == BUYER and item.technology_id == option.technology_id)
-    save_path = tmp_path / "sale-schema-60.mws"
+    save_path = tmp_path / "sale-schema-66.mws"
     save_world(world, save_path)
-    assert SCHEMA == 60
+    assert SCHEMA == 66
     world = load_world(save_path)
 
     app = create_app(save_dir=lambda: tmp_path / "runtime")

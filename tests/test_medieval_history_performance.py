@@ -3,6 +3,7 @@
 import copy
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
@@ -72,6 +73,19 @@ def test_recording_a_cause_addresses_its_event_without_traversing_the_history():
     assert world.events.traversals == 0
 
 
+def test_actor_transition_requires_a_real_decision_cause_at_record_time():
+    world = create_medieval_world(73)
+    with pytest.raises(ValueError, match="real decision cause"):
+        record_event(
+            world,
+            "unauthored_actor_transition",
+            "Não deve ser aceito.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            deltas=(StateDelta(owner_kind="stock", owner_id="s", aspect="food", before="1", after="2"),),
+        )
+
+
 def test_transaction_copy_shares_only_the_validated_event_prefix_and_isolates_state():
     world = create_medieval_world(73)
     event = record_event(world, "observed", "Fato existente.")
@@ -116,6 +130,107 @@ def test_transaction_copy_isolates_registry_values_and_config_budget():
     assert candidate.economy.stocks[stock.id].goods != world.economy.stocks[stock.id].goods
     assert candidate.society.population[population.id].count != world.society.population[population.id].count
     assert world.config.institutional_actions_consumed == {}
+
+
+def test_transaction_copy_shares_frozen_knowledge_values_but_not_registries():
+    from src.classes.governance.models import KnowledgeReport
+    from src.classes.mechanical_language import EntityRef
+
+    world = create_medieval_world(73)
+    report = KnowledgeReport(
+        id="report:test", recipient_ref=EntityRef("polity", "valedouro"),
+        publisher_ref=EntityRef("polity", "valedouro"), stock_id="stock:test",
+        resource_id="food", kind="inventory", channel="administrative_report",
+        observed_day=0, quantity=1, population=1, unit_price=1, quote_day=0,
+        export_rate_permille=0, export_policy_event_id=None, export_collector_ref=None,
+        event_id="event:1",
+    )
+    world.knowledge.reports[report.id] = report
+    object.__setattr__(world.knowledge, "_semantic_validation_key", ("sentinel",))
+    world.knowledge.for_actor(EntityRef("polity", "valedouro"))
+
+    candidate = world.transaction_copy()
+
+    assert candidate.knowledge is not world.knowledge
+    assert candidate.knowledge.reports is not world.knowledge.reports
+    assert candidate.knowledge.reports["report:test"] is world.knowledge.reports["report:test"]
+    assert candidate.knowledge._semantic_validation_key is None
+    assert candidate.knowledge._query_cache is not world.knowledge._query_cache
+    assert candidate.knowledge._registry_epochs == world.knowledge._registry_epochs
+    assert candidate.knowledge._query_cache["reports"][1][("polity", "valedouro")] is \
+        world.knowledge._query_cache["reports"][1][("polity", "valedouro")]
+
+    replacement = candidate.knowledge.reports["report:test"].model_copy(update={"quantity": 1})
+    candidate.knowledge.reports["report:test"] = replacement
+    assert world.knowledge.reports["report:test"] is not replacement
+
+
+def test_knowledge_semantic_validation_cache_is_invalidated_by_new_facts():
+    world = create_medieval_world(73)
+    world.knowledge.validate(world)
+    first_key = world.knowledge._semantic_validation_key
+    first_structural_epoch = world.knowledge._structural_validation_epoch
+    assert first_structural_epoch == world.knowledge._registry_epoch
+
+    # Revalidating an unchanged canonical snapshot is the fast path used by
+    # nested owners in one transaction.
+    world.knowledge.validate(world)
+    assert world.knowledge._semantic_validation_key == first_key
+
+    record_event(world, "observed", "Novo fato invalida a validação transitória.")
+    world.knowledge.validate(world)
+    assert world.knowledge._semantic_validation_key != first_key
+    assert world.knowledge._structural_validation_epoch == world.knowledge._registry_epoch
+
+
+def test_knowledge_semantic_validation_cache_is_invalidated_by_registry_replacement():
+    world = create_medieval_world(73)
+    world.knowledge.validate(world)
+    first_key = world.knowledge._semantic_validation_key
+    first_structural_epoch = world.knowledge._structural_validation_epoch
+    world.knowledge.technologies["invalid"] = next(iter(world.knowledge.technologies.values())) \
+        if world.knowledge.technologies else None
+    if "invalid" in world.knowledge.technologies:
+        with pytest.raises(ValueError):
+            world.knowledge.validate(world)
+    else:
+        # The generated world may start without technical knowledge; replacing
+        # any registry value still changes the validation identity.
+        world.knowledge.reports["invalid"] = object()
+        with pytest.raises(ValueError):
+            world.knowledge.validate(world)
+    assert world.knowledge._semantic_validation_key == first_key
+    assert world.knowledge._structural_validation_epoch == first_structural_epoch
+
+
+def test_knowledge_actor_query_cache_keeps_independent_registry_indexes():
+    world = create_medieval_world(73)
+    actor = next(iter(world.society.polities))
+    from src.classes.mechanical_language import EntityRef
+
+    actor_ref = EntityRef("polity", actor)
+    world.knowledge.for_actor(actor_ref)
+    world.knowledge.routes_for_actor(actor_ref)
+    world.knowledge.for_actor(actor_ref)
+
+    assert set(world.knowledge._query_cache) >= {"reports", "route_reports"}
+
+
+def test_knowledge_actor_query_cache_ignores_writes_to_other_registries():
+    world = create_medieval_world(73)
+    actor = next(iter(world.society.polities))
+    from src.classes.mechanical_language import EntityRef
+
+    actor_ref = EntityRef("polity", actor)
+    first = world.knowledge.for_actor(actor_ref)
+    reports_epoch = world.knowledge._registry_epochs["reports"]
+
+    # A notice write must not invalidate an index built from reports.  The
+    # registry epochs are intentionally per-domain rather than global.
+    world.knowledge.notices["notice:unrelated"] = object()
+
+    assert world.knowledge._registry_epochs["reports"] == reports_epoch
+    assert world.knowledge.for_actor(actor_ref) is first
 
 
 def test_transaction_copy_isolates_map_runtime_but_shares_authored_topology():

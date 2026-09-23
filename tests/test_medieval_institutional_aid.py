@@ -4,8 +4,10 @@ from dataclasses import replace
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
+from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
 from src.sim.medieval.institutional_aid import (
@@ -20,6 +22,7 @@ from src.sim.medieval.institutional_aid import (
 )
 from src.sim.medieval.commitments import resolve_diplomacy
 from src.sim.medieval.logistics import resolve_parcels
+from src.sim.medieval.relief import distribute_relief, relief_settlement_options
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.systems.calendar_agenda import ScheduledSituation
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -47,6 +50,27 @@ def decision(world, option, event_type):
     event = record_event(world, event_type, "Decisão institucional.", fact_kind=FactKind.DECISION,
                          decision=option.decision())
     return event
+
+
+def provider_decision(world, option, event_type):
+    return record_event(world, event_type, "Decisão institucional do provedor.",
+                        fact_kind=FactKind.DECISION,
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision())
+
+
+def assert_actor_authored_material_events(world, order, receipt_type, decision_event, option):
+    expected = {
+        "decision_event_id": decision_event.id,
+        "actor_ref": option.actor_ref.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    opened = next(event for event in world.events if event.id == order.last_event_id)
+    receipt = next(event for event in world.events if event.event_type == receipt_type)
+    for event in (opened, receipt):
+        assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+        assert event.causal_payload == expected
+        assert set(event.causal_payload) == set(expected)
 
 
 def test_aid_chain_hides_terms_until_provider_and_fulfills_real_freight(tmp_path):
@@ -97,8 +121,45 @@ def test_aid_chain_hides_terms_until_provider_and_fulfills_real_freight(tmp_path
     assert world.relations.obligations[obligation_id].status == "fulfilled"
     fulfillment = next(e for e in world.events if e.event_type == "institutional_aid_fulfilled")
     assert order.last_event_id in {link.cause_event_id for link in fulfillment.causal_links}
+    opened = next(event for event in world.events if event.id == order.last_event_id)
+    assert opened.causal_origin is CausalOrigin.DETERMINISTIC
+    assert fulfillment.causal_origin is CausalOrigin.DETERMINISTIC
+    assert opened.causal_payload is fulfillment.causal_payload is None
     save_world(world, tmp_path / "aid.mws")
     assert world_snapshot(load_world(tmp_path / "aid.mws")) == world_snapshot(world)
+
+
+def test_delivered_aid_becomes_a_separate_relief_choice_with_a_navigable_chain(tmp_path):
+    """Arrival changes a public stock; only the recipient may choose to distribute it."""
+    world = prepared_world()
+    request = next(item for item in aid_request_options(world, REQUESTER) if item.provider_ref == PROVIDER)
+    request_institutional_aid(world, REQUESTER, request.id, decision(world, request, "aid request").id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    response = next(item for item in aid_response_options(world, PROVIDER) if item.kind == "accept")
+    respond_institutional_aid(world, PROVIDER, response.id, decision(world, response, "aid response").id)
+    fulfillment = aid_fulfillment_options(world, PROVIDER)[0]
+    order = fulfill_institutional_aid(world, PROVIDER, fulfillment.id,
+                                      decision(world, fulfillment, "aid fulfillment").id)
+
+    while world.economy.freight_orders[order.id].delivered_quantity < order.quantity:
+        due_day = min(item.due_day for item in world.agenda._situations.values() if item.kind == "cargo")
+        world.clock = world.clock.advance(due_day - world.clock.absolute_day)
+        due = world.agenda.pop_due(due_day)
+        resolve_parcels(world, [item for item in due if item.kind == "cargo"])
+
+    delivered = next(event for event in reversed(world.events) if event.event_type == "cargo_delivered")
+    refresh_settlement_reports(world)
+    relief = next(item for item in relief_settlement_options(world, REQUESTER.id)
+                  if item.settlement_id == "pedraclara")
+    report_event = next(event for event in world.events
+                        if event.id == world.knowledge.settlement_reports[relief.report_id].event_id)
+    effect = distribute_relief(world, relief.id, decision_event_id=decision(world, relief, "aid distribution").id)
+
+    assert delivered.id in {link.cause_event_id for link in report_event.causal_links}
+    assert report_event.id in {link.cause_event_id for link in effect.causal_links}
+    assert world.economy.needs["pedraclara"].missing_food == 0
+    save_world(world, tmp_path / "aid-to-relief.mws")
+    assert world_snapshot(load_world(tmp_path / "aid-to-relief.mws")) == world_snapshot(world)
 
 
 def test_stale_or_wrong_aid_decisions_do_not_mutate_world():
@@ -117,6 +178,31 @@ def test_stale_or_wrong_aid_decisions_do_not_mutate_world():
     with pytest.raises(ValueError, match="current|stale|option"):
         request_institutional_aid(world, REQUESTER, option.id, stale.id)
     assert world_snapshot(world) == before
+
+
+def test_canonical_pending_aid_request_suppresses_duplicate_provider_option():
+    world = prepared_world()
+    option = next(item for item in aid_request_options(world, REQUESTER)
+                  if item.provider_ref == PROVIDER)
+    request = request_institutional_aid(
+        world, REQUESTER, option.id, decision(world, option, "aid request").id)
+
+    assert request.event_type == "institutional_aid_requested"
+    assert not any(item.provider_ref == PROVIDER for item in aid_request_options(world, REQUESTER))
+
+
+def test_foreign_partial_aid_request_fact_does_not_suppress_provider_option():
+    world = prepared_world()
+    record_event(
+        world,
+        "institutional_aid_requested",
+        "Foreign partial receipt with a coincidental provider field.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="aid_request", owner_id="foreign-request",
+                           aspect="provider_ref", after='{"kind":"polity","id":"valedouro"}'),),
+    )
+
+    assert any(item.provider_ref == PROVIDER for item in aid_request_options(world, REQUESTER))
 
 
 def test_aid_response_requires_a_valid_private_provider_notice():
@@ -159,6 +245,55 @@ def test_aid_rejection_notifies_only_the_requester():
     assert requester_notices[0].kind == "response"
     assert requester_notices[0].response_status == "rejected"
     assert tuple(notice.kind for notice in world.knowledge.institutional_aid_for_actor(PROVIDER)) == ("request",)
+
+
+def test_aid_validation_uses_current_request_event_provenance():
+    world = prepared_world()
+    option = next(item for item in aid_request_options(world, REQUESTER)
+                  if item.provider_ref == PROVIDER)
+    decision_event = decision(world, option, "aid request")
+    request = request_institutional_aid(world, REQUESTER, option.id, decision_event.id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    response = next(item for item in aid_response_options(world, PROVIDER) if item.kind == "accept")
+    respond_institutional_aid(world, PROVIDER, response.id,
+                              decision(world, response, "aid response").id)
+
+    world.relations.validate(world)
+
+    index = next(i for i, event in enumerate(world.events) if event.id == request.id)
+    recorded_request = world.events[index]
+    assert decision_event.id in {link.cause_event_id for link in recorded_request.causal_links}
+    world.events[index] = recorded_request.model_copy(update={
+        "causal_links": tuple(link for link in request.causal_links
+                              if link.cause_event_id != decision_event.id),
+    })
+    assert decision_event.id not in {link.cause_event_id for link in world.events[index].causal_links}
+    with pytest.raises(ValueError, match="institutional aid proposal lacks its request provenance"):
+        world.relations.validate(world)
+
+
+@pytest.mark.parametrize("response_kind", ("accept", "reject"))
+def test_answered_aid_request_releases_provider_menu_without_disclosing_to_other_polities(response_kind):
+    world = prepared_world()
+    initial = aid_request_options(world, REQUESTER)
+    request_option = next(item for item in initial if item.provider_ref == PROVIDER)
+    request = request_institutional_aid(world, REQUESTER, request_option.id,
+                                        decision(world, request_option, "aid request").id)
+
+    assert PROVIDER not in {item.provider_ref for item in aid_request_options(world, REQUESTER)}
+    assert not aid_response_options(world, EntityRef("polity", "escarlia"))
+    pending = aid_response_options(world, PROVIDER)
+    assert {item.request_event_id for item in pending} == {request.id}
+    if response_kind == "accept":
+        refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    selected = next(item for item in aid_response_options(world, PROVIDER) if item.kind == response_kind)
+    respond_institutional_aid(world, PROVIDER, selected.id,
+                              decision(world, selected, "aid response").id)
+
+    assert not aid_response_options(world, PROVIDER)
+    released = aid_request_options(world, REQUESTER)
+    assert [(item.provider_ref, item.id) for item in released if item.provider_ref == PROVIDER] == [
+        (request_option.provider_ref, request_option.id)]
 
 
 def _breached_aid_world():
@@ -220,6 +355,38 @@ def test_breach_remediation_preserves_history_and_validates_after_parcel_progres
     save_world(world, path)
     restored = load_world(path)
     assert world_snapshot(restored) == world_snapshot(world)
+
+
+def test_provider_decision_authors_fulfillment_freight_and_memory_receipt():
+    world = prepared_world()
+    request_option = next(item for item in aid_request_options(world, REQUESTER)
+                          if item.provider_ref == PROVIDER)
+    request_institutional_aid(world, REQUESTER, request_option.id,
+                              decision(world, request_option, "aid request").id)
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    response_option = next(item for item in aid_response_options(world, PROVIDER)
+                           if item.kind == "accept")
+    respond_institutional_aid(world, PROVIDER, response_option.id,
+                               decision(world, response_option, "aid response").id)
+    option = aid_fulfillment_options(world, PROVIDER)[0]
+    selected = provider_decision(world, option, "aid fulfillment")
+
+    order = fulfill_institutional_aid(world, PROVIDER, option.id, selected.id)
+
+    assert_actor_authored_material_events(
+        world, order, "institutional_aid_fulfilled", selected, option)
+
+
+def test_provider_decision_authors_remediation_freight_and_memory_receipt():
+    world, _ = _breached_aid_world()
+    refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+    option = aid_remediation_options(world, PROVIDER)[0]
+    selected = provider_decision(world, option, "aid remediation")
+
+    order = remediate_institutional_aid(world, PROVIDER, option.id, selected.id)
+
+    assert_actor_authored_material_events(
+        world, order, "institutional_aid_remediated", selected, option)
 
 
 def test_remediated_aid_cannot_erase_its_breach_provenance():

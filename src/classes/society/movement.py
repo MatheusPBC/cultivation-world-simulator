@@ -1,8 +1,8 @@
 """Persistent, bounded civic movements owned by Society.
 
-This is the next rung after a local protest or tumult.  A movement reserves
-real participants from at least two local population groups and names a living
-leader; it does not grant authority, territory or a rebellion outcome.
+This is the next rung after a local protest or tumult.  A movement starts with
+one consenting group; other groups join through their own dated decisions.
+It names a living leader but grants no authority, territory or outcome.
 """
 
 from typing import Annotated, Literal
@@ -36,7 +36,7 @@ class CivicMovement(SocietyValue):
     @model_validator(mode="after")
     def valid_shape(self):
         if (self.id != f"civic-movement:{self.decision_event_id}"
-                or len(self.member_group_ids) < 2
+                or not self.member_group_ids
                 or len(set(self.member_group_ids)) != len(self.member_group_ids)
                 or set(self.participants_by_group) != set(self.member_group_ids)
                 or self.initiator_group_id not in self.member_group_ids

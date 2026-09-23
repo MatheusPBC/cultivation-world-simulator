@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import math
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.knowledge import workforce_demand_report_id, workforce_offer_notice_id
 from src.classes.governance.models import (WorkforceDemandReport, WorkforceOfferNotice,
@@ -19,6 +20,7 @@ from src.classes.society.workforce import WorkforceTransition
 from src.classes.state_delta import StateDelta
 from src.systems.calendar_agenda import ScheduledSituation
 
+from .actor_dossier import _latest_food_affordability
 from .economy import _causes, _delta
 from .events import record_event
 from .migration_policy import _route_path
@@ -51,6 +53,18 @@ class WorkforceTransitionOption(SocietyValue):
     def decision(self):
         return {"action": "accept_workforce_offer",
                 "actor_ref": EntityRef("population_group", self.group_id).to_dict(),
+                "selected_affordance_id": self.id}
+
+
+class MilitaryRecruitmentOption(SocietyValue):
+    """A sponsor may invite volunteers only for its own current demand."""
+    id: str
+    demand_id: str
+    actor_ref: EntityRef
+
+    def decision(self):
+        return {"action": "authorize_military_recruitment",
+                "actor_ref": self.actor_ref.to_dict(),
                 "selected_affordance_id": self.id}
 
 
@@ -104,6 +118,20 @@ def _current_demands(world):
             output = recipe.outputs.get("food", 0)
             if need is not None and output > 0 and need.missing_food > 0:
                 count = max(count, math.ceil(need.missing_food / output) * recipe.workers)
+        # A later owner may distribute food after this production receipt was
+        # published.  That changes subsistence state, but it does not erase the
+        # typed labour shortfall that created the dated workforce affordance.
+        # Keep the already observed terms for this same production event so a
+        # valid offer is not made stale by an independent relief decision.
+        previous = next((item for item in world.knowledge.workforce_demand_reports.values()
+                         if item.sponsor_ref == stock.owner_ref
+                         and item.work_kind == "facility"
+                         and item.work_id == facility.id
+                         and item.target_occupation == recipe.occupation
+                         and item.observed_day == day
+                         and item.source_event_id == event.id), None)
+        if previous is not None:
+            count = previous.count
         demands.append(_Demand(stock.owner_ref, "facility", facility.id, account.id, count,
                                facility.wage_per_worker, event.id, recipe.occupation))
     for project in sorted(world.economy.repairs.values(), key=lambda item: item.id):
@@ -120,6 +148,52 @@ def _current_demands(world):
             continue
         demands.append(_Demand(project.maintainer_ref, "repair", project.id, account.id, 1,
                                blueprint.wage_per_worker, event.id, "artisan"))
+    for project in sorted(world.research.projects.values(), key=lambda item: item.id):
+        event = _event(world, project.last_event_id)
+        shortfall = labor_shortfall(event, "research", project.id)
+        technology = world.research.technologies.get(project.technology_id)
+        account = world.economy.accounts.get(project.account_id)
+        if (event is None or event.day != day or event.event_type != "research_progressed"
+                or shortfall is None or project.stage != "blocked" or project.blocker != "labor"
+                or technology is None or account is None or account.owner_ref != project.owner_ref
+                or not can_actor_act_for(world, project.owner_ref, project.owner_ref, "research")
+                or not can_actor_act_for(world, project.owner_ref, project.owner_ref, "supply")
+                or not can_actor_act_for(world, project.owner_ref, project.owner_ref, "trade")):
+            continue
+        demands.append(_Demand(project.owner_ref, "research", project.id, account.id,
+                               shortfall, technology.wage_per_worker, event.id,
+                               technology.assistant_occupation))
+    # A chosen defensive plan may lack soldiers while route, rations and cash
+    # are otherwise sufficient.  Strategy records that typed reading when it
+    # reviews the plan; Force recomputes the same physical capacity here.
+    from .force import WAGE_PER_SOLDIER, recruitment_capacity
+    from .strategy_response import _plan_status
+    recruited_sources = set()
+    for plan in sorted(world.strategy.plans.values(), key=lambda item: item.id):
+        objective = world.strategy.objectives.get(plan.objective_id)
+        event = _event(world, plan.last_event_id)
+        if (objective is None or objective.kind != "defend_occupied_settlement"
+                or plan.stage != "blocked" or plan.detachment_id is not None
+                or event is None or event.day != day
+                or event.event_type != "strategy_defense_plan_updated"
+                or _plan_status(world, objective)[0] is not None):
+            continue
+        for source_id, account_id, capacity in recruitment_capacity(
+                world, objective.actor_ref, objective.settlement_id):
+            if source_id in recruited_sources:
+                continue
+            shortfall = labor_shortfall(event, "military_recruitment", source_id)
+            if (shortfall is None or not any(delta.owner_kind == "military_recruitment"
+                                            and delta.owner_id == source_id and delta.aspect == "plan_id"
+                                            and delta.after == plan.id for delta in event.deltas)
+                    or not can_actor_act_for(world, objective.actor_ref, objective.actor_ref, "supply")
+                    or not can_actor_act_for(world, objective.actor_ref, objective.actor_ref, "trade")):
+                continue
+            demands.append(_Demand(objective.actor_ref, "military_recruitment", source_id,
+                                   account_id, min(shortfall, capacity), WAGE_PER_SOLDIER,
+                                   event.id, "soldier"))
+            recruited_sources.add(source_id)
+            break
     # A staffed post becomes a merchant-work demand only after its existing,
     # paid inspection capacity was actually exhausted today.  This is a typed
     # material signal from the checkpoint itself, not dispatch on a narrative
@@ -229,6 +303,10 @@ def _work_settlement_id(world, work_kind, work_id):
         return world.economy.stocks[world.economy.facilities[work_id].stock_id].location_id
     if work_kind == "repair":
         return world.economy.stocks[world.economy.repairs[work_id].stock_id].location_id
+    if work_kind == "research":
+        return world.economy.stocks[world.research.projects[work_id].stock_id].location_id
+    if work_kind == "military_recruitment":
+        return work_id
     return None
 
 
@@ -244,6 +322,12 @@ def _eligible_groups(world, demand):
     that ends the wait, not a bypass of the labour deficit it still proves.
     """
     settlement_id = _work_settlement_id(world, demand.work_kind, demand.work_id)
+    if demand.work_kind == "military_recruitment":
+        for group in sorted(world.society.population.values(), key=lambda item: item.id):
+            if (group.settlement_id == settlement_id and group.occupation != "soldier"
+                    and world.society.available_count(group.id) == group.count):
+                yield group
+        return
     if settlement_id is None:
         checkpoint = world.economy.customs_checkpoints[demand.work_id]
         site = world.map.infrastructure_sites[checkpoint.site_id]
@@ -270,8 +354,10 @@ def _eligible_groups(world, demand):
         yield group
 
 
-def _publish_offers(world, report):
+def _publish_offers(world, report, *, decision_event_id=None):
     """Deliver direct notices only to current local groups; no stock is reserved."""
+    if report.work_kind == "military_recruitment" and decision_event_id is None:
+        raise ValueError("military recruitment offers require a sponsor decision")
     account = world.economy.accounts.get(report.account_id)
     if (account is None or account.owner_ref != report.sponsor_ref
             or not can_actor_act_for(world, report.sponsor_ref, report.sponsor_ref, "supply")
@@ -306,12 +392,19 @@ def _publish_offers(world, report):
                 and previous.stipend_per_person == notice.stipend_per_person):
             remaining -= amount
             continue
+        origin = (CausalOrigin.ACTOR_DECISION if decision_event_id is not None
+                  else CausalOrigin.DETERMINISTIC)
         event = record_event(
             world, "workforce_offer_received", "Um grupo local recebeu uma proposta de transição ocupacional.",
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_origin=origin,
+            causal_payload=({"decision_event_id": decision_event_id,
+                             "actor_ref": report.sponsor_ref.to_dict(),
+                             "selected_affordance_id": f"military-recruitment:{report.id}:{report.event_id}"}
+                            if decision_event_id is not None else None),
             deltas=(_delta("workforce_offer", notice.id, "observation",
                            previous.observation() if previous else None, notice.observation()),),
-            cause_ids=_causes(report.event_id))
+            cause_ids=_causes(report.event_id, decision_event_id))
         world.knowledge.workforce_offer_notices[notice.id] = notice.model_copy(update={"event_id": event.id})
         remaining -= amount
 
@@ -320,8 +413,63 @@ def refresh_workforce_notices(world):
     """Refresh today's sponsor-only demand receipts and direct local offers."""
     for demand in _current_demands(world):
         report = _observe_demand(world, demand)
-        if report is not None:
+        if report is not None and report.work_kind != "military_recruitment":
             _publish_offers(world, report)
+
+
+def military_recruitment_options(world, actor):
+    if not isinstance(actor, EntityRef) or actor.kind != "polity":
+        return ()
+    options = []
+    for report in sorted(world.knowledge.workforce_demand_reports.values(), key=lambda item: item.id):
+        if (report.work_kind != "military_recruitment" or report.sponsor_ref != actor
+                or _current_report(world, report) is None
+                or any(item.demand_id == report.id and item.observed_day == report.observed_day
+                       for item in world.knowledge.workforce_offer_notices.values())
+                or not any(group.count >= 5 for group in _eligible_groups(world, report))):
+            continue
+        options.append(MilitaryRecruitmentOption(
+            id=f"military-recruitment:{report.id}:{report.event_id}",
+            demand_id=report.id, actor_ref=actor))
+    return tuple(options)
+
+
+def authorize_military_recruitment(world, actor, option_id, decision_event_id):
+    option = next((item for item in military_recruitment_options(world, actor)
+                   if item.id == option_id), None)
+    decision = _event(world, decision_event_id)
+    if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+        raise ValueError("military recruitment option is stale or was not selected")
+    require_authority(world, actor, "military")
+    require_authority(world, actor, "supply")
+    require_authority(world, actor, "trade")
+    _publish_offers(world, world.knowledge.workforce_demand_reports[option.demand_id],
+                    decision_event_id=decision_event_id)
+
+
+def military_recruitment_group_actors(world):
+    """Include potential recipients before the sponsor's monthly menu runs."""
+    actors = set()
+    for report in world.knowledge.workforce_demand_reports.values():
+        if report.work_kind != "military_recruitment" or _current_report(world, report) is None:
+            continue
+        actors.update(EntityRef("population_group", group.id) for group in _eligible_groups(world, report)
+                      if group.count >= 5)
+    return actors
+
+
+def military_recruitment_adapters():
+    from .institutional_decision_turn import DiscretionaryAdapter
+
+    return (DiscretionaryAdapter(
+        name="military_recruitment", family="strategy",
+        options_fn=military_recruitment_options,
+        label_fn=lambda option: "Convidar voluntários para o plano defensivo sem soldados disponíveis.",
+        causes_fn=lambda world, option: (
+            world.knowledge.workforce_demand_reports[option.demand_id].event_id,),
+        execute_fn=authorize_military_recruitment,
+    ),)
 
 
 def _current_report(world, report):
@@ -341,7 +489,7 @@ def workforce_transition_options(world, group_id):
     if (group is None or world.society.available_count(group_id) != group.count):
         return ()
     options = []
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     for notice in world.knowledge.workforce_offers_for(group_id):
         report = world.knowledge.workforce_demand_reports.get(notice.demand_id)
         try:
@@ -353,6 +501,13 @@ def workforce_transition_options(world, group_id):
             continue
         if (notice.observed_day != world.clock.absolute_day or report.observed_day != world.clock.absolute_day
                 or notice.count > group.count or _current_report(world, report) is None):
+            continue
+        sponsor_account = world.economy.accounts.get(report.account_id)
+        household = world.economy.accounts.get(f"household:{group_id}")
+        stipend = notice.count * notice.stipend_per_person
+        if (sponsor_account is None or sponsor_account.owner_ref != report.sponsor_ref
+                or sponsor_account.balance < stipend or household is None
+                or household.owner_ref != EntityRef("population_group", group_id)):
             continue
         options.append(WorkforceTransitionOption(
             id=f"workforce_transition:{group.id}:{notice.id}:{notice.event_id}",
@@ -371,6 +526,7 @@ def _transition_situation(world, actor, options):
     report = world.knowledge.settlement_report(actor, group.settlement_id)
     notices = world.knowledge.workforce_offer_notices
     demands = world.knowledge.workforce_demand_reports
+    affordability = _latest_food_affordability(world, report)
     return {
         "you_are": actor.to_dict(),
         "settlement_id": group.settlement_id,
@@ -378,6 +534,8 @@ def _transition_situation(world, actor, options):
         "missing_food": report.missing_food if report is not None else None,
         "health": report.health if report is not None else None,
         "unrest": report.unrest if report is not None else None,
+        "unaffordable_food": affordability["unaffordable_food"],
+        "unaffordable_group_count": affordability["unaffordable_group_count"],
         "workforce_options": [
             {"id": option.id, "notice_id": option.notice_id,
              "target_occupation": notices[option.notice_id].target_occupation,
@@ -459,6 +617,10 @@ def accept_workforce_transition(world, option_id, *, decision_event_id):
     event = record_event(
         world, "workforce_transition_started", f"Um grupo aceitou uma transição para {notice.target_occupation}.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision_event_id,
+                        "actor_ref": decision.decision["actor_ref"],
+                        "selected_affordance_id": option.id},
         deltas=(_delta("account", sponsor_account.id, "balance", sponsor_account.balance,
                        sponsor_account.balance - stipend),
                 _delta("account", household.id, "balance", household.balance, household.balance + stipend),

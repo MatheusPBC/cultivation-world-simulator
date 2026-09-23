@@ -63,6 +63,9 @@ def test_provider_diplomacy_situation_contains_memory_view_without_foreign_terms
     },)
     assert "balance" not in repr(situation["known_institutional_views"])
     assert "source_stock_id" not in repr(situation)
+    assert "own_production_readings" in situation
+    assert all("event_id" in item and "labor_shortfall" in item
+               for item in situation["own_production_readings"])
     assert set(situation["own_strategic_capacity"]) == {
         "food_reserves", "productive_inputs", "territorial_defense",
         "administrative_bandwidth", "diplomatic_bandwidth", "military_command",
@@ -284,7 +287,11 @@ async def test_provider_silence_or_invalid_response_leaves_open_offer_unchanged(
     world.clock = world.clock.advance(1)
     _provider(monkeypatch, lambda _prompt: answer)
 
-    await review_diplomacy_with_provider(world)
+    if answer == 'forged:teaching-option':
+        with pytest.raises(ai_decider.ProviderDecisionRequired):
+            await review_diplomacy_with_provider(world)
+    else:
+        await review_diplomacy_with_provider(world)
 
     assert world.relations.proposals[proposal.id].status == 'offered'
     assert not world.relations.obligations
@@ -313,3 +320,34 @@ async def test_provider_teaching_needs_distinct_teacher_and_learner_choices(monk
     assert {teacher.id, f'accept-promised-teaching:{teacher.id}'} <= {
         item.decision['selected_affordance_id'] for item in decisions}
     assert world.knowledge.knows(BUYER, 'metallurgy')
+
+
+@pytest.mark.asyncio
+async def test_promised_teaching_acceptance_that_goes_stale_pauses_before_decision(monkeypatch):
+    from src.sim.medieval.diplomacy_policy import (_execute_teaching, _learning_options,
+                                                   _record_option_decision,
+                                                   review_promised_teaching_turns, _teaching_options)
+    from tests.test_medieval_diplomacy import offer, pay
+
+    world = _provider_world(world_with_knowledge()); useful_buyer(world)
+    proposal = offer(world, 80)
+    respond(world, proposal)
+    pay(world, f'{proposal.id}:term:0')
+    world.clock = world.clock.advance(1)
+    teacher = _teaching_options(world, SELLER)[0]
+    teacher_decision = _record_option_decision(world, teacher, ())
+    _execute_teaching(world, teacher, teacher_decision.id)
+    initial = _learning_options(world, BUYER)
+    assert initial
+    calls = 0
+
+    def learning_options(current, actor):
+        nonlocal calls
+        calls += 1
+        return initial if calls == 1 else ()
+
+    monkeypatch.setattr('src.sim.medieval.diplomacy_policy._learning_options', learning_options)
+    _provider(monkeypatch, lambda _prompt: initial[0].id)
+    with pytest.raises(ai_decider.ProviderDecisionRequired):
+        await review_promised_teaching_turns(world, actors=(BUYER,))
+    assert not world.knowledge.knows(BUYER, 'metallurgy')

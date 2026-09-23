@@ -34,17 +34,22 @@ from .institutional_aid import (
 )
 from .institutional_aid_policy import _known_before_today
 from .institutional_aid_policy import _own_open_chain, _pressured_settlements
+from .actor_dossier import _own_production_readings
 from .institutional_decision_turn import (DiscretionaryAdapter,
                                           review_institutional_decision_turn_with_provider)
-from .procurement import (SUPPLY_OBJECTIVE_ACTION, execute_market_purchase_option,
-                          execute_supply_objective_option, market_purchase_options,
-                          supply_objective_options)
+from .procurement import (SUPPLY_OBJECTIVE_ACTION, execute_supply_objective_option,
+                          market_purchase_options, supply_objective_options)
+from .market_purchase_policy import (market_purchase_acceptance_options,
+                                     market_purchase_adapters)
 from .freight_recovery import (blocking_routes, execute_freight_recovery,
                                freight_recovery_options)
 from .purchase_recovery import (purchase_recovery_request_options,
                                 purchase_recovery_response_options,
                                 request_purchase_recovery, respond_purchase_recovery)
-from .expansion import expansion_adapters, expansion_options
+from .embargo import embargo_adapters, embargo_options
+from .expansion import (expansion_adapters, expansion_options,
+                        foundation_adapters, foundation_options,
+                        site_construction_adapters, site_construction_options)
 from .research_policy import research_adapters, research_options
 from .siege_campaign import (siege_campaign_adapters, siege_campaign_options,
                               siege_campaign_withdrawal_options,
@@ -68,6 +73,16 @@ from .campaign_ceasefire import (
 )
 from .relief import relief_settlement_options, relief_transfer_options
 from .relief_policy import relief_adapters
+from .reciprocal_supply import (
+    fulfill_resource_transfer,
+    offer_reciprocal_supply,
+    reciprocal_response_options,
+    reciprocal_supply_options,
+    remediate_resource_transfer,
+    resource_transfer_options,
+    resource_transfer_remediation_options,
+    respond_reciprocal_supply,
+)
 
 
 def _current_aid_requests(world, actor):
@@ -85,6 +100,49 @@ def _current_aid_requests(world, actor):
 def _execute_aid_request(world, actor, option_id, decision_event_id):
     request_institutional_aid(world, actor, option_id, decision_event_id)
     schedule_review(world)
+
+
+def _reciprocal_causes(world, option):
+    proposal = getattr(option, "proposal_id", None)
+    if proposal is not None and proposal in world.relations.proposals:
+        return (world.relations.proposals[proposal].last_event_id,)
+    return tuple(getattr(option, "causes", lambda: ())())
+
+
+def _reciprocal_adapters():
+    """Expose bilateral supply and repair in the same institutional menu."""
+    return (
+        DiscretionaryAdapter(
+            name="reciprocal_supply_offer", family="institutional_aid",
+            options_fn=reciprocal_supply_options,
+            label_fn=lambda option: f"Propor troca material de abastecimento com {option.counterparty_ref.id}.",
+            causes_fn=lambda _world, option: tuple(
+                value for value in (getattr(option, "report_event_id", None),) if value),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                offer_reciprocal_supply(world, actor, option_id, decision_event_id)),
+        DiscretionaryAdapter(
+            name="reciprocal_supply_response", family="institutional_aid",
+            options_fn=reciprocal_response_options,
+            label_fn=lambda option: f"Responder {option.kind} à proposta recíproca {option.proposal_id}.",
+            causes_fn=_reciprocal_causes,
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                respond_reciprocal_supply(world, actor, option_id, decision_event_id)),
+        DiscretionaryAdapter(
+            name="resource_transfer_fulfillment", family="institutional_aid",
+            options_fn=resource_transfer_options,
+            label_fn=lambda option: f"Despachar a entrega prometida de {option.resource_id}.",
+            causes_fn=lambda world, option: (
+                world.relations.obligations[option.obligation_id].last_event_id,),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                fulfill_resource_transfer(world, actor, option_id, decision_event_id)),
+        DiscretionaryAdapter(
+            name="resource_transfer_remediation", family="institutional_aid",
+            options_fn=resource_transfer_remediation_options,
+            label_fn=lambda option: f"Reparar a entrega descumprida de {option.resource_id}.",
+            causes_fn=lambda _world, option: (option.breach_event_id,),
+            execute_fn=lambda world, actor, option_id, decision_event_id:
+                remediate_resource_transfer(world, actor, option_id, decision_event_id)),
+    )
 
 
 def _current_aid_responses(world, actor):
@@ -227,6 +285,7 @@ def _supply_situation(world, actor, options):
             }
         opportunities.append(opportunity)
     return {"today": world.clock.absolute_day,
+            "own_production_readings": _own_production_readings(world, actor),
             "settlement_reports": reports,
             "opportunities": tuple(opportunities)}
 
@@ -236,16 +295,6 @@ SUPPLY_ADAPTER = DiscretionaryAdapter(
     label_fn=lambda option: (
         "Executar o abastecimento disponível para um assentamento pressionado."),
     causes_fn=_supply_causes, execute_fn=execute_supply_objective_option,
-    claim_fn=lambda option: ("objective", option.objective_id),
-    family="supply", situation_fn=_supply_situation)
-
-MARKET_PURCHASE_ADAPTER = DiscretionaryAdapter(
-    name="market_purchase", options_fn=market_purchase_options,
-    label_fn=lambda option: (
-        f"Comprar {option.resource_id} por uma rota conhecida: "
-        f"{' > '.join(option.route_ids)}."),
-    causes_fn=_market_purchase_causes,
-    execute_fn=execute_market_purchase_option,
     claim_fn=lambda option: ("objective", option.objective_id),
     family="supply", situation_fn=_supply_situation)
 
@@ -410,17 +459,20 @@ PURCHASE_RECOVERY_RESPONSE_ADAPTER = DiscretionaryAdapter(
     causes_fn=_purchase_recovery_causes, execute_fn=_execute_purchase_recovery_response,
     family="purchase_recovery")
 
-CIVIL_ADAPTERS = (SUPPLY_ADAPTER, MARKET_PURCHASE_ADAPTER, AID_ADAPTER,
+CIVIL_ADAPTERS = (SUPPLY_ADAPTER, *market_purchase_adapters(), AID_ADAPTER,
                   AID_RESPONSE_ADAPTER, AID_FULFILLMENT_ADAPTER, AID_REMEDIATION_ADAPTER,
                   REPAIR_ADAPTER,
                   SITE_REACTIVATION_ADAPTER, FREIGHT_RECOVERY_ADAPTER,
                   PURCHASE_RECOVERY_REQUEST_ADAPTER, PURCHASE_RECOVERY_RESPONSE_ADAPTER,
-                  *expansion_adapters(), *research_adapters(), *siege_campaign_adapters(),
+                  *expansion_adapters(), *foundation_adapters(), *site_construction_adapters(),
+                  *embargo_adapters(), *research_adapters(),
+                  *siege_campaign_adapters(),
                   CAMPAIGN_CEASEFIRE_OFFER_ADAPTER, CAMPAIGN_CEASEFIRE_RESPONSE_ADAPTER,
                   CAMPAIGN_CEASEFIRE_FULFILLMENT_ADAPTER,
                   ADMINISTRATION_CONCESSION_OFFER_ADAPTER,
                   ADMINISTRATION_CONCESSION_RESPONSE_ADAPTER,
                   ADMINISTRATION_TRANSFER_FULFILLMENT_ADAPTER,
+                  *_reciprocal_adapters(),
                   *relief_adapters())
 
 
@@ -429,13 +481,16 @@ def concurrent_civil_options(world, actor):
     if not isinstance(actor, EntityRef) or actor.kind != "polity":
         return ()
     return (*supply_objective_options(world, actor), *market_purchase_options(world, actor),
+            *market_purchase_acceptance_options(world, actor),
             *_current_aid_requests(world, actor),
             *_current_aid_responses(world, actor),
             *aid_fulfillment_options(world, actor), *aid_remediation_options(world, actor),
             *repair_authorization_options(world, actor), *site_reactivation_options(world, actor),
             *freight_recovery_options(world, actor),
             *purchase_recovery_request_options(world, actor), *purchase_recovery_response_options(world, actor),
-            *expansion_options(world, actor), *research_options(world, actor),
+            *expansion_options(world, actor), *foundation_options(world, actor),
+            *site_construction_options(world, actor), *embargo_options(world, actor),
+            *research_options(world, actor),
             *siege_campaign_options(world, actor), *siege_campaign_withdrawal_options(world, actor),
             *siege_occupation_options(world, actor), *territorial_control_options(world, actor),
             *campaign_ceasefire_offer_options(world, actor),

@@ -247,13 +247,13 @@ def test_competing_facilities_cannot_pay_the_same_workers_twice():
     assert world.economy.facilities[other.id].last_batches == 0
 
 
-def test_previous_experimental_save_is_rejected_without_overwrite(tmp_path):
+def test_previous_schema_save_is_rejected_without_overwrite(tmp_path):
     import sqlite3
     world = create_medieval_world(73)
     path = tmp_path / "old.mws"
     save_world(world, path)
     with sqlite3.connect(path) as connection:
-        connection.execute("UPDATE metadata SET schema_version=5")
+        connection.execute("UPDATE metadata SET schema_version=60")
     before = path.read_bytes()
     with pytest.raises(ValueError, match="Unsupported"):
         load_world(path)

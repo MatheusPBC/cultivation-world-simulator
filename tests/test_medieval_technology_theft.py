@@ -8,17 +8,34 @@ from src.classes.event import FactKind
 from src.classes.governance.models import AuthorityOffice
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.events import record_event
+from src.sim.medieval.economy import monthly_workforce, produce_monthly
+from src.sim.medieval.expansion import progress_expansions, start_expansion
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_site_reports
 from src.sim.medieval.technology_theft import execute_technology_theft, technology_theft_options
 from tests.test_medieval_technology_sale import researched_world
+from src.systems.time import WorldClock
 
 
 OWNER = EntityRef("polity", "auren")
 
 
-def prepared_world(skill=60):
+def prepared_world(skill=60, *, apply=True):
     world = researched_world()
+    # A technique is stealable only from a paid, operating technical line.
+    # Research and disclosure alone are not evidence that the holder applies it.
+    if apply:
+        facility_id = "works:minas-de-ferroalto"
+        decision = record_event(world, "theft_fixture_expansion_decided", "Construir a linha de carvão observada.",
+                                fact_kind=FactKind.DECISION,
+                                decision={"action": "expand", "actor_ref": EntityRef("polity", "escarlia").to_dict(),
+                                          "facility_id": facility_id, "blueprint_id": "charcoal-kilns"})
+        start_expansion(world, facility_id, "charcoal-kilns", decision_event_id=decision.id)
+        for day in (120, 150):
+            world.clock = WorldClock(day)
+            progress_expansions(world, monthly_workforce(world))
+        produce_monthly(world)
+        assert world.economy.facilities["line:minas-de-ferroalto:charcoal"].last_batches > 0
     agent = world.society.characters["character:004"].model_copy(
         update={"skills": world.society.characters["character:004"].skills.model_copy(
             update={"investigation": skill})})
@@ -29,6 +46,23 @@ def prepared_world(skill=60):
         scopes=office.scopes, starts_day=office.starts_day, ends_day=office.ends_day)
     refresh_site_reports(world, site_ids=["minas-de-ferroalto"])
     return world, agent
+
+
+def test_known_but_unapplied_technology_is_not_a_theft_target():
+    world, _agent = prepared_world(apply=False)
+    assert not technology_theft_options(world, OWNER)
+
+
+def test_theft_option_disappears_when_technical_line_stops_operating():
+    world, _agent = prepared_world()
+    option, = technology_theft_options(world, OWNER)
+    operation = world.event_index()[option.operation_event_id]
+    assert operation.event_type == "production_completed"
+    assert operation.causal_payload["production"]["recipe_id"] == "charcoal"
+    world.clock = WorldClock(180)
+    produce_monthly(world, {group_id: 0 for group_id in monthly_workforce(world)})
+    refresh_site_reports(world, site_ids=["minas-de-ferroalto"])
+    assert not technology_theft_options(world, OWNER)
 
 
 def decide(world, option):
@@ -51,6 +85,8 @@ def test_success_copies_only_sighted_canonical_technology_and_round_trips(tmp_pa
     path = tmp_path / "technology-theft.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
 
 
 def test_low_skill_is_failure_and_discovery_does_not_grant_knowledge(monkeypatch):

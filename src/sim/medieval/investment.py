@@ -17,8 +17,7 @@ def review_investment(world):
         owner = stock.owner_ref
         recipe = economy.recipes[facility.recipe_id]
         site = world.map.infrastructure_sites[facility.site_id]
-        if (not facility.max_batches or facility.last_batches != facility.max_batches
-                or not site.enabled or site.integrity < 1
+        if (not facility.max_batches or not site.enabled or site.integrity < 1
                 or any(not can_actor_act_for(world, owner, owner, scope) for scope in ('trade', 'supply'))):
             continue
         # With the institutional provider enabled, expansion is an explicit
@@ -27,17 +26,31 @@ def review_investment(world):
         # so test-mode and offline fixtures remain conservative and auditable.
         if world.config.ai_enabled:
             continue
-        # Do not expand an idle plant or a full store; no foreign stock is inspected.
-        if all(stock.goods.get(r, 0) >= amount * facility.max_batches * 2 for r, amount in recipe.outputs.items()):
-            continue
+        # A full output store is a reason to consider a storage expansion; it
+        # only blocks production-capacity projects. No foreign stock is inspected.
+        output_store_full = all(stock.goods.get(r, 0) >= amount * facility.max_batches * 2
+                                for r, amount in recipe.outputs.items())
         for blueprint in sorted(economy.expansion_blueprints.values(), key=lambda b: b.id):
             if blueprint.required_technology_id:
                 continue  # Technical adaptations have their own knowledge-aware policy.
+            if blueprint.foundation_recipe_id or blueprint.grants_capability_id:
+                continue  # Founding a line or raising a site is its own owner's act, never an anchor investment.
+            storage_pressure = (blueprint.stock_capacity_gain > 0
+                                and facility.last_batches < facility.max_batches
+                                and 'storage' in facility.last_limitations)
+            production_pressure = blueprint.stock_capacity_gain == 0 and facility.last_batches == facility.max_batches
+            if not (storage_pressure or production_pressure):
+                continue
+            if output_store_full and not storage_pressure:
+                continue
             people = sum(g.count for g in world.society.population.values()
                          if g.settlement_id == stock.location_id and g.occupation == recipe.occupation)
-            artisans = sum(g.count for g in world.society.population.values()
-                           if g.settlement_id == stock.location_id and g.occupation == 'artisan')
-            if people < (facility.max_batches + blueprint.capacity_gain) * recipe.workers or artisans < blueprint.workers_per_unit:
+            builders = sum(g.count for g in world.society.population.values()
+                           if g.settlement_id == stock.location_id
+                           and g.occupation == blueprint.worker_occupation)
+            required_batches = (facility.max_batches + blueprint.capacity_gain
+                                if blueprint.stock_capacity_gain == 0 else facility.last_batches)
+            if people < required_batches * recipe.workers or builders < blueprint.workers_per_unit:
                 continue
             price = economy.markets[stock.location_id].prices
             material_budget = sum(max(0, amount * blueprint.required_units - stock.goods.get(r, 0)) * price[r]
@@ -66,8 +79,9 @@ def review_investment(world):
     for project in economy.expansions.values():
         if project.stage == 'completed':
             continue
-        facility = economy.facilities[project.facility_id]
-        stock = economy.stocks[facility.stock_id]
+        stock = (economy.stocks[project.stock_id]
+                 if project.facility_id is None
+                 else economy.stocks[economy.facilities[project.facility_id].stock_id])
         for rid in economy.expansion_blueprints[project.blueprint_id].inputs:
             if any(o.stock_id == stock.id and o.resource_id == rid for o in world.strategy.objectives.values()):
                 continue

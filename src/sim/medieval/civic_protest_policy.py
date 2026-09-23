@@ -15,8 +15,9 @@ from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
                                           review_institutional_decision_turn_with_provider)
 from .institutional_memory import institutional_views
 from .civic_tumult import TUMULT_ACTION, civic_tumult_options, execute_civic_tumult
-from .civic_movement import (MOVEMENT_ACTION, civic_movement_dissolve_options,
+from .civic_movement import (MOVEMENT_ACTION, JOIN_MOVEMENT_ACTION, civic_movement_dissolve_options,
                              civic_movement_options, dissolve_civic_movement,
+                             civic_movement_join_options, join_civic_movement,
                              form_civic_movement, REBELLION_ACTION,
                              civic_rebellion_options, declare_civic_rebellion,
                              SUPPRESS_REBELLION_ACTION, civic_rebellion_response_options,
@@ -34,6 +35,7 @@ _LABELS = {
     REFUSE_ACTION: "Recusar a demanda cívica recebida.",
     TUMULT_ACTION: "Participar de um tumulto local contra uma instalação observada.",
     MOVEMENT_ACTION: "Formar um movimento cívico com outros grupos locais observados.",
+    JOIN_MOVEMENT_ACTION: "Entrar voluntariamente em um movimento cívico observado.",
     "dissolve_civic_movement": "Encerrar o movimento cívico e liberar os participantes.",
     STRIKE_ACTION: "Iniciar uma greve geral limitada com os grupos do movimento.",
     REBELLION_ACTION: "Declarar uma rebelião organizada contra a administração local.",
@@ -59,6 +61,7 @@ def _group_situation(world, actor, options):
         "strike_targets": [item.id for item in options if ":organized_strike:" in item.id],
         "tumult_targets": [item.id for item in options if item.id.startswith("civic-tumult:")],
         "movement_targets": [item.id for item in options if item.id.startswith("civic-movement:")],
+        "movement_join_targets": [item.id for item in options if item.id.startswith("civic-movement-join:")],
         "general_strike_targets": [item.id for item in options if item.id.startswith("civic-strike:")],
         "rebellion_targets": [item.id for item in options if item.id.startswith("civic-rebellion:")],
         "revolution_targets": [item.id for item in options if item.id.startswith("civic-revolution:")],
@@ -118,6 +121,10 @@ def _movement_dissolve_options(world, actor):
     return civic_movement_dissolve_options(world, actor.id) if actor.kind == "population_group" else ()
 
 
+def _movement_join_options(world, actor):
+    return civic_movement_join_options(world, actor.id) if actor.kind == "population_group" else ()
+
+
 def _strike_options(world, actor):
     return civic_general_strike_options(world, actor.id) if actor.kind == "population_group" else ()
 
@@ -153,6 +160,11 @@ def _movement_causes(world, option):
 def _movement_dissolve_causes(world, option):
     movement = world.society.civic_movements.get(option.movement_id)
     return (movement.last_event_id,) if movement is not None else ()
+
+
+def _movement_join_causes(world, option):
+    movement = world.society.civic_movements.get(option.movement_id)
+    return (movement.last_event_id, option.report_event_id) if movement is not None else (option.report_event_id,)
 
 
 def _strike_causes(world, option):
@@ -195,6 +207,7 @@ def civic_actors(world):
     groups = (EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
              if civic_protest_options(world, group_id) or civic_dissolve_options(world, group_id)
              or civic_tumult_options(world, group_id) or civic_movement_options(world, group_id)
+             or civic_movement_join_options(world, group_id)
              or civic_movement_dissolve_options(world, group_id)
              or civic_general_strike_options(world, group_id)
              or civic_rebellion_options(world, group_id)
@@ -240,6 +253,10 @@ def civic_adapters(on_executed=None):
         dissolve_civic_movement(world, actor.id, option_id, decision_event_id)
         _executed()
 
+    def _execute_movement_join(world, actor, option_id, decision_event_id):
+        join_civic_movement(world, actor.id, option_id, decision_event_id)
+        _executed()
+
     def _execute_strike(world, actor, option_id, decision_event_id):
         start_general_strike(world, actor.id, option_id, decision_event_id)
         _executed()
@@ -272,6 +289,8 @@ def civic_adapters(on_executed=None):
             _adapter("civic_movement", _movement_options, _movement_causes, _execute_movement),
             _adapter("civic_movement_dissolve", _movement_dissolve_options,
                      _movement_dissolve_causes, _execute_movement_dissolve),
+            _adapter("civic_movement_join", _movement_join_options,
+                     _movement_join_causes, _execute_movement_join),
             _adapter("civic_general_strike", _strike_options, _strike_causes, _execute_strike),
             _adapter("civic_rebellion", _rebellion_options, _rebellion_causes, _execute_rebellion),
             _adapter("civic_revolution", _revolution_options, _revolution_causes, _execute_revolution),

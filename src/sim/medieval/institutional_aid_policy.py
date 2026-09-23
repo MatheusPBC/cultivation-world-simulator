@@ -15,7 +15,7 @@ from .events import record_event
 from .institutional_aid import (REQUEST_ACTION, _answered, aid_fulfillment_options, aid_remediation_options,
                                 aid_request_options, aid_response_options, fulfill_institutional_aid,
                                 remediate_institutional_aid, request_institutional_aid, respond_institutional_aid)
-from .ai_decider import NO_ACTION, select_option
+from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
 from .institutional_memory import institutional_view
 
 
@@ -27,6 +27,12 @@ def _decide(world, option, event_type, content):
 def _event_day(world, event_id):
     event = next((item for item in world.events if item.id == event_id), None)
     return event.day if event is not None else None
+
+
+def _stale(actor, family):
+    return ProviderDecisionRequired(
+        f"provider decision required for {actor.kind}:{actor.id}: {family} affordance became stale"
+    )
 
 
 def _known_before_today(world, provider, request_event_id):
@@ -75,7 +81,12 @@ def _respond(world, actor):
 
 
 async def _respond_with_provider(world, actor):
-    """Consult the provider for a response; failure means no response.
+    """Consult the provider for a response.
+
+    Return ``None`` when this family has no current affordance, ``False`` when
+    the actor was consulted but declined/failed to execute, and ``True`` after
+    a material response.  The distinction prevents a later aid family from
+    consulting the same actor again after an explicit ``NO_ACTION``.
 
     In provider mode a technical failure is deliberately not converted into a
     strategic routine choice.  The caller keeps the routine policy only for
@@ -83,7 +94,7 @@ async def _respond_with_provider(world, actor):
     """
     answerable, routine, request_event_id = _response_candidates(world, actor)
     if routine is None:
-        return False
+        return None
     notice = next((item for item in world.knowledge.institutional_aid_for_actor(actor)
                    if item.kind == "request" and item.request_event_id == request_event_id), None)
     # Strictly the actor's own knowledge: who asked, where, how much was asked,
@@ -101,13 +112,18 @@ async def _respond_with_provider(world, actor):
     if selected in (None, NO_ACTION):
         return False
     chosen = next((option for option in _response_candidates(world, actor)[0] if option.id == selected), None)
-    return _apply_response(world, actor, chosen) if chosen is not None else False
+    if chosen is None:
+        raise _stale(actor, "institutional aid response")
+    try:
+        return _apply_response(world, actor, chosen)
+    except ValueError as exc:
+        raise _stale(actor, "institutional aid response") from exc
 
 
 async def _fulfill_with_provider(world, actor):
     options = aid_fulfillment_options(world, actor)
     if not options:
-        return False
+        return None
     choices = [{"id": option.id,
                 "label": f"Cumprir a obrigação {option.obligation_id} enviando {option.quantity} {option.resource_id}."}
                for option in options]
@@ -122,14 +138,12 @@ async def _fulfill_with_provider(world, actor):
         return False
     option = next((item for item in aid_fulfillment_options(world, actor) if item.id == selected), None)
     if option is None:
-        return False
+        raise _stale(actor, "institutional aid fulfillment")
     decision = _decide(world, option, "aid_fulfillment_decided", "A instituição cumpriu a ajuda acordada.")
     try:
         fulfill_institutional_aid(world, actor, option.id, decision.id)
-    except ValueError:
-        # Same technical-failure boundary as the routine path: a route the
-        # provider chose in good faith may have closed since it was offered.
-        return False
+    except ValueError as exc:
+        raise _stale(actor, "institutional aid fulfillment") from exc
     return True
 
 
@@ -156,7 +170,7 @@ def _fulfill(world, actor):
 async def _remediate_with_provider(world, actor):
     options = aid_remediation_options(world, actor)
     if not options:
-        return False
+        return None
     choices = [{"id": option.id,
                 "label": f"Reparar a obrigação {option.obligation_id} enviando {option.quantity} {option.resource_id}."}
                for option in options]
@@ -169,9 +183,12 @@ async def _remediate_with_provider(world, actor):
         return False
     option = next((item for item in aid_remediation_options(world, actor) if item.id == selected), None)
     if option is None:
-        return False
+        raise _stale(actor, "institutional aid remediation")
     decision = _decide(world, option, "aid_remediation_decided", "A instituição reparou uma ajuda descumprida.")
-    remediate_institutional_aid(world, actor, option.id, decision.id)
+    try:
+        remediate_institutional_aid(world, actor, option.id, decision.id)
+    except ValueError as exc:
+        raise _stale(actor, "institutional aid remediation") from exc
     return True
 
 
@@ -202,8 +219,20 @@ def _pressured_settlements(world, actor):
         if (settlement.administrator_id != actor.id or report is None
                 or report.observed_day != day or report.missing_food <= 0):
             continue
-        settlements.append(settlement.id)
-    return tuple(dict.fromkeys(settlements))
+        settlements.append((report.missing_food, settlement.id))
+    return tuple(settlement_id for _, settlement_id in sorted(settlements, key=lambda item: (-item[0], item[1])))
+
+
+def _routine_actors_by_need(world):
+    """Let the largest own *observed* shortfall ask before tiny requests lock providers."""
+    actors = tuple(EntityRef("polity", identity) for identity in world.society.polities)
+
+    def priority(actor):
+        settlements = _pressured_settlements(world, actor)
+        report = world.knowledge.settlement_report(actor, settlements[0]) if settlements else None
+        return (-(report.missing_food if report else 0), actor.id)
+
+    return tuple(sorted(actors, key=priority))
 
 
 def _own_open_chain(world, requester, settlement_id):
@@ -212,7 +241,7 @@ def _own_open_chain(world, requester, settlement_id):
     Only the requester's own request facts and its own accepted commitments are
     inspected, whoever the provider is. No foreign holding is read.
     """
-    events = {item.id: item for item in world.events}
+    events = world.event_index()
     for event in world.events:
         if event.event_type != "institutional_aid_requested":
             continue
@@ -238,12 +267,11 @@ def _own_open_chain(world, requester, settlement_id):
 
 
 def _request(world, actor):
-    pressured = _pressured_settlements(world, actor)
+    pressured = tuple(settlement_id for settlement_id in _pressured_settlements(world, actor)
+                      if not _own_open_chain(world, actor, settlement_id))
     if not pressured:
         return False
     settlement_id = pressured[0]
-    if _own_open_chain(world, actor, settlement_id):
-        return False
     candidates = []
     for option in aid_request_options(world, actor):
         if option.requester_settlement_id != settlement_id:
@@ -264,12 +292,12 @@ def _request(world, actor):
 async def _request_with_provider(world, actor):
     pressured = _pressured_settlements(world, actor)
     if not pressured:
-        return False
+        return None
     options = tuple(option for option in aid_request_options(world, actor)
                     if option.requester_settlement_id in pressured
                     and not _own_open_chain(world, actor, option.requester_settlement_id))
     if not options:
-        return False
+        return None
     choices = [{"id": option.id,
                 "label": f"Pedir ajuda alimentar para {option.requester_settlement_id} a {option.provider_ref.id}."}
                for option in options]
@@ -286,7 +314,7 @@ async def _request_with_provider(world, actor):
     option = next((item for item in aid_request_options(world, actor) if item.id == selected), None)
     if option is None or option.requester_settlement_id not in pressured or _own_open_chain(
             world, actor, option.requester_settlement_id):
-        return False
+        raise _stale(actor, "institutional aid request")
     decision = _decide(world, option, "aid_request_decided", "A instituição pediu ajuda alimentar.")
     request_institutional_aid(world, actor, option.id, decision.id)
     schedule_review(world)
@@ -295,8 +323,7 @@ async def _request_with_provider(world, actor):
 
 def review_institutional_aid(world, allow_requests=False):
     """One bounded institutional step per actor, by routine rules alone."""
-    for identity in sorted(world.society.polities):
-        actor = EntityRef("polity", identity)
+    for actor in _routine_actors_by_need(world):
         if _respond(world, actor) or _fulfill(world, actor) or _remediate(world, actor):
             continue
         if allow_requests:
@@ -313,14 +340,21 @@ async def review_institutional_aid_with_provider(world, allow_requests=False, ex
     boundary must not be asked to request again, but it still independently
     answers, fulfils or remediates like any other institution.
     """
-    for identity in sorted(world.society.polities):
-        actor = EntityRef("polity", identity)
+    actors = (tuple(EntityRef("polity", identity) for identity in sorted(world.society.polities))
+              if world.config.ai_enabled else _routine_actors_by_need(world))
+    for actor in actors:
         if world.config.ai_enabled:
-            if (await _respond_with_provider(world, actor)
-                    or await _fulfill_with_provider(world, actor)
-                    or await _remediate_with_provider(world, actor)):
-                continue
-            if allow_requests and actor not in excluded_requesters:
+            consulted = False
+            for review in (_respond_with_provider, _fulfill_with_provider, _remediate_with_provider):
+                result = await review(world, actor)
+                if result is None:
+                    continue
+                consulted = True
+                # Both execution and explicit NO_ACTION end this actor's turn.
+                # A provider response is one decision over the current family;
+                # it must not fall through into another consultation.
+                break
+            if (not consulted and allow_requests and actor not in excluded_requesters):
                 await _request_with_provider(world, actor)
         elif (_respond(world, actor) or _fulfill(world, actor) or _remediate(world, actor)):
             continue

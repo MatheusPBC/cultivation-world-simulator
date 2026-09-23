@@ -21,6 +21,7 @@ from .economy import _delta
 
 MEMORY_SPAN_DAYS = 360
 FULFILLMENT_VIEW = 3
+BRIBERY_VIEW = -3
 BREACH_VIEW = -4
 REPUDIATION_VIEW = -6
 REMEDIATION_VIEW = 2
@@ -79,7 +80,7 @@ def effective_salience(world, memory):
 def _remembered_obligation(world, memory, events):
     event = events.get(memory.event_id)
     if event is None:
-        return None, None
+        return None, None, None
     for delta in event.deltas:
         if delta.owner_kind != "obligation":
             continue
@@ -91,9 +92,11 @@ def _remembered_obligation(world, memory, events):
         # Every negotiated term is remembered through the same evidence: a
         # concluded obligation whose debtor and creditor are named by the
         # canonical clause. Assets remain owned by their material owners.
+        # The proposal itself is also returned so a caller can tell a bribery
+        # term apart from an ordinary negotiated one without a second owner.
         if clause is not None:
-            return event, clause
-    return None, None
+            return event, clause, proposal
+    return None, None, None
 
 
 def _remembered_refusal(world, memory, events):
@@ -128,11 +131,13 @@ def aid_evidence(world, observer_ref):
 
     The historical name is retained for the existing projection contract; the
     evidence now covers every concluded bilateral obligation, not only aid.
+    Bribery receipts remain evidence in this directional index; the view layer
+    assigns them their own weight rather than treating them as fulfillment.
     """
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     directions = {}
     for memory in world.relations.memories_for(observer_ref):
-        event, clause = _remembered_obligation(world, memory, events)
+        event, clause, proposal = _remembered_obligation(world, memory, events)
         if clause is not None and clause.creditor_ref == observer_ref:
             if event.event_type in {"commitment_fulfilled", "institutional_aid_fulfilled",
                                     "commitment_breached", "institutional_aid_remediated",
@@ -188,14 +193,24 @@ def institutional_view(world, observer_ref, subject_ref):
 
 
 def _view_entries(world, observer_ref, subject_ref):
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     entries = []
     for memory in world.relations.memories_for(observer_ref):
-        event, clause = _remembered_obligation(world, memory, events)
+        event, clause, proposal = _remembered_obligation(world, memory, events)
         if clause is None or clause.debtor_ref != subject_ref or clause.creditor_ref != observer_ref:
             refusal, provider = _remembered_refusal(world, memory, events)
             if refusal is not None and provider == subject_ref:
                 entries.append((memory, REFUSAL_VIEW))
+            continue
+        if proposal is not None and proposal.proposal_kind == "bribery":
+            # A paid bribe is a material fact remembered by both parties, but
+            # it is never read as an honored public/institutional commitment:
+            # it keeps the same directional machine (only the paid party
+            # reads the payer, by the same debtor/creditor match above) with
+            # its own, deliberately negative, qualitative weight instead of
+            # FULFILLMENT_VIEW or the generic commitment_fulfilled lookup.
+            if event.event_type == "commitment_fulfilled":
+                entries.append((memory, BRIBERY_VIEW))
             continue
         weight = {"commitment_fulfilled": FULFILLMENT_VIEW,
                   "institutional_aid_fulfilled": FULFILLMENT_VIEW,

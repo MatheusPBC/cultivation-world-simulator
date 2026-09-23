@@ -71,6 +71,17 @@ def test_xianxia_or_foreign_databases_are_rejected_without_modification(tmp_path
     assert path.read_bytes() == before
 
 
+def test_previous_freight_schema_is_rejected_without_touching_save(tmp_path):
+    path = tmp_path / "schema-65.mws"
+    save_world(create_medieval_world(73), path)
+    with sqlite3.connect(path) as conn:
+        conn.execute("UPDATE metadata SET schema_version=65 WHERE id=1")
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="Unsupported Medieval World Simulator save"):
+        load_world(path)
+    assert path.read_bytes() == before
+
+
 def test_loading_missing_save_does_not_create_a_database(tmp_path):
     path = tmp_path / "missing.mws"
     with pytest.raises(FileNotFoundError):

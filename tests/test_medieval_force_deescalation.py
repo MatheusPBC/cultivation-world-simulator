@@ -1,6 +1,7 @@
 """A force contact can create promises to leave, never an automatic retreat."""
 
 import asyncio
+import json
 
 import pytest
 
@@ -9,7 +10,9 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
-from src.sim.medieval.events import record_event
+from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
+from src.sim.medieval.events import record_event, validate_history
 from src.sim.medieval.force import (detect_force_standoffs, force_options, occupy_settlement,
                                     raise_detachment, raise_options, withdrawal_options)
 from src.sim.medieval.force_contact_policy import review_force_contacts
@@ -156,3 +159,62 @@ def test_stale_mandateless_and_provider_off_contact_turn_are_atomic(monkeypatch)
     monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: False)
     assert asyncio.run(review_force_contacts(world, (world.agenda.get(f"force-contact-review:{notice.id}"),))) is None
     assert world_snapshot(world) == before
+
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+                                                   "ai_max_calls": 10})
+    before_ai = world_snapshot(world)
+    with pytest.raises(ProviderDecisionRequired):
+        asyncio.run(review_force_contacts(world, (world.agenda.get(f"force-contact-review:{notice.id}"),)))
+    assert len(world.events) == before_ai["event_count"]
+    assert world.society.detachments[own_id].stage == "present"
+
+
+async def test_provider_turns_require_independent_offer_response_and_withdrawal(monkeypatch, tmp_path):
+    """A provider may choose each current turn, but never moves both columns at once."""
+    world, own_id, rival_id, standoff_id = contact_world()
+    world.config = world.config.model_copy(
+        update={"ai_enabled": True, "ai_calls_per_step": 2, "ai_max_calls": 8}
+    )
+    selected_ids = []
+
+    async def choose_deescalation(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        choices = [choice["id"] for choice in payload["choices"]]
+        selected = "NO_ACTION"
+        for option_id in choices:
+            if option_id.startswith("force-deescalation-response:") and option_id.endswith(":accept"):
+                selected = option_id
+                break
+            if option_id.startswith("force-deescalation:") and option_id.endswith(":mutual"):
+                selected = option_id
+                break
+            if option_id.startswith("force-withdrawal-fulfillment:"):
+                selected = option_id
+                break
+        selected_ids.append(selected)
+        return {"selected_id": selected}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_deescalation)
+
+    for _ in range(6):
+        due = tick(world)
+        await review_force_contacts(world, due)
+        if (world.relations.obligations
+                and all(item.status == "fulfilled" for item in world.relations.obligations.values())):
+            break
+
+    assert len(selected_ids) == 4
+    assert any(item.startswith("force-deescalation:") for item in selected_ids)
+    assert any(item.startswith("force-deescalation-response:") for item in selected_ids)
+    assert sum(item.startswith("force-withdrawal-fulfillment:") for item in selected_ids) == 2
+    assert {item.status for item in world.relations.obligations.values()} == {"fulfilled"}
+    assert world.society.force_standoffs[standoff_id].stage == "resolved"
+    assert world.society.detachments[own_id].stage == "marching"
+    assert world.society.detachments[rival_id].stage == "marching"
+    assert not [event for event in world.events
+                if event.causal_origin.value == "llm_interpretation" and event.deltas]
+    validate_history(world.events, world.clock.absolute_day)
+    path = tmp_path / "provider-force-deescalation.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)

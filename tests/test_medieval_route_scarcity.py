@@ -60,7 +60,11 @@ async def test_interrupted_food_route_becomes_dated_scarcity_and_aid_affordance(
     assert interrupted.id in {link.cause_event_id for link in subsistence.causal_links}
     assert any(option.requester_settlement_id == "pedraclara"
                for option in aid_request_options(world, AUREN))
-    # A request/notice is only a dated institutional decision.  No aid is
-    # material until a provider accepts and later fulfills its own options.
-    assert not any(event.event_type in {"institutional_aid_accepted", "relief_distributed"}
+    # A request/notice is only a dated institutional decision.  The blocked
+    # settlement receives no institutional aid without an independent provider
+    # acceptance and later fulfillment. Another polity may still make its own
+    # offline local-relief decision elsewhere in the same monthly boundary.
+    assert not any(event.event_type == "institutional_aid_accepted" for event in world.events)
+    assert not any(event.event_type == "relief_distributed"
+                   and event.causal_payload["relief_distribution"]["settlement_id"] == "pedraclara"
                    for event in world.events)

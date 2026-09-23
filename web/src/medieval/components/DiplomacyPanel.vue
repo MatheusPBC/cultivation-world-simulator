@@ -26,7 +26,10 @@ const { proposals, aidTrail, memories, readings, strategicEvidence, source } = u
         <li v-for="term in p.terms" :key="term.number" :data-term="`${p.id}:${term.number}`">
           <strong v-if="term.clause.kind === 'payment'">{{ t('paymentTerm', { amount: formatNumber(term.clause.amount) }) }}</strong>
           <strong v-else-if="term.clause.kind === 'resource_transfer'">{{ t('resourceTransferTerm', { quantity: formatNumber(term.clause.quantity), resource: term.resource }) }}</strong>
-          <strong v-else>{{ t('teachingTerm', { technology: term.technology }) }}</strong>
+          <strong v-else-if="term.clause.kind === 'teaching'">{{ t('teachingTerm', { technology: term.technology }) }}</strong>
+          <strong v-else-if="term.clause.kind === 'withdrawal'">{{ t('withdrawalTerm', { detachment: term.clause.detachment_id }) }}</strong>
+          <strong v-else-if="term.clause.kind === 'campaign_withdrawal'">{{ t('campaignWithdrawalTerm', { campaign: term.clause.campaign_id, detachment: term.clause.detachment_id }) }}</strong>
+          <strong v-else>{{ t('administrationTransferTerm', { settlement: term.clause.settlement_id }) }}</strong>
           <p>{{ term.debtor }} → {{ term.creditor }}</p>
           <p class="muted">{{ t('fulfillmentDue') }}: {{ calendar(term.clause.due_day) }}</p>
           <p v-if="term.clause.depends_on.length" class="muted">{{ t('dependsOnTerms') }}: {{ term.clause.depends_on.map(i => i + 1).join(', ') }}</p>

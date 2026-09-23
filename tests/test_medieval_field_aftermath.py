@@ -11,7 +11,9 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
+from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.dated import resolve_dated
+from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.field_aftermath_policy import (execute_field_aftermath_option,
                                                       field_aftermath_options,
@@ -146,6 +148,44 @@ async def test_provider_off_or_no_action_leaves_victory_without_occupation(monke
     assert silent.society.settlements[TARGET].occupier_id is None
     assert not any(event.event_type in {"settlement_occupied", "battle_resolved", "loot_taken"}
                    for event in silent.events[-2:])
+
+
+async def test_ai_enabled_aftermath_pauses_when_provider_disappears(monkeypatch):
+    world, _, notice = resolved_victory_world()
+    due = tick(world)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+                                                   "ai_max_calls": 10})
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
+    before = world_snapshot(world)
+    with pytest.raises(ProviderDecisionRequired):
+        await review_field_aftermaths(world, due)
+    assert world_snapshot(world) == before
+    assert world.society.settlements[TARGET].occupier_id is None
+
+
+async def test_provider_stale_aftermath_rolls_back_simulator_transaction(monkeypatch):
+    world, _, notice = resolved_victory_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1,
+                                                   "ai_max_calls": 10})
+    before = world_snapshot(world)
+    real_options = field_aftermath_options(world, OWNER, outcome_notice_id=notice.id)
+
+    async def choose_first(_world, _actor, _situation, choices, **_kwargs):
+        return choices[0]["id"]
+
+    monkeypatch.setattr(ai_decider, "select_option", choose_first)
+    calls = 0
+
+    def stale_after_selection(candidate, actor, *, outcome_notice_id=None):
+        nonlocal calls
+        calls += 1
+        return real_options if calls == 1 else ()
+
+    monkeypatch.setattr("src.sim.medieval.field_aftermath_policy.field_aftermath_options",
+                        stale_after_selection)
+    with pytest.raises(ProviderDecisionRequired, match="stale"):
+        await MedievalSimulator(world).step()
+    assert world_snapshot(world) == before
 
 
 def test_stale_authority_or_supervening_occupier_block_aftermath_atomically():

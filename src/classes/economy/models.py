@@ -65,6 +65,26 @@ class ProductionFacility(SocietyValue):
     last_event_id: Identity | None = None
 
 
+class ProductionPriority(SocietyValue):
+    """A durable, actor-selected ordering for one upcoming production cycle.
+
+    The priority contains no production result or resource quantity.  Economy
+    owns the intent and revalidates its causal decision before using it at a
+    later monthly boundary.
+    """
+
+    id: Identity
+    owner_ref: EntityRef
+    payroll_account_id: Identity
+    settlement_id: Identity
+    occupation: Occupation
+    facility_id: Identity
+    effective_day: Count
+    decision_event_id: Identity
+    selected_affordance_id: Identity
+    last_event_id: Identity
+
+
 class Payroll(SocietyValue):
     """Last settled period, not an additional balance or workforce owner."""
     id: Identity  # facility ID

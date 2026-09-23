@@ -22,16 +22,18 @@ def test_codex_cli_provider_reads_last_message_file():
         api_format="codex_cli",
     )
 
-    with patch("src.utils.llm.client.subprocess.run", side_effect=fake_run) as run:
+    with patch("src.utils.llm.client.shutil.which", return_value="/test/codex"), \
+         patch("src.utils.llm.client.subprocess.run", side_effect=fake_run) as run:
         assert _call_with_requests(config, "prompt") == "CODEX_RESPONSE"
 
     run.assert_called_once()
     command = run.call_args.args[0]
-    assert command[:2] == ["/usr/local/bin/codex", "exec"]
+    assert command[:2] == ["/test/codex", "exec"]
     assert "--ephemeral" in command
     assert "--sandbox" in command
     assert "read-only" in command
     assert run.call_args.kwargs["input"] == "prompt"
+    assert "CODEX_HOME" not in run.call_args.kwargs["env"]
 
 
 def test_codex_cli_provider_applies_and_cleans_output_schema():

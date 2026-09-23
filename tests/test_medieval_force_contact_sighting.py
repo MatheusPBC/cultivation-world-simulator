@@ -91,7 +91,7 @@ async def test_contact_sighting_is_bounded_updates_only_on_change_and_round_trip
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
     prompts = []
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 1, "ai_max_calls": 10})
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10, "ai_max_calls": 10})
     async def no_action(prompt, *args, **kwargs):
         prompts.append(prompt)
         return {"selected_id": ai_decider.NO_ACTION}

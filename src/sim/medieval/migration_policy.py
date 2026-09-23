@@ -47,15 +47,9 @@ def _fresh(world, report):
     return report is not None and world.clock.absolute_day - report.observed_day < REPORT_MAX_AGE
 
 
-def _route_path(world, actor, origin_id, destination_id, *, route_reports=None):
-    """Use public topology only to connect the actor's own dated route reports."""
-    origin = world.society.settlements[origin_id].region_id
-    target = world.society.settlements[destination_id].region_id
+def _route_graph(world, route_reports):
     edges = {}
-    # Reports are immutable during one migration review.  Callers may pass a
-    # transient per-actor index so repeated destination checks do not rebuild
-    # the same public graph; the index is never persisted.
-    for report in (world.knowledge.routes_for_actor(actor) if route_reports is None else route_reports):
+    for report in route_reports:
         route = world.map.routes.get(report.route_id)
         if (not _fresh(world, report) or route is None or report.travel_days is None
                 or report.operational_capacity <= 0 or route.mode not in {"road", "river"}):
@@ -63,6 +57,20 @@ def _route_path(world, actor, origin_id, destination_id, *, route_reports=None):
         left, right = route.endpoint_region_ids
         edges.setdefault(left, []).append((right, report))
         edges.setdefault(right, []).append((left, report))
+    return edges
+
+
+def _route_path(world, actor, origin_id, destination_id, *, route_reports=None, route_graph=None):
+    """Use public topology only to connect the actor's own dated route reports."""
+    origin = world.society.settlements[origin_id].region_id
+    target = world.society.settlements[destination_id].region_id
+    edges = route_graph
+    # Reports are immutable during one migration review.  Callers may pass a
+    # transient per-actor index so repeated destination checks do not rebuild
+    # the same public graph; the index is never persisted.
+    if edges is None:
+        edges = _route_graph(world, world.knowledge.routes_for_actor(actor)
+                             if route_reports is None else route_reports)
     pending = deque([(origin, (), ())])
     visited = {origin}
     while pending:
@@ -83,7 +91,7 @@ def _own_food(world, group_id):
             and stock.location_id == group.settlement_id else 0)
 
 
-def migration_options(world, group_id, *, route_reports=None):
+def migration_options(world, group_id, *, route_reports=None, route_graph=None):
     """Return only destinations this household was actually told about."""
     group = world.society.population.get(group_id)
     actor = EntityRef("population_group", group_id)
@@ -99,7 +107,7 @@ def migration_options(world, group_id, *, route_reports=None):
                 or destination.health < source.health or destination.missing_food > source.missing_food):
             continue
         path = _route_path(world, actor, group.settlement_id, destination.settlement_id,
-                           route_reports=route_reports)
+                           route_reports=route_reports, route_graph=route_graph)
         if path is None:
             continue
         route_ids, path_reports = path
@@ -128,7 +136,7 @@ def migration_options(world, group_id, *, route_reports=None):
     return tuple(sorted(choices, key=lambda choice: choice.id))
 
 
-def recovery_options(world, journey_id, *, route_reports=None):
+def recovery_options(world, journey_id, *, route_reports=None, route_graph=None):
     """A stranded household may retry, reroute, or physically return.
 
     Rerouting is limited to another settlement known through current reports
@@ -155,7 +163,7 @@ def recovery_options(world, journey_id, *, route_reports=None):
                         or destination.population + journey.count > destination.housing_capacity):
                     continue
                 path = _route_path(world, actor, source.settlement_id, destination.settlement_id,
-                                   route_reports=route_reports)
+                                   route_reports=route_reports, route_graph=route_graph)
                 if path is None:
                     continue
                 route_ids, route_reports = path
@@ -197,6 +205,10 @@ def review_migration(world, *, excluded_actors=()):
             EntityRef("population_group", group_id))
         for group_id in sorted(world.society.population)
     }
+    route_graph_by_actor = {
+        actor: _route_graph(world, reports)
+        for actor, reports in route_reports_by_actor.items()
+    }
     recovered_groups.update(delta.owner_id for event in world.events
                             if event.day == world.clock.absolute_day and event.event_type == "migration_returned"
                             for delta in event.deltas if delta.owner_kind == "population_group")
@@ -208,7 +220,8 @@ def review_migration(world, *, excluded_actors=()):
             continue
         observe_present_household(world, journey.source_group_id, journey.destination_id, journey.last_event_id)
         options = recovery_options(world, journey.id,
-                                   route_reports=route_reports_by_actor.get(actor, ()))
+                                   route_reports=route_reports_by_actor.get(actor, ()),
+                                   route_graph=route_graph_by_actor.get(actor, {}))
         retry = next((item for item in options if item.action == "retry_migration_arrival"), None)
         source = world.knowledge.settlement_report(actor, world.society.population[journey.source_group_id].settlement_id)
         destination = world.knowledge.settlement_report(actor, journey.destination_id)
@@ -248,7 +261,8 @@ def review_migration(world, *, excluded_actors=()):
         if actor in excluded:
             continue
         options = migration_options(world, group_id,
-                                    route_reports=route_reports_by_actor.get(actor, ()))
+                                    route_reports=route_reports_by_actor.get(actor, ()),
+                                    route_graph=route_graph_by_actor.get(actor, {}))
         if not options:
             continue
         # Conservative household choice: the best observed health/food/headroom,
@@ -311,13 +325,18 @@ def migration_adapters():
         authorization = record_event(
             world, "migration_authorized", "O grupo autorizou a jornada escolhida.",
             fact_kind=FactKind.DECISION,
-            decision={"action": "migrate", "actor_ref": actor.to_dict(), "group_id": option.group_id,
+            decision={"action": "migrate", "actor_ref": actor.to_dict(), "option_id": option.id,
+                      "group_id": option.group_id,
                       "destination_id": option.destination_id, "count": option.count, "food": option.food,
                       "route_ids": list(option.route_ids), "source_report_id": option.source_report_id,
                       "destination_report_id": option.destination_report_id,
                       "route_report_ids": list(option.route_report_ids), "character_ids": [],
                       "cancel_activity_ids": []},
-            cause_ids=(decision_event_id,))
+            # The owner authorization must retain the reports that made this
+            # affordance valid.  Without them ``start_migration`` correctly
+            # rejects the authorization as stale, because a decision cannot
+            # materialize a route that it did not cite.
+            cause_ids=(decision_event_id, *causes_for(world, option)))
         return start_migration(world, option.id, decision_event_id=authorization.id)
 
     def execute_recovery(world, actor, option_id, decision_event_id):

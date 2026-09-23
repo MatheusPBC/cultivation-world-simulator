@@ -321,7 +321,7 @@ def buy_household_provisions(world, *, group_id, offer_id, quantity, buyer_decis
         raise ValueError("household provision price, reserve, funds or capacity changed")
     terms = _terms(group_id, offer, quantity)
     terms["seller_account_id"] = seller.id
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     for event_id, action, actor in ((buyer_decision_id, "buy_household_provisions", buyer.owner_ref),
                                     (seller_decision_id, "sell_household_provisions", seller.owner_ref)):
         event = events.get(event_id)

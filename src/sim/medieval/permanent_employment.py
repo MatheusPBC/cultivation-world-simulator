@@ -18,6 +18,7 @@ from src.classes.society.models import SocietyValue
 from .economy import _causes, _delta
 from .events import record_event
 from .labor import settle_work
+from .actor_dossier import _own_production_readings
 
 
 ACTION = "create_permanent_employment"
@@ -93,6 +94,50 @@ def _workforce_limit(world, group):
     return max(1, group.count // denominator)
 
 
+def _food_labor_pressure(world, settlement_id):
+    """Whether a dated food line is already short of workers.
+
+    A standing contract for the same farmer cohort would reserve people before
+    production and make the shortage self-reinforcing.  This reading comes
+    only from the latest typed production receipt and current settlement
+    condition; it does not infer a policy or move anyone.
+    """
+    need = world.economy.needs.get(settlement_id)
+    if need is None:
+        return False
+    for facility in world.economy.facilities.values():
+        stock = world.economy.stocks.get(facility.stock_id)
+        recipe = world.economy.recipes.get(facility.recipe_id)
+        if (stock is None or recipe is None or stock.location_id != settlement_id
+                or recipe.occupation != "farmer" or "food" not in recipe.outputs):
+            continue
+        event = next((item for item in reversed(world.events) if item.id == facility.last_event_id), None)
+        if event is None or event.day != world.clock.absolute_day:
+            continue
+        if any(delta.owner_kind == "production" and delta.owner_id == facility.id
+               and delta.aspect == "labor_shortfall" and delta.after.isdecimal()
+               and int(delta.after) > 0 for delta in event.deltas):
+            return True
+    return False
+
+
+def _standing_monthly_cost(world, account_id):
+    """Cost of one payroll account's already accepted recurring payrolls.
+
+    A permanent-employment option creates a new obligation rather than a
+    one-shot purchase.  The option builder therefore must not offer another
+    contract when the current owner account cannot cover the existing
+    obligations plus its first payroll.  This conservative reading never
+    forecasts revenue or creates credit; a later dated decision can observe a
+    genuinely replenished balance and re-open the option.
+    """
+    return sum(
+        contract.workforce_limit * contract.wage_per_worker
+        for contract in world.economy.employment_contracts.values()
+        if contract.account_id == account_id
+    )
+
+
 def permanent_employment_options(world, employer):
     """Enumerate only funded, local, currently authorized standing jobs.
 
@@ -108,6 +153,11 @@ def permanent_employment_options(world, employer):
     options = []
     for group in sorted(world.society.population.values(), key=lambda item: item.id):
         if group.id in contracted or group.occupation == "dependent" or group.count <= 0:
+            continue
+        # Do not create a standing reservation for farmers while a current
+        # food line is labor-bound.  The group may still receive and accept a
+        # workforce transition affordance when another owner enumerates one.
+        if group.occupation == "farmer" and _food_labor_pressure(world, group.settlement_id):
             continue
         workforce_limit = _workforce_limit(world, group)
         sites = sorted((site for site in world.map.infrastructure_sites.values()
@@ -125,7 +175,10 @@ def permanent_employment_options(world, employer):
             for stock in stocks:
                 for account in accounts:
                     wage = _site_wage(world, site, group.occupation)
-                    if account.balance < workforce_limit * wage:
+                    candidate_cost = workforce_limit * wage
+                    committed_cost = _standing_monthly_cost(world, account.id)
+                    if (account.balance < candidate_cost
+                            or committed_cost + candidate_cost > account.balance):
                         continue
                     opaque_terms = "|".join((stock.id, account.id, str(group.last_event_id),
                                               repr(sorted(stock.last_event_ids.items())),
@@ -313,6 +366,7 @@ def _situation(world, actor, options):
     return {
         "you_are": actor.to_dict(),
         "today": world.clock.absolute_day,
+        "own_production_readings": _own_production_readings(world, actor),
         "settlement_reports": [
             {"settlement_id": report.settlement_id, "missing_food": report.missing_food,
              "health": report.health, "unrest": report.unrest,

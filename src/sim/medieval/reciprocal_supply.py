@@ -23,10 +23,12 @@ from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity
 
 from .demand import reserve_quantity
-from .diplomacy import offer_proposal, respond_proposal
+from .diplomacy import disclose, offer_proposal, respond_proposal
 from .economy import _causes, _delta
 from .events import record_event
-from .institutional_memory import institutional_view
+from .institutional_memory import (apply_memory_creation, apply_reinforcement,
+                                    institutional_view, memories_of,
+                                    memory_creation_deltas, reinforcement_deltas)
 from .logistics import check_freight, open_order
 from .routing import fiscal_route_options, known_supply_path, validate_fiscal_route_option
 
@@ -34,6 +36,7 @@ from .routing import fiscal_route_options, known_supply_path, validate_fiscal_ro
 OFFER_ACTION = "offer_reciprocal_supply"
 RESPONSE_ACTION = "respond_reciprocal_supply"
 FULFILL_ACTION = "fulfill_resource_transfer"
+REMEDIATE_ACTION = "remediate_resource_transfer"
 OFFER_WINDOW = 10
 FOOD_DUE_DAYS = 20
 PLEDGE_DUE_DAYS = 40
@@ -107,6 +110,30 @@ class ResourceTransferFulfillmentOption:
 
     def decision(self):
         return {"action": FULFILL_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class ResourceTransferRemediationOption:
+    """A debtor's current, material repair of a breached freight term.
+
+    The original source stock and route are historical terms.  A repair is a
+    new owner decision and therefore recomposes a currently owned stock and a
+    currently known fiscal route; it never edits the old clause.
+    """
+    id: Identity
+    actor_ref: EntityRef
+    obligation_id: Identity
+    source_stock_id: Identity
+    destination_stock_id: Identity
+    resource_id: Identity
+    quantity: int
+    route_ids: tuple[Identity, ...]
+    breach_event_id: Identity
+    route_option_id: Identity
+
+    def decision(self):
+        return {"action": REMEDIATE_ACTION, "actor_ref": self.actor_ref.to_dict(),
                 "selected_affordance_id": self.id}
 
 
@@ -424,6 +451,115 @@ def fulfill_resource_transfer(world, actor, option_id, decision_event_id):
         update={"status": "fulfilled", "material_event_id": opened.last_event_id, "last_event_id": receipt.id})
     candidate.agenda.cancel(obligation.id)
     from .diplomacy import disclose
+    disclose(candidate, proposal, receipt)
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    candidate.relations.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return opened
+
+
+def resource_transfer_remediation_options(world, actor):
+    """Enumerate repairs for non-aid resource-transfer breaches.
+
+    Institutional aid keeps its narrower owner because its source candidates
+    are tied to the aid request. Reciprocal and negotiated freight terms use
+    this general path, still bounded by the debtor's own stock, notice and
+    route knowledge.
+    """
+    if not (isinstance(actor, EntityRef)
+            and can_actor_act_for(world, actor, actor, "supply")
+            and can_actor_act_for(world, actor, actor, "diplomacy")):
+        return ()
+    notices = tuple(world.knowledge.notices.values())
+    options = []
+    for obligation in sorted(world.relations.obligations.values(), key=lambda item: item.id):
+        proposal = world.relations.proposals.get(obligation.proposal_id)
+        if (proposal is None or proposal.proposal_kind == "institutional_aid"
+                or obligation.status != "breached" or obligation.breach_event_id is None):
+            continue
+        clause = proposal.clauses[obligation.clause_index]
+        if (clause.kind != "resource_transfer" or clause.debtor_ref != actor
+                or not any(notice.recipient_ref == actor and notice.event_id == obligation.breach_event_id
+                           for notice in notices)):
+            continue
+        destination = world.economy.stocks.get(clause.destination_stock_id)
+        if destination is None or destination.owner_ref != clause.creditor_ref:
+            continue
+        for source in sorted(world.economy.stocks.values(), key=lambda item: item.id):
+            if source.owner_ref != actor or source.id == destination.id:
+                continue
+            available = source.goods.get(clause.resource_id, 0) - reserve_quantity(
+                world, source.id, clause.resource_id)
+            if available < clause.quantity:
+                continue
+            routes = fiscal_route_options(world, actor, source.id, destination.id,
+                                          clause.resource_id, clause.quantity)
+            route = next(iter(routes), None)
+            if route is None:
+                continue
+            try:
+                check_freight(world, source.id, destination.id, clause.resource_id,
+                              clause.quantity, route.route_ids)
+            except (KeyError, ValueError):
+                continue
+            stamp = source.last_event_ids.get(clause.resource_id)
+            options.append(ResourceTransferRemediationOption(
+                id=(f"resource-transfer-remediate:{obligation.id}:{obligation.breach_event_id}:"
+                    f"{source.id}:{stamp}:{route.id}"), actor_ref=actor,
+                obligation_id=obligation.id, source_stock_id=source.id,
+                destination_stock_id=destination.id, resource_id=clause.resource_id,
+                quantity=clause.quantity, route_ids=tuple(route.route_ids),
+                breach_event_id=obligation.breach_event_id, route_option_id=route.id))
+    return tuple(options)
+
+
+def remediate_resource_transfer(world, actor, option_id, decision_event_id):
+    """Dispatch a fresh freight term and close only the current obligation."""
+    candidate = deepcopy(world)
+    decision, decided_by = _decision(candidate, decision_event_id, REMEDIATE_ACTION)
+    if decided_by != actor:
+        raise ValueError("resource transfer remediation has the wrong actor")
+    option = next((item for item in resource_transfer_remediation_options(candidate, actor)
+                   if item.id == option_id), None)
+    if option is None or decision.decision != option.decision():
+        raise ValueError("resource transfer remediation option is stale or unknown")
+    require_authority(candidate, actor, "supply")
+    require_authority(candidate, actor, "diplomacy")
+    obligation = candidate.relations.obligations[option.obligation_id]
+    proposal = candidate.relations.proposals[obligation.proposal_id]
+    clause = proposal.clauses[obligation.clause_index]
+    if obligation.breach_event_id != option.breach_event_id or clause.kind != "resource_transfer":
+        raise ValueError("resource transfer remediation breach is stale")
+    route = validate_fiscal_route_option(candidate, option.route_option_id, actor,
+                                         option.source_stock_id, option.destination_stock_id,
+                                         option.resource_id, option.quantity)
+    if tuple(route.route_ids) != tuple(option.route_ids):
+        raise ValueError("resource transfer remediation route is stale")
+    opened = open_order(candidate, option.source_stock_id, option.destination_stock_id,
+                        option.resource_id, option.quantity, option.route_ids,
+                        decision_ids=(decision.id,), cause_ids=(option.breach_event_id,))
+    parties = (proposal.proposer_ref, proposal.counterparty_ref)
+    reinforced = tuple(memory for memory in
+                       (memories_of(candidate, party, option.breach_event_id) for party in parties)
+                       if memory is not None)
+    receipt = record_event(
+        candidate, "resource_transfer_remediated",
+        "Uma remessa material reparou uma obrigação de recurso descumprida.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("obligation", obligation.id, "status", "breached", "remediated"),
+                _delta("obligation", obligation.id, "remediation_material_event_id", None,
+                       opened.last_event_id),
+                *memory_creation_deltas(candidate, parties),
+                *reinforcement_deltas(candidate, reinforced)),
+        cause_ids=(decision.id, option.breach_event_id, opened.last_event_id))
+    candidate.relations.obligations[obligation.id] = obligation.model_copy(
+        update={"status": "remediated", "material_event_id": None,
+                "remediation_material_event_id": opened.last_event_id,
+                "last_event_id": receipt.id})
+    candidate.agenda.cancel(obligation.id)
+    apply_memory_creation(candidate, parties, receipt)
+    apply_reinforcement(candidate, reinforced, receipt)
     disclose(candidate, proposal, receipt)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)

@@ -11,16 +11,57 @@ import json
 from src.classes.event import FactKind
 
 
+def site_capabilities(site):
+    """Canonical text of a site's physical capabilities, for receipts."""
+    return ",".join(site.capability_ids)
+
+
 def site_aspect(site, aspect):
     return {"integrity": str(site.integrity), "enabled": str(site.enabled),
             "service_suspended": str(site.service_suspended),
+            # Physical capability is what makes a place able to host a line at
+            # all, so a capability that history changed must prove it like any
+            # other aspect the Map owns.
+            "capability_ids": site_capabilities(site),
             "owner_ref": json.dumps(site.owner_ref.to_dict(), sort_keys=True) if site.owner_ref else "None",
             "maintainer_ref": json.dumps(site.maintainer_ref.to_dict(), sort_keys=True) if site.maintainer_ref else "None"}.get(aspect)
 
 
+def _commissioned_capabilities(events, site):
+    """The last capability set history declared for this site, if any."""
+    latest = None
+    for event in events.values():
+        for delta in event.deltas:
+            if (delta.owner_kind == "site" and delta.owner_id == site.id
+                    and delta.aspect == "capability_ids"):
+                if latest is None or event.sequence > latest[0].sequence:
+                    latest = (event, delta)
+    return latest
+
+
 def validate_infrastructure(world) -> None:
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
+    granted = {blueprint.grants_capability_id
+               for blueprint in world.economy.expansion_blueprints.values()
+               if blueprint.grants_capability_id}
     for site in world.map.infrastructure_sites.values():
+        # A capability is a physical fact about a place, so its shape is
+        # checked whether or not history ever touched this site.
+        if (len(set(site.capability_ids)) != len(site.capability_ids)
+                or any(not capability or not capability.strip() for capability in site.capability_ids)):
+            raise ValueError("site capabilities must be unique and named")
+        commissioned = _commissioned_capabilities(events, site)
+        if commissioned is not None:
+            receipt, delta = commissioned
+            # A capability history created must still read exactly as the
+            # receipt that created it, and must be one an authored blueprint
+            # actually grants -- never a capability invented after the fact.
+            if delta.after != site_capabilities(site):
+                raise ValueError("site capabilities must match the receipt that commissioned them")
+            if receipt.fact_kind != FactKind.STATE_TRANSITION or receipt.day > world.clock.absolute_day:
+                raise ValueError("commissioned capabilities require a dated material fact")
+            if any(capability not in granted for capability in site.capability_ids):
+                raise ValueError("a commissioned site may only hold an authored blueprint capability")
         # Authored initial state has no receipt; anything changed since must.
         if site.last_event_id is None:
             continue

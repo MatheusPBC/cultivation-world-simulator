@@ -1,5 +1,9 @@
 """A foreign prepared column can apply bounded pressure without owning a city."""
 
+from copy import deepcopy
+
+import pytest
+
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
@@ -35,10 +39,11 @@ def tick(world):
     resolve_dated(world, due)
 
 
-def prepared_foreign_column():
+def prepared_foreign_column(*, with_route_reports=True):
     world = create_medieval_world(131)
     refresh_settlement_reports(world)
-    refresh_route_reports(world)
+    if with_route_reports:
+        refresh_route_reports(world)
     group = next(item for item in world.society.population.values() if item.settlement_id == "campomanso")
     soldier_id = f"pop:campomanso:{group.people}:soldier"
     world.society.population[soldier_id] = group.model_copy(
@@ -59,7 +64,8 @@ def prepared_foreign_column():
     prepare_force_position(world, ATTACKER, position.id, decide(world, position).id)
     for _ in range(3):
         tick(world)
-    refresh_route_reports(world, route_ids=(ROAD, OTHER_EXIT))
+    if with_route_reports:
+        refresh_route_reports(world, route_ids=(ROAD, OTHER_EXIT))
     return world, detachment.id
 
 
@@ -136,3 +142,37 @@ def test_too_small_has_no_option_and_lift_preserves_an_external_closure():
     assert all(lapsed.map.get_route_operational_capacity(route_id) > 0
                for route_id in (ROAD, OTHER_EXIT))
     assert any(event.event_type == "settlement_investment_lifted" for event in lapsed.events)
+
+
+def test_missing_route_observation_blocks_pressure_until_new_local_report(tmp_path):
+    uninformed, detachment_id = prepared_foreign_column(with_route_reports=False)
+    informed = deepcopy(uninformed)
+    refresh_route_reports(informed, route_ids=(ROAD, OTHER_EXIT))
+    option = next(item for item in settlement_investment_options(informed, ATTACKER,
+                       detachment_id=detachment_id) if item.kind == "invest")
+    assert uninformed.knowledge.route_report(ATTACKER, ROAD) is None
+    assert uninformed.map.get_route_operational_capacity(ROAD) > 0
+    assert not any(item.kind == "invest" for item in settlement_investment_options(
+        uninformed, ATTACKER, detachment_id=detachment_id))
+
+    stale_decision = decide(uninformed, option)
+    before = world_snapshot(uninformed)
+    with pytest.raises(ValueError, match="stale or unknown"):
+        execute_settlement_investment_option(uninformed, ATTACKER, option.id, stale_decision.id)
+    assert world_snapshot(uninformed) == before
+
+    refresh_route_reports(uninformed, route_ids=(ROAD, OTHER_EXIT))
+    current = next(item for item in settlement_investment_options(uninformed, ATTACKER,
+                   detachment_id=detachment_id) if item.kind == "invest")
+    assert current.id != option.id
+    assert uninformed.knowledge.route_report(ATTACKER, ROAD).event_id in current.report_event_ids
+    investment = execute_settlement_investment_option(
+        uninformed, ATTACKER, current.id, decide(uninformed, current).id)
+    assert investment.stage == "active"
+    assert all(uninformed.map.get_route_operational_capacity(route_id) == 0
+               for route_id in investment.route_ids)
+    path = tmp_path / "information-bounded-investment.mws"
+    save_world(uninformed, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(uninformed)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True

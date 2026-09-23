@@ -68,6 +68,42 @@ def test_missing_materials_block_without_spending_or_free_progress():
     assert world.economy.facilities[project.facility_id].max_batches == 60
 
 
+def test_storage_pressure_exposes_and_completes_granary_expansion():
+    from src.sim.medieval.economy import produce_monthly
+    from src.sim.medieval.expansion import expansion_options, start_expansion, progress_expansions
+
+    world = create_medieval_world(73)
+    world.clock = WorldClock(30)
+    facility = world.economy.facilities['works:campos-de-brumafria']
+    stock = world.economy.stocks[facility.stock_id]
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={'capacity': world.economy.used_capacity(stock) + 50})
+    produce_monthly(world)
+    pressured_capacity = world.economy.stocks[stock.id].capacity
+
+    option = next(item for item in expansion_options(world, stock.owner_ref)
+                  if item.facility_id == facility.id and item.blueprint_id == 'granary-extension')
+    decision = record_event(world, 'expansion_decided', 'Ampliar o armazém após pressão material de armazenamento.',
+        fact_kind=FactKind.DECISION, decision={'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
+                                               'facility_id': facility.id, 'blueprint_id': option.blueprint_id},
+        cause_ids=(world.economy.facilities[facility.id].last_event_id,))
+    project = start_expansion(world, facility.id, option.blueprint_id, decision_event_id=decision.id)
+    available = {group.id: group.count for group in world.society.population.values()}
+    world.clock = WorldClock(60)
+    progress_expansions(world, available)
+    assert world.economy.expansions[project.id].completed_units == 3
+    assert world.economy.stocks[stock.id].capacity == pressured_capacity
+
+    world.clock = WorldClock(90)
+    progress_expansions(world, available)
+    assert world.economy.expansions[project.id].stage == 'completed'
+    assert world.economy.stocks[stock.id].capacity == pressured_capacity + 10000
+    receipt = next(event for event in reversed(world.events)
+                   if event.id == world.economy.expansions[project.id].last_event_id)
+    assert any(delta.owner_kind == 'stock' and delta.owner_id == stock.id
+               and delta.aspect == 'capacity' for delta in receipt.deltas)
+
+
 def test_public_query_exposes_construction_and_catalog():
     from src.server.medieval.queries import economy_view
     world = create_medieval_world(73)
@@ -105,15 +141,27 @@ async def test_monthly_engine_shares_construction_workers_with_production():
     from src.sim.medieval.engine import MedievalSimulator
     world = create_medieval_world(73)
     project = start(world)
-    # 1800 local artisans, mine requests1800; ten work on the extension.
+    # The mine asks for more labor than the currently available local artisans;
+    # construction reserves its workers first on the same monthly boundary.
     mine = world.economy.facilities[project.facility_id]
-    world.economy.facilities = {mine.id: mine.model_copy(update={'max_batches': 180})}
+    recipe = world.economy.recipes[mine.recipe_id]
     stock = world.economy.stocks[mine.stock_id]
+    local_workers = sum(world.society.available_count(group.id)
+                        for group in world.society.population.values()
+                        if group.settlement_id == stock.location_id
+                        and group.occupation == recipe.occupation)
+    world.economy.facilities = {mine.id: mine.model_copy(update={'max_batches': 180})}
     world.economy.stocks[stock.id] = stock.model_copy(update={'goods': {**stock.goods, 'wood': 500}})
     await MedievalSimulator(world).step()
     assert world.economy.expansions[project.id].completed_units == 5
-    assert world.economy.facilities[mine.id].last_batches == 179
-    assert sum(p.gross for p in world.economy.payrolls.values()) == 1810
+    builders = sum(world.economy.payrolls[project.id].workers_by_group.values())
+    assert builders > 0
+    assert world.economy.facilities[mine.id].last_batches == min(
+        180, (local_workers - builders) // recipe.workers)
+    assert world.economy.payrolls[project.id].gross == (
+        builders * world.economy.expansion_blueprints[project.blueprint_id].wage_per_worker)
+    assert world.economy.payrolls[mine.id].gross == (
+        world.economy.facilities[mine.id].last_batches * recipe.workers * mine.wage_per_worker)
 
 
 def test_project_material_demand_is_remaining_not_monthly_multiplied():

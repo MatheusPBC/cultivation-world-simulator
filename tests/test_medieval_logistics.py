@@ -145,9 +145,8 @@ def test_cargo_quantity_corruption_and_missing_agenda_are_rejected(tmp_path):
         save_world(world, tmp_path / "corrupt.mws")
 
 
-async def test_delivery_on_month_boundary_feeds_population_before_consumption():
+async def test_delivery_on_month_boundary_can_fund_causal_relief():
     from src.systems.time import WorldClock
-    from tests.medieval_relief_helpers import relieve_settlement
     world = cargo_world()
     world.clock = WorldClock(26)
     world.map.routes[ROAD].update_runtime(capacity=1000, quality=1)
@@ -158,13 +157,15 @@ async def test_delivery_on_month_boundary_feeds_population_before_consumption():
     await engine.step()
     await engine.step()
     assert world.clock.absolute_day == 30
-    # No household can pay, so the full ration is missing this cycle; the
-    # 300 units that arrived just before the boundary sit in the granary
-    # until the administration chooses to give them away.
-    assert world.economy.needs["pedraclara"].missing_food == 2400
-    arrival = next(e for e in world.events if e.event_type == "cargo_delivered")
-    relief = relieve_settlement(world, "pedraclara")
+    # Offline routine-rules now selects a real distribution affordance at the
+    # month boundary. The 300 units delivered beforehand can reduce the gap;
+    # no stock or ration is granted merely by this test's expectation.
     assert world.economy.needs["pedraclara"].missing_food == 2100
+    arrival = next(e for e in world.events if e.event_type == "cargo_delivered")
+    relief = next(e for e in world.events if e.event_type == "relief_distributed"
+                  and any(delta.owner_kind == "stock" and delta.owner_id == DEST for delta in e.deltas))
+    assert any(e.event_type == "relief_distribution_decided" and e.id in
+               {link.cause_event_id for link in relief.causal_links} for e in world.events)
     assert arrival.id in {link.cause_event_id for link in relief.causal_links}
 
 

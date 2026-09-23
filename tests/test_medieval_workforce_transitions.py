@@ -16,13 +16,41 @@ from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.workforce import (accept_workforce_transition, labor_shortfall, refresh_workforce_notices,
                                          WorkforceTransitionOption, resolve_workforce_transitions, workforce_adapters,
-                                         workforce_transition_options)
+                                         workforce_transition_options, _transition_situation)
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval import ai_decider
 
 
 CUSTOMS_SITE = "passagem-negra"
 CUSTOMS_ROUTE = "road-pontenegro-ferroalto"
+
+
+@pytest.mark.asyncio
+async def test_natural_food_pressure_can_improve_through_workforce_decisions():
+    """A pressured natural run improves only after material labour choices.
+
+    This is deliberately a bounded acceptance fixture, not a promise that
+    every natural seed is prosperous.  It proves that the existing fallback
+    selects enumerated workforce/employment affordances and that the later
+    production receipts can lower the same food pressure without a subsidy or
+    narrative event.
+    """
+    world = create_medieval_world(73)
+    engine = MedievalSimulator(world)
+    initial_pressure = None
+    while world.clock.absolute_day < 60:
+        await engine.step()
+        if world.clock.absolute_day == 30:
+            initial_pressure = sum(need.missing_food for need in world.economy.needs.values())
+
+    final_pressure = sum(need.missing_food for need in world.economy.needs.values())
+    assert initial_pressure is not None and final_pressure < initial_pressure
+    assert world.society.workforce_transitions
+    assert any(event.event_type == "workforce_transition_completed" for event in world.events)
+    assert world.economy.employment_contracts
+    assert any(event.event_type == "production_limited" and any(
+        delta.owner_kind == "production" and delta.aspect == "labor_shortfall"
+        for delta in event.deltas) for event in world.events)
 
 
 def labour_limited_world():
@@ -86,6 +114,12 @@ def test_local_transition_is_dated_conservative_and_causally_material(tmp_path):
     assert not workforce_transition_options(world, group.id), "a reserved group cannot work, migrate, or accept again"
     start = next(event for event in world.events if event.event_type == "workforce_transition_started")
     assert start.fact_kind == FactKind.STATE_TRANSITION
+    assert start.causal_origin.value == "actor_decision"
+    assert start.causal_payload == {
+        "decision_event_id": transition.decision_event_id,
+        "actor_ref": EntityRef("population_group", group.id).to_dict(),
+        "selected_affordance_id": option.id,
+    }
     assert any(link.cause_event_id == transition.decision_event_id for link in start.causal_links)
 
 
@@ -104,6 +138,17 @@ def test_local_transition_is_dated_conservative_and_causally_material(tmp_path):
     completed = next(event for event in resumed.events if event.event_type == "workforce_transition_completed")
     assert completed.fact_kind == FactKind.STATE_TRANSITION
     assert transition.last_event_id in {link.cause_event_id for link in completed.causal_links}
+
+
+def test_spent_sponsor_funds_remove_a_same_day_workforce_option():
+    world, group, facility, option = labour_limited_world()
+    assert option in workforce_transition_options(world, group.id)
+    account = world.economy.accounts[facility.payroll_account_id]
+    world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
+
+    # Offers are notices, not reservations. Another decision may spend the
+    # sponsor's funds before this group receives its turn.
+    assert workforce_transition_options(world, group.id) == ()
 
 
 def labour_signal(world, facility):
@@ -228,6 +273,39 @@ def test_the_labour_signal_is_typed_quantified_and_restated_every_cycle():
     assert labour_signal(world, facility) == first
 
 
+def test_transition_situation_exposes_dated_unaffordable_reading_without_balances():
+    from src.sim.medieval.economy import consume_monthly
+    from src.systems.time import WorldClock
+
+    world = create_medieval_world(73)
+    world.economy.facilities.clear()
+    world.clock = WorldClock(30)
+    target = "pedraclara"
+    stock = world.economy.stocks[f"stock:{target}"]
+    world.economy.stocks[stock.id] = stock.model_copy(update={"goods": {"food": 1000}})
+    consume_monthly(world)
+    group = next(item for item in world.society.population.values() if item.settlement_id == target)
+    actor = EntityRef("population_group", group.id)
+
+    assert _transition_situation(world, actor, ())["unaffordable_food"] == 0
+    refresh_reports(world)
+    situation = _transition_situation(world, actor, ())
+
+    assert situation["unaffordable_food"] > 0
+    assert situation["unaffordable_group_count"] > 0
+    assert "household" not in situation and "balance" not in situation
+
+
+def test_transition_situation_reports_zero_affordability_without_a_reading():
+    world, group, _facility, _option = labour_limited_world()
+    actor = EntityRef("population_group", group.id)
+
+    situation = _transition_situation(world, actor, ())
+
+    assert situation["unaffordable_food"] == 0
+    assert situation["unaffordable_group_count"] == 0
+
+
 def test_agricultural_labour_limit_creates_a_private_return_to_farming_offer():
     world = create_medieval_world(73)
     produce_monthly(world)
@@ -255,6 +333,25 @@ def test_food_pressure_expands_only_the_engine_owned_farmer_demand():
     assert all(notice.count <= world.society.population[notice.source_group_id].count // 2
                for notice in world.knowledge.workforce_offer_notices.values()
                if notice.demand_id == report.id)
+
+
+def test_relief_does_not_make_same_day_labor_receipt_stale():
+    world = create_medieval_world(73)
+    produce_monthly(world)
+    need = world.economy.needs["pedraclara"]
+    world.economy.needs[need.id] = need.model_copy(update={"missing_food": 450})
+    refresh_workforce_notices(world)
+    report = next(item for item in world.knowledge.workforce_demand_reports.values()
+                  if item.work_id == "works:campos-de-pedra-clara")
+    offer = next(item for item in world.knowledge.workforce_offer_notices.values()
+                 if item.demand_id == report.id)
+
+    # A separate owner may cover the observed food shortfall before the group
+    # answers. The production event and its typed labour signal are unchanged.
+    world.economy.needs[need.id] = need.model_copy(update={"missing_food": 0})
+
+    options = workforce_transition_options(world, offer.source_group_id)
+    assert any(option.notice_id == offer.id for option in options)
 
 
 def test_offline_workforce_fallback_prioritizes_farming_when_food_is_missing(monkeypatch):
@@ -622,10 +719,11 @@ def cross_settlement_world():
     stock = world.economy.stocks[facility.stock_id]
     refresh_route_reports(world)
     for candidate in list(world.society.population.values()):
-        if candidate.settlement_id == stock.location_id and candidate.occupation == "farmer":
+        if candidate.settlement_id == stock.location_id and candidate.occupation != "artisan":
             # Shrink to just its named residents (never below), small enough
             # that MAX_GROUP_FRACTION_DENOMINATOR floors any offer to zero --
-            # a real, if tiny, local cohort that still cannot fill the demand.
+            # including the new opening soldier cohorts. A real, if tiny,
+            # local cohort still cannot fill the demand.
             named = sum(1 for c in world.society.characters.values()
                        if c.population_group_id == candidate.id and c.death_day is None)
             world.society.population[candidate.id] = candidate.model_copy(update={"count": named})

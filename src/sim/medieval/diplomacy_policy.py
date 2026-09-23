@@ -15,7 +15,7 @@ from .economy import _delta, transfer_money
 from .institutional_memory import (apply_memory_creation, apply_reinforcement,
                                    memory_creation_deltas, memories_of, reinforcement_deltas)
 from . import ai_decider
-from .ai_decider import NO_ACTION, select_option
+from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
 from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
                                           review_institutional_decision_turn_with_provider)
 from .technology_sighting import (DISCLOSE_TECHNOLOGY_ACTION, disclosure_options,
@@ -224,7 +224,7 @@ def fulfill(world, ctx, proposal):
     if bargain is None and remediation is None:
         return
     day = world.clock.absolute_day
-    events = {e.id:e for e in world.events}
+    events = world.event_index()
     for index, clause in enumerate(proposal.clauses):
         if clause.debtor_ref != ctx.actor: continue
         obligation = world.relations.obligations[f'{proposal.id}:term:{index}']
@@ -1013,8 +1013,10 @@ def _diplomacy_situation(world, actor, options):
     counterparty breach history is likewise bounded to what this specific
     actor was itself notified of -- see ``_known_counterparty_breaches``."""
     context = diplomatic_context(world, actor)
+    from .actor_dossier import _own_production_readings
     return {
         "today": world.clock.absolute_day,
+        "own_production_readings": _own_production_readings(world, actor),
         "known_proposal_ids": sorted({option.proposal_id for option in options
                                       if getattr(option, "proposal_id", None)}),
         "own_obligation_ids": sorted({option.obligation_id for option in options
@@ -1151,9 +1153,22 @@ async def review_promised_teaching_turns(world, *, consulted=(), actors=None):
             if was_askable:
                 consulted.add(actor)
             continue
+        current = next((item for item in _learning_options(world, actor) if item.id == option.id), None)
+        if current is None:
+            raise ProviderDecisionRequired(
+                f"provider decision required for {actor.kind}:{actor.id}: "
+                "promised teaching affordance became stale"
+            )
+        option = current
         consulted.add(actor)
         event = _record_option_decision(world, option, causes)
-        _execute_learning(world, option, event.id)
+        try:
+            _execute_learning(world, option, event.id)
+        except ValueError as exc:
+            raise ProviderDecisionRequired(
+                f"provider decision required for {actor.kind}:{actor.id}: "
+                "promised teaching affordance became stale"
+            ) from exc
     return consulted
 
 

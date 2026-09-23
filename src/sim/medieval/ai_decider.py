@@ -7,8 +7,9 @@ option ID or NO_ACTION, and nothing else it says is kept or used.
 
     Its answer is an interpretation, recorded as a zero-delta receipt that can
     never be the material cause of anything. The decision, the revalidation and
-    the execution stay with the actor and the canonical owner. Provider mode
-    treats unavailable/error/invalid/NO_ACTION as no material action.
+    the execution stay with the actor and the canonical owner. In AI-enabled
+    mode, unavailable/error/invalid provider responses pause the candidate;
+    only an explicit NO_ACTION is a valid non-action.
 """
 
 import json
@@ -27,6 +28,10 @@ DECLINED_EVENT = "ai_decision_declined"
 FAILED_EVENT = "ai_decision_failed"
 RECEIPT_EVENTS = frozenset({INTERPRETED_EVENT, DECLINED_EVENT, FAILED_EVENT})
 MAX_LABEL = 160
+
+
+class ProviderDecisionRequired(RuntimeError):
+    """The world cannot advance until an enabled actor can be consulted."""
 
 
 def _contains_private_identifier(value: str) -> bool:
@@ -57,16 +62,17 @@ def _prompt_choices(choices):
 
 
 def provider_available() -> bool:
-    """A real key and model must exist outside the save for this to be true."""
+    """A configured provider must exist outside the save for this to be true."""
     from src.utils.llm.runtime_mode import is_test_mode_enabled
     if is_test_mode_enabled():
         return False
     try:
+        from src.utils.llm.validation import is_llm_runtime_configured
         from src.config.settings_service import get_settings_service
-        profile = get_settings_service().get_settings().llm
+        profile, api_key = get_settings_service().get_llm_runtime_config()
     except Exception:
         return False
-    return bool(getattr(profile, "has_api_key", False) and getattr(profile, "model_name", ""))
+    return is_llm_runtime_configured(profile, api_key)
 
 
 def spent_calls(world, *, since_day=None):
@@ -128,7 +134,9 @@ def _prompt(actor, situation, choices):
                "choices": [{"id": item["id"], "label": item["label"][:MAX_LABEL]} for item in choices],
                "answer_format": {"selected_id": f"one choice id or {NO_ACTION}"}}
     return ("Você decide por um ator do mundo medieval. Escolha exatamente uma opção da lista "
-            "ou NO_ACTION. Responda somente JSON no formato indicado.\n"
+            f"ou {NO_ACTION}. Sua resposta inteira deve ser um único objeto JSON com exatamente "
+            "a chave `selected_id`; não repita contexto, escolhas, situação ou o formato. "
+            "O valor de `selected_id` deve ser exatamente um ID listado nas escolhas ou NO_ACTION.\n"
             + json.dumps(payload, sort_keys=True, ensure_ascii=False))
 
 
@@ -141,14 +149,22 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     if not choices:
         return None
     if not within_budget(world) or not provider_available():
-        _receipt(world, FAILED_EVENT, "Consulta ao provedor indisponível; nenhuma ação material foi tomada.",
-                 causes=causes)
-        return None
+        if not world.config.ai_enabled:
+            _receipt(world, FAILED_EVENT, "Consulta ao provedor indisponível; nenhuma ação material foi tomada.",
+                     causes=causes)
+            return None
+        raise ProviderDecisionRequired(
+            f"provider decision required for {actor.kind}:{actor.id}; no provider or budget is available"
+        )
     if not actor_within_monthly_cap(world, actor):
-        _receipt(world, FAILED_EVENT,
-                 "O teto mensal de ações institucionais deste ator foi atingido; nenhuma ação material foi tomada.",
-                 causes=causes)
-        return None
+        if not world.config.ai_enabled:
+            _receipt(world, FAILED_EVENT,
+                     "O teto mensal de ações institucionais deste ator foi atingido; nenhuma ação material foi tomada.",
+                     causes=causes)
+            return None
+        raise ProviderDecisionRequired(
+            f"provider decision required for {actor.kind}:{actor.id}; monthly decision cap is exhausted"
+        )
     # This consultation is genuinely happening now, whatever its outcome: the
     # monthly ceiling counts attempts, not successes.
     _consume_monthly_slot(world, actor)
@@ -156,11 +172,13 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     prompt_choices, aliases = _prompt_choices(choices)
     try:
         answer = await call_llm_json(_prompt(actor, situation, prompt_choices))
-    except Exception:
-        # Provider errors, timeouts and parse failures are all the same to the
-        # world: no interpretation happened and nothing material changed.
-        _receipt(world, FAILED_EVENT, "O provedor falhou; nenhuma ação material foi tomada.", causes=causes)
-        return None
+    except Exception as exc:
+        # The candidate transaction is discarded by the simulator. The
+        # runtime pauses and exposes the typed wait instead of silently
+        # substituting a deterministic actor choice.
+        raise ProviderDecisionRequired(
+            f"provider decision required for {actor.kind}:{actor.id}: {type(exc).__name__}"
+        ) from exc
     selected = answer.get("selected_id") if isinstance(answer, dict) else None
     known = {item["id"] for item in choices}
     if selected == NO_ACTION:
@@ -169,9 +187,9 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     if not isinstance(selected, str) or selected not in known:
         selected = aliases.get(selected, selected)
     if not isinstance(selected, str) or selected not in known:
-        _receipt(world, FAILED_EVENT, "O provedor devolveu uma escolha inexistente; nenhuma ação material foi tomada.",
-                 causes=causes)
-        return None
+        raise ProviderDecisionRequired(
+            f"provider decision required for {actor.kind}:{actor.id}: selected affordance is unknown"
+        )
     # Only the ID survives: every other word of the answer is discarded.
     _receipt(world, INTERPRETED_EVENT, "O provedor indicou uma das opções enumeradas.", causes=causes)
     return selected

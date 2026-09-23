@@ -86,6 +86,26 @@ it('shows live political settlements with their canonical source', async () => {
   await row.get('button').trigger('click')
   expect(useObserverStore().focusEventId).toBe('event:91')
 })
+it('selects a canonical detachment and exposes its military chain and sources', async () => {
+  ready = true
+  const commander = data.society.characters[0].id
+  data.campaigns.detachments = [{ id: 'detachment:auren:1', owner_ref: { kind: 'polity', id: 'auren' }, source_group_id: 'pop:pedraclara:human:soldier', count: 120, location_id: 'pedraclara', destination_id: 'portovelho', route_ids: ['road:pedraclara-portovelho'], route_index: 0, provisions: 18, stage: 'marching', started_day: 12, due_day: 28, decision_event_id: 'event:detachment-decision', last_event_id: 'event:detachment-last' }]
+  data.campaigns.commands = [{ id: 'command:1', detachment_id: 'detachment:auren:1', character_id: commander, institution_ref: { kind: 'polity', id: 'auren' }, office_id: 'office:marshal', doctrine: 'hold', doctrine_effective_day: 12, previous_doctrine: null, appointed_day: 12, last_event_id: 'event:command' }]
+  data.campaigns.positions = [{ id: 'position:1', detachment_id: 'detachment:auren:1', stage: 'prepared', settlement_id: 'pedraclara', anchor_site_id: null, started_day: 12, ready_day: 20, last_event_id: 'event:position' }]
+  data.campaigns.standoffs = [{ id: 'standoff:1', detachment_ids: ['detachment:auren:1', 'detachment:enemy:1'], settlement_id: 'pedraclara', started_day: 20, started_event_id: 'event:standoff-start', stage: 'active', resolved_day: null, last_event_id: 'event:standoff-last' }]
+  data.campaigns.route_interdictions = [{ id: 'interdiction:1', actor_ref: { kind: 'polity', id: 'auren' }, detachment_id: 'detachment:auren:1', route_id: 'road:pedraclara-portovelho', settlement_id: 'pedraclara', investment_id: null, started_day: 20, decision_event_id: 'event:interdiction-decision', stage: 'active', lifted_day: null, last_event_id: 'event:interdiction-last' }]
+  const app = await open()
+  await app.get('[data-detachment="detachment:auren:1"]').trigger('click')
+  const inspector = app.get('[data-testid="inspector"]')
+  expect(inspector.text()).toContain('Destacamentos')
+  expect(inspector.text()).toContain('120')
+  expect(inspector.text()).toContain('Em marcha')
+  expect(inspector.text()).toContain('Manter posição')
+  expect(inspector.text()).toContain('Confronto')
+  expect(inspector.text()).toContain('Interdição de rota')
+  await inspector.get('[data-testid="detachment-decision-source"]').trigger('click')
+  expect(useObserverStore().focusEventId).toBe('event:detachment-decision')
+})
 it('shows institutional capacity as a derived Dao read model', async () => {
   ready = true
   ;(data.governance as any).strategic_capacity = [{

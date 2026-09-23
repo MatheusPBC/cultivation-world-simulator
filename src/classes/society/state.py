@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 from .models import Character, Occupation, Organization, Polity, PopulationGroup, Settlement
 from .migration import MigrationJourney
-from .force import (AssemblyDenial, Detachment, DetachmentCommand, FieldEngagement, ForcePosition, ForceStandoff,
+from .force import (AssemblyDenial, Detachment, DetachmentCommand, DetachmentTraining, FieldEngagement, ForcePosition, ForceStandoff,
                     Garrison, MAX_SIEGE_GARRISON_ENDURANCE, SIEGE_GARRISON_ENDURANCE, SiegeCampaign,
                     RouteInterdiction, SettlementInvestment)
 from .control import TerritorialControl
@@ -29,6 +29,7 @@ class SocietyState(SocietySerialization):
     detachments: dict[str, Detachment] = field(default_factory=dict)
     force_standoffs: dict[str, ForceStandoff] = field(default_factory=dict)
     force_positions: dict[str, ForcePosition] = field(default_factory=dict)
+    detachment_trainings: dict[str, DetachmentTraining] = field(default_factory=dict)
     garrisons: dict[str, Garrison] = field(default_factory=dict)
     territorial_controls: dict[str, TerritorialControl] = field(default_factory=dict)
     siege_campaigns: dict[str, SiegeCampaign] = field(default_factory=dict)
@@ -154,6 +155,8 @@ class SocietyState(SocietySerialization):
                 "facility": {"farmer", "artisan"},
                 "repair": {"artisan"},
                 "customs": {"merchant"},
+                "research": {"farmer", "artisan", "soldier"},
+                "military_recruitment": {"soldier"},
             }.get(transition.work_kind, set())
             traveling = source is not None and transition.destination_settlement_id != source.settlement_id
             # A customs recruitment never leaves its own settlement in this
@@ -164,7 +167,7 @@ class SocietyState(SocietySerialization):
                     or transition.target_occupation not in expected_occupations
                     or source.occupation == transition.target_occupation
                     or transition.destination_settlement_id not in self.settlements
-                    or (traveling and transition.work_kind == "customs")
+                    or (traveling and transition.work_kind in {"customs", "military_recruitment"})
                     or transition.target_group_id != (f"pop:{transition.destination_settlement_id}:"
                                                        f"{source.people}:{transition.target_occupation}")
                     or (transition.due_day != transition.started_day + 30 if not traveling
@@ -208,6 +211,13 @@ class SocietyState(SocietySerialization):
                 settlement = self.settlements[position.settlement_id]
                 if site is None or settlement.region_id not in site.region_ids:
                     raise ValueError("force position anchor must be an existing local map site")
+        for training in self.detachment_trainings.values():
+            detachment = self.detachments.get(training.detachment_id)
+            if (detachment is None or training.settlement_id not in self.settlements
+                    or (training.stage == "training" and
+                        (detachment.stage != "present" or detachment.location_id != training.settlement_id
+                         or detachment.provisions < detachment.count))):
+                raise ValueError("active detachment training requires its supplied local column")
         for key, garrison in self.garrisons.items():
             detachment = self.detachments.get(garrison.detachment_id)
             settlement = self.settlements.get(garrison.settlement_id)
@@ -215,8 +225,9 @@ class SocietyState(SocietySerialization):
                     or garrison.account_id == "" or garrison.decision_event_id == ""
                     or (garrison.stage == "active" and (
                         detachment.stage != "present" or detachment.location_id != settlement.id
-                        or settlement.occupier_id != detachment.owner_ref.id))):
-                raise ValueError("active garrison requires its present occupied detachment")
+                        or (settlement.occupier_id != detachment.owner_ref.id
+                            and settlement.administrator_id != detachment.owner_ref.id)))):
+                raise ValueError("active garrison requires its present occupied or administered detachment")
             if world is not None and garrison.account_id not in world.economy.accounts:
                 raise ValueError("garrison requires an existing owner account")
         for key, control in self.territorial_controls.items():
@@ -292,7 +303,11 @@ class SocietyState(SocietySerialization):
             settlement = self.settlements.get(protest.settlement_id)
             if (key != protest.id or group is None or settlement is None
                     or group.settlement_id != protest.settlement_id
-                    or protest.participants > group.count
+                    # Closed protests retain their historical participant
+                    # count even when later workforce or migration events
+                    # shrink the cohort. Only an open reservation must fit the
+                    # live canonical group.
+                    or (protest.stage == "open" and protest.participants > group.count)
                     or (protest.demand_kind == "site_repair" and world is not None
                         and protest.site_id not in world.map.infrastructure_sites)):
                 raise ValueError("invalid civic protest")
@@ -381,7 +396,53 @@ class SocietyState(SocietySerialization):
         from src.classes.event import FactKind
         from src.classes.mechanical_language import EntityRef
 
-        events = {event.id: event for event in world.events}
+        events = world.event_index()
+        for training in self.detachment_trainings.values():
+            detachment = self.detachments[training.detachment_id]
+            decision = events.get(training.decision_event_id)
+            started = next((event for event in events.values()
+                            if event.event_type == "detachment_training_started"
+                            and any(delta.owner_kind == "detachment_training" and delta.owner_id == training.id
+                                    and delta.aspect == "stage" and delta.before == "None"
+                                    and delta.after == "training" for delta in event.deltas)), None)
+            final = events.get(training.last_event_id)
+            scheduled = world.agenda.get(training.id)
+            technique = events.get(training.knowledge_event_id)
+            linked = tuple(events.get(link.cause_event_id) for link in started.causal_links) if started else ()
+            equipped = next((event for event in linked if event is not None
+                             and event.event_type == "detachment_training_tools_committed"), None)
+            knowledge_id = (f"technology:{detachment.owner_ref.kind}:{detachment.owner_ref.id}:"
+                            f"{training.technology_id}")
+            if (decision is None or started is None or final is None
+                    or decision.fact_kind != FactKind.DECISION or decision.decision is None
+                    or decision.decision.get("action") != "train_detachment"
+                    or decision.decision.get("actor_ref") != detachment.owner_ref.to_dict()
+                    or not str(decision.decision.get("selected_affordance_id", "")).startswith(
+                        f"detachment-training:{detachment.id}:{training.technology_id}:")
+                    or training.decision_event_id not in {link.cause_event_id for link in started.causal_links}
+                    or training.knowledge_event_id not in {link.cause_event_id for link in started.causal_links}
+                    or started.day != training.started_day or technique is None or equipped is None
+                    or not any(delta.owner_kind == "technical_knowledge"
+                               and delta.owner_id == knowledge_id and delta.aspect == "technology_id"
+                               and delta.after == training.technology_id for delta in technique.deltas)
+                    or not any(delta.owner_kind == "stock" and delta.aspect == "tools"
+                               and int(delta.after) < int(delta.before) for delta in equipped.deltas)
+                    or decision.id not in {link.cause_event_id for link in equipped.causal_links}):
+                raise ValueError("detachment training lacks its current decision and technique")
+            if training.stage == "training":
+                if (training.last_event_id != started.id or training.ready_day <= world.clock.absolute_day
+                        or scheduled is None or scheduled.kind != "force_training"
+                        or scheduled.due_day != training.ready_day):
+                    raise ValueError("active detachment training lacks its dated work")
+            elif (scheduled is not None or final.event_type !=
+                  ("detachment_training_completed" if training.stage == "completed"
+                   else "detachment_training_lapsed")
+                  or (training.stage == "completed" and final.day != training.ready_day)
+                  or not any(delta.owner_kind == "detachment_training" and delta.owner_id == training.id
+                             and delta.aspect == "stage" and delta.before == "training"
+                             and delta.after == training.stage for delta in final.deltas)
+                  or started.id not in {link.cause_event_id for link in final.causal_links}):
+                raise ValueError("ended detachment training lacks its factual completion or lapse")
         for garrison in self.garrisons.values():
             decision = events.get(garrison.decision_event_id)
             first = next((event for event in events.values()
@@ -462,6 +523,23 @@ class SocietyState(SocietySerialization):
                                                    str(MAX_SIEGE_GARRISON_ENDURANCE)}
                                for delta in started.deltas)):
                 raise ValueError("siege campaign lacks its factual decision")
+            if any(delta.owner_kind == "siege_campaign" and delta.owner_id == campaign.id
+                   and delta.aspect == "garrison_endurance"
+                   and delta.after == str(MAX_SIEGE_GARRISON_ENDURANCE) for delta in started.deltas):
+                defender = self.detachments.get(campaign_garrison.detachment_id) if campaign_garrison else None
+                linked = tuple(events.get(link.cause_event_id) for link in started.causal_links)
+                position_id = f"force-position:{defender.id}" if defender else None
+                knowledge_id = (f"technology:{defender.owner_ref.kind}:{defender.owner_ref.id}:fortification"
+                                if defender else None)
+                if (not any(event is not None and event.event_type == "force_position_prepared"
+                            and any(delta.owner_kind == "force_position" and delta.owner_id == position_id
+                                    and delta.aspect == "stage" and delta.after == "prepared"
+                                    for delta in event.deltas) for event in linked)
+                        or not any(event is not None and any(
+                            delta.owner_kind == "technical_knowledge" and delta.owner_id == knowledge_id
+                            and delta.aspect == "technology_id" and delta.after == "fortification"
+                            for delta in event.deltas) for event in linked)):
+                    raise ValueError("fortified siege lacks its prepared position and knowledge causes")
             if campaign.phase == "sieging":
                 if (final.event_type not in {"siege_campaign_started", "siege_campaign_progressed"}
                         or scheduled is None or scheduled.kind != "siege_campaign"
@@ -705,10 +783,12 @@ class SocietyState(SocietySerialization):
                     or not str(decision.decision.get("selected_affordance_id", "")).startswith(
                         f"civic-movement:{movement.initiator_group_id}:{movement.settlement_id}:")
                     or final is None
-                    or (movement.stage == "active" and (final.event_type != "civic_movement_formed"
+                    or (movement.stage == "active" and (final.event_type not in {"civic_movement_formed", "civic_movement_joined"}
                         or not any(delta.owner_kind == "civic_movement" and delta.owner_id == movement.id
                                    and delta.aspect == "stage" and delta.before == "None" and delta.after == "active"
-                                   for delta in final.deltas)))
+                                   for event in events.values()
+                                   if event.event_type == "civic_movement_formed"
+                                   for delta in event.deltas)))
                     or (movement.stage == "rebellion" and (final.event_type != "civic_rebellion_declared"
                         or not any(delta.owner_kind == "civic_movement" and delta.owner_id == movement.id
                                    and delta.aspect == "stage" and delta.before == "active" and delta.after == "rebellion"
@@ -737,6 +817,25 @@ class SocietyState(SocietySerialization):
                     or (movement.stage in {"active", "rebellion", "revolution", "negotiating"}
                         and movement.settlement_id in active_movement_settlements)):
                 raise ValueError("invalid civic movement")
+            for group in groups:
+                if group.id == movement.initiator_group_id:
+                    continue
+                joined = next((event for event in events.values()
+                               if event.event_type == "civic_movement_joined"
+                               and any(delta.owner_kind == "civic_movement"
+                                       and delta.owner_id == movement.id
+                                       and delta.aspect == f"participants:{group.id}"
+                                       and delta.after == str(movement.participants_by_group[group.id])
+                                       for delta in event.deltas)), None)
+                if joined is None or not any(
+                    (cause := events.get(link.cause_event_id)) is not None
+                    and cause.fact_kind == FactKind.DECISION
+                    and cause.decision is not None
+                    and cause.decision.get("action") == "join_civic_movement"
+                    and cause.decision.get("actor_ref") == EntityRef("population_group", group.id).to_dict()
+                    for link in joined.causal_links
+                ):
+                    raise ValueError("civic movement member lacks its independent join decision")
             if movement.stage in {"active", "rebellion", "revolution", "negotiating"}:
                 active_movement_groups.update(group.id for group in groups)
                 active_movement_settlements.add(movement.settlement_id)

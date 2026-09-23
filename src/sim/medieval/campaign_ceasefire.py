@@ -89,6 +89,17 @@ def _campaign_parts(world, campaign_id):
     return campaign, attacker, defender
 
 
+def _defender_garrison_active(world, campaign):
+    """Whether the defender still has an active duty this ceasefire can end.
+
+    A collapsed garrison has no executable withdrawal: ``_withdraw_garrison``
+    only ends an ``active`` duty.  The affordance must disappear rather than
+    be offered and fail at fulfillment.
+    """
+    garrison = world.society.garrisons.get(campaign.defender_garrison_id)
+    return garrison is not None and garrison.stage == "active"
+
+
 def _open_offer(world, campaign_id):
     return any(proposal.proposal_kind == "campaign_ceasefire" and proposal.status == "offered"
                and any(clause.kind == "campaign_withdrawal" and clause.campaign_id == campaign_id
@@ -104,16 +115,31 @@ def campaign_ceasefire_offer_options(world, actor):
     options = []
     for campaign in sorted(world.society.siege_campaigns.values(), key=lambda item: item.id):
         parts = _campaign_parts(world, campaign.id)
-        if parts is None or campaign.attacker_ref != actor or _open_offer(world, campaign.id):
+        if parts is None or _open_offer(world, campaign.id):
             continue
-        own_withdrawals = tuple(item for item in siege_campaign_withdrawal_options(world, actor)
-                                if item.campaign_id == campaign.id)
+        _campaign, attacker_detachment, defender_detachment = parts
+        if actor == campaign.attacker_ref:
+            own_detachment = attacker_detachment
+            own_withdrawals = tuple(item for item in siege_campaign_withdrawal_options(world, actor)
+                                    if item.campaign_id == campaign.id)
+        elif actor == defender_detachment.owner_ref:
+            if not _defender_garrison_active(world, campaign):
+                continue
+            own_detachment = defender_detachment
+            own_withdrawals = tuple(item for item in withdrawal_options(
+                world, actor, detachment_id=defender_detachment.id,
+                allow_open_campaign_supply=True, campaign_authorized=True))
+        else:
+            continue
         if not own_withdrawals:
             continue
-        base = f"campaign-ceasefire:{campaign.id}:{campaign.last_event_id}:{own_withdrawals[0].id}"
-        options.append(CampaignCeasefireOffer(f"{base}:unilateral-self", actor, campaign.id, "unilateral_self"))
+        base = (f"campaign-ceasefire:{campaign.id}:{campaign.last_event_id}:"
+                f"{own_detachment.last_event_id}:{own_withdrawals[0].id}")
+        options.append(CampaignCeasefireOffer(
+            f"{base}:unilateral-self", actor, campaign.id, "unilateral_self"))
         if campaign.phase == "sieging":
-            options.append(CampaignCeasefireOffer(f"{base}:mutual", actor, campaign.id, "mutual"))
+            options.append(CampaignCeasefireOffer(
+                f"{base}:mutual", actor, campaign.id, "mutual"))
     return tuple(sorted(options, key=lambda item: item.id))
 
 
@@ -130,16 +156,22 @@ def offer_campaign_ceasefire(world, actor, option_id, decision_event_id):
     if parts is None:
         raise ValueError("campaign ceasefire is no longer current")
     campaign, attacker, defender = parts
+    if actor == campaign.attacker_ref:
+        own_detachment, counterpart_detachment = attacker, defender
+    elif actor == defender.owner_ref:
+        own_detachment, counterpart_detachment = defender, attacker
+    else:
+        raise ValueError("campaign ceasefire actor is not a current participant")
     due_day = candidate.clock.absolute_day + WITHDRAWAL_DUE_DAYS
     clauses = [CampaignWithdrawalClause(
-        debtor_ref=actor, creditor_ref=defender.owner_ref, due_day=due_day,
-        campaign_id=campaign.id, detachment_id=attacker.id)]
+        debtor_ref=actor, creditor_ref=counterpart_detachment.owner_ref, due_day=due_day,
+        campaign_id=campaign.id, detachment_id=own_detachment.id)]
     if option.kind == "mutual":
         clauses.append(CampaignWithdrawalClause(
-            debtor_ref=defender.owner_ref, creditor_ref=actor, due_day=due_day,
-            campaign_id=campaign.id, detachment_id=defender.id))
+            debtor_ref=counterpart_detachment.owner_ref, creditor_ref=actor, due_day=due_day,
+            campaign_id=campaign.id, detachment_id=counterpart_detachment.id))
     proposal = offer_proposal(
-        candidate, actor, defender.owner_ref, tuple(clauses),
+        candidate, actor, counterpart_detachment.owner_ref, tuple(clauses),
         candidate.clock.absolute_day + OFFER_WINDOW_DAYS,
         decision_event_id=decision_event_id, intent=option.decision(),
         proposal_kind="campaign_ceasefire", request_affordance_id=option.id)
@@ -202,10 +234,12 @@ def campaign_ceasefire_fulfillment_options(world, actor):
             routes = tuple(item for item in siege_campaign_withdrawal_options(world, actor)
                            if item.campaign_id == clause.campaign_id
                            and item.detachment_id == clause.detachment_id)
-        else:
+        elif _defender_garrison_active(world, campaign):
             routes = tuple(item for item in withdrawal_options(
                 world, actor, detachment_id=clause.detachment_id,
                 allow_open_campaign_supply=True, campaign_authorized=True))
+        else:
+            routes = ()
         for route in routes:
             options.append(CampaignCeasefireFulfillment(
                 id=f"campaign-ceasefire-fulfillment:{obligation.id}:{obligation.last_event_id}:{route.id}",

@@ -37,7 +37,7 @@ class ResearchState(RegistrySerialization):
         for key in self.technologies:
             visit(key)
         owners, researchers = set(), set()
-        events = {e.id: e for e in world.events} if world is not None else {}
+        events = world.event_index() if world is not None else {}
         for p in self.projects.values():
             if p.technology_id not in self.technologies:
                 raise ValueError('unknown research technology')

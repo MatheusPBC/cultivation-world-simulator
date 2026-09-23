@@ -70,7 +70,7 @@ def validate_customs(economy, world=None) -> None:
         raise ValueError("only one customs checkpoint may serve a site")
     if world is None:
         return
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
     for checkpoint in economy.customs_checkpoints.values():
         site = world.map.infrastructure_sites.get(checkpoint.site_id)
         account = economy.accounts.get(checkpoint.account_id)

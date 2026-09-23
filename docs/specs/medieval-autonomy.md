@@ -153,6 +153,24 @@ inclusive quando há pedidos atrasados. Roteamento de novas ordens considera
 alternativas abertas; redirecionar carga já contratada não foi implementado.
 Falha técnica de execução/save aborta o salto inteiro, não vira recusa do vendedor.
 
+### Recrutamento por necessidade defensiva
+
+Um plano de resposta a ocupação já adotado e sem coluna continua a ser revisto.
+Se os soldados locais estiverem indisponíveis, mas a instituição conhecer uma
+rota ao objetivo e tiver rações, caixa e autoridade para equipar uma coluna,
+Strategy registra uma falta de trabalho militar tipada. Falta de comida,
+pagamento ou rota não se apresenta como falta de soldados. Knowledge publica
+somente ao patrocinador a leitura datada; a oferta a civis não é automática.
+
+O patrocinador pode selecionar `authorize_military_recruitment` no menu mensal
+concorrente. O owner recompõe a leitura e então envia ofertas diretas a grupos
+locais; cada grupo aceita ou recusa por sua própria decisão. Aceitação paga
+bolsa real, reserva no máximo um quinto do grupo e exige 30 dias para Society
+alterar a ocupação, sem criar habitantes. O plano continua bloqueado até que
+Force enumere e o ator escolha outra decisão para erguer uma coluna com rações
+e salário. A necessidade do plano não concede comando sobre o grupo nem
+executa mobilização futura.
+
 ## Persistência e observação
 
 Schema8 inclui alvos/relatórios por recurso e projetos econômicos; o save atual é

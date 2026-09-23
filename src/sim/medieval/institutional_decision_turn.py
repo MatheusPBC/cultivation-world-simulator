@@ -8,13 +8,12 @@ back to its own adapter's unmodified executor. Nothing about a "supply
 objective" or "aid request" is understood here -- only IDs, labels and
 causes the adapter already computed.
 
-A technical failure (no budget, no provider, no monthly slots left) means the
-actor was never actually consulted, not that it chose to defer: nothing is
-claimed, so whatever deterministic safety net a caller still runs for that
-target proceeds exactly as if this turn had not existed this boundary. A
-provider that was genuinely asked -- and answered, declined explicitly, or
-answered badly -- did use its turn, so its options are claimed regardless of
-whether an action actually executed.
+A technical failure (no budget, no provider, no monthly slots left) aborts the
+candidate transaction in AI-enabled mode. The runtime pauses and reports the
+decision wait; no deterministic safety net may silently choose for the actor.
+A provider that was genuinely asked -- and answered or declined explicitly --
+uses its turn, so its options are claimed regardless of whether an action
+executed.
 """
 
 from dataclasses import dataclass
@@ -172,16 +171,25 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
         return claims, True
     if selected is None:
         return claims, True
-    # Re-fetch fresh: nothing about the chosen option survives past this
-    # point unless it is still present in a freshly recomposed menu.
-    fresh = _by_id(world, actor, adapters)
+    # Re-fetch through the selected option's owner only.  The shared menu was
+    # needed for the decision, but recomposing every unrelated family's menu
+    # here duplicates work and can make revalidation depend on other owners.
+    # Nothing about the chosen option survives unless its own adapter still
+    # offers the same ID immediately before execution.
+    selected_adapter, _ = by_id[selected]
+    fresh = {option.id: option
+             for option in selected_adapter.options_fn(world, actor)}
     if selected not in fresh:
+        if world.config.ai_enabled:
+            raise ai_decider.ProviderDecisionRequired(
+                f"provider decision required for {actor.kind}:{actor.id}: stale affordance"
+            )
         record_event(
             world, STALE_AFFORDANCE_EVENT_TYPE,
             "A opção escolhida deixou de existir antes da revalidação; nenhuma mutação material foi aplicada.",
             fact_kind=FactKind.OCCURRENCE, cause_ids=causes)
         return claims, True
-    adapter, option = fresh[selected]
+    adapter, option = selected_adapter, fresh[selected]
     decision = record_event(
         world, DECISION_EVENT_TYPE, "O ator escolheu entre opções institucionais concorrentes.",
         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
@@ -189,9 +197,18 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
     )
     try:
         adapter.execute_fn(world, actor, option.id, decision.id)
-    except ValueError:
-        # The decision remains factual history; a stale affordance never
-        # becomes a material mutation.
+    except ValueError as exc:
+        # In provider mode a stale/rejected affordance is a technical failure
+        # of the consultation, not a deliberate actor choice.  Let the
+        # simulator discard the candidate transaction and surface the typed
+        # wait; otherwise a family whose owner has not yet been audited could
+        # silently turn a provider decision into no action.
+        if world.config.ai_enabled:
+            raise ai_decider.ProviderDecisionRequired(
+                f"provider decision required for {actor.kind}:{actor.id}: stale affordance"
+            ) from exc
+        # Offline/test policy keeps the historical deterministic receipt, but
+        # never applies a material mutation after owner rejection.
         record_event(
             world, STALE_AFFORDANCE_EVENT_TYPE,
             "O owner rejeitou a opção durante a execução; nenhuma mutação material foi aplicada.",

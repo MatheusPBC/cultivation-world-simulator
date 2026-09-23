@@ -15,6 +15,8 @@ class FreightOrder(SocietyValue):
     id: Identity
     source_id: Identity
     destination_id: Identity
+    source_location_id: Identity
+    destination_location_id: Identity
     resource_id: Identity
     quantity: Positive
     delivered_quantity: Count = 0
@@ -53,12 +55,15 @@ class RouteFlow(SocietyValue):
     bulk: Count
 
 
-def path_regions(world, source_id, destination_id, route_ids, resource_id):
+def path_regions(world, source_id, destination_id, route_ids, resource_id, *,
+                 source_location_id=None, destination_location_id=None):
     economy = world.economy
     if source_id not in economy.stocks or destination_id not in economy.stocks or source_id == destination_id:
         raise ValueError("freight requires distinct existing stocks")
-    start = world.society.settlements[economy.stocks[source_id].location_id].region_id
-    end = world.society.settlements[economy.stocks[destination_id].location_id].region_id
+    start_location = source_location_id or economy.stocks[source_id].location_id
+    end_location = destination_location_id or economy.stocks[destination_id].location_id
+    start = world.society.settlements[start_location].region_id
+    end = world.society.settlements[end_location].region_id
     regions = [start]
     for route_id in route_ids:
         route = world.map.routes.get(route_id)
@@ -104,16 +109,33 @@ def validate_logistics(economy, world=None):
         used_decisions.update(order.decision_ids)
     if world is None:
         return
-    events = {e.id: e for e in world.events}
+    events = world.event_index()
     for order in economy.freight_orders.values():
-        path_regions(world, order.source_id, order.destination_id, order.route_ids, order.resource_id)
+        path_regions(world, order.source_id, order.destination_id, order.route_ids, order.resource_id,
+                     source_location_id=order.source_location_id,
+                     destination_location_id=order.destination_location_id)
+        if (quantities[order.id] and economy.stocks[order.destination_id].location_id
+                != order.destination_location_id):
+            raise ValueError("pending cargo destination moved from its recorded place")
+        opened = events.get(f"event:{order.id.removeprefix('freight:')}")
+        if (opened is None or opened.event_type != "freight_opened"
+                or not all(any(delta.owner_kind == "freight" and delta.owner_id == order.id
+                               and delta.aspect == aspect and delta.before == "None" and delta.after == location
+                               for delta in opened.deltas)
+                           for aspect, location in (("source_location_id", order.source_location_id),
+                                                    ("destination_location_id", order.destination_location_id)))):
+            raise ValueError("freight historical endpoints lack their opening receipt")
         if order.created_day > world.clock.absolute_day:
             raise ValueError("future freight creation")
         if any(d not in events or events[d].fact_kind != FactKind.DECISION for d in order.decision_ids):
             raise ValueError("missing freight decision")
         if order.resolution_event_id is not None:
             resolution = events.get(order.resolution_event_id)
-            if (resolution is None or resolution.event_type not in {"purchase_recovery_completed", "contraband_returned", "contraband_seized"}
+            if (resolution is None or resolution.event_type not in {
+                    "purchase_recovery_completed", "contraband_returned", "contraband_seized",
+                    # A post that refuses an embargoed counterparty sends the
+                    # cargo home; the units leave the road and must be resolved.
+                    "customs_refused"}
                     or not any(delta.owner_kind == "freight" and delta.owner_id == order.id
                                and delta.aspect == "resolved_quantity"
                                and delta.after == str(order.resolved_quantity)

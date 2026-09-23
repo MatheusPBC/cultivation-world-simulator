@@ -1,5 +1,6 @@
 """The fallback policy only selects enumerated options and never invents terms."""
 
+from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.institutional_aid_policy import review_institutional_aid
 from src.sim.medieval.intelligence import refresh_trade_reports
 from src.sim.medieval.procurement import review_supply
@@ -27,6 +28,41 @@ def first_request(world):
     notice = next(item for _, item in sorted(world.knowledge.institutional_aid_notices.items())
                   if item.kind == "request")
     return notice, notice.requester_ref, notice.recipient_ref
+
+
+def test_routine_aid_prioritizes_observed_need_across_polities_and_settlements():
+    world = create_medieval_world(73)
+    shortages = {"campomanso": 1, "brumafria": 1, "portovelho": 1, "salgueiro": 300}
+    for settlement_id, need in list(world.economy.needs.items()):
+        world.economy.needs[settlement_id] = need.model_copy(
+            update={"missing_food": shortages.get(settlement_id, 0)}
+        )
+    refresh_settlement_reports(world)
+
+    review_institutional_aid(world, allow_requests=True)
+
+    requests = [notice for notice in world.knowledge.institutional_aid_notices.values()
+                if notice.kind == "request"]
+    assert any(notice.requester_ref.id == "valedouro"
+               and notice.requester_settlement_id == "salgueiro"
+               and notice.requested_food == 300 for notice in requests)
+
+
+def test_routine_aid_can_request_for_second_settlement_while_first_chain_is_open():
+    world = create_medieval_world(73)
+    for settlement_id, need in list(world.economy.needs.items()):
+        world.economy.needs[settlement_id] = need.model_copy(
+            update={"missing_food": {"salgueiro": 300, "portovelho": 20}.get(settlement_id, 0)}
+        )
+    refresh_settlement_reports(world)
+
+    review_institutional_aid(world, allow_requests=True)
+    review_institutional_aid(world, allow_requests=True)
+
+    requested_settlements = {notice.requester_settlement_id
+                             for notice in world.knowledge.institutional_aid_notices.values()
+                             if notice.kind == "request" and notice.requester_ref.id == "valedouro"}
+    assert requested_settlements == {"salgueiro", "portovelho"}
 
 
 def test_policy_runs_request_response_and_fulfillment_on_consecutive_days():

@@ -19,3 +19,8 @@ input,select{border:1px solid var(--line);background:#111f1f;color:var(--text);b
 .threat-list h3 { margin: 0 0 .5rem; }
 .threat-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .65rem; align-items: center; padding: .4rem 0; border-top: 1px solid rgba(220,203,164,.18); }
 .threat-row span { color: #f0b36a; font-size: .85rem; }
+.detachment-list { border-color: rgba(155,202,182,.45); }
+.detachment-row { display:flex; align-items:center; justify-content:space-between; gap:.75rem; width:100%; padding:.55rem 0; border:0; border-top:1px solid rgba(220,203,164,.18); border-radius:0; text-align:left; font-size:.78rem; }
+.detachment-row span:first-child { display:grid; min-width:0; }
+.detachment-row small { color:var(--muted); font-size:.68rem; overflow-wrap:anywhere; }
+.detachment-row > span:last-child { color:var(--gold); white-space:nowrap; font-size:.72rem; }
