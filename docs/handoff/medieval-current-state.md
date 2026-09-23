@@ -4107,3 +4107,20 @@ otimizada do dia 1440 ao 1441 passou save/load e auditoria (`ok=true`, zero
 causas quebradas, autorias inválidas ou deltas Story/LLM). A continuação
 natural em andamento foi iniciada antes desta mudança, então seu resultado
 futuro será evidência do runtime anterior, não aprovação do checkout novo.
+
+A continuação otimizada do checkpoint antigo de dia 1440 até o dia 1800
+conservou moeda e recursos e passou save/load. Comparada ao checkpoint de dia
+1800 da trajetória original, `world_snapshot` foi integralmente igual e os
+80.374 eventos coincidiram um a um, sem primeiro evento divergente. Os hashes
+dos arquivos SQLite diferiram, portanto a igualdade afirmada é **semântica**
+(estado canônico e história), não identidade byte a byte dos contêineres.
+Isso prova equivalência neste recorte de 360 dias, não nas demais seeds ou em
+todo o horizonte de dez anos.
+
+A execução original, iniciada antes das duas otimizações acima, chegou ao dia
+2190; o checkpoint de dia 2160 foi salvo e relido. Ela foi encerrada
+intencionalmente depois dessa confirmação, sem apagar seus checkpoints. A
+continuação do **checkout otimizado** começou do save semanticamente idêntico
+de dia 1800 e tem alvo de dia 3600, com novos checkpoints a cada 360 dias.
+Ainda não há resultado final para a seed 73, nem execução das outras duas
+seeds exigidas pelo gate.
