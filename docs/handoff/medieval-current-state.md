@@ -3715,3 +3715,16 @@ de artesãos residentes versus empregados pagos. `NO_ACTION` não constrói nada
 E155–E156 seguem sendo a prova material com decisão injetada; ainda falta
 observar um provider real escolher a oficina por conta própria e a recuperação
 econômica natural em horizonte longo.
+
+Uma fixture pressionada compôs a primeira interferência direta entre campanha,
+criatura e comércio: cargas reais no rio reduziram a condição do dragão; ele
+escolheu pedir tributo e, após o prazo, escolheu fechar sua própria travessia.
+Valedouro já havia adotado a defesa de Portovelho e mobilizado uma coluna por
+essa rota, enquanto uma compra bilateral seguia pelo mesmo rio. Contra cópia
+com a travessia aberta, a coluna ficou retida, a carga atrasou e a entrega
+ficou menor. Ambos os recibos de espera citam o fechamento da criatura, e o
+save/load com auditoria causal passou. A estrada alternativa fechada e a
+ocupação são premissas explícitas da fixture; isso **não** demonstra que a
+sequência surgiu naturalmente, nem reação de QG/rei ou consequência
+populacional posterior. O recorte de force também passou a ligar diretamente
+`detachment_held` ao fato Map-owned que tornou a rota indisponível.

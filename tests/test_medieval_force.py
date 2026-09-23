@@ -67,6 +67,24 @@ def raised(world, destination=TARGET):
     return option, raise_detachment(world, OWNER, option.id, decide(world, option).id)
 
 
+def test_held_column_cites_the_physical_route_closure():
+    world = soldier_world()
+    option, detachment = raised(world)
+    route_id = option.route_ids[0]
+    closure = record_event(
+        world, "route_closed_for_test", "A passagem foi fechada por causa externa.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("route", route_id, "enabled", True, False),))
+    world.map.routes[route_id].update_runtime(enabled=False)
+
+    tick(world)
+    held = next(event for event in reversed(world.events)
+                if event.event_type == "detachment_held" and
+                any(delta.owner_id == detachment.id for delta in event.deltas))
+    assert closure.id in {link.cause_event_id for link in held.causal_links}
+    assert world.society.detachments[detachment.id].route_index == 0
+
+
 def marched_home(world, destination=OWN_TARGET):
     option, detachment = raised(world, destination=destination)
     while world.society.detachments[detachment.id].stage == "marching":

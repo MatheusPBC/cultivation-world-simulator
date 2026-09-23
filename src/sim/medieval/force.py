@@ -1197,9 +1197,11 @@ def _advance(world, detachment):
     route_id = detachment.route_ids[detachment.route_index]
     day = world.clock.absolute_day
     if world.map.get_route_operational_capacity(route_id) <= 0:
+        from .logistics import _route_causes
         return _record(world, detachment, detachment.model_copy(update={"due_day": day + 1}),
                        "detachment_held", "Passagem indisponível; a coluna aguarda.",
-                       deltas=(_delta("detachment", detachment.id, "due_day", detachment.due_day, day + 1),))
+                       deltas=(_delta("detachment", detachment.id, "due_day", detachment.due_day, day + 1),),
+                       causes=_route_causes(world, (route_id,))[route_id])
     index = detachment.route_index + 1
     arrived = index >= len(detachment.route_ids)
     location = detachment.destination_id if arrived else detachment.location_id
