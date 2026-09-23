@@ -51,6 +51,7 @@ const { savings, totalSavings, payrolls, employmentContracts, policies, source }
       <h4>{{ contract.employer }} · {{ contract.cohort?.id ?? contract.cohort_id }}</h4>
       <p class="muted">{{ contract.workSite }} · {{ t('staffingTarget') }}: {{ n(contract.staffing_target) }} / {{ n(contract.workforce_limit) }} {{ t('workers') }} · {{ n(contract.wage_per_worker) }} / {{ t('perPerson') }}</p>
       <p>{{ t('employmentOutcomes.' + contract.last_outcome) }}</p>
+      <button v-if="contract.staffing_event_id" data-testid="staffing-source" @click="source(contract.staffing_event_id)">{{ t('source') }} · {{ t('staffingDecision') }}</button>
       <button @click="source(contract.last_event_id)">{{ t('source') }}</button>
     </article>
     <h3>{{ t('taxPolicies') }}</h3><p class="muted">{{ t('taxPoliciesHelp') }}</p>

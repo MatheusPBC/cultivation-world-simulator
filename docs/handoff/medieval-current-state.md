@@ -4266,3 +4266,9 @@ antigo schema 69 de dia 1440 foi rejeitado por `load_world`; seu SHA-256 antes
 e depois da tentativa permaneceu
 `7a45729add2609cc1deb25b645048cc03207df16b724c74d6febf3222dd9cb6e`.
 Essas provas são focadas e curtas, não substituem as três séries longas.
+
+Na mesma continuação, Finanças passou a oferecer um link causal separado para
+`staffing_event_id` de cada vínculo permanente. Assim, o Dao pode abrir a
+decisão que alterou o alvo de trabalhadores sem confundi-la com o receipt da
+folha mais recente. O teste focado `web/src/medieval/__tests__/income.test.ts`
+valida essa navegação (4 testes passaram), assim como o type-check do frontend.

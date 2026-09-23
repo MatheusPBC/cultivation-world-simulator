@@ -7,6 +7,23 @@ import { medievalI18n } from '../i18n'
 import type { ObservatoryView } from '../../types/medieval-api'
 import fixture from './world.json'
 
+it('opens the causal source for an employer staffing-target decision', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  data.economy.employment_contracts = [{ id: 'employment:1', employer_ref: { kind: 'polity', id: 'auren' },
+    settlement_id: 'campomanso', cohort_id: 'population:artisan', work_site_id: 'site:1', occupation: 'artisan',
+    stock_id: 'stock:campomanso', account_id: 'account:auren', workforce_limit: 20, staffing_target: 10,
+    staffing_event_id: 'event:staffing-target', wage_per_worker: 2, created_day: 1,
+    decision_event_id: 'event:decision', selected_affordance_id: 'affordance:1', created_event_id: 'event:created',
+    last_reviewed_day: 30, last_outcome: 'paid', last_event_id: 'event:payroll' }]
+  store.snapshot = data
+  const panel = mount(IncomePanel, { global: { plugins: [pinia, medievalI18n] } })
+  await panel.get('[data-testid="staffing-source"]').trigger('click')
+  expect(store.focusEventId).toBe('event:staffing-target')
+  panel.unmount()
+})
+
 it('separates accumulated savings from dated wages and opens payroll evidence', async () => {
   const pinia = createPinia(); setActivePinia(pinia)
   const store = useObserverStore()
