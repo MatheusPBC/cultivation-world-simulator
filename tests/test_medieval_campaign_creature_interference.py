@@ -1,6 +1,5 @@
 """One creature decision interrupts a real defensive plan and a food shipment."""
 
-import asyncio
 from copy import deepcopy
 
 import pytest
@@ -11,6 +10,7 @@ from src.run.medieval_creatures import DRAKE_ID, ROUTE_ID
 from src.sim.medieval import ai_decider
 from src.sim.medieval.creatures import creature_options, execute_creature_option
 from src.sim.medieval.economy import _delta
+from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.markets import purchase
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -34,7 +34,7 @@ def decide(world, option):
 
 @pytest.mark.asyncio
 async def test_drake_closure_holds_a_mobilized_column_and_food_against_open_route(monkeypatch, tmp_path):
-    world = await crossed_world()
+    world = await crossed_world(destination_food=0)
     demand_option = next(item for item in creature_options(world, DRAKE_ID) if item.kind == "request")
     execute_creature_option(world, DRAKE_ID, demand_option.id, decide(world, demand_option).id)
     demand = next(iter(world.creatures.demands.values()))
@@ -57,7 +57,7 @@ async def test_drake_closure_holds_a_mobilized_column_and_food_against_open_rout
     adoption = next(item for item in defense_adoption_options(world, VALEDOURO)
                     if item.settlement_id == "portovelho")
     plan = adopt_occupied_settlement_defense(world, VALEDOURO, adoption.id, decide(world, adoption).id)
-    values = terms(world, quantity=100)
+    values = terms(world, quantity=2000)
     order = purchase(world, *consent(world, values))
     assert ROUTE_ID in order.route_ids
 
@@ -108,6 +108,24 @@ async def test_drake_closure_holds_a_mobilized_column_and_food_against_open_rout
     assert open_world.economy.freight_orders[order.id].delivered_quantity > \
         world.economy.freight_orders[order.id].delivered_quantity
     assert open_world.society.detachments[column_id].stage == "present"
+
+    # The same material interruption reaches civilian subsistence. Neither
+    # world starts with a granary reserve in Portovelho; only the cargo's
+    # ability to cross the river differs after the fork.
+    next_closing = (world.clock.absolute_day // 30 + 1) * 30
+    for candidate in (world, open_world):
+        candidate.config = candidate.config.model_copy(update={"ai_enabled": False})
+        engine = MedievalSimulator(candidate)
+        while candidate.clock.absolute_day < next_closing:
+            await engine.step()
+    closed_need = world.economy.needs["portovelho"]
+    open_need = open_world.economy.needs["portovelho"]
+    assert closed_need.missing_food > open_need.missing_food
+    assert closed_need.health < open_need.health
+    closed_subsistence = next(event for event in reversed(world.events)
+                              if event.event_type == "subsistence_resolved"
+                              and event.causal_payload.get("subsistence", {}).get("settlement_id") == "portovelho")
+    assert closure.id in {link.cause_event_id for link in closed_subsistence.causal_links}
 
     path = tmp_path / "drake-interrupted-campaign.mws"
     save_world(world, path)

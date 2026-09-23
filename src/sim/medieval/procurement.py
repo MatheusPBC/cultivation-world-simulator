@@ -342,7 +342,8 @@ def market_purchase_options(world, actor):
                      "export_policy_event_id": report.export_policy_event_id,
                      "export_collector_ref": (report.export_collector_ref.to_dict()
                                               if report.export_collector_ref is not None else None)}
-            destination_admin = world.society.settlements[inventory.stock_id.split(":", 1)[1]].administrator_id
+            destination_stock = world.economy.stocks[objective.stock_id]
+            destination_admin = world.society.settlements[destination_stock.location_id].administrator_id
             if quote["export_collector_ref"] is not None and quote["export_collector_ref"]["id"] == destination_admin:
                 quote = {"export_rate_permille": 0, "export_policy_event_id": None,
                          "export_collector_ref": None}

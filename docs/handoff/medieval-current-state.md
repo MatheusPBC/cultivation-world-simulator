@@ -3729,6 +3729,18 @@ sequência surgiu naturalmente, nem reação de QG/rei ou consequência
 populacional posterior. O recorte de force também passou a ligar diretamente
 `detachment_held` ao fato Map-owned que tornou a rota indisponível.
 
+No checkout schema 68, a mesma fixture passou a começar com o celeiro de
+Portovelho vazio nos dois mundos e uma compra maior já paga. A travessia
+fechada conservou a carga, mas a entrega menor chegou à população no próximo
+fechamento: mais rações faltantes e saúde menor que no controle aberto. O
+recibo de subsistência cita o fechamento da criatura. A extensão expôs um
+`KeyError` real no menu mensal: a compra presumiu que o ID de um estoque de
+acampamento codificava uma cidade. O menu agora consulta a localização do
+estoque canônico, como a execução existente já fazia. Os 7 testes focados de
+mercado, criatura e interferência passaram, assim como save/load e auditoria
+da fixture. Isso verifica composição pressionada, não ocorrência espontânea,
+reação de QG/rei ou decisão de provider real nessa cadeia.
+
 ### Medição natural de um ano no schema 67
 
 A seed 73, sem provider real e sem reforço artificial, completou 360 dias no

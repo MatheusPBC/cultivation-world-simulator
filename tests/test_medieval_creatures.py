@@ -31,9 +31,13 @@ def buy_across_the_river(world, quantity=10):
     return purchase(world, *consent(world, values))
 
 
-async def crossed_world(crossings=8, steps=40):
+async def crossed_world(crossings=8, steps=40, destination_food=None):
     """Real cargo crosses the drake's river until it is materially hungry."""
     world = cargo_world()
+    if destination_food is not None:
+        destination = world.economy.stocks["stock:portovelho"]
+        world.economy.stocks[destination.id] = destination.model_copy(
+            update={"goods": {**destination.goods, "food": destination_food}})
     seller = world.economy.stocks[SELLER_STOCK]
     world.economy.stocks[seller.id] = seller.model_copy(
         update={"goods": {**seller.goods, "food": seller.goods.get("food", 0) + 5000}})
