@@ -3919,3 +3919,23 @@ recursos, save/load e auditoria causal (`ok=true`, 3.855 eventos, zero causas
 quebradas ou Story/LLM material). A saúde em Pedraclara/Portovelho ainda caiu
 para 862/860: esta correção resolve a renda que não acompanhava indivíduos,
 **não** prova equilíbrio econômico nem decisão espontânea de construir oficina.
+
+### Rechecagem natural após composição campanha/criatura/população
+
+A seed 73 foi executada novamente por 120 dias no schema 68 após a correção
+do menu de compras para estoques de acampamento: 3.855 eventos, save de
+2.215.936 bytes, conservação de moeda/recursos, save/load equivalente e
+auditoria causal `ok=true`. O horizonte não produziu fechamento de travessia,
+campanha nem comandante nomeado; ausência de crise não é falha da seed. A
+saúde final de Pedraclara/Portovelho continuou em 862/860. Esta medição não
+resolve a pressão econômica nem substitui três seeds por dez anos ou provider
+real.
+
+O recibo de subsistência do dia 120 mostra a causa imediata da queda: antes
+das decisões de socorro do mesmo fechamento, Pedraclara tinha 1.847 rações
+não compráveis e Portovelho 1.581. O estoque público final ainda continha
+5.006/4.074 rações, respectivamente; portanto, neste recorte a barreira
+dominante é renda doméstica/acesso, não ausência física de comida na cidade.
+Coortes grandes de artesãos tinham saldos quase zerados. A próxima mudança
+econômica deve ampliar trabalho/remuneração materialmente viável para essas
+coortes ou outro caminho de acesso decidido por ator, não criar rações.
