@@ -4298,3 +4298,14 @@ Este gate avançou apenas uma seed até quatro anos; não é a série completa d
 dez anos/três seeds nem valida a economia como estável. Os artefatos ficam em
 `/tmp/cws-schema70-seed73-resumed-to1440.mws` e
 `/tmp/cws-schema70-seed73-resumed-to1440.checkpoint-day-01440.mws`.
+
+### Fonte da acessibilidade alimentar — 23/09/2026
+
+O fechamento `subsistence_resolved` agora aponta para o último evento de saldo
+de cada grupo doméstico participante e para o último evento da cotação local,
+além das fontes de estoque/compra que já citava. Assim, quando o payload mostra
+que parte das rações ficou inacessível por dinheiro, o `Por quê?` pode seguir
+até os recebimentos/despesas da coorte e ao preço aplicado. Isso só completa
+proveniência: não muda preço, saldo, compras, alívio, saúde ou população. Os 17
+testes focados de `tests/test_medieval_consumption.py`, Ruff nos dois arquivos
+alterados e `git diff --check` passaram.

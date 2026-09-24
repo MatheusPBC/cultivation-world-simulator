@@ -241,7 +241,8 @@ def consume_monthly(world) -> None:
         # manufacture a subsidy or to infer one from prose.
         from src.sim.medieval.consumption import requirement_shares
         public_shares = requirement_shares(required_by_group, pool)
-        price = economy.markets[need.id].prices["food"]
+        market = economy.markets[need.id]
+        price = market.prices["food"]
         unaffordable = {
             group_id: max(0, quantity - min(quantity,
                                              (economy.accounts.get(f"household:{group_id}").balance // price
@@ -282,8 +283,12 @@ def consume_monthly(world) -> None:
                              f"{settlement.name}: {domestic + paid}/{required} rações atendidas; {domestic} domésticas, {paid} compradas; "
                              f"déficit de {missing}.",
                              extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"),
+                                  market.last_event_id,
                                   *domestic_receipts, *receipts,
                                   *interrupted_route_causes,
+                                  *(economy.accounts[f"household:{group_id}"].last_event_id
+                                    for group_id in required_by_group
+                                    if f"household:{group_id}" in economy.accounts),
                                   *(group.last_event_id for group in groups),
                                  *(f.last_event_id for f in economy.facilities.values() if f.stock_id == stock.id
                                    and "food" in economy.recipes[f.recipe_id].outputs),

@@ -45,7 +45,18 @@ def test_families_pay_only_whole_received_rations_and_unpaid_demand_stays_missin
     assert {e.decision["action"] for e in decisions} == {"buy_rations", "sell_rations"}
     assert all(not e.deltas for e in decisions)
     final = next(e for e in world.events if e.id == world.economy.needs["pedraclara"].last_event_id)
-    assert purchase.id in {c.cause_event_id for c in final.causal_links}
+    cause_ids = {c.cause_event_id for c in final.causal_links}
+    assert purchase.id in cause_ids
+    market_source = world.economy.markets["pedraclara"].last_event_id
+    if market_source is not None:
+        assert market_source in cause_ids
+    household_sources = {
+        world.economy.accounts[f"household:{candidate.id}"].last_event_id
+        for candidate in world.society.population.values()
+        if candidate.settlement_id == "pedraclara"
+        and world.economy.accounts[f"household:{candidate.id}"].last_event_id is not None
+    }
+    assert household_sources <= cause_ids
     assert final.causal_payload["subsistence"] == {
         "settlement_id": "pedraclara",
         "required": 2400,
