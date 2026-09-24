@@ -33,7 +33,9 @@ eventos narrativos não podem forçar a trajetória natural.
   causal e conservação passaram, mas houve 452 mortes por privação, saúde média
   321,62/1000 e unrest 449,75/1000. Não é sucesso econômico nem gate final.
   Schema 71 agora permite suspender um vínculo sob pressão atual de folha por
-  decisão do empregador; ainda não foi observado em mundo natural/provider.
+  decisão do empregador. Um smoke natural schema71 de 120 dias passou
+  conservação/save-load/auditoria, mas não registrou staffing; provider real e
+  efeito econômico da suspensão seguem sem medição.
 - A interferência campanha–criatura–comércio foi provada em fixture pressionada;
   a cadeia política rei → QG → comandante e sua formação natural ainda não foram
   provadas. O limite de staffing já mostra custos/saldo do empregador à IA, mas

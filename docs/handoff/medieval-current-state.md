@@ -18,9 +18,16 @@ seguinte; não mediu recuperação de renda doméstica, saúde ou população. U
 provider stub selecionou o ID zero pelo menu institucional composto e o owner
 registrou a pausa. Passaram 18 testes de emprego e um recorte combinado de 22
 testes de emprego, persistência/schema e observatório, além de Ruff,
-`git diff --check`, type-check medieval e quatro testes de Finanças. Ainda não
-há smoke natural nem escolha de provider real no schema 71. A série natural
-abaixo é evidência de checkout anterior e não certifica esta regra.
+`git diff --check`, type-check medieval e quatro testes de Finanças. O smoke
+natural schema 71 da seed 73 avançou 120 dias sem provider: 3.867 eventos,
+76.000 moedas e recursos conservados, save/load/continuação equivalentes até o
+dia 121 e auditorias do save/checkpoint `ok=true`, sem causas quebradas, erros
+de autoria ou efeitos Story/LLM. Durou 13,02s, salvou 2.232.320 bytes e chegou
+a RSS de 153.382.912 bytes. Houve 84 rações faltantes acumuladas, saúde média
+952,88 e zero mortes; não foi registrada decisão de staffing. Isso verifica
+integridade curta, não a eficácia natural da suspensão, provider real ou
+estabilidade longa. A série natural abaixo é evidência de checkout anterior e
+não certifica esta regra.
 
 ## Série natural de dez anos de checkout anterior — 23/09/2026
 
