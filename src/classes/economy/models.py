@@ -123,7 +123,7 @@ class PermanentEmploymentContract(SocietyValue):
     # Current employer-selected staffing target within the accepted ceiling.
     # A smaller target frees real people and payroll for other material work;
     # it never increases the contract's original ceiling.
-    staffing_target: Positive
+    staffing_target: Count
     staffing_event_id: Identity | None
     wage_per_worker: Positive
     created_day: Count
@@ -131,7 +131,7 @@ class PermanentEmploymentContract(SocietyValue):
     selected_affordance_id: Identity
     created_event_id: Identity
     last_reviewed_day: Count
-    last_outcome: Literal["created", "paid", "unpaid_funds", "unpaid_labor", "unavailable"] = "created"
+    last_outcome: Literal["created", "paid", "unpaid_funds", "unpaid_labor", "unavailable", "paused"] = "created"
     last_event_id: Identity
 
     @model_validator(mode="after")

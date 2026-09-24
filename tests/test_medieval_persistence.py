@@ -71,7 +71,7 @@ def test_xianxia_or_foreign_databases_are_rejected_without_modification(tmp_path
     assert path.read_bytes() == before
 
 
-@pytest.mark.parametrize("schema", (66, 68))
+@pytest.mark.parametrize("schema", (66, 68, 70))
 def test_previous_schema_is_rejected_without_touching_save(tmp_path, schema):
     path = tmp_path / f"schema-{schema}.mws"
     save_world(create_medieval_world(73), path)

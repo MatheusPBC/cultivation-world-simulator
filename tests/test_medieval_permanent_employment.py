@@ -191,8 +191,7 @@ def test_employer_can_choose_lower_staffing_after_real_production_payroll_limit(
     assert choices
     assert any(world.event_index()[option.pressure_event_id].event_type == "production_limited"
                for option in choices)
-    option = next(item for item in choices if item.contract_id == contract.id
-                  and item.target == max(1, contract.workforce_limit // 4))
+    option = next(item for item in choices if item.contract_id == contract.id and item.target == 0)
     unrevised = deepcopy(world)
     decision = record_employment_staffing_decision(world, employer, option.id)
     revised = set_employment_staffing(world, employer, option.id, decision_event_id=decision.id)
@@ -226,10 +225,11 @@ def test_employer_can_choose_lower_staffing_after_real_production_payroll_limit(
     with pytest.raises(ValueError, match="staffing decision provenance"):
         resumed.economy.validate(resumed)
 
-    # Same available funds at the next boundary: the actor's lower staffing
-    # target leaves real payroll and workers for a facility. No output is
+    # Same available funds at the next boundary: the actor's explicit
+    # suspension leaves real payroll and workers for a facility. No output is
     # granted by the staffing decision itself.
     produced = []
+    staffed_workers = []
     for candidate in (unrevised, world):
         treasury = candidate.economy.accounts[contract.account_id]
         candidate.economy.accounts[treasury.id] = treasury.model_copy(
@@ -237,10 +237,27 @@ def test_employer_can_choose_lower_staffing_after_real_production_payroll_limit(
         next_month(candidate)
         workforce = monthly_workforce(candidate)
         settle_permanent_employment(candidate, workforce)
+        staffed_workers.append(candidate.economy.payrolls.get(contract.id))
         produce_monthly(candidate, workforce)
         produced.append(sum(facility.last_batches for facility in candidate.economy.facilities.values()
                             if facility.payroll_account_id == contract.account_id))
     assert produced[1] > produced[0]
+    assert staffed_workers[0] is not None
+    assert staffed_workers[0].day == world.clock.absolute_day
+    assert staffed_workers[1] is not None
+    assert staffed_workers[1].day < world.clock.absolute_day
+    paused = world.economy.employment_contracts[contract.id]
+    assert paused.staffing_target == 0
+    assert paused.last_outcome == "paused"
+    assert any(event.event_type == "permanent_employment_paused"
+               and event.day == world.clock.absolute_day for event in world.events)
+    world.economy.validate(world)
+    paused_path = tmp_path / "paused-staffing.mws"
+    save_world(world, paused_path)
+    paused_round_trip = load_world(paused_path)
+    paused_round_trip.economy.validate(paused_round_trip)
+    assert paused_round_trip.economy.employment_contracts[contract.id].staffing_target == 0
+    assert paused_round_trip.economy.employment_contracts[contract.id].last_outcome == "paused"
 
 
 def test_staffing_rejects_stale_or_unsourced_choice_without_mutation():
@@ -253,7 +270,8 @@ def test_staffing_rejects_stale_or_unsourced_choice_without_mutation():
     world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
     next_month(world)
     produce_monthly(world, monthly_workforce(world))
-    option = employment_staffing_options(world, contract.employer_ref)[0]
+    option = next(item for item in employment_staffing_options(world, contract.employer_ref)
+                  if item.contract_id == contract.id and item.target == 0)
     unsourced = record_event(world, "fixture_unsourced_staffing", "Escolha sem relatório.",
                             fact_kind=FactKind.DECISION, decision=option.decision())
     before = world.economy.employment_contracts[contract.id]
@@ -282,7 +300,8 @@ async def test_staffing_option_joins_the_single_institutional_provider_menu(monk
     world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
     next_month(world)
     produce_monthly(world, monthly_workforce(world))
-    option = employment_staffing_options(world, contract.employer_ref)[0]
+    option = next(item for item in employment_staffing_options(world, contract.employer_ref)
+                  if item.contract_id == contract.id and item.target == 0)
     assert option.id in _by_id(world, contract.employer_ref, monthly_adapters())
     world.config = world.config.model_copy(update={"ai_enabled": True,
                                                    "ai_calls_per_step": 100, "ai_max_calls": 100})
@@ -296,6 +315,7 @@ async def test_staffing_option_joins_the_single_institutional_provider_menu(monk
         world, monthly_adapters(), actors=(contract.employer_ref,))
     assert contract.employer_ref in covered
     assert world.economy.employment_contracts[contract.id].staffing_target == option.target
+    assert option.target == 0
     decision = next(event for event in reversed(world.events)
                     if event.event_type == "institutional_decision_turn_decided")
     assert decision.decision == option.decision()

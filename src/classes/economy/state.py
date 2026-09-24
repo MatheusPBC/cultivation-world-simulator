@@ -244,7 +244,8 @@ class EconomyState(EconomySerialization):
                                and delta.aspect == "created" and delta.before == "False" and delta.after == "True"
                                for delta in created.deltas)
                     or last.event_type not in {"permanent_employment_created", "permanent_employment_settled",
-                                               "permanent_employment_unpaid", "employment_staffing_changed"}):
+                                               "permanent_employment_unpaid", "permanent_employment_paused",
+                                               "employment_staffing_changed"}):
                 raise ValueError("invalid permanent employment contract provenance")
             staffing_change = events.get(contract.staffing_event_id) if contract.staffing_event_id else None
             if staffing_change is None:

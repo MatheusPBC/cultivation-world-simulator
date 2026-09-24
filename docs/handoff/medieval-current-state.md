@@ -1,6 +1,28 @@
 # Estado atual — Medieval World Simulator
 
-## Nova série natural com o fallback corrigido — 23/09/2026
+## Schema 71 — suspensão decidida de vínculo permanente — 24/09/2026
+
+Após receipt atual da própria produção limitada por folha, o empregador pode
+escolher entre reduzir o alvo ou suspender o vínculo no próximo ciclo (alvo
+zero). A pausa não demite pessoas, muda ocupação, remove o contrato nem paga
+salários: apenas não reserva trabalhadores naquele ciclo, deixando-os elegíveis
+para outras atividades materiais. O receipt `permanent_employment_paused`
+registra a decisão causal, a data e o estado do vínculo. Se houver nova pressão
+de folha, opções atuais permitem retomada/revisão; nada ocorre sem nova decisão.
+Finanças apresenta o resultado `paused` em português.
+
+O save foi elevado a schema 71; schemas anteriores são rejeitados sem migração
+ou sobrescrita, com teste explícito de que save 70 permanece intacto. Uma
+fixture contrafactual liberou trabalho e caixa e produziu mais lotes no ciclo
+seguinte; não mediu recuperação de renda doméstica, saúde ou população. Um
+provider stub selecionou o ID zero pelo menu institucional composto e o owner
+registrou a pausa. Passaram 18 testes de emprego e um recorte combinado de 22
+testes de emprego, persistência/schema e observatório, além de Ruff,
+`git diff --check`, type-check medieval e quatro testes de Finanças. Ainda não
+há smoke natural nem escolha de provider real no schema 71. A série natural
+abaixo é evidência de checkout anterior e não certifica esta regra.
+
+## Série natural de dez anos de checkout anterior — 23/09/2026
 
 As seeds 73, 101 e 137 foram executadas do dia zero ao dia 3.600 no checkout
 com o fallback de ajuda e a affordance de workforce corrigidos. Os checkpoints
@@ -20,8 +42,10 @@ polity/ciclo, embora o owner transfira rações reais à despensa dos moradores
 e deixe deltas navegáveis. Outras cidades podem continuar famintas apesar de
 estoque público local e incapacidade de compra das famílias. A adequação
 dessa restrição decisória ainda precisa ser avaliada; nenhuma mudança nela
-foi feita durante a série. O gate natural está fechado, mas os gates de
-provider real, produto e funcionalidades amplas do roadmap continuam abertos.
+foi feita durante a série. Essa matriz completou o horizonte no checkout em que
+foi executada, mas mudanças posteriores de economia e schema reabriram o gate
+para o checkout atual. Os gates de provider real, produto e funcionalidades
+amplas continuam abertos.
 
 ## Ajuda institucional deixa de privilegiar IDs — 22/09/2026
 

@@ -32,9 +32,9 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-# Employment contracts now persist a decision-backed staffing target distinct
-# from their original ceiling. Older saves are rejected without rewriting data.
-SCHEMA = 70
+# Employment contracts now persist a decision-backed staffing target that can
+# be explicitly suspended at zero. Older saves are rejected without rewriting data.
+SCHEMA = 71
 EVENT_CHUNK_SIZE = 512
 
 

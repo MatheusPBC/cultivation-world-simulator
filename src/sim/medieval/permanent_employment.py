@@ -330,6 +330,13 @@ def employment_staffing_options(world, employer):
                 contract_id=contract.id, target=target,
                 current_target=contract.staffing_target,
                 workforce_limit=contract.workforce_limit, pressure_event_id=pressure.id))
+        if contract.staffing_target > 0:
+            target = 0
+            options.append(EmploymentStaffingOption(
+                id=(f"employment-staffing:{contract.id}:{target}:{world.clock.absolute_day}:"
+                    f"{contract.last_event_id}:{pressure.id}"), employer_ref=employer,
+                contract_id=contract.id, target=target, current_target=contract.staffing_target,
+                workforce_limit=contract.workforce_limit, pressure_event_id=pressure.id))
     return tuple(options)
 
 
@@ -346,7 +353,9 @@ def record_employment_staffing_decision(world, employer, option_id):
     if option is None:
         raise ValueError("employment staffing option is stale or unknown")
     return record_event(world, "employment_staffing_decided",
-                        "O empregador escolheu um novo alvo de contratação dentro do vínculo vigente.",
+                        ("O empregador decidiu suspender o vínculo no próximo ciclo."
+                         if option.target == 0 else
+                         "O empregador escolheu um novo alvo de contratação dentro do vínculo vigente."),
                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                         decision=option.decision(), cause_ids=_staffing_causes(world, option))
 
@@ -365,7 +374,9 @@ def set_employment_staffing(world, employer, option_id, *, decision_event_id):
     require_authority(candidate, employer, "trade")
     contract = candidate.economy.employment_contracts[option.contract_id]
     event = record_event(candidate, "employment_staffing_changed",
-                         f"{contract.cohort_id}: alvo de contratação alterado para até {option.target} pessoas.",
+                         (f"{contract.cohort_id}: vínculo suspenso a partir do próximo ciclo."
+                          if option.target == 0 else
+                          f"{contract.cohort_id}: alvo de contratação alterado para até {option.target} pessoas."),
                          fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
                          causal_payload={"decision_event_id": decision.id,
                                          "actor_ref": employer.to_dict(),
@@ -411,6 +422,23 @@ def settle_permanent_employment(world, available):
     """
     for contract in sorted(world.economy.employment_contracts.values(), key=lambda item: item.id):
         if contract.last_reviewed_day == world.clock.absolute_day:
+            continue
+        if contract.staffing_target == 0:
+            event = record_event(
+                world, "permanent_employment_paused",
+                f"{contract.cohort_id}: vínculo suspenso por decisão do empregador; sem folha neste ciclo.",
+                fact_kind=FactKind.STATE_TRANSITION,
+                deltas=(
+                    _delta("employment_contract", contract.id, "last_reviewed_day",
+                           contract.last_reviewed_day, world.clock.absolute_day),
+                    _delta("employment_contract", contract.id, "last_outcome",
+                           contract.last_outcome, "paused"),
+                ),
+                cause_ids=_causes(contract.last_event_id),
+            )
+            world.economy.employment_contracts[contract.id] = contract.model_copy(
+                update={"last_reviewed_day": world.clock.absolute_day, "last_outcome": "paused",
+                        "last_event_id": event.id})
             continue
         blocker = _blocker(world, contract, available)
         group = world.society.population.get(contract.cohort_id)
@@ -529,9 +557,13 @@ def employment_staffing_adapters():
         name="employment_staffing", family="employment_staffing",
         options_fn=employment_staffing_options,
         label_fn=lambda option: (
-            f"Ajustar trabalho remunerado do vínculo {option.contract_id} para até "
-            f"{option.target}/{option.workforce_limit} pessoas no próximo ciclo; "
-            "a verba e os trabalhadores restantes poderão servir à produção."),
+            (f"Suspender o vínculo {option.contract_id} no próximo ciclo; liberar até "
+             f"{option.workforce_limit} pessoas e a verba correspondente, sem garantir que "
+             "outra atividade as empregue ou produza")
+            if option.target == 0 else
+            (f"Ajustar trabalho remunerado do vínculo {option.contract_id} para até "
+             f"{option.target}/{option.workforce_limit} pessoas no próximo ciclo; "
+             "a verba e os trabalhadores restantes poderão servir à produção.")),
         causes_fn=_staffing_causes,
         execute_fn=lambda world, actor, option_id, decision_event_id:
             set_employment_staffing(world, actor, option_id, decision_event_id=decision_event_id),
