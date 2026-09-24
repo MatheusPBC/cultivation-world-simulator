@@ -539,13 +539,37 @@ def employment_staffing_adapters():
             "you_are": actor.to_dict(), "today": world.clock.absolute_day,
             "own_production_readings": _own_production_readings(world, actor),
             "staffing_options": [
-                {"id": option.id, "contract_id": option.contract_id,
-                 "current_target": option.current_target, "proposed_target": option.target,
-                 "workforce_limit": option.workforce_limit,
-                 "pressure_event_id": option.pressure_event_id}
+                _staffing_context(world, option)
                 for option in options],
         },
     ),)
+
+
+def _staffing_context(world, option):
+    """Give the employer dated terms for comparing its own current choices.
+
+    These are current contract arithmetic and account state, not a prediction
+    of next month's total payroll or production. The executor still recomputes
+    authority, funds, labor, and the selected affordance before applying it.
+    """
+    contract = world.economy.employment_contracts[option.contract_id]
+    account = world.economy.accounts[contract.account_id]
+    return {
+        "id": option.id,
+        "contract_id": contract.id,
+        "settlement_id": contract.settlement_id,
+        "occupation": contract.occupation,
+        "current_target": option.current_target,
+        "proposed_target": option.target,
+        "workforce_limit": option.workforce_limit,
+        "wage_per_worker": contract.wage_per_worker,
+        "current_contract_payroll": option.current_target * contract.wage_per_worker,
+        "proposed_contract_payroll": option.target * contract.wage_per_worker,
+        "employer_account_balance": account.balance,
+        "account_balance_event_id": account.last_event_id,
+        "pressure_event_id": option.pressure_event_id,
+        "payroll_scope": "vínculo local apenas; não inclui folha total das instalações",
+    }
 
 
 def review_permanent_employment_fallback(world, *, excluded_actors=()):

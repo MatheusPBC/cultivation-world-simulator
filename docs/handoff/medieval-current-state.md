@@ -4309,3 +4309,17 @@ até os recebimentos/despesas da coorte e ao preço aplicado. Isso só completa
 proveniência: não muda preço, saldo, compras, alívio, saúde ou população. Os 17
 testes focados de `tests/test_medieval_consumption.py`, Ruff nos dois arquivos
 alterados e `git diff --check` passaram.
+
+### Contexto econômico para revisão de folha — 23/09/2026
+
+A affordance `employment_staffing` já entrava no turno institucional único e
+mostrava as limitações datadas de produção, mas o contexto não expunha os
+termos financeiros necessários para comparar os alvos. Agora cada opção mostra
+local e ocupação do vínculo, trabalhadores atuais/propostos, salário por
+trabalhador, custo bruto daquele vínculo e saldo atual da conta do próprio
+empregador com seu evento-fonte. O campo explicita que não representa a folha
+total das instalações nem prevê o próximo ciclo; owner e executor continuam
+revalidando recursos e disponibilidade. Nada seleciona a opção automaticamente
+nem muda o fallback. Os 18 testes focados de
+`tests/test_medieval_permanent_employment.py`, Ruff e `git diff --check`
+passaram.

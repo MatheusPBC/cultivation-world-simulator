@@ -204,7 +204,15 @@ def test_employer_can_choose_lower_staffing_after_real_production_payroll_limit(
     situation = employment_staffing_adapters()[0].situation_fn(world, employer,
                                                                employment_staffing_options(world, employer))
     assert situation["own_production_readings"]
-    assert "balance" not in repr(situation)
+    staffing_context = next(item for item in situation["staffing_options"]
+                            if item["contract_id"] == contract.id)
+    assert staffing_context["employer_account_balance"] == world.economy.accounts[contract.account_id].balance
+    assert staffing_context["current_contract_payroll"] == (
+        revised.staffing_target * revised.wage_per_worker)
+    assert staffing_context["proposed_contract_payroll"] == (
+        staffing_context["proposed_target"] * revised.wage_per_worker)
+    assert staffing_context["account_balance_event_id"] == world.economy.accounts[contract.account_id].last_event_id
+    assert "não inclui folha total" in staffing_context["payroll_scope"]
     path = tmp_path / "staffing.mws"
     save_world(world, path)
     resumed = load_world(path)
