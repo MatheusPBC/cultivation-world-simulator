@@ -35,6 +35,8 @@ from src.systems.institutional_resource_commitment import (
     RESPONSE_DOMAIN,
 )
 from src.systems.time import Month, Year, create_month_stamp
+from src.systems.domain_decision_interpreter import DomainDecisionFailed
+from src.utils.llm.exceptions import LLMError
 
 TRADE_ACTIONS = {"request_reciprocal_trade", "accept_reciprocal_trade"}
 
@@ -266,6 +268,27 @@ async def test_unsupported_response_identifier_refuses_nothing_and_mutates_nothi
     assert "institutional_trade_accepted" not in types
     response_decision = events[2]
     assert response_decision.causal_payload["interpretation"]["source"] == "llm_rejected"
+    assert base_world.institutional_relations.commitments == {}
+    assert partner.economy.stocks == {"grain": 20.0, "medicine": 0.0}
+    assert proposer.economy.stocks == {"grain": 0.0, "medicine": 20.0}
+
+
+@pytest.mark.asyncio
+async def test_counterparty_provider_failure_is_not_recorded_as_a_refusal(base_world):
+    partner, proposer, shortage = _setup(base_world)
+
+    async def unavailable(_task, _template, _context, **_kwargs):
+        raise LLMError("provider unavailable")
+
+    with pytest.raises(DomainDecisionFailed) as exc_info:
+        await process_economy_reactivity(
+            base_world,
+            current_events=[shortage],
+            invalidations=DomainInvalidationQueue(),
+            llm_call=_trade_then(unavailable),
+        )
+
+    assert exc_info.value.domain == RESPONSE_DOMAIN
     assert base_world.institutional_relations.commitments == {}
     assert partner.economy.stocks == {"grain": 20.0, "medicine": 0.0}
     assert proposer.economy.stocks == {"grain": 0.0, "medicine": 20.0}

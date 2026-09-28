@@ -7,8 +7,9 @@ from .models import (KnowledgeReport, DiplomaticNotice, AuthorityClaimNotice, Fi
                      CreatureTributeNotice, CreatureDamageNotice, ForceContactNotice, FieldEngagementOfferNotice,
                      FieldEngagementOutcomeNotice, CampaignSupplyNotice, SettlementPressureNotice,
                      RiteObservation, InvestigationFinding, InvestigationAccusationNotice, EspionageFinding, TechnologyTheftFinding,
-                     CivicDemandNotice, TechnologySighting)
+                     CivicDemandNotice, FamilyLoanNotice, TechnologySighting)
 from .serialization import RegistrySerialization, validate_actor
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.research.models import TechnicalKnowledge
@@ -144,6 +145,10 @@ def civic_demand_notice_id(protest_id, recipient_ref):
     return f"civic_demand_notice:{protest_id}:{recipient_ref.kind}:{recipient_ref.id}"
 
 
+def family_loan_notice_id(request_id, recipient_ref):
+    return f"family_loan_notice:{request_id}:{recipient_ref.kind}:{recipient_ref.id}"
+
+
 def investigation_accusation_notice_id(investigation_id, recipient_ref):
     return f"investigation_accusation:{investigation_id}:{recipient_ref.kind}:{recipient_ref.id}"
 
@@ -153,9 +158,43 @@ def technology_sighting_id(recipient_ref, holder_ref, technology_id):
             f"{holder_ref.kind}:{holder_ref.id}:{technology_id}")
 
 
+def _authorizes_technology_sighting(decision, *, holder_ref, recipient_ref,
+                                    technology_id, source_event_id):
+    """Match explicit disclosure or the teaching commitment that reveals it."""
+    intent = decision.decision
+    if intent == {
+        "action": "disclose_technology_sighting",
+        "actor_ref": holder_ref.to_dict(),
+        "selected_affordance_id": (
+            f"technology-disclosure:{holder_ref.kind}:{holder_ref.id}:"
+            f"{recipient_ref.kind}:{recipient_ref.id}:{technology_id}:{source_event_id}"
+        ),
+    }:
+        return True
+    if intent is None or intent.get("actor_ref") != holder_ref.to_dict():
+        return False
+    if intent.get("action") == "offer_proposal":
+        if intent.get("counterparty_ref") != recipient_ref.to_dict():
+            return False
+        return any(
+            clause.get("kind") == "teaching"
+            and clause.get("technology_id") == technology_id
+            and clause.get("debtor_ref") == holder_ref.to_dict()
+            and clause.get("creditor_ref") == recipient_ref.to_dict()
+            for clause in intent.get("clauses", ())
+        )
+    if intent.get("action") == "offer_teaching_bargain":
+        option_prefix = (
+            f"teaching-offer:{holder_ref.kind}:{holder_ref.id}:"
+            f"{recipient_ref.kind}:{recipient_ref.id}:{technology_id}:"
+        )
+        return str(intent.get("selected_affordance_id", "")).startswith(option_prefix)
+    return False
+
+
 @dataclass
 class KnowledgeState(RegistrySerialization):
-    schema_version = 8
+    schema_version = 10
     _registry_epoch: int = field(default=0, init=False, repr=False, compare=False)
     _registry_epochs: dict[str, int] = field(default_factory=dict, init=False, repr=False, compare=False)
     _structural_validation_epoch: int | None = field(default=None, init=False, repr=False, compare=False)
@@ -187,6 +226,7 @@ class KnowledgeState(RegistrySerialization):
     technology_theft_findings: dict[str, TechnologyTheftFinding] = field(default_factory=dict)
     civic_demand_notices: dict[str, CivicDemandNotice] = field(default_factory=dict)
     technology_sightings: dict[str, TechnologySighting] = field(default_factory=dict)
+    family_loan_notices: dict[str, FamilyLoanNotice] = field(default_factory=dict)
     registries = {"reports": KnowledgeReport, "technologies": TechnicalKnowledge, "notices": DiplomaticNotice,
                   "authority_claim_notices": AuthorityClaimNotice,
                   "route_reports": RouteReport, "fiscal_route_reports": FiscalRouteReport,
@@ -209,6 +249,7 @@ class KnowledgeState(RegistrySerialization):
     registries["technology_theft_findings"] = TechnologyTheftFinding
     registries["civic_demand_notices"] = CivicDemandNotice
     registries["technology_sightings"] = TechnologySighting
+    registries["family_loan_notices"] = FamilyLoanNotice
 
     def __post_init__(self):
         self._bind_registry_epoch()
@@ -248,8 +289,8 @@ class KnowledgeState(RegistrySerialization):
     def knows(self, actor_ref, technology_id):
         return any(k.owner_ref == actor_ref and k.technology_id == technology_id for k in self.technologies.values())
 
-    def _actor_query(self, registry_name, actor_ref, predicate):
-        """Cache a read-only actor projection until that registry changes."""
+    def _actor_query(self, registry_name, actor_ref):
+        """Index a registry by recipient once until that registry changes."""
         registry = getattr(self, registry_name)
         signature = self._registry_epochs.get(registry_name, 0)
         cache = getattr(self, "_query_cache", None)
@@ -258,25 +299,27 @@ class KnowledgeState(RegistrySerialization):
             object.__setattr__(self, "_query_cache", cache)
         cached = cache.get(registry_name)
         if cached is None or cached[0] != signature:
-            cached = (signature, {})
+            grouped = {}
+            for _, item in sorted(registry.items()):
+                recipient = item.recipient_ref
+                grouped.setdefault((recipient.kind, recipient.id), []).append(item)
+            cached = (signature, {key: tuple(items) for key, items in grouped.items()})
             cache[registry_name] = cached
         key = (actor_ref.kind, actor_ref.id)
-        if key not in cached[1]:
-            cached[1][key] = tuple(item for _, item in sorted(registry.items()) if predicate(item, actor_ref))
-        return cached[1][key]
+        return cached[1].get(key, ())
 
     def for_actor(self, actor_ref):
-        return self._actor_query("reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
+        return self._actor_query("reports", actor_ref)
 
     def routes_for_actor(self, actor_ref):
         """Latest dated observation per route this actor was told about."""
-        return self._actor_query("route_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
+        return self._actor_query("route_reports", actor_ref)
 
     def route_report(self, actor_ref, route_id):
         return self.route_reports.get(route_report_id(actor_ref, route_id))
 
     def fiscal_routes_for_actor(self, actor_ref):
-        return self._actor_query("fiscal_route_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
+        return self._actor_query("fiscal_route_reports", actor_ref)
 
     def fiscal_route_report(self, actor_ref, route_id):
         return self.fiscal_route_reports.get(fiscal_route_report_id(actor_ref, route_id))
@@ -288,7 +331,7 @@ class KnowledgeState(RegistrySerialization):
         return tuple(item for _, item in sorted(self.customs_notices.items()) if item.recipient_ref == actor_ref)
 
     def settlements_for_actor(self, actor_ref):
-        return self._actor_query("settlement_reports", actor_ref, lambda item, actor: item.recipient_ref == actor)
+        return self._actor_query("settlement_reports", actor_ref)
 
     def settlement_report(self, actor_ref, settlement_id):
         return self.settlement_reports.get(settlement_report_id(actor_ref, settlement_id))
@@ -330,6 +373,10 @@ class KnowledgeState(RegistrySerialization):
 
     def institutional_aid_for_actor(self, actor_ref):
         return tuple(item for _, item in sorted(self.institutional_aid_notices.items())
+                     if item.recipient_ref == actor_ref)
+
+    def family_loan_notices_for_actor(self, actor_ref):
+        return tuple(item for _, item in sorted(self.family_loan_notices.items())
                      if item.recipient_ref == actor_ref)
 
     def authority_claims_for_actor(self, actor_ref):
@@ -452,17 +499,17 @@ class KnowledgeState(RegistrySerialization):
                     or not any(delta.owner_kind == "technology_sighting" and delta.owner_id == item.id
                                and delta.aspect == "source_event_id" and delta.after == item.source_event_id
                                for delta in receipt.deltas)
-                    or not any((decision := events.get(link.cause_event_id)) is not None
-                               and decision.fact_kind == FactKind.DECISION
-                               and decision.decision == {
-                                   "action": "disclose_technology_sighting",
-                                   "actor_ref": item.holder_ref.to_dict(),
-                                   "selected_affordance_id": (
-                                       f"technology-disclosure:{item.holder_ref.kind}:{item.holder_ref.id}:"
-                                       f"{item.recipient_ref.kind}:{item.recipient_ref.id}:{item.technology_id}:"
-                                       f"{item.source_event_id}"),
-                               }
-                               for link in receipt.causal_links)):
+                    or not any(
+                        (decision := events.get(link.cause_event_id)) is not None
+                        and decision.fact_kind == FactKind.DECISION
+                        and _authorizes_technology_sighting(
+                            decision, holder_ref=item.holder_ref,
+                            recipient_ref=item.recipient_ref,
+                            technology_id=item.technology_id,
+                            source_event_id=item.source_event_id,
+                        )
+                        for link in receipt.causal_links
+                    )):
                 raise ValueError("invalid technology sighting provenance")
         for report in self.reports.values():
             validate_actor(world, report.recipient_ref)
@@ -495,6 +542,8 @@ class KnowledgeState(RegistrySerialization):
             self._validate_workforce_offer(world, events, notice)
         for notice in self.institutional_aid_notices.values():
             self._validate_institutional_aid_notice(world, events, notice)
+        for notice in self.family_loan_notices.values():
+            self._validate_family_loan_notice(world, events, notice)
         for notice in self.creature_tribute_notices.values():
             validate_actor(world, notice.recipient_ref)
             demand = world.creatures.demands.get(notice.demand_id)
@@ -833,30 +882,79 @@ class KnowledgeState(RegistrySerialization):
         validate_actor(world, notice.counterparty_ref)
         engagement = world.society.field_engagements.get(notice.engagement_id)
         event = events.get(notice.event_id)
-        if engagement is None or event is None or engagement.status != "resolved":
+        if (engagement is None or event is None or engagement.status != "resolved"
+                or event.event_type != "field_engagement_resolved"
+                or event.fact_kind != FactKind.STATE_TRANSITION):
             raise ValueError("invalid field engagement outcome notice")
         if notice.recipient_ref == engagement.challenger_ref:
             casualties, counterparty, own_detachment_id = (engagement.challenger_casualties,
                                                             engagement.defender_ref,
                                                             engagement.challenger_detachment_id)
+            own_side, opposing_side = "challenger", "defender"
             expected_outcome = ("won" if engagement.winner_ref == engagement.challenger_ref else
                                 "lost" if engagement.winner_ref == engagement.defender_ref else "indecisive")
         elif notice.recipient_ref == engagement.defender_ref:
             casualties, counterparty, own_detachment_id = (engagement.defender_casualties,
                                                             engagement.challenger_ref,
                                                             engagement.defender_detachment_id)
+            own_side, opposing_side = "defender", "challenger"
             expected_outcome = ("won" if engagement.winner_ref == engagement.defender_ref else
                                 "lost" if engagement.winner_ref == engagement.challenger_ref else "indecisive")
         else:
             raise ValueError("field engagement outcome recipient is not a participant")
+
+        def field_values(owner_id, aspect):
+            matches = [delta.after for delta in event.deltas
+                       if delta.owner_kind == "field_engagement_outcome_notice"
+                       and delta.owner_id == owner_id and delta.aspect == aspect]
+            return matches[0] if len(matches) == 1 else None
+
+        def combat_terms(side, detachment_id):
+            matches = [delta.after for delta in event.deltas
+                       if delta.owner_kind == "field_engagement" and delta.owner_id == engagement.id
+                       and delta.aspect == f"{side}_column:{detachment_id}"]
+            if len(matches) != 1 or not isinstance(matches[0], str):
+                return None
+            values = {}
+            for part in matches[0].split(";"):
+                key, separator, value = part.partition("=")
+                if not separator or key in values:
+                    return None
+                values[key] = value
+            return values
+
+        own_terms = combat_terms(own_side, own_detachment_id)
+        opposing_terms = [delta.after for delta in event.deltas
+                          if delta.owner_kind == "field_engagement" and delta.owner_id == engagement.id
+                          and delta.aspect == f"{opposing_side}_terms"]
+        opposing_count = None
+        if len(opposing_terms) == 1 and isinstance(opposing_terms[0], str):
+            summary = dict(part.split("=", 1) for part in opposing_terms[0].split(";") if "=" in part)
+            try:
+                opposing_count = int(summary["count"])
+            except (KeyError, ValueError):
+                opposing_count = None
+        expected_counterparty_band = (
+            "1-9" if opposing_count is not None and opposing_count <= 9 else
+            "10-24" if opposing_count is not None and opposing_count <= 24 else
+            "25-49" if opposing_count is not None and opposing_count <= 49 else
+            "50-99" if opposing_count is not None and opposing_count <= 99 else
+            "100+" if opposing_count is not None else None)
         if (notice.counterparty_ref != counterparty or notice.own_detachment_id != own_detachment_id
                 or notice.own_casualties != casualties
                 or notice.outcome != expected_outcome
+                or own_terms is None or own_terms.get("prepared") != str(notice.own_prepared)
+                or own_terms.get("supplied") != str(notice.own_supplied)
+                or expected_counterparty_band is None
+                or notice.counterparty_strength_band != expected_counterparty_band
                 or notice.id != field_engagement_outcome_notice_id(engagement.id, notice.recipient_ref)
                 or notice.settlement_id != engagement.settlement_id or notice.learned_day != event.day
                 or notice.event_id != event.id or event.id != engagement.last_event_id
-                or not any(delta.owner_kind == "field_engagement_outcome_notice" and delta.owner_id == notice.id
-                           and delta.aspect == "outcome" and delta.after == notice.outcome for delta in event.deltas)):
+                or field_values(notice.id, "outcome") != str(notice.outcome)
+                or field_values(notice.id, "own_casualties") != str(notice.own_casualties)
+                or field_values(notice.id, "counterparty_strength_band") != str(notice.counterparty_strength_band)
+                or field_values(notice.id, "own_prepared") != str(notice.own_prepared)
+                or field_values(notice.id, "own_supplied") != str(notice.own_supplied)):
             raise ValueError("invalid field engagement outcome notice")
     @staticmethod
     def _validate_campaign_supply_notice(world, events, notice):
@@ -914,10 +1012,18 @@ class KnowledgeState(RegistrySerialization):
                       and delta.owner_id == f"aid-request:{request_decision.id}" and delta.aspect == aspect]
             return values[0] if len(values) == 1 else None
         if (request.event_type != "institutional_aid_requested" or request.fact_kind != FactKind.STATE_TRANSITION
-                or request_decision is None or (request_decision.decision or {}).get("actor_ref") != notice.requester_ref.to_dict()
+                or request.causal_origin is not CausalOrigin.ACTOR_DECISION
+                or request_decision is None
+                or request_decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+                or (request_decision.decision or {}).get("actor_ref") != notice.requester_ref.to_dict()
                 or request_delta_value("status") != "requested"
                 or request_delta_value("requester_settlement_id") != notice.requester_settlement_id
-                or request_delta_value("report_id") != notice.report_id):
+                or request_delta_value("report_id") != notice.report_id
+                or request.causal_payload != {
+                    "decision_event_id": request_decision.id,
+                    "actor_ref": notice.requester_ref.to_dict(),
+                    "selected_affordance_id": request_delta_value("option_id"),
+                }):
             raise ValueError("invalid institutional aid request notice provenance")
         report_events = [events[link.cause_event_id] for link in request.causal_links if link.cause_event_id in events]
         observations = [delta.after for candidate in report_events if candidate.fact_kind == FactKind.STATE_TRANSITION
@@ -950,8 +1056,15 @@ class KnowledgeState(RegistrySerialization):
         expected_type = f"institutional_aid_{notice.response_status}" if notice.response_status else None
         if (notice.recipient_ref != notice.requester_ref or notice.response_status not in {"accepted", "rejected"}
                 or event.event_type != expected_type or event.fact_kind != FactKind.STATE_TRANSITION
+                or event.causal_origin is not CausalOrigin.ACTOR_DECISION
                 or request.id not in {link.cause_event_id for link in event.causal_links}
                 or response_decision is None
+                or response_decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+                or event.causal_payload != {
+                    "decision_event_id": response_decision.id,
+                    "actor_ref": (response_decision.decision or {}).get("actor_ref"),
+                    "selected_affordance_id": (response_decision.decision or {}).get("selected_affordance_id"),
+                }
                 or request_delta_value("provider_ref") != json.dumps(
                     (response_decision.decision or {}).get("actor_ref"), sort_keys=True,
                     separators=(",", ":"), ensure_ascii=False)
@@ -959,6 +1072,38 @@ class KnowledgeState(RegistrySerialization):
                            and delta.aspect == "status" and delta.before == "requested"
                            and delta.after == notice.response_status for delta in event.deltas)):
             raise ValueError("invalid institutional aid response notice provenance")
+
+    @staticmethod
+    def _validate_family_loan_notice(world, events, notice):
+        validate_actor(world, notice.recipient_ref)
+        request = world.economy.family_loan_requests.get(notice.request_id)
+        event = events.get(notice.event_id)
+        group = world.society.population.get(notice.recipient_ref.id)
+        if (request is None or group is None or event is None
+                or notice.id != family_loan_notice_id(notice.request_id, notice.recipient_ref)
+                or notice.recipient_ref.kind != "population_group"
+                or notice.borrower_ref != request.borrower_ref
+                or notice.settlement_id != request.settlement_id
+                or notice.purpose != request.purpose
+                or notice.requested_principal != request.principal
+                or notice.expires_day != request.expires_day
+                or notice.learned_day != event.day or notice.learned_day > world.clock.absolute_day
+                or event.fact_kind != FactKind.STATE_TRANSITION
+                or not any(delta.owner_kind == "family_loan_notice" and delta.owner_id == notice.id
+                           and delta.aspect == "observation" and delta.after == notice.observation()
+                           for delta in event.deltas)):
+            raise ValueError("invalid family loan notice provenance")
+        expected_event = {"requested": "family_loan_request_delivered",
+                          "funded": "family_loan_funded", "repaid": "family_loan_repaid"}[notice.status]
+        if event.event_type != expected_event:
+            raise ValueError("family loan notice lifecycle lacks its matching receipt")
+        if ((notice.status == "requested" and request.status not in {"open", "partially_funded"})
+                or (notice.status in {"funded", "repaid"}
+                    and request.status not in {"partially_funded", "funded"})
+                or (notice.status == "repaid" and not any(
+                    loan.lender_notice_id == notice.id and loan.status == "repaid"
+                    for loan in world.economy.family_loans.values()))):
+            raise ValueError("family loan notice disagrees with the canonical obligation")
 
     @staticmethod
     def _validate_workforce_demand(world, events, report):
@@ -1174,9 +1319,38 @@ class KnowledgeState(RegistrySerialization):
         def causes(event):
             return (events[link.cause_event_id] for link in event.causal_links if link.cause_event_id in events)
 
+        def validate_field_engagement_readings(local_receipt):
+            cause_ids = {link.cause_event_id for link in local_receipt.causal_links}
+            for reading in report.field_engagements:
+                source = events.get(reading.event_id)
+                engagement = world.society.field_engagements.get(reading.engagement_id)
+                source_deltas = source.deltas if source is not None else ()
+
+                def matches(aspect, value):
+                    rows = [delta.after for delta in source_deltas
+                            if delta.owner_kind == "field_engagement" and delta.owner_id == reading.engagement_id
+                            and delta.aspect == aspect]
+                    return len(rows) == 1 and rows[0] == str(value)
+
+                if (source is None or engagement is None or source.event_type != "field_engagement_resolved"
+                        or source.fact_kind != FactKind.STATE_TRANSITION or source.day > report.observed_day
+                        or source.day < report.observed_day - 30 or source.id not in cause_ids
+                        or engagement.status != "resolved" or engagement.last_event_id != source.id
+                        or engagement.settlement_id != report.settlement_id
+                        or reading.challenger_ref != engagement.challenger_ref
+                        or reading.defender_ref != engagement.defender_ref
+                        or reading.winner_ref != engagement.winner_ref
+                        or reading.challenger_casualties != engagement.challenger_casualties
+                        or reading.defender_casualties != engagement.defender_casualties
+                        or not matches("winner_ref", reading.winner_ref)
+                        or not matches("challenger_casualties", reading.challenger_casualties)
+                        or not matches("defender_casualties", reading.defender_casualties)):
+                    raise ValueError("settlement battle reading lacks local factual provenance")
+
         if report.channel == "local_settlement_report":
             if report.recipient_ref != report.publisher_ref or not records(receipt, "settlement_observed", report.id):
                 raise ValueError("settlement observation requires its own typed receipt")
+            validate_field_engagement_readings(receipt)
             return
         own = settlement_report_id(report.publisher_ref, report.settlement_id)
         if report.recipient_ref == report.publisher_ref or not records(receipt, "settlement_report_received", report.id):
@@ -1192,6 +1366,9 @@ class KnowledgeState(RegistrySerialization):
             raise ValueError("settlement bulletin requires its publication decision")
         if not any(records(event, "settlement_observed", own) for decision in published for event in causes(decision)):
             raise ValueError("settlement bulletin requires the publisher's own observation receipt")
+        own_observation = next(event for decision in published for event in causes(decision)
+                               if records(event, "settlement_observed", own))
+        validate_field_engagement_readings(own_observation)
 
     @staticmethod
     def _validate_site_report(world, events, report):
@@ -1249,9 +1426,85 @@ class KnowledgeState(RegistrySerialization):
         def causes(event):
             return (events[link.cause_event_id] for link in event.causal_links if link.cause_event_id in events)
 
-        if report.channel == "administrative_route_report":
+        if report.channel in {"administrative_route_report", "field_route_observation"}:
             if report.recipient_ref != report.publisher_ref or not records(receipt, "route_observed", report.id):
                 raise ValueError("route observation requires its own typed receipt")
+            if report.channel == "field_route_observation":
+                payload = receipt.causal_payload or {}
+                if payload.get("kind") == "field_infrastructure_route_observation":
+                    site = world.map.infrastructure_sites.get(payload.get("site_id"))
+                    site_report_event = events.get(payload.get("site_report_event_id"))
+                    site_report_key = site_report_id(report.publisher_ref, payload.get("site_id"))
+                    site_reading = None
+                    if site_report_event is not None:
+                        site_delta = next((delta for delta in site_report_event.deltas
+                                           if delta.owner_kind == "site_report" and delta.owner_id == site_report_key
+                                           and delta.aspect == "observation"), None)
+                        if site_delta is not None and isinstance(site_delta.after, str):
+                            try:
+                                site_reading = json.loads(site_delta.after)
+                            except (TypeError, ValueError):
+                                site_reading = None
+                    direct_causes = {link.cause_event_id for link in receipt.causal_links}
+                    site_roles = payload.get("site_roles")
+                    if (report.publisher_ref.kind not in {"polity", "organization"}
+                            or site is None or report.route_id not in site.route_ids
+                            or payload.get("actor_ref") != report.publisher_ref.to_dict()
+                            or not isinstance(site_roles, (list, tuple)) or not site_roles
+                            or any(role not in {"owner", "maintainer"} for role in site_roles)
+                            or site_report_event is None or site_report_event.event_type != "site_observed"
+                            or site_report_event.day != report.observed_day
+                            or site_report_key not in {delta.owner_id for delta in site_report_event.deltas
+                                                       if delta.owner_kind == "site_report"
+                                                       and delta.aspect == "observation"}
+                            or site_reading is None or site_reading.get("site_id") != site.id
+                            or site_reading.get("publisher") != report.publisher_ref.to_dict()
+                            or site_reading.get("observed_day") != report.observed_day
+                            or site_report_event.id not in direct_causes):
+                        raise ValueError("local infrastructure route observation lacks a current site reading")
+                    return
+                source = events.get(payload.get("source_event_id"))
+                command_event = events.get(payload.get("command_event_id"))
+                route = world.map.routes[report.route_id]
+                direct_causes = {link.cause_event_id for link in receipt.causal_links}
+                source_causes = ({link.cause_event_id for link in source.causal_links}
+                                 if source is not None else set())
+                pending, ancestry = list(source_causes), set()
+                while pending:
+                    ancestor_id = pending.pop()
+                    if ancestor_id in ancestry or ancestor_id not in events:
+                        continue
+                    ancestry.add(ancestor_id)
+                    pending.extend(link.cause_event_id for link in events[ancestor_id].causal_links)
+                appointment_exists = any(
+                    event_id in events
+                    and events[event_id].event_type == "detachment_commander_appointed"
+                    and any(delta.owner_kind == "detachment_command"
+                            and delta.owner_id == payload.get("detachment_id")
+                            and delta.aspect == "character_id"
+                            and delta.after == report.publisher_ref.id
+                            for delta in events[event_id].deltas)
+                    for event_id in ancestry)
+                if (payload.get("kind") != "field_route_observation"
+                        or report.recipient_ref.kind != "character"
+                        or payload.get("actor_ref") != report.publisher_ref.to_dict()
+                        or not isinstance(payload.get("detachment_id"), str)
+                        or payload.get("position_region_id") not in route.endpoint_region_ids
+                        or source is None or source.event_type not in {"detachment_held", "detachment_marched"}
+                        or source.day != report.observed_day
+                        or source.causal_payload is None
+                        or source.causal_payload.get("detachment_id") != payload.get("detachment_id")
+                        or source.causal_payload.get("position_region_id") != payload.get("position_region_id")
+                        or (source.event_type == "detachment_held"
+                            and (source.causal_payload.get("blocked_route_id") not in world.map.routes
+                                 or payload.get("position_region_id") not in world.map.routes[
+                                     source.causal_payload.get("blocked_route_id")].endpoint_region_ids))
+                        or payload.get("source_event_id") not in direct_causes
+                        or command_event is None
+                        or payload.get("command_event_id") not in direct_causes
+                        or payload.get("command_event_id") not in source_causes
+                        or not appointment_exists):
+                    raise ValueError("field route observation lacks physical commander provenance")
             return
         own = route_report_id(report.publisher_ref, report.route_id)
         if report.recipient_ref == report.publisher_ref or not records(receipt, "route_report_received", report.id):

@@ -5,7 +5,6 @@ selects IDs from the menu the contact policy exposed.  It never constructs the
 offer, terms, routes, or material withdrawal itself.
 """
 
-import asyncio
 import json
 
 from src.classes.causal_origin import CausalOrigin
@@ -66,6 +65,11 @@ async def test_provider_contact_policy_completes_bilateral_deescalation_round_tr
     decisions = [event for event in world.events if event.event_type == "force_standoff_decided"]
     assert len(decisions) == 4
     assert len(calls) == 4
+    for decision in decisions:
+        assert decision.causal_origin == CausalOrigin.ACTOR_DECISION
+        source = decision.causal_payload["decision_source"]
+        assert source["kind"] == "provider"
+        assert source["receipt_event_id"] in {link.cause_event_id for link in decision.causal_links}
     assert {item.status for item in world.relations.obligations.values()} == {"fulfilled"}
     assert world.society.force_standoffs[standoff_id].stage == "resolved"
     assert stages_when_withdrawals_begin == ("marching", "marching")

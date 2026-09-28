@@ -6,21 +6,33 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
+from src.classes.economy.models import Stock
 from src.classes.governance.authority import headquarters_holder, political_holder
 from src.classes.governance.knowledge import settlement_report_id
+from src.classes.governance.knowledge import campaign_supply_notice_id
+from src.classes.governance.models import CampaignSupplyNotice
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
-from src.sim.medieval.economy import _delta
+from src.sim.medieval.economy import _causes, _delta
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import raise_detachment
 from src.sim.medieval.field_engagement import _fatigue_level
+from src.sim.medieval.force import detect_force_standoffs
+from src.sim.medieval.force_contact_policy import review_force_contacts, review_id as force_contact_review_id
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
-from src.sim.medieval.strategy_response import (defense_action_options, defense_adoption_options,
-                                                 review_strategy_responses_with_provider)
+from src.sim.medieval.strategy_response import (REVIEW_KIND, defense_action_options,
+                                                 adopt_occupied_settlement_defense,
+                                                 defense_adoption_options,
+                                                 review_strategy_responses_with_provider,
+                                                 schedule_campaign_logistics_review)
+from tests.medieval_ai_helpers import provider_selection_stub
+from tests.test_medieval_field_engagement import add_column
+from src.systems.calendar_agenda import ScheduledSituation
 
 
 OWNER = EntityRef("polity", "auren")
@@ -46,6 +58,11 @@ def occupied_response_world():
     occupation = record_event(
         world, "test_strategy_occupation", "Fixture factual de ocupação observável.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "strategy_response_fixture",
+            "source_refs": [{"kind": "scenario", "id": "strategy_response_fixture"},
+                            {"kind": "settlement", "id": TARGET}],
+            "observed_day": world.clock.absolute_day}},
         deltas=(_delta("settlement", TARGET, "occupier_id", None, OCCUPIER.id),))
     world.society.set_occupation(TARGET, OCCUPIER.id)
     refresh_route_reports(world)
@@ -58,6 +75,9 @@ def occupied_response_world():
 def choose_first(monkeypatch):
     async def call_llm_json(prompt, *args, **kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
+        if all(item["id"].startswith("detachment-command-appoint:")
+               for item in payload["choices"]):
+            return {"selected_id": ai_decider.NO_ACTION}
         return {"selected_id": payload["choices"][0]["id"]}
 
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
@@ -67,8 +87,12 @@ def choose_first(monkeypatch):
 def authorize_defense(world):
     due = tick(world)
     assert asyncio.run(review_strategy_responses_with_provider(world, due))
-    assert any(event.event_type == "strategy_defense_political_ordered"
-               for event in world.events)
+    order = next(event for event in world.events
+                 if event.event_type == "strategy_defense_political_ordered")
+    assert order.causal_origin == CausalOrigin.ACTOR_DECISION
+    source = order.causal_payload["decision_source"]
+    assert source["kind"] == "provider"
+    assert source["receipt_event_id"] in {link.cause_event_id for link in order.causal_links}
     assert not world.society.detachments
 
 
@@ -88,6 +112,9 @@ def test_political_no_action_cannot_mobilize_or_substitute_headquarters(monkeypa
     assert not asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
     refusal = next(event for event in world.events if event.event_type == "strategy_defense_political_declined")
     assert refusal.decision["actor_ref"] == political_holder(world, OWNER).to_dict()
+    assert refusal.causal_origin == CausalOrigin.ACTOR_DECISION
+    assert refusal.decision["selected_affordance_id"] == ai_decider.NO_ACTION
+    assert refusal.causal_payload["decision_source"]["kind"] == "provider"
     assert not any(event.event_type == "strategy_defense_force_decided" for event in world.events)
     assert world.strategy.plans[plan.id].stage == "adopted"
     assert world_snapshot(world)["economy"] == before["economy"]
@@ -101,10 +128,29 @@ def test_pending_political_order_survives_save_before_headquarters_turn(monkeypa
     choose_first(monkeypatch)
     assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
     authorize_defense(world)
+    order = next(event for event in world.events
+                 if event.event_type == "strategy_defense_political_ordered")
     path = tmp_path / "pending-political-order.mws"
     save_world(world, path)
     world = load_world(path)
+    prompts = []
+
+    async def choose_and_capture(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        prompts.append(payload)
+        return {"selected_id": payload["choices"][0]["id"]}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_and_capture)
     assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    headquarters_prompt = next(item for item in prompts
+                               if item["you_are"] == headquarters_holder(world, OWNER).to_dict())
+    assert headquarters_prompt["situation"]["political_order"] == {
+        "event_id": order.id,
+        "issued_day": order.day,
+        "issuer_ref": political_holder(world, OWNER).to_dict(),
+        "authorized_action": "prepare_defense",
+        "operational_plan_id": next(iter(world.strategy.plans)),
+    }
     decision = next(event for event in world.events if event.event_type == "strategy_defense_force_decided")
     order = next(event for event in world.events if event.event_type == "strategy_defense_political_ordered")
     assert order.id in {link.cause_event_id for link in decision.causal_links}
@@ -148,6 +194,11 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert world.strategy.plans[plan.id].detachment_id == raised.id
     force_decision = next(event for event in world.events if event.event_type == "strategy_defense_force_decided")
     political = next(event for event in world.events if event.event_type == "strategy_defense_political_ordered")
+    for decision in (force_decision, political):
+        assert decision.causal_origin == CausalOrigin.ACTOR_DECISION
+        source = decision.causal_payload["decision_source"]
+        assert source["kind"] == "provider"
+        assert source["receipt_event_id"] in {link.cause_event_id for link in decision.causal_links}
     material = next(event for event in world.events if event.event_type == "detachment_raised")
     headquarters = headquarters_holder(world, OWNER)
     own_briefing = world.knowledge.settlement_report(headquarters, TARGET)
@@ -163,6 +214,291 @@ def test_provider_adopts_then_existing_raise_marches_with_causal_chain(monkeypat
     assert all(delta.owner_kind not in {"stock", "account", "detachment"} for delta in adoption.deltas)
 
 
+def test_one_campaign_reaches_named_commander_after_distinct_policy_and_hq_decisions(monkeypatch):
+    world, _, _ = occupied_response_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 32,
+                                                   "ai_max_calls": 100})
+    choose_first(monkeypatch)
+
+    assert asyncio.run(review_strategy_responses_with_provider(world, allow_adoptions=True))
+    plan = next(iter(world.strategy.plans.values()))
+    authorize_defense(world)
+    assert asyncio.run(review_strategy_responses_with_provider(world, tick(world)))
+    column = next(item for item in world.society.detachments.values() if item.owner_ref == OWNER)
+    while column.stage == "marching":
+        tick(world)
+        column = world.society.detachments[column.id]
+    assert column.location_id == TARGET
+
+    resident = next(item for item in world.society.population.values()
+                    if item.settlement_id == "ferroalto")
+    rival_group_id = f"pop:ferroalto:{resident.people}:soldier"
+    world.society.population[rival_group_id] = resident.model_copy(
+        update={"id": rival_group_id, "occupation": "soldier", "count": 1})
+    rival, _ = add_column(world, rival_group_id, identity="detachment:strategy-contact-rival",
+                          owner=OCCUPIER, count=20, location_id=TARGET)
+    detect_force_standoffs(world, rival.id)
+    # The co-presence receipt creates one private notice for each institution.
+    from src.classes.governance.knowledge import force_contact_notice_id
+    standoff = next(item for item in world.society.force_standoffs.values()
+                    if set(item.detachment_ids) == {column.id, rival.id})
+    notice = world.knowledge.force_contact_notices[force_contact_notice_id(standoff.id, OWNER)]
+    commander = world.society.characters["character:002"]
+    world.society.characters[commander.id] = commander.model_copy(update={"location_id": TARGET})
+    asked = []
+
+    async def choose_campaign_actor(_world, actor, _situation, choices, **_kwargs):
+        asked.append(actor)
+        if actor == OWNER:
+            return next(item["id"] for item in choices if item["id"].startswith("detachment-command-appoint:"))
+        assert actor == EntityRef("character", commander.id)
+        return next(item["id"] for item in choices if ":press:" in item["id"])
+
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose_campaign_actor))
+    due_contact = tick(world)
+    contact = next(item for item in due_contact if item.id == force_contact_review_id(notice.id))
+    asyncio.run(review_force_contacts(world, (contact,)))
+    appointed = world.society.detachment_commands[column.id]
+    assert appointed.character_id == commander.id
+    due_command = tick(world)
+    assert any(item.kind == "detachment_command_review" for item in due_command)
+    asyncio.run(review_force_contacts(world, due_command))
+
+    policy_decision = next(item for item in world.events
+                           if item.event_type == "strategy_defense_political_ordered")
+    headquarters_decision = next(item for item in world.events
+                                 if item.event_type == "strategy_defense_force_decided")
+    command_decision = next(item for item in world.events
+                            if item.event_type == "detachment_commander_decided")
+    assert policy_decision.decision["actor_ref"] == political_holder(world, OWNER).to_dict()
+    assert headquarters_decision.decision["actor_ref"] == headquarters_holder(world, OWNER).to_dict()
+    assert command_decision.decision["actor_ref"] == EntityRef("character", commander.id).to_dict()
+    assert policy_decision.day < headquarters_decision.day < command_decision.day
+    assert notice.event_id in {link.cause_event_id for link in command_decision.causal_links}
+    assert appointed.last_event_id in {link.cause_event_id for link in command_decision.causal_links}
+    assert world.strategy.plans[plan.id].detachment_id == column.id
+    assert asked == [OWNER, EntityRef("character", commander.id)]
+
+
+def test_qg_can_withdraw_after_a_real_delay_is_resolved_but_not_with_open_supply(monkeypatch):
+    from src.sim.medieval.force import campaign_logistics_withdrawal_options
+
+    async def build_present_column():
+        world, _, _ = occupied_response_world()
+        world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8,
+                                                       "ai_max_calls": 32})
+        choose_first(monkeypatch)
+        await review_strategy_responses_with_provider(world, allow_adoptions=True)
+        plan = next(iter(world.strategy.plans.values()))
+        due = tick(world)
+        assert await review_strategy_responses_with_provider(world, due)
+        assert any(event.event_type == "strategy_defense_political_ordered" for event in world.events)
+        due = tick(world)
+        assert await review_strategy_responses_with_provider(world, due)
+        plan = world.strategy.plans[plan.id]
+        column = world.society.detachments[plan.detachment_id]
+        while column.stage == "marching":
+            tick(world)
+            column = world.society.detachments[column.id]
+        return world, plan, column
+
+    world, plan, column = asyncio.run(build_present_column())
+    headquarters = headquarters_holder(world, OWNER)
+    delay = record_event(world, "cargo_delayed", "A remessa foi atrasada por capacidade logística real.",
+                         fact_kind=FactKind.OCCURRENCE,
+                         cause_ids=(column.last_event_id,))
+    opened_id = f"event:{len(world.events) + 1}"
+    notice_id = campaign_supply_notice_id(column.id, opened_id)
+    opened = record_event(
+        world, "campaign_supply_observed", "A instituição recebeu a leitura do atraso na própria campanha.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("campaign_supply_notice", notice_id, "state", None, "open"),),
+        cause_ids=_causes(delay.id, column.last_event_id))
+    closed = record_event(
+        world, "campaign_supply_lapsed", "A remessa atrasada foi resolvida sem nova obrigação pendente.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("campaign_supply_notice", notice_id, "state", "open", "lapsed"),),
+        cause_ids=(opened.id, delay.id))
+    world.knowledge.campaign_supply_notices[notice_id] = CampaignSupplyNotice(
+        id=notice_id, recipient_ref=OWNER, detachment_id=column.id, settlement_id=column.location_id,
+        threshold=column.provisions + 1, observed_provisions=column.provisions,
+        event_id=opened.id, learned_day=opened.day, state="lapsed", last_event_id=closed.id)
+    review_ids = schedule_campaign_logistics_review(world, column.id)
+    assert review_ids == (f"strategy-response-review:{plan.id}",)
+    assert world.agenda.get(review_ids[0]).due_day == world.clock.absolute_day + 1
+
+    options = campaign_logistics_withdrawal_options(world, OWNER, plan.id)
+    assert options
+    # A live, still-undispatched request may be lapsed by an explicit QG
+    # withdrawal; it must not prevent the actor from choosing to leave.
+    pending_id = f"event:{len(world.events) + 1}"
+    pending_notice_id = campaign_supply_notice_id(column.id, pending_id)
+    pending_event = record_event(
+        world, "campaign_supply_observed", "A nova necessidade aguarda uma decisão do QG.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("campaign_supply_notice", pending_notice_id, "state", None, "open"),),
+        cause_ids=(delay.id,))
+    world.knowledge.campaign_supply_notices[pending_notice_id] = CampaignSupplyNotice(
+        id=pending_notice_id, recipient_ref=OWNER, detachment_id=column.id,
+        settlement_id=column.location_id, threshold=column.provisions + 1,
+        observed_provisions=column.provisions, event_id=pending_event.id,
+        learned_day=pending_event.day, last_event_id=pending_event.id)
+    options = campaign_logistics_withdrawal_options(world, OWNER, plan.id)
+    assert options
+
+    option = options[0]
+    situation = ScheduledSituation(f"strategy-response-review:{plan.id}", REVIEW_KIND,
+                                   world.clock.absolute_day)
+    async def choose_withdraw(_world, actor, _context, choices, **_kwargs):
+        assert actor == headquarters
+        assert option.id in {item["id"] for item in choices}
+        return option.id
+
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose_withdraw))
+    assert asyncio.run(review_strategy_responses_with_provider(world, (situation,)))
+    returned = world.society.detachments[column.id]
+    assert returned.stage == "marching"
+    assert returned.destination_id == option.destination_id
+    assert world.strategy.plans[plan.id].stage == "withdrawn"
+    assert world.knowledge.campaign_supply_notices[pending_notice_id].state == "lapsed"
+    decision = next(event for event in reversed(world.events)
+                    if event.event_type == "strategy_defense_logistics_review_decided")
+    movement = next(event for event in reversed(world.events)
+                    if event.event_type == "detachment_withdrawal_started")
+    assert decision.id in {link.cause_event_id for link in movement.causal_links}
+    assert delay.id in {link.cause_event_id for link in world.event_index()[
+        world.strategy.plans[plan.id].last_event_id].causal_links}
+
+
+def test_actual_delayed_campaign_cargo_reaches_qg_withdrawal_turn(monkeypatch, tmp_path):
+    from src.sim.medieval.campaign_supply import (campaign_stock_id, observe_campaign_supply_needs,
+                                                   review_campaign_supplies, _transition_notice)
+    from src.sim.medieval.dated import resolve_dated
+    from src.sim.medieval.logistics import _record_parcel, open_order
+
+    async def scenario():
+        world, _, _ = occupied_response_world()
+        world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 8,
+                                                       "ai_max_calls": 32})
+        choose_first(monkeypatch)
+        await review_strategy_responses_with_provider(world, allow_adoptions=True)
+        plan = next(iter(world.strategy.plans.values()))
+        await review_strategy_responses_with_provider(world, tick(world))
+        await review_strategy_responses_with_provider(world, tick(world))
+        plan = world.strategy.plans[plan.id]
+        column = world.society.detachments[plan.detachment_id]
+        while column.stage == "marching":
+            tick(world)
+            column = world.society.detachments[column.id]
+
+        pressure = record_event(
+            world, "campaign_supply_fixture_pressure", "Fixture pressiona a reserva real da coluna.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            deltas=(_delta("detachment", column.id, "provisions", column.provisions, 3),),
+            cause_ids=(column.last_event_id,))
+        column = column.model_copy(update={"provisions": 3, "last_event_id": pressure.id})
+        world.society.detachments[column.id] = column
+        notice = next(item for item in observe_campaign_supply_needs(world) if item.detachment_id == column.id)
+        campaign_stock = world.economy.stocks[campaign_stock_id(column.id)]
+        source_id = "stock:actual-campaign-delay-source"
+        world.economy.stocks[source_id] = Stock(
+            id=source_id, owner_ref=OWNER, location_id=column.location_id, capacity=1000,
+            goods={"food": 500}, last_event_ids={"food": pressure.id})
+
+        def open_supply(notice, suffix):
+            headquarters = headquarters_holder(world, OWNER)
+            decision = record_event(
+                world, "campaign_supply_decided", "O QG autorizou uma remessa de campanha.",
+                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                causal_payload={"decision_source": {"kind": "api"}},
+                decision={"action": "campaign_supply_test", "actor_ref": headquarters.to_dict(),
+                          "selected_affordance_id": f"campaign-supply-test:{suffix}"},
+                cause_ids=(notice.event_id,))
+            quantity = 1 if suffix == "first" else 15
+            order = open_order(world, source_id, campaign_stock.id, "food", quantity, (),
+                               decision_ids=(decision.id,), cause_ids=(notice.event_id,))
+            transition = record_event(
+                world, "campaign_supply_dispatched", "A remessa foi entregue à logística.",
+                fact_kind=FactKind.STATE_TRANSITION,
+                deltas=(_delta("campaign_supply_notice", notice.id, "state", "open", "dispatched"),),
+                cause_ids=(decision.id, order.last_event_id))
+            _transition_notice(world, notice, "dispatched", transition, freight_id=order.id)
+            return order
+
+        first_order = open_supply(notice, "first")
+        world.agenda.cancel(f"campaign-supply-review:{notice.id}")
+        first_parcel = next(item for item in world.economy.parcels.values() if item.order_id == first_order.id)
+        world.agenda.cancel(first_parcel.id)
+        world.clock = world.clock.advance(1)
+        delayed = _record_parcel(
+            world, first_parcel, first_parcel.model_copy(update={"due_day": world.clock.absolute_day + 2}),
+            "cargo_delayed", "A capacidade diária reteve o frete original.")
+        followup = next(item for item in observe_campaign_supply_needs(world) if item.detachment_id == column.id)
+        assert delayed.id in {link.cause_event_id for link in world.event_index()[followup.event_id].causal_links}
+        world.clock = world.clock.advance(1)
+        due = world.agenda.pop_due(world.clock.absolute_day)
+        resolve_dated(world, due)
+        await review_campaign_supplies(world, due)
+        assert world.knowledge.campaign_supply_notices[followup.id].state == "open"
+        assert not campaign_logistics_withdrawal_options(world, OWNER, plan.id), (
+            "the real pending parcel still targets the campaign bag"
+        )
+
+        world.clock = world.clock.advance(1)
+        due = world.agenda.pop_due(world.clock.absolute_day)
+        resolve_dated(world, due)  # original delayed parcel arrives before the QG reviews
+        assert world.knowledge.campaign_supply_notices[notice.id].state == "fulfilled"
+        scheduled = world.agenda.get(f"strategy-response-review:{plan.id}")
+        assert scheduled is not None and scheduled.due_day == world.clock.absolute_day + 1
+        world.clock = world.clock.advance(1)
+        due = world.agenda.pop_due(world.clock.absolute_day)
+        resolve_dated(world, due)
+        assert campaign_logistics_withdrawal_options(world, OWNER, plan.id)
+        return world, plan, due, delayed.id, followup.id
+
+    from src.sim.medieval.force import campaign_logistics_withdrawal_options
+    world, plan, due, delayed_id, followup_notice_id = asyncio.run(scenario())
+    selected = []
+
+    async def choose_withdraw(_world, actor, context, choices, **_kwargs):
+        assert actor == headquarters_holder(world, OWNER)
+        choice = next(item for item in choices if item["id"].startswith("campaign-delay-withdraw:"))
+        assert choice["lapsed_supply_notice_ids"] == [followup_notice_id]
+        assert any(route["affordance_id"] == choice["id"]
+                   and route["lapsed_supply_notice_ids"] == [followup_notice_id]
+                   for route in context["withdrawal_routes"])
+        assert followup_notice_id in choice["label"]
+        selected.append(choice["id"])
+        return choice["id"]
+
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose_withdraw))
+    assert asyncio.run(review_strategy_responses_with_provider(world, due))
+    assert selected
+    assert world.strategy.plans[plan.id].stage == "withdrawn"
+    assert world.society.detachments[plan.detachment_id].stage == "marching"
+    decision = next(event for event in reversed(world.events)
+                    if event.event_type == "strategy_defense_logistics_review_decided")
+    assert decision.decision["actor_ref"] == headquarters_holder(world, OWNER).to_dict()
+    assert delayed_id in {link.cause_event_id for link in decision.causal_links}
+    lapsed = next(event for event in reversed(world.events)
+                  if event.event_type == "campaign_supply_lapsed"
+                  and any(delta.owner_kind == "campaign_supply_notice"
+                          and delta.owner_id == followup_notice_id
+                          and delta.after == "lapsed" for delta in event.deltas))
+    assert decision.id in {link.cause_event_id for link in lapsed.causal_links}
+    assert world.knowledge.campaign_supply_notices[followup_notice_id].event_id in {
+        link.cause_event_id for link in lapsed.causal_links
+    }
+    movement = next(event for event in reversed(world.events)
+                    if event.event_type == "detachment_withdrawal_started")
+    assert decision.id in {link.cause_event_id for link in movement.causal_links}
+    updated = world.event_index()[world.strategy.plans[plan.id].last_event_id]
+    assert delayed_id in {link.cause_event_id for link in updated.causal_links}
+    path = tmp_path / "campaign-delay-qg-withdrawal.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
 def test_defense_menu_can_choose_sustained_column_with_real_daily_rations(monkeypatch, tmp_path):
     world, _, _ = occupied_response_world()
     stock = next(item for item in world.economy.stocks.values()
@@ -171,6 +507,11 @@ def test_defense_menu_can_choose_sustained_column_with_real_daily_rations(monkey
     premise = record_event(
         world, "test_defense_food_premise", "Premissa factual de estoque para expedição prolongada.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "strategy_response_fixture",
+            "source_refs": [{"kind": "scenario", "id": "strategy_response_fixture"},
+                            {"kind": "stock", "id": stock.id}],
+            "observed_day": world.clock.absolute_day}},
         deltas=(_delta("stock", stock.id, "food", before_food, before_food + 3000),))
     world.economy.stocks[stock.id] = stock.model_copy(update={
         "goods": {**stock.goods, "food": before_food + 3000},
@@ -187,6 +528,9 @@ def test_defense_menu_can_choose_sustained_column_with_real_daily_rations(monkey
 
     async def choose_sustained(prompt, *args, **kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
+        if all(item["id"].startswith("detachment-command-appoint:")
+               for item in payload["choices"]):
+            return {"selected_id": ai_decider.NO_ACTION}
         assert any("40 dias" in choice["label"] for choice in payload["choices"])
         return {"selected_id": sustained.id}
 
@@ -271,6 +615,11 @@ def test_mobilized_plan_closes_only_after_own_fresh_report(monkeypatch, tmp_path
     end = record_event(
         world, "test_strategy_occupation_resolved", "Fixture factual do fim da ocupação estrangeira.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "strategy_response_fixture",
+            "source_refs": [{"kind": "scenario", "id": "strategy_response_fixture"},
+                            {"kind": "settlement", "id": TARGET}],
+            "observed_day": world.clock.absolute_day}},
         deltas=(_delta("settlement", TARGET, "occupier_id", OCCUPIER.id, occupier_after),))
     world.society.set_occupation(TARGET, occupier_after)
     refresh_settlement_reports(world)
@@ -343,6 +692,11 @@ def test_blocked_defense_reopens_when_material_means_return(monkeypatch, tmp_pat
     removed = record_event(
         world, "test_defense_food_unavailable", "Premissa material de falta de provisões.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "strategy_response_fixture",
+            "source_refs": [{"kind": "scenario", "id": "strategy_response_fixture"},
+                            {"kind": "stock", "id": own_stocks[0].id}],
+            "observed_day": world.clock.absolute_day}},
         deltas=tuple(_delta("stock", stock.id, "food", original_food[stock.id], 0)
                      for stock in own_stocks))
     for stock in own_stocks:
@@ -404,6 +758,9 @@ def test_defense_no_action_preserves_a_later_choice(monkeypatch):
     assert not world.society.detachments
     refusal = next(event for event in world.events if event.event_type == "strategy_defense_operational_declined")
     assert refusal.decision["actor_ref"] == headquarters_holder(world, OWNER).to_dict()
+    assert refusal.causal_origin == CausalOrigin.ACTOR_DECISION
+    assert refusal.decision["selected_affordance_id"] == ai_decider.NO_ACTION
+    assert refusal.causal_payload["decision_source"]["kind"] == "provider"
     assert world.agenda.get(f"strategy-response-review:{plan.id}").due_day == 32
 
     for day in range(3, 32):
@@ -475,6 +832,34 @@ def test_missing_stale_forged_or_no_action_never_adopts(monkeypatch):
     stale, _, _ = occupied_response_world()
     stale.clock = stale.clock.advance(31)
     assert not defense_adoption_options(stale, OWNER)
+
+
+@pytest.mark.parametrize("mismatch", ["action", "actor", "affordance", "origin"])
+def test_defense_adoption_owner_rejects_nonmatching_decisions(mismatch):
+    world, _, _ = occupied_response_world()
+    option = defense_adoption_options(world, OWNER)[0]
+    decision = record_event(
+        world, "test_defense_adoption_decision", "Fixture de escolha explícita.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
+    if mismatch == "action":
+        payload = {**decision.decision, "action": "other_action"}
+    elif mismatch == "actor":
+        payload = {**decision.decision, "actor_ref": OCCUPIER.to_dict()}
+    elif mismatch == "affordance":
+        payload = {**decision.decision, "selected_affordance_id": "invented"}
+    else:
+        payload = decision.decision
+    world.events[-1] = decision.model_copy(update={
+        "decision": payload,
+        "causal_origin": CausalOrigin.DETERMINISTIC if mismatch == "origin" else decision.causal_origin,
+        "causal_payload": None if mismatch == "origin" else decision.causal_payload,
+    })
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="decision"):
+        adopt_occupied_settlement_defense(world, OWNER, option.id, decision.id)
+    assert world_snapshot(world) == before
 
 
 def test_saved_plan_and_changed_authority_route_or_occupation_block_executor_atomically(tmp_path, monkeypatch):

@@ -112,8 +112,7 @@ def _remembered_refusal(world, memory, events):
     if event is None or event.event_type != "institutional_aid_rejected":
         return None, None
     request = next((candidate for link in event.causal_links
-                    for candidate in events.values()
-                    if candidate.id == link.cause_event_id
+                    if (candidate := events.get(link.cause_event_id)) is not None
                     and candidate.event_type == "institutional_aid_requested"), None)
     if request is None:
         return None, None
@@ -141,7 +140,7 @@ def aid_evidence(world, observer_ref):
         if clause is not None and clause.creditor_ref == observer_ref:
             if event.event_type in {"commitment_fulfilled", "institutional_aid_fulfilled",
                                     "commitment_breached", "institutional_aid_remediated",
-                                    "payment_obligation_remediated"}:
+                                    "payment_obligation_remediated", "campaign_withdrawal_remediated"}:
                 directions.setdefault(clause.debtor_ref, []).append(memory.event_id)
             continue
         refusal, provider = _remembered_refusal(world, memory, events)
@@ -215,7 +214,8 @@ def _view_entries(world, observer_ref, subject_ref):
         weight = {"commitment_fulfilled": FULFILLMENT_VIEW,
                   "institutional_aid_fulfilled": FULFILLMENT_VIEW,
                   "institutional_aid_remediated": REMEDIATION_VIEW,
-                  "payment_obligation_remediated": REMEDIATION_VIEW}.get(event.event_type, 0)
+                  "payment_obligation_remediated": REMEDIATION_VIEW,
+                  "campaign_withdrawal_remediated": REMEDIATION_VIEW}.get(event.event_type, 0)
         if event.event_type == "commitment_breached":
             deliberate = any(
                 (cause := next((candidate for candidate in events.values()

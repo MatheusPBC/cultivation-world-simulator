@@ -1,12 +1,64 @@
 """Real authority boundaries; removing a mandate must prevent material execution."""
 
+import copy
+
 import pytest
 
+from src.classes.governance.models import StrategicPlan
+from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.persistence import world_snapshot, save_world, load_world
 from tests.test_medieval_markets import consent, terms
 from src.sim.medieval.engine import MedievalSimulator
+from src.sim.medieval.economy import _delta
+from src.sim.medieval.events import record_event
+
+
+def test_supply_completion_event_order_does_not_depend_on_plan_insertion_order():
+    from src.sim.medieval.demand import objective_target
+    from src.sim.medieval.procurement import progress_supply
+
+    base = create_medieval_world(73)
+    objectives = tuple(base.strategy.objectives.values())[:2]
+
+    def complete(insertion_order):
+        world = copy.deepcopy(base)
+        targets = {objective.id: objective_target(world, objective) for objective in objectives}
+        premise = record_event(
+            world, "supply_completion_order_fixture", "Planos preparados no cenário de teste.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"root_premise": {
+                "kind": "scenario_bootstrap", "domain": "supply_completion_order_test",
+                "source_refs": [{"kind": "scenario", "id": "supply_completion_order_test"}],
+                "observed_day": world.clock.absolute_day,
+            }},
+            deltas=tuple(delta for objective in objectives for delta in (
+                _delta("stock", objective.stock_id, objective.resource_id,
+                       world.economy.stocks[objective.stock_id].goods.get(objective.resource_id, 0),
+                       targets[objective.id]),
+                _delta("plan", f"plan:{objective.id}", "stage", None, "await_delivery"),
+            )),
+        )
+        for objective in objectives:
+            stock = world.economy.stocks[objective.stock_id]
+            world.economy.stocks[stock.id] = stock.model_copy(update={
+                "goods": {**stock.goods, objective.resource_id: targets[objective.id]},
+                "last_event_ids": {**stock.last_event_ids, objective.resource_id: premise.id},
+            })
+        for objective in insertion_order:
+            plan_id = f"plan:{objective.id}"
+            world.strategy.plans[plan_id] = StrategicPlan(
+                id=plan_id, objective_id=objective.id, stage="await_delivery",
+                last_review_day=world.clock.absolute_day, last_event_id=premise.id,
+            )
+        progress_supply(world)
+        return [event.deltas[0].owner_id for event in world.events
+                if event.event_type == "supply_plan_updated"]
+
+    ordered = complete(objectives)
+    assert len(ordered) == 2
+    assert ordered == complete(reversed(objectives))
 
 
 def test_bootstrap_authority_is_independent_of_titles_and_character_count():
@@ -89,6 +141,14 @@ async def test_natural_monthly_supply_creates_real_orders_without_daily_decision
     await engine.step()
     assert world.clock.absolute_day == 30
     assert any(o.resource_id in {"iron", "wood"} for o in world.economy.freight_orders.values())
+    supply_decisions = [event for event in world.events
+                        if event.event_type in {"freight_decided", "buy_decided", "sell_decided", "sale_refused"}]
+    assert supply_decisions
+    assert all(event.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules",
+        "rule": ("market_sale_response" if event.event_type in {"sell_decided", "sale_refused"}
+                 else "supply_objective"),
+    } for event in supply_decisions)
     while world.clock.absolute_day < 60:
         await engine.step()
     assert world.economy.freight_orders
@@ -101,13 +161,13 @@ async def test_natural_monthly_supply_creates_real_orders_without_daily_decision
     # settlement request answered, say), which is genuine new activity, not
     # spam, and must not be mistaken for it here.
     supply_decision_types = {"freight_decided", "buy_decided"}
-    supply_decisions = len([e for e in world.events
-                            if e.fact_kind.value == "decision" and e.event_type in supply_decision_types])
+    supply_decision_count = len([e for e in world.events
+                                 if e.fact_kind.value == "decision" and e.event_type in supply_decision_types])
     await engine.step()
     assert world.clock.absolute_day == 61
     assert len(world.economy.freight_orders) == orders
     assert len([e for e in world.events if e.fact_kind.value == "decision"
-               and e.event_type in supply_decision_types]) == supply_decisions
+               and e.event_type in supply_decision_types]) == supply_decision_count
     path = tmp_path / "autonomous.mws"
     save_world(world, path)
     resumed = load_world(path)

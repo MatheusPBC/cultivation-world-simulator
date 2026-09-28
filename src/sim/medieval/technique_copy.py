@@ -15,6 +15,7 @@ when the copier runs a line that requires the technique.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -213,7 +214,9 @@ def technique_copy_options(world, actor):
 
 def _decision(world, decision_event_id):
     event = next((item for item in world.events if item.id == decision_event_id), None)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != COPY_ACTION
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("technique copy requires a current actor decision")

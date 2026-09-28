@@ -12,6 +12,7 @@ import json
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -21,6 +22,7 @@ from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.espionage import espionage_adapters, espionage_options
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+from src.sim.medieval.institutional_agenda import monthly_adapters, monthly_actors
 from src.sim.medieval.persistence import world_snapshot
 from src.sim.medieval.research_policy import (execute_research_option, research_adapters,
                                               research_options)
@@ -57,13 +59,15 @@ def test_research_executor_requires_the_selected_current_decision():
     assert world_snapshot(world) == before
     selected = record_event(
         world, "institutional_decision_turn_decided", "Escolher pesquisa.",
-        fact_kind=FactKind.DECISION, decision=option.decision())
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
     execute_research_option(world, AUREN, option.id, selected.id)
 
-    project = next(iter(world.research.projects.values()))
-    started = world.events[-1]
-    assert project.sponsor_decision_id == started.causal_links[0].cause_event_id
-    sponsor = next(event for event in world.events if event.id == project.sponsor_decision_id)
+    assert not world.research.projects
+    agenda_item = next(item for item in world.agenda.to_dict()
+                       if item["id"] == f"character-rite-offer-review:{option.researcher_id}:{selected.id}")
+    assert agenda_item["due_day"] == world.clock.absolute_day + 1
+    sponsor = next(event for event in world.events if event.event_type == "research_authorized")
     assert selected.id in {link.cause_event_id for link in sponsor.causal_links}
 
 
@@ -108,7 +112,7 @@ async def test_stale_research_sponsorship_pauses_without_authorizing(monkeypatch
         account = world.economy.accounts[option.account_id]
         world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})
 
-    chosen = answer_with(monkeypatch, "Financiar pesquisa de ", sabotage)
+    chosen = answer_with(monkeypatch, "Propor pesquisa de ", sabotage)
     with pytest.raises(ProviderDecisionRequired, match="stale affordance"):
         await review_institutional_decision_turn(world, AUREN, research_adapters())
     assert len(chosen) == 1
@@ -116,31 +120,88 @@ async def test_stale_research_sponsorship_pauses_without_authorizing(monkeypatch
     assert not [item for item in world.events if item.event_type.startswith("research_")]
 
 
-async def test_owner_rejection_of_research_leaves_no_authorization_receipt(monkeypatch):
-    """The owner is the only judge of its own terms.  Whatever makes
-    ``start_research`` refuse, the refusal must leave the world exactly as the
-    actor found it and reach the simulator as a decision wait."""
+async def test_sponsorship_does_not_synthesize_researcher_consent(monkeypatch):
+    """Institutional authorization is only an offer until the researcher acts."""
     world = enable_ai(create_medieval_world(73))
-
-    def reject(*_args, **_kwargs):
-        raise ValueError("research unavailable: owner rejected the terms")
-
-    monkeypatch.setattr("src.sim.medieval.research_policy.start_research", reject)
-    chosen = answer_with(monkeypatch, "Financiar pesquisa de ", lambda: None)
+    assert AUREN in monthly_actors(world)
+    chosen = answer_with(monkeypatch, "Propor pesquisa de ", lambda: None)
     events_before = len(world.events)
-    with pytest.raises(ProviderDecisionRequired, match="stale affordance"):
-        await review_institutional_decision_turn(world, AUREN, research_adapters())
+    await review_institutional_decision_turn(world, AUREN, monthly_adapters())
     assert len(chosen) == 1
     assert not world.research.projects
-    decisions = [item.event_type for item in world.events[events_before:]
-                 if item.event_type in {"research_authorized", "research_accepted"}]
-    assert decisions == []
+    events = world.events[events_before:]
+    assert any(item.event_type == "research_authorized" for item in events)
+    assert not any(item.event_type == "research_accepted" for item in events)
+
+
+async def test_researcher_no_action_declines_only_the_current_offer(monkeypatch):
+    """A researcher may decline without creating a project or retry loop."""
+    from src.sim.medieval.character_rite_policy import review_character_rites
+    from src.sim.medieval.research import researcher_work_options
+
+    world = enable_ai(create_medieval_world(73))
+    chosen_sponsor = answer_with(monkeypatch, "Propor pesquisa de ", lambda: None)
+    await review_institutional_decision_turn(world, AUREN, research_adapters())
+    assert chosen_sponsor
+    authorization = next(event for event in world.events if event.event_type == "research_authorized")
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    researcher_id = authorization.decision["researcher_id"]
+    current_offers = researcher_work_options(world, researcher_id)
+    offered = next(item for item in current_offers
+                   if item.technology_id == authorization.decision["technology_id"])
+
+    async def decline(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        assert any(item["id"] == offered.id for item in payload["choices"])
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", decline)
+    await review_character_rites(world, due)
+
+    assert not world.research.projects
+    assert not [event for event in world.events if event.event_type == "research_accepted"]
+    refusal = next(event for event in reversed(world.events)
+                   if event.event_type == "character_initiative_decided")
+    assert refusal.decision["action"] == "no_action"
+    assert offered.id in refusal.decision["declined_option_ids"]
+    refusal_receipt_id = refusal.causal_payload["decision_source"]["receipt_event_id"]
+    assert refusal.causal_payload["decision_source"]["kind"] == "provider"
+    assert refusal_receipt_id in {link.cause_event_id for link in refusal.causal_links}
+    assert world.event_index()[refusal_receipt_id].event_type == "ai_decision_declined"
+    assert not researcher_work_options(world, offered.researcher_id)
+
+
+async def test_researcher_owner_rejection_rolls_back_the_dated_response(monkeypatch):
+    from src.sim.medieval.character_rite_policy import review_character_rites
+
+    world = enable_ai(create_medieval_world(73))
+    chosen_sponsor = answer_with(monkeypatch, "Propor pesquisa de ", lambda: None)
+    await review_institutional_decision_turn(world, AUREN, research_adapters())
+    assert len(chosen_sponsor) == 1
+    world.clock = world.clock.advance(1)
+    due = world.agenda.pop_due(world.clock.absolute_day)
+    before = world_snapshot(world)
+    attempt = world.transaction_copy()
+    chosen_researcher = answer_with(monkeypatch, "Aceitar trabalhar em ", lambda: None)
+
+    def reject(*_args, **_kwargs):
+        raise ValueError("research unavailable: owner rejected current terms")
+
+    monkeypatch.setattr("src.sim.medieval.research.start_research", reject)
+    with pytest.raises(ProviderDecisionRequired, match="became stale"):
+        await review_character_rites(attempt, due)
+
+    assert len(chosen_researcher) == 1
+    assert not world.research.projects
+    assert world_snapshot(world) == before
 
 
 async def test_stale_technology_sale_acceptance_pauses_without_paying(monkeypatch):
     world = enable_ai(researched_world())
     option = technology_sale_options(world, AUREN)[0]
-    record_technology_sale_request(world, AUREN, option.id)
+    record_technology_sale_request(world, AUREN, option.id, decision_source={"kind": "api"})
     assert technology_sale_acceptance_options(world, ESCARLIA)
     balances = {key: value.balance for key, value in world.economy.accounts.items()}
 

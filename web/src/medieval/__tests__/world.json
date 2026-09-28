@@ -19,7 +19,9 @@
       "seed": 73,
       "character_count": 12,
       "locale": "pt-BR",
-      "decision_policy": "routine-rules"
+      "decision_policy": "routine-rules",
+      "ai_enabled": false,
+      "ai_calls_per_step": 24
     },
     "population": 10900,
     "living_characters": 12,

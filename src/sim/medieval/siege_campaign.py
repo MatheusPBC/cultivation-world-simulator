@@ -10,6 +10,7 @@ the existing route causes remaining current.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -388,7 +389,8 @@ def siege_campaign_withdrawal_options(world, actor):
     return tuple(sorted(options, key=lambda item: item.id))
 
 
-def _execute_siege_withdrawal(candidate, actor, option, decision_event_id):
+def _execute_siege_withdrawal(candidate, actor, option, decision_event_id, *,
+                              selected_affordance_id=None):
     """Execute a current siege withdrawal from any accepted actor decision."""
     require_authority(candidate, actor, "military")
     campaign = candidate.society.siege_campaigns[option.campaign_id]
@@ -404,7 +406,8 @@ def _execute_siege_withdrawal(candidate, actor, option, decision_event_id):
                        if item.destination_id == option.destination_id and item.route_ids == option.route_ids), None)
     if withdrawal is None:
         raise ValueError("siege withdrawal route is no longer current")
-    material = _begin_withdrawal(candidate, actor, withdrawal, decision_event_id)
+    material = _begin_withdrawal(candidate, actor, withdrawal, decision_event_id,
+                                 selected_affordance_id=selected_affordance_id or option.id)
     event = record_event(
         candidate, "siege_campaign_withdrawn",
         "A coluna encerrou voluntariamente o cerco e iniciou uma retirada material.",
@@ -472,7 +475,9 @@ def occupy_after_siege_breach(world, actor, option_id, decision_event_id):
     """Apply only the occupier field after an explicit post-breach decision."""
     candidate = deepcopy(world)
     decision = next((event for event in candidate.events if event.id == decision_event_id), None)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != candidate.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
+            or decision.day != candidate.clock.absolute_day
             or decision.decision is None or decision.decision.get("action") != OCCUPY_AFTER_BREACH_ACTION
             or decision.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("siege occupation requires a current actor decision")

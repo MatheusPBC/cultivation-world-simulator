@@ -44,8 +44,10 @@ def consider_sale(world, terms, buy_decision_id):
     event = record_event(world, "sale_refused" if reason else "sell_decided",
                          f"{(world.society.polities if actor.kind == 'polity' else world.society.organizations)[actor.id].name}: "
                          f"{reason or 'venda aceita, preservando a reserva local'}.",
-                         fact_kind=FactKind.DECISION,
+                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                          decision={**terms, "action": action, "actor_ref": actor.to_dict()},
+                         causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                             "rule": "market_sale_response"}},
                          cause_ids=_causes(buy_decision_id, source.last_event_ids.get(resource_id), market.last_event_id))
     return None if reason else event.id
 
@@ -75,6 +77,47 @@ def _pending_orders(world, stock_id, resource_id):
 def _route_evidence(option):
     """The exact dated receipts that made this selected path available."""
     return (*option.route_report_ids, *option.fiscal_route_report_ids)
+
+
+def _objective_source_events(world, objective):
+    """Owner receipts that explain the material need represented by an objective."""
+    sources = set()
+    if objective.kind == "maintain_production_inputs":
+        for project in world.economy.repairs.values():
+            blueprint = world.economy.repair_blueprints.get(project.blueprint_id)
+            if (project.stock_id == objective.stock_id and project.stage != "completed"
+                    and blueprint is not None and objective.resource_id in blueprint.inputs):
+                sources.update((project.decision_event_id, project.last_event_id))
+        for facility in world.economy.facilities.values():
+            recipe = world.economy.recipes.get(facility.recipe_id)
+            if (facility.stock_id == objective.stock_id and recipe is not None
+                    and objective.resource_id in recipe.inputs and facility.last_event_id is not None):
+                sources.add(facility.last_event_id)
+        for project in world.economy.expansions.values():
+            blueprint = world.economy.expansion_blueprints.get(project.blueprint_id)
+            facility = world.economy.facilities.get(project.facility_id) if project.facility_id else None
+            stock_id = project.stock_id if facility is None else facility.stock_id
+            if (stock_id == objective.stock_id and project.stage != "completed"
+                    and blueprint is not None and objective.resource_id in blueprint.inputs):
+                sources.add(project.last_event_id)
+        for project in world.research.projects.values():
+            technology = world.research.technologies.get(project.technology_id)
+            if (project.stock_id == objective.stock_id and project.stage not in {"completed", "superseded"}
+                    and technology is not None and objective.resource_id in technology.inputs):
+                sources.add(project.last_event_id)
+    return tuple(sorted(source for source in sources if source))
+
+
+def _record_blocked_plan(world, objective, blocker):
+    previous = world.strategy.plans.get(f"plan:{objective.id}")
+    causes = list(_objective_source_events(world, objective))
+    causes.extend(report.event_id for report in world.knowledge.for_actor(objective.actor_ref)
+                  if report.kind == "inventory" and report.stock_id == objective.stock_id
+                  and report.resource_id == objective.resource_id and report.event_id is not None)
+    if previous is not None:
+        causes.append(previous.last_event_id)
+    if causes:
+        _set_plan(world, objective, "blocked", blocker=blocker, causes=causes)
 
 
 def _offers(world, objective, inventory, reasons):
@@ -127,12 +170,12 @@ def _review_objective(world, objective):
     if (stock.owner_ref != actor or (objective.kind == "maintain_food_reserve"
             and world.society.settlements[objective.settlement_id].administrator_id != actor.id)
             or not can_actor_act_for(world, actor, actor, "supply")):
-        _set_plan(world, objective, "blocked", blocker="sem autoridade de abastecimento")
+        _record_blocked_plan(world, objective, "sem autoridade de abastecimento")
         return
     inventory = next((r for r in world.knowledge.for_actor(actor) if r.stock_id == stock.id and r.kind == "inventory"
                       and r.resource_id == resource_id and r.observed_day == world.clock.absolute_day), None)
     if inventory is None:
-        _set_plan(world, objective, "blocked", blocker="sem relatório local atualizado")
+        _record_blocked_plan(world, objective, "sem relatório local atualizado")
         return
     target = objective_target(world, objective)
     pending = _pending_orders(world, stock.id, resource_id)
@@ -170,8 +213,10 @@ def _review_objective(world, objective):
             if route_option.fiscal_route_report_ids:
                 decision_terms["route_option_id"] = route_option.id
             decision = record_event(world, "freight_decided", f"Remeter {quantity} de {world.economy.resources[resource_id].name} para {world.society.settlements[objective.settlement_id].name}.",
-                                    fact_kind=FactKind.DECISION,
+                                    fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                     decision=decision_terms,
+                                    causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                        "rule": "supply_objective"}},
                                     cause_ids=_causes(plan.last_event_id, report.event_id, *evidence))
             order = queue_freight(world, source_id, stock.id, resource_id, quantity, path, decision_event_id=decision.id)
         else:
@@ -215,8 +260,10 @@ def _review_objective(world, objective):
             if route_option.fiscal_route_report_ids:
                 terms["route_option_id"] = route_option.id
             decision = record_event(world, "buy_decided", f"Propor compra de {quantity} de {world.economy.resources[resource_id].name} para {world.society.settlements[objective.settlement_id].name}.",
-                                    fact_kind=FactKind.DECISION,
+                                    fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                     decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},
+                                    causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                        "rule": "supply_objective"}},
                                     cause_ids=_causes(plan.last_event_id, report.event_id, buyer.last_event_id, *evidence))
             accepted = consider_sale(world, terms, decision.id)
             response_causes.append(world.events[-1].id)
@@ -308,7 +355,7 @@ def market_purchase_options(world, actor):
     policy and it does not choose on behalf of an actor; execution is an
     explicit decision followed by the ordinary bilateral market executor.
     """
-    if (not isinstance(actor, EntityRef) or actor.kind != "polity"
+    if (not isinstance(actor, EntityRef) or actor.kind not in {"polity", "organization"}
             or not can_actor_act_for(world, actor, actor, "supply")
             or not can_actor_act_for(world, actor, actor, "trade")):
         return ()
@@ -387,11 +434,21 @@ def market_purchase_terms(option):
     return terms
 
 
+def _selection_provenance(decision_event, rule):
+    source = (decision_event.causal_payload or {}).get("decision_source")
+    if source:
+        receipt_id = source.get("receipt_event_id") if source.get("kind") == "provider" else None
+        return {"decision_source": source}, ((receipt_id,) if receipt_id else ())
+    return ({"decision_source": {"kind": "owner", "owner": "market_purchase",
+                                  "rule": rule}}, ())
+
+
 def execute_market_purchase_option(world, actor, option_id, decision_event_id, *, seller_decision_id):
     """Execute one selected market option after bilateral seller consent."""
     decision = next((event for event in world.events if event.id == decision_event_id), None)
     option = next((item for item in market_purchase_options(world, actor) if item.id == option_id), None)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("market purchase option is stale or unknown")
     offer = world.knowledge.reports.get(option.offer_id)
@@ -403,11 +460,14 @@ def execute_market_purchase_option(world, actor, option_id, decision_event_id, *
         fiscal = world.knowledge.fiscal_route_report(actor, route_id)
         route_causes.extend(item.event_id for item in (physical, fiscal) if item is not None)
     terms = market_purchase_terms(option)
+    provenance, source_causes = _selection_provenance(decision, "materialize_buyer_selection")
     buy_decision = record_event(
         world, "buy_decided", "O ator aceitou uma oferta de mercado enumerada pelo engine.",
-        fact_kind=FactKind.DECISION,
-        decision={**terms, "action": "buy", "actor_ref": actor.to_dict()},
-        cause_ids=_causes(decision.id, offer.event_id, *route_causes))
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision={**terms, "action": "buy", "actor_ref": actor.to_dict(),
+                  "selected_affordance_id": decision.decision["selected_affordance_id"]},
+        causal_payload=provenance,
+        cause_ids=_causes(decision.id, offer.event_id, *route_causes, *source_causes))
     causal_payload = {"decision_event_id": decision.id,
                       "actor_ref": decision.decision["actor_ref"],
                       "selected_affordance_id": decision.decision["selected_affordance_id"]}
@@ -429,9 +489,9 @@ def _would_open_an_order(world, objective_id):
     selection logic.
     """
     candidate = copy.deepcopy(world)
+    existing_order_ids = set(candidate.economy.freight_orders)
     _review_objective(candidate, candidate.strategy.objectives[objective_id])
-    plan = candidate.strategy.plans.get(f"plan:{objective_id}")
-    return plan is not None and plan.stage == "await_delivery"
+    return bool(set(candidate.economy.freight_orders) - existing_order_ids)
 
 
 def supply_objective_options(world, actor):
@@ -462,6 +522,7 @@ def execute_supply_objective_option(world, actor, option_id, decision_event_id):
     decision = next((event for event in world.events if event.id == decision_event_id), None)
     option = next((item for item in supply_objective_options(world, actor) if item.id == option_id), None)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("supply objective option is stale or unknown")
     _review_objective(world, world.strategy.objectives[option.objective_id])
@@ -470,7 +531,7 @@ def execute_supply_objective_option(world, actor, option_id, decision_event_id):
 
 def progress_supply(world):
     """Delivery receipts can satisfy a goal; pending orders never count as reserves."""
-    for plan in list(world.strategy.plans.values()):
+    for plan in sorted(world.strategy.plans.values(), key=lambda item: item.id):
         if plan.stage != "await_delivery":
             continue
         objective = world.strategy.objectives[plan.objective_id]

@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.society.force import Detachment
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
@@ -36,10 +37,14 @@ def test_bilateral_teaching_needs_local_training_before_field_effect(tmp_path):
              "student_ref": OWNER.to_dict()}
     teacher = record_event(world, "teaching_offered", "Ensinar a doutrina conhecida.",
                            fact_kind=FactKind.DECISION,
+                           causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}},
                            decision={**terms, "action": "teach", "actor_ref": RIVAL.to_dict()})
     learner = record_event(world, "teaching_accepted", "Receber a instrução.",
-                           fact_kind=FactKind.DECISION,
-                           decision={**terms, "action": "learn", "actor_ref": OWNER.to_dict()})
+                            fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision={**terms, "action": "learn", "actor_ref": OWNER.to_dict()})
     teach_technology(world, teacher.id, learner.id)
     acquired = world.knowledge.technologies["technology:polity:auren:field_drill"]
     assert acquired.channel == "teaching"
@@ -74,15 +79,15 @@ def test_paid_technique_sale_needs_local_training_before_field_effect(tmp_path):
     disclosure = next(option for option in disclosure_options(world, OWNER)
                       if option.recipient_ref == RIVAL and option.technology_id == "field_drill")
     disclosed = record_event(world, "technology_disclosure_decided", "Divulgar a técnica.",
-                             fact_kind=FactKind.DECISION, decision=disclosure.decision(),
+                             fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                             causal_payload={"decision_source": {"kind": "api"}},
+                             decision=disclosure.decision(),
                              cause_ids=disclosure.causes())
     sighting = execute_disclosure(world, disclosure, disclosed.id)
 
     resident = next(group for group in world.society.population.values()
-                    if group.settlement_id == "ferroalto")
-    source_id = f"pop:ferroalto:{resident.people}:soldier:diffusion"
-    world.society.population[source_id] = resident.model_copy(
-        update={"id": source_id, "occupation": "soldier", "count": 20})
+                    if group.settlement_id == "ferroalto" and group.occupation == "soldier")
+    source_id = resident.id
     raised = record_event(world, "fixture_rival_column_decided", "Coluna na premissa pressionada.",
                           fact_kind=FactKind.DECISION,
                           decision={"action": "raise_detachment", "actor_ref": RIVAL.to_dict()})
@@ -91,7 +96,7 @@ def test_paid_technique_sale_needs_local_training_before_field_effect(tmp_path):
                            deltas=(_delta("detachment", "detachment:diffusion", "stage", None, "present"),),
                            cause_ids=(raised.id,))
     column = Detachment(id="detachment:diffusion", owner_ref=RIVAL, source_group_id=source_id,
-                        count=20, location_id="ferroalto", destination_id="ferroalto",
+                        count=resident.count, location_id="ferroalto", destination_id="ferroalto",
                         provisions=220, stage="present", started_day=world.clock.absolute_day,
                         due_day=world.clock.absolute_day + 1,
                         decision_event_id=raised.id, last_event_id=arrival.id)
@@ -103,10 +108,11 @@ def test_paid_technique_sale_needs_local_training_before_field_effect(tmp_path):
     sale = next(option for option in technology_sale_options(world, RIVAL)
                 if option.technology_id == "field_drill")
     buyer_balance = world.economy.accounts[sale.buyer_account_id].balance
-    request = record_technology_sale_request(world, RIVAL, sale.id)
+    request = record_technology_sale_request(world, RIVAL, sale.id, decision_source={"kind": "api"})
     acceptance = next(option for option in technology_sale_acceptance_options(world, OWNER)
                       if option.request_event_id == request.id)
-    consent = record_technology_sale_acceptance(world, OWNER, acceptance.id)
+    consent = record_technology_sale_acceptance(world, OWNER, acceptance.id,
+                                                decision_source={"kind": "api"})
     receipt = execute_technology_sale(world, RIVAL, sale.id, request.id, consent.id)
     learned = world.knowledge.technologies[f"technology:polity:{RIVAL.id}:field_drill"]
     assert learned.channel == "sale" and sighting.event_id in {
@@ -123,7 +129,7 @@ def test_paid_technique_sale_needs_local_training_before_field_effect(tmp_path):
     for _ in range(3):
         tick(world)
     assert world.society.detachment_trainings[training.id].stage == "completed"
-    assert field_strength(world, world.society.detachments[column.id])[0] == baseline + 20
+    assert field_strength(world, world.society.detachments[column.id])[0] == baseline + column.count
     completed = world.event_index()[world.society.detachment_trainings[training.id].last_event_id]
     assert learned.event_id in {link.cause_event_id for link in completed.causal_links}
 

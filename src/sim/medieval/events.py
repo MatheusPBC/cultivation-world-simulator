@@ -131,14 +131,28 @@ def validate_history(events, day: int, *, from_sequence: int = 1) -> None:
         causes = [link.cause_event_id for link in event.causal_links]
         if len(set(causes)) != len(causes) or any(not _is_recorded(events, cause) for cause in causes):
             raise ValueError("unknown or repeated event cause")
-        if event.causal_origin == CausalOrigin.ACTOR_DECISION and event.deltas:
+        if any((source := _recorded_event(events, cause)) is not None
+               and (source.sequence >= event.sequence or source.day > event.day)
+               for cause in causes):
+            raise ValueError("causal links must point to an earlier event no later than their effect")
+        if (event.fact_kind is FactKind.DECISION
+                and event.causal_origin is CausalOrigin.ACTOR_DECISION):
+            _validate_actor_decision_source(
+                events, decision=event.decision, causal_payload=event.causal_payload,
+                cause_ids=causes, decision_sequence=index, decision_day=event.day)
+        if (event.causal_origin is CausalOrigin.ACTOR_DECISION
+                and event.fact_kind is not FactKind.DECISION):
             if not any((_cause := _recorded_event(events, cause)) is not None
-                       and _cause.fact_kind == FactKind.DECISION
+                       and _cause.fact_kind is FactKind.DECISION
+                       and _cause.causal_origin is CausalOrigin.ACTOR_DECISION
                        and _cause.decision is not None
+                       and _cause.sequence < event.sequence and _cause.day == event.day
                        for cause in causes):
-                raise ValueError("actor state transition requires a real decision cause")
-            _validate_actor_authorship_payload(
-                events, causal_payload=event.causal_payload, cause_ids=causes)
+                raise ValueError("actor-authored event requires a same-day real decision cause")
+            if event.deltas:
+                _validate_actor_authorship_payload(
+                    events, causal_payload=event.causal_payload, cause_ids=causes,
+                    event_day=event.day, event_sequence=event.sequence)
         if event.deltas and any((_cause := _recorded_event(events, cause)) is not None
                                 and _interprets(_cause) for cause in causes):
             raise ValueError("a state change cannot be caused directly by an interpretation")
@@ -163,7 +177,8 @@ def _recorded_event(events, event_id):
     return events[int(event_id.partition(":")[2]) - 1]
 
 
-def _validate_actor_authorship_payload(events, *, causal_payload, cause_ids):
+def _validate_actor_authorship_payload(events, *, causal_payload, cause_ids,
+                                       event_day, event_sequence):
     """Require an actor transition to carry the decision that authored it.
 
     ``validate_history`` remains the complete-ledger guard, but callers also
@@ -183,30 +198,120 @@ def _validate_actor_authorship_payload(events, *, causal_payload, cause_ids):
             or decision_event_id not in cause_ids):
         raise ValueError("actor state transition has incomplete causal authorship payload")
     decision_source = _recorded_event(events, decision_event_id)
-    if decision_source is None or decision_source.decision is None:
+    if (decision_source is None or decision_source.fact_kind is not FactKind.DECISION
+            or decision_source.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision_source.decision is None or decision_source.day != event_day
+            or decision_source.sequence >= event_sequence):
         raise ValueError("actor state transition has invalid decision authorship payload")
     if (decision_source.decision.get("actor_ref") != actor_ref
             or decision_source.decision.get("selected_affordance_id") != selected_affordance_id):
         raise ValueError("actor state transition authorship does not match its decision")
 
 
+def _provider_selection_source(events, decision, *, decision_day):
+    """Match the immediately preceding provider receipt to its actor decision."""
+    if not events or not isinstance(decision, dict):
+        return None
+    receipt = events[-1]
+    if (receipt.day != decision_day
+            or receipt.event_type not in {"ai_decision_interpreted", "ai_decision_declined"}):
+        return None
+    selection = (receipt.causal_payload or {}).get("selection")
+    if not isinstance(selection, dict) or selection.get("actor_ref") != decision.get("actor_ref"):
+        return None
+    selected_id = selection.get("selected_affordance_id")
+    matches = (selected_id == decision.get("selected_affordance_id")
+               or selected_id == "NO_ACTION"
+               and decision.get("action") in {"no_action", "maintain"})
+    if not matches:
+        return None
+    return receipt
+
+
+def _validate_actor_decision_source(events, *, decision, causal_payload, cause_ids,
+                                    decision_sequence, decision_day):
+    """Require an auditable origin for every actor-authored decision fact."""
+    source = causal_payload.get("decision_source") if isinstance(causal_payload, dict) else None
+    if not isinstance(source, dict) or not isinstance(source.get("kind"), str):
+        raise ValueError("actor decision requires a decision source")
+
+    kind = source["kind"]
+    if kind == "fallback":
+        if any(not isinstance(source.get(field), str) or not source[field].strip()
+               for field in ("policy", "rule")):
+            raise ValueError("fallback decision source requires policy and rule")
+        return
+    if kind in {"player", "api"}:
+        return
+    if kind != "provider":
+        raise ValueError("actor decision has an unsupported decision source")
+
+    receipt_id = source.get("receipt_event_id")
+    receipt = _recorded_event(events, receipt_id)
+    if (not isinstance(receipt_id, str) or receipt_id not in cause_ids or receipt is None
+            or receipt.sequence >= decision_sequence
+            or receipt.day != decision_day
+            or receipt.event_type not in {"ai_decision_interpreted", "ai_decision_declined"}
+            or receipt.causal_origin is not CausalOrigin.LLM_INTERPRETATION or receipt.deltas):
+        raise ValueError("provider decision source requires a prior causal receipt")
+    selection = (receipt.causal_payload or {}).get("selection")
+    if not isinstance(decision, dict) or not isinstance(selection, dict):
+        raise ValueError("provider decision source does not match an actor selection")
+    selected_id = selection.get("selected_affordance_id")
+    matches = (selected_id == decision.get("selected_affordance_id")
+               or selected_id == "NO_ACTION"
+               and decision.get("action") in {"no_action", "maintain"})
+    if not matches or selection.get("actor_ref") != decision.get("actor_ref"):
+        raise ValueError("provider decision source does not match actor and affordance")
+
+
 def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCCURRENCE,
                  causal_origin=CausalOrigin.DETERMINISTIC, decision=None, causal_payload=None,
                  deltas=(), cause_ids=()) -> WorldEvent:
+    if (fact_kind is FactKind.DECISION and causal_origin is CausalOrigin.ACTOR_DECISION
+            and isinstance(decision, dict)
+            and not (isinstance(causal_payload, dict) and causal_payload.get("decision_source"))):
+        receipt = _provider_selection_source(world.events, decision,
+                                             decision_day=world.clock.absolute_day)
+        if receipt is not None:
+            cause_ids = tuple(cause_ids)
+            causal_payload = {**(causal_payload or {}),
+                              "decision_source": {"kind": "provider", "receipt_event_id": receipt.id}}
+            if receipt.id not in cause_ids:
+                cause_ids = (*cause_ids, receipt.id)
     sequence = len(world.events) + 1
     event_id = f"event:{sequence}"
     if len(set(cause_ids)) != len(cause_ids) or any(not _is_recorded(world.events, cause) for cause in cause_ids):
         raise ValueError("unknown or repeated event cause")
     if deltas and any(_interprets(world.events[int(cause.partition(":")[2]) - 1]) for cause in cause_ids):
         raise ValueError("a state change cannot be caused directly by an interpretation")
+    if fact_kind is FactKind.DECISION and causal_origin is CausalOrigin.ACTOR_DECISION:
+        _validate_actor_decision_source(
+            world.events, decision=decision, causal_payload=causal_payload,
+            cause_ids=cause_ids, decision_sequence=sequence,
+            decision_day=world.clock.absolute_day)
     if causal_origin == CausalOrigin.ACTOR_DECISION and deltas:
         if not any((cause_event := _recorded_event(world.events, cause)) is not None
-                   and cause_event.fact_kind == FactKind.DECISION
+                   and cause_event.fact_kind is FactKind.DECISION
+                   and cause_event.causal_origin is CausalOrigin.ACTOR_DECISION
                    and cause_event.decision is not None
+                   and cause_event.sequence < sequence
+                   and cause_event.day == world.clock.absolute_day
                    for cause in cause_ids):
-            raise ValueError("actor state transition requires a real decision cause")
+            raise ValueError("actor state transition requires a same-day real decision cause")
         _validate_actor_authorship_payload(
-            world.events, causal_payload=causal_payload, cause_ids=cause_ids)
+            world.events, causal_payload=causal_payload, cause_ids=cause_ids,
+            event_day=world.clock.absolute_day, event_sequence=sequence)
+    elif (causal_origin is CausalOrigin.ACTOR_DECISION
+          and fact_kind is not FactKind.DECISION):
+        if not any((cause_event := _recorded_event(world.events, cause)) is not None
+                   and cause_event.fact_kind is FactKind.DECISION
+                   and cause_event.causal_origin is CausalOrigin.ACTOR_DECISION
+                   and cause_event.decision is not None
+                   and cause_event.sequence < sequence
+                   and cause_event.day == world.clock.absolute_day
+                   for cause in cause_ids):
+            raise ValueError("actor-authored event requires a same-day real decision cause")
     event = WorldEvent(
         id=event_id, day=world.clock.absolute_day, sequence=sequence,
         event_type=event_type, content=content, fact_kind=fact_kind,
@@ -216,9 +321,56 @@ def record_event(world, event_type: str, content: str, *, fact_kind=FactKind.OCC
                                     cause_event_id=cause, created_at=0.0)
                            for i, cause in enumerate(cause_ids)),
     )
+    prior_count = len(world.events)
+    prior_identity = id(world.events[-1]) if world.events else 0
+    cached_index = world._event_index_cache
+    cached_types = world._event_type_cache
     world.events.append(event)
-    world._event_index_cache = None
-    world._event_type_cache = None
+    if (cached_index is not None and cached_index[0] == prior_count
+            and cached_index[1] == prior_identity):
+        cached_index[2][event.id] = event
+        world._event_index_cache = (len(world.events), id(event), cached_index[2])
+    else:
+        world._event_index_cache = None
+    if (cached_types is not None and cached_types[0] == prior_count
+            and cached_types[1] == prior_identity):
+        grouped = cached_types[2]
+        grouped[event.event_type] = (*grouped.get(event.event_type, ()), event)
+        world._event_type_cache = (len(world.events), id(event), grouped)
+    else:
+        world._event_type_cache = None
+    world._actor_decision_cache = None
     if hasattr(world.knowledge, "_query_cache"):
         world.knowledge._query_cache = None
     return event
+
+
+def record_no_action_decision(world, event_type: str, content: str, actor_ref, *,
+                              affordance_ids=(), cause_ids=()):
+    """Persist an explicit provider refusal without implying a world effect."""
+    actor = actor_ref.to_dict() if hasattr(actor_ref, "to_dict") else actor_ref
+    if not isinstance(actor, dict):
+        raise ValueError("no-action decision requires an actor reference")
+    cause_ids = tuple(cause_ids)
+    receipt = world.events[-1] if world.events else None
+    selection = (receipt.causal_payload or {}).get("selection") if receipt is not None else None
+    if (receipt is None or receipt.event_type != "ai_decision_declined"
+            or receipt.fact_kind is not FactKind.OCCURRENCE
+            or receipt.causal_origin is not CausalOrigin.LLM_INTERPRETATION
+            or receipt.deltas
+            or receipt.day != world.clock.absolute_day
+            or not isinstance(selection, dict)
+            or selection.get("actor_ref") != actor
+            or selection.get("selected_affordance_id") != "NO_ACTION"
+            or {link.cause_event_id for link in receipt.causal_links} != set(cause_ids)):
+        raise ValueError("no-action decision requires its current provider refusal receipt")
+    causal_ids = tuple(dict.fromkeys((*cause_ids, receipt.id)))
+    return record_event(
+        world, event_type, content, fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision={"action": "no_action", "actor_ref": actor,
+                  "selected_affordance_id": "NO_ACTION",
+                  "declined_option_ids": tuple(sorted(affordance_ids))},
+        causal_payload={"decision_source": {"kind": "provider", "receipt_event_id": receipt.id}},
+        cause_ids=causal_ids,
+    )

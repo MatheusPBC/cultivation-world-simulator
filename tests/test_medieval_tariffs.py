@@ -23,7 +23,8 @@ def tariff_world():
     refresh_reports(world)
     option = next(item for item in tariff_options(world, "auren") if item.export_rate_permille == 50)
     decision = record_event(world, "export_tariff_decided", "Escolha fiscal atual.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
     event = set_export_tariff(world, option.id, decision_event_id=decision.id)
     assert event.causal_origin is CausalOrigin.ACTOR_DECISION
     assert event.causal_payload == {
@@ -36,7 +37,7 @@ def tariff_world():
 
 
 def terms(world, quantity=100):
-    source, destination = world.economy.stocks[SOURCE], world.economy.stocks[DESTINATION]
+    source = world.economy.stocks[SOURCE]
     price = world.economy.markets[source.location_id].prices["food"]
     quote = export_quote(world, SOURCE, DESTINATION)
     return {"source_id": SOURCE, "destination_id": DESTINATION, "resource_id": "food", "quantity": quantity,
@@ -67,8 +68,10 @@ def foreign_order_for_auren(world):
 def consent(world, values):
     buyer = world.economy.stocks[values["destination_id"]].owner_ref.to_dict()
     seller = world.economy.stocks[values["source_id"]].owner_ref.to_dict()
-    return tuple(record_event(world, f"{action}_decided", "Termos públicos aceitos.", fact_kind=FactKind.DECISION,
-                              decision={**values, "action": action, "actor_ref": actor}).id
+    return tuple(record_event(world, f"{action}_decided", "Termos públicos aceitos.",
+                              fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                              decision={**values, "action": action, "actor_ref": actor},
+                              causal_payload={"decision_source": {"kind": "api"}}).id
                  for action, actor in (("buy", buyer),
                                        ("sell", seller)))
 
@@ -129,9 +132,21 @@ def test_export_policy_receipt_survives_income_tax_change_and_save(tmp_path):
 
     world = tariff_world()
     policy_event = world.authority.tax_policies["auren"].export_policy_event_id
+    unauthorized = record_event(
+        world, "income_tax_interpreted", "Payload correto sem decisão de ator.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "set_income_tax", "actor_ref": {"kind": "polity", "id": "auren"},
+                  "polity_id": "auren", "income_rate": 250})
+    before_unauthorized = world_snapshot(world)
+    with pytest.raises(ValueError, match="matching decision"):
+        set_income_tax(world, "auren", 250, decision_event_id=unauthorized.id)
+    assert world_snapshot(world) == before_unauthorized
+
     decision = record_event(world, "income_tax_decided", "Renda.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
                             decision={"action": "set_income_tax", "actor_ref": {"kind": "polity", "id": "auren"},
-                                      "polity_id": "auren", "income_rate": 250})
+                                      "polity_id": "auren", "income_rate": 250},
+                            causal_payload={"decision_source": {"kind": "api"}})
     set_income_tax(world, "auren", 250, decision_event_id=decision.id)
     refresh_trade_reports(world, replace_today=True)
     path = tmp_path / "tariff.mws"
@@ -159,13 +174,15 @@ def test_third_party_seller_receives_base_price_while_origin_treasury_receives_f
     assert world.economy.accounts[buyer.id].balance == buyer.balance - quantity * price - fee
 
 
-@pytest.mark.parametrize("invalid", ["stale", "invented"])
+@pytest.mark.parametrize("invalid", ["stale", "invented", "unauthored"])
 def test_export_tariff_executor_rejects_stale_or_invented_selection_without_effect(invalid):
     world = create_medieval_world(73)
     refresh_reports(world)
     option = next(item for item in tariff_options(world, "auren") if item.export_rate_permille == 50)
-    decision = record_event(world, "export_tariff_decided", "Escolha fiscal.", fact_kind=FactKind.DECISION,
-                            decision=option.decision())
+    decision = record_event(
+        world, "export_tariff_decided", "Escolha fiscal.", fact_kind=FactKind.DECISION,
+        **({} if invalid == "unauthored" else {"causal_origin": CausalOrigin.ACTOR_DECISION}),
+        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
     if invalid == "stale":
         world.clock = world.clock.advance(1)
     else:
@@ -223,6 +240,12 @@ async def test_only_a_pending_foreign_delivery_causes_the_conservative_tariff_wi
     foreign_order_for_auren(pending)
     assert review_export_tariffs(pending)
     assert pending.authority.tax_policies["auren"].export_rate_permille == 0
+    tariff_decision = next(event for event in reversed(pending.events)
+                           if event.event_type == "export_tariff_decided")
+    assert tariff_decision.causal_origin.value == "actor_decision"
+    assert tariff_decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "export_tariff",
+    }
 
     delivered = tariff_world()
     order = foreign_order_for_auren(delivered)

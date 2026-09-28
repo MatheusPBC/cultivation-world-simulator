@@ -2,6 +2,7 @@
 
 import json
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.economy.expansion import ExpansionProject, foundation_line_id
 from src.classes.event import FactKind
 from src.classes.governance.authority import require_authority, can_actor_act_for
@@ -12,6 +13,29 @@ from .economy import _apply_stock, _causes, _delta
 from .events import record_event
 from .labor import settle_work
 from .industrial_lines import line_id, line_exists_or_planned, commission_line
+
+
+def _is_actor_backed_owner_decision(world, event, option):
+    """Accept a direct choice or this owner's parameterized receipt of it.
+
+    The composed menu stores only the selected affordance ID.  Construction
+    owners then record their canonical site/stock/account terms as a
+    deterministic decision receipt.  That receipt is valid only when it has a
+    same-day causal link to the actor's exact current selection.
+    """
+    if event is None:
+        return False
+    if event.causal_origin is CausalOrigin.ACTOR_DECISION:
+        return True
+    if event.causal_origin is not CausalOrigin.DETERMINISTIC or option is None:
+        return False
+    causes = {link.cause_event_id for link in event.causal_links}
+    return any(source.id in causes
+               and source.fact_kind == FactKind.DECISION
+               and source.causal_origin is CausalOrigin.ACTOR_DECISION
+               and source.day == event.day == world.clock.absolute_day
+               and source.decision == option.decision()
+               for source in world.events)
 
 
 class ExpansionOption(SocietyValue):
@@ -211,6 +235,16 @@ def foundation_options(world, actor):
 
 
 def start_foundation(world, option, *, decision_event_id):
+    """Start a production-line foundation atomically."""
+    candidate = world.transaction_copy()
+    project = _start_foundation_in_place(candidate, option,
+                                         decision_event_id=decision_event_id)
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.expansions[project.id]
+
+
+def _start_foundation_in_place(world, option, *, decision_event_id):
     """Owner-side revalidation before any dated construction exists."""
     economy = world.economy
     economy.validate(world)
@@ -227,6 +261,7 @@ def start_foundation(world, option, *, decision_event_id):
         raise ValueError(f'foundation unavailable: {blocker}')
     decision = next((item for item in world.events if item.id == decision_event_id), None)
     if (decision is None or decision.fact_kind != FactKind.DECISION
+            or not _is_actor_backed_owner_decision(world, decision, option)
             or decision.day != world.clock.absolute_day
             or decision.decision != _foundation_terms(option)
             or any(project.decision_event_id == decision_event_id for project in economy.expansions.values())):
@@ -255,16 +290,20 @@ def foundation_adapters():
     from .institutional_decision_turn import DiscretionaryAdapter
 
     def execute(world, actor, option_id, decision_event_id):
-        option = next((item for item in foundation_options(world, actor) if item.id == option_id), None)
+        candidate = world.transaction_copy()
+        option = next((item for item in foundation_options(candidate, actor) if item.id == option_id), None)
         if option is None:
             raise ValueError("foundation option is stale or unknown")
         # The institutional turn carries only the transient affordance ID; the
         # owner recomposes site, stock and account into its own dated receipt.
         authorization = record_event(
-            world, "line_foundation_authorized", "A instituição autorizou a fundação da linha escolhida.",
-            fact_kind=FactKind.DECISION, decision=_foundation_terms(option),
+            candidate, "line_foundation_authorized", "A instituição autorizou a fundação da linha escolhida.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
+            decision=_foundation_terms(option),
             cause_ids=(decision_event_id,))
-        start_foundation(world, option, decision_event_id=authorization.id)
+        _start_foundation_in_place(candidate, option, decision_event_id=authorization.id)
+        candidate.economy.validate(candidate)
+        world.__dict__.update(candidate.__dict__)
 
     return (DiscretionaryAdapter(
         name="line_foundation", family="production", options_fn=foundation_options,
@@ -375,7 +414,90 @@ def site_construction_options(world, actor):
     return tuple(options)
 
 
+def _site_construction_situation(world, actor, options):
+    """Give the decision-maker the authored terms behind valid construction IDs.
+
+    This is evidence for comparing an existing affordance, not a forecast:
+    opening a site does not create a production line or promise employment.
+    The owner still recomposes these terms when the selected option executes.
+    """
+    opportunities = []
+    for option in sorted((item for item in options if isinstance(item, SiteConstructionOption)),
+                         key=lambda item: item.id):
+        blueprint = world.economy.expansion_blueprints[option.blueprint_id]
+        stock = world.economy.stocks[option.stock_id]
+        account = world.economy.accounts[option.account_id]
+        market = world.economy.markets[option.settlement_id]
+        inputs = []
+        missing_input_cost = 0
+        for resource, quantity in sorted(blueprint.inputs.items()):
+            required = quantity * blueprint.required_units
+            available = stock.goods.get(resource, 0)
+            missing = max(0, required - available)
+            price = market.prices[resource]
+            missing_input_cost += missing * price
+            inputs.append({"resource_id": resource, "required": required,
+                           "available_in_own_stock": available, "missing": missing,
+                           "current_unit_price": price})
+        worker_units = blueprint.workers_per_unit * blueprint.required_units
+        wage_cost = worker_units * blueprint.wage_per_worker
+        opportunities.append({
+            "affordance_id": option.id,
+            "settlement_id": option.settlement_id,
+            "site_kind": blueprint.site_kind,
+            "granted_capability": blueprint.grants_capability_id,
+            "required_units": blueprint.required_units,
+            "scheduled_units_per_month": blueprint.monthly_units,
+            "required_worker_occupation": blueprint.worker_occupation,
+            "worker_units_over_project": worker_units,
+            "wage_per_worker_unit": blueprint.wage_per_worker,
+            "total_project_wages": wage_cost,
+            "inputs": inputs,
+            "estimated_cash_for_missing_inputs": missing_input_cost,
+            "minimum_cash_for_missing_inputs_and_wages": missing_input_cost + wage_cost,
+            "own_treasury_balance": account.balance,
+            "result_scope": "opens_site_capability_only; production_requires_a_separate_line",
+            "evidence_event_ids": list(_site_construction_evidence_ids(world, option)),
+        })
+    return {"site_construction_opportunities": opportunities,
+            "today": world.clock.absolute_day}
+
+
+def _site_construction_evidence_ids(world, option):
+    """Return only the dated actor-visible facts behind this project choice."""
+    from .actor_dossier import _latest_food_affordability, _own_local_livelihood_readings
+
+    blueprint = world.economy.expansion_blueprints[option.blueprint_id]
+    stock = world.economy.stocks.get(option.stock_id)
+    account = world.economy.accounts.get(option.account_id)
+    evidence = [option.stock_event_id, account.last_event_id if account else None]
+    if stock is not None:
+        evidence.extend(stock.last_event_ids.get(resource) for resource in blueprint.inputs)
+    report = world.knowledge.settlement_report(option.actor_ref, option.settlement_id)
+    if report is not None:
+        evidence.append(report.event_id)
+        affordability = _latest_food_affordability(world, report)
+        evidence.append(affordability["affordability_event_id"])
+    evidence.extend(
+        event_id
+        for reading in _own_local_livelihood_readings(world, option.actor_ref)
+        if reading["settlement_id"] == option.settlement_id
+        for event_id in reading["source_event_ids"]
+    )
+    return _causes(*evidence)
+
+
 def start_site_construction(world, option, *, decision_event_id):
+    """Create a construction obligation atomically after fresh owner validation."""
+    candidate = world.transaction_copy()
+    project = _start_site_construction_in_place(candidate, option,
+                                                decision_event_id=decision_event_id)
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.expansions[project.id]
+
+
+def _start_site_construction_in_place(world, option, *, decision_event_id):
     """Owner-side revalidation before any dated construction exists."""
     economy = world.economy
     economy.validate(world)
@@ -392,6 +514,7 @@ def start_site_construction(world, option, *, decision_event_id):
         raise ValueError(f'construction unavailable: {blocker}')
     decision = next((item for item in world.events if item.id == decision_event_id), None)
     if (decision is None or decision.fact_kind != FactKind.DECISION
+            or not _is_actor_backed_owner_decision(world, decision, option)
             or decision.day != world.clock.absolute_day
             or decision.decision != _construction_terms(option)
             or any(project.decision_event_id == decision_event_id for project in economy.expansions.values())):
@@ -421,19 +544,25 @@ def site_construction_adapters():
     from .institutional_decision_turn import DiscretionaryAdapter
 
     def execute(world, actor, option_id, decision_event_id):
-        option = next((item for item in site_construction_options(world, actor) if item.id == option_id), None)
+        candidate = world.transaction_copy()
+        option = next((item for item in site_construction_options(candidate, actor)
+                       if item.id == option_id), None)
         if option is None:
             raise ValueError("site construction option is stale or unknown")
         authorization = record_event(
-            world, "site_construction_authorized", "A instituição autorizou a obra escolhida.",
-            fact_kind=FactKind.DECISION, decision=_construction_terms(option),
+            candidate, "site_construction_authorized", "A instituição autorizou a obra escolhida.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
+            decision=_construction_terms(option),
             cause_ids=(decision_event_id,))
-        start_site_construction(world, option, decision_event_id=authorization.id)
+        _start_site_construction_in_place(candidate, option, decision_event_id=authorization.id)
+        candidate.economy.validate(candidate)
+        world.__dict__.update(candidate.__dict__)
 
     return (DiscretionaryAdapter(
         name="site_construction", family="production", options_fn=site_construction_options,
         label_fn=lambda option: option.label,
-        causes_fn=lambda world, option: _causes(option.stock_event_id),
+        causes_fn=_site_construction_evidence_ids,
+        situation_fn=_site_construction_situation,
         execute_fn=execute),)
 
 
@@ -441,20 +570,23 @@ def expansion_adapters():
     from .institutional_decision_turn import DiscretionaryAdapter
 
     def execute(world, actor, option_id, decision_event_id):
-        option = next((item for item in expansion_options(world, actor) if item.id == option_id), None)
+        candidate = world.transaction_copy()
+        option = next((item for item in expansion_options(candidate, actor) if item.id == option_id), None)
         if option is None:
             raise ValueError("expansion option is stale or unknown")
         # The institutional turn carries only the transient affordance ID.
         # The owner recomposes the private construction terms into a dated
         # authorization receipt before the material project is created.
         authorization = record_event(
-            world, "expansion_authorized", "A instituição autorizou a ampliação escolhida.",
-            fact_kind=FactKind.DECISION,
+            candidate, "expansion_authorized", "A instituição autorizou a ampliação escolhida.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
             decision={"action": "expand", "actor_ref": actor.to_dict(),
                       "facility_id": option.facility_id, "blueprint_id": option.blueprint_id},
             cause_ids=(decision_event_id,))
-        start_expansion(world, option.facility_id, option.blueprint_id,
-                        decision_event_id=authorization.id)
+        _start_expansion_in_place(candidate, option.facility_id, option.blueprint_id,
+                                  decision_event_id=authorization.id)
+        candidate.economy.validate(candidate)
+        world.__dict__.update(candidate.__dict__)
 
     return (DiscretionaryAdapter(
         name="expansion", family="production", options_fn=expansion_options,
@@ -469,6 +601,16 @@ def review_expansions(world):
 
 
 def start_expansion(world, facility_id, blueprint_id, *, decision_event_id):
+    """Start an expansion atomically after revalidating the current decision."""
+    candidate = world.transaction_copy()
+    project = _start_expansion_in_place(candidate, facility_id, blueprint_id,
+                                        decision_event_id=decision_event_id)
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.expansions[project.id]
+
+
+def _start_expansion_in_place(world, facility_id, blueprint_id, *, decision_event_id):
     economy = world.economy
     economy.validate(world)
     facility = economy.facilities.get(facility_id)
@@ -491,7 +633,11 @@ def start_expansion(world, facility_id, blueprint_id, *, decision_event_id):
     if any(capability not in site.capability_ids for capability in blueprint.required_site_capabilities):
         raise ValueError('application requires the authored site capabilities')
     decision = next((e for e in world.events if e.id == decision_event_id), None)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != world.clock.absolute_day
+    selected_option = next((option for option in expansion_options(world, stock.owner_ref)
+                            if option.facility_id == facility_id and option.blueprint_id == blueprint_id), None)
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or not _is_actor_backed_owner_decision(world, decision, selected_option)
+            or decision.day != world.clock.absolute_day
             or decision.decision != {'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
                                      'facility_id': facility_id, 'blueprint_id': blueprint_id}
             or any(p.decision_event_id == decision_event_id or (p.facility_id == facility_id and p.stage != 'completed')
@@ -513,6 +659,19 @@ def start_expansion(world, facility_id, blueprint_id, *, decision_event_id):
 
 
 def progress_expansions(world, available):
+    """Advance every due project as one cross-owner monthly transaction."""
+    candidate = world.transaction_copy()
+    candidate_available = dict(available)
+    _progress_expansions_in_place(candidate, candidate_available)
+    candidate.economy.validate(candidate)
+    from src.classes.core.infrastructure import validate_infrastructure
+    validate_infrastructure(candidate)
+    world.__dict__.update(candidate.__dict__)
+    available.clear()
+    available.update(candidate_available)
+
+
+def _progress_expansions_in_place(world, available):
     economy = world.economy
     economy.validate(world)
     day = world.clock.absolute_day

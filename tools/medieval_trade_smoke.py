@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
@@ -75,7 +76,8 @@ async def run(seed: int, output: Path) -> dict:
                      "actor_ref": {"kind": "polity", "id": "escarlia"}}
     funding = record_event(world, "prepared_treasury_funding",
                            "A fixture fiscalizou o tesouro comprador antes da remessa preparada.",
-                           fact_kind=FactKind.DECISION, decision=funding_terms)
+                           fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}}, decision=funding_terms)
     transfer_money(world, funding_terms["source_id"], funding_terms["target_id"], funding_terms["amount"],
                    decision_event_id=funding.id)
     initial_food = food_total(world)
@@ -92,7 +94,8 @@ async def run(seed: int, output: Path) -> dict:
     decisions = []
     for action, owner in (("buy", "valedouro"), ("sell", "auren")):
         decision = record_event(world, f"{action}_decided", "Oferta aceita pela política preparada do cenário.",
-                                 fact_kind=FactKind.DECISION,
+                                 fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                 causal_payload={"decision_source": {"kind": "api"}},
                                  decision={**values, "action": action, "actor_ref": {"kind": "polity", "id": owner}})
         decisions.append(decision.id)
     order = purchase(world, *decisions)

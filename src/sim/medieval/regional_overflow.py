@@ -1,10 +1,10 @@
-"""A bounded natural overflow law for the medieval runtime.
+"""A bounded seasonal water-load source for the medieval runtime.
 
-This is deliberately a single vertical, not a generic hazard system.  The
-engine derives a seasonal regional water load from the saved run seed, requires
-two consecutive high readings, and may damage one already water-exposed,
-explicitly maintained Map site.  It neither publishes climate knowledge to
-actors nor repairs, enables, reroutes, or chooses maintenance work.
+The engine derives regional assessments from the saved run seed and geography,
+requires two consecutive high readings, and can start a flood occurrence. Site
+exposure and material damage use the shared engine-owned hazard interaction
+registry. This module does not publish unobserved climate to actors or perform
+maintenance, repair, enabling, or rerouting.
 """
 
 from __future__ import annotations
@@ -30,13 +30,15 @@ from src.systems.material_hazard_impacts import (
 MONTH_DAYS = 30
 OVERFLOW_LOAD_THRESHOLD = 88
 OVERFLOW_CONSECUTIVE_MONTHS = 2
-MAX_OVERFLOW_INTEGRITY_LOSS = 0.15
 MIN_SITE_VULNERABILITY = 55
 
 # The high-water season is intentionally late enough that a new natural world
 # cannot open with a scripted calamity.  A keyed monthly variation makes a
 # high season a possibility, not a quota, and stays stable across save/load.
-_SEASONAL_LOAD = (8, 10, 15, 23, 35, 51, 61, 57, 42, 28, 16, 10)
+# The two-month peak permits, but does not guarantee, sustained high water. A
+# one-month peak could never satisfy OVERFLOW_CONSECUTIVE_MONTHS and made this
+# physical pathway impossible in every natural world.
+_SEASONAL_LOAD = (8, 10, 15, 23, 35, 51, 60, 60, 42, 28, 16, 10)
 _WATER_EXPOSURE = {
     WaterBodyKind.RIVER: 42,
     WaterBodyKind.LAKE: 31,
@@ -110,6 +112,14 @@ def _assessment(world, region_id: int, *, load: int, streak: int, prior, clears_
         # later assessment is a dated continuation of the prior reading, not
         # an uncaused replacement of it.
         deltas=tuple(deltas),
+        causal_payload=(
+            {"root_premise": {
+                "kind": "world_generation", "domain": "regional_hydrology",
+                "source_refs": [{"kind": "region", "id": str(region_id)}],
+                "observed_day": world.clock.absolute_day,
+                "initial_load": load,
+            }} if prior is None else None
+        ),
         cause_ids=_causes(prior.evidence_event_id if prior else None),
     )
     state.assessments[assessment_id] = RegionalOverflowAssessment(
@@ -281,7 +291,6 @@ def apply_monthly_regional_overflow(world) -> tuple[str, ...]:
 
 
 __all__ = [
-    "MAX_OVERFLOW_INTEGRITY_LOSS",
     "MIN_SITE_VULNERABILITY",
     "OVERFLOW_CONSECUTIVE_MONTHS",
     "OVERFLOW_LOAD_THRESHOLD",

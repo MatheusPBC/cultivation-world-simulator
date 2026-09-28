@@ -9,7 +9,7 @@ import StrategicCapacity from './components/StrategicCapacity.vue'
 import SavePanel from './components/SavePanel.vue'
 import { formatNumber } from './mappers'
 const { t } = useI18n()
-const { store, scene, overlay, seed, count, replace, create } = useAppShell()
+const { store, scene, overlay, seed, count, replace, aiAvailable, create } = useAppShell()
 </script>
 
 <template>
@@ -34,7 +34,7 @@ const { store, scene, overlay, seed, count, replace, create } = useAppShell()
         </section>
       </main>
       <template v-if="scene === 'game' && store.snapshot">
-        <Controls />
+        <Controls :ai-available="aiAvailable" />
         <main class="observatory-grid">
           <section class="atlas-column">
             <div class="section-heading"><div><p class="eyebrow">{{ t('map') }}</p><h2>{{ store.snapshot.map.name }}</h2></div><span class="muted">{{ t('observatory') }}</span></div>

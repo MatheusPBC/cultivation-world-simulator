@@ -16,6 +16,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import math
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.diplomacy import ResourceTransferClause
@@ -144,6 +145,7 @@ def _event(world, event_id):
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
     if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("reciprocal supply requires a current actor decision")
@@ -152,6 +154,14 @@ def _decision(world, decision_event_id, action):
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("reciprocal supply decision has an invalid actor") from exc
     return event, actor
+
+
+def _decision_authorship(decision):
+    return {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": decision.decision["selected_affordance_id"],
+    }
 
 
 def _can_negotiate(world, actor):
@@ -437,12 +447,15 @@ def fulfill_resource_transfer(world, actor, option_id, decision_event_id):
                                  option.destination_stock_id, option.resource_id, option.quantity)
     obligation = candidate.relations.obligations[option.obligation_id]
     proposal = candidate.relations.proposals[obligation.proposal_id]
+    authorship = _decision_authorship(decision)
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id, option.resource_id,
                         option.quantity, option.route_ids, decision_ids=(decision.id,),
-                        cause_ids=(obligation.last_event_id, proposal.decision_event_id))
+                        cause_ids=(obligation.last_event_id, proposal.decision_event_id),
+                        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload=authorship)
     receipt = record_event(candidate, "resource_transfer_fulfilled",
                            "Entrega prometida despachada pelo dono canônico da carga.",
                            fact_kind=FactKind.STATE_TRANSITION,
+                           causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload=authorship,
                            deltas=(_delta("obligation", obligation.id, "status", "active", "fulfilled"),
                                    _delta("obligation", obligation.id, "material_event_id", None,
                                           opened.last_event_id)),
@@ -538,7 +551,9 @@ def remediate_resource_transfer(world, actor, option_id, decision_event_id):
         raise ValueError("resource transfer remediation route is stale")
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id,
                         option.resource_id, option.quantity, option.route_ids,
-                        decision_ids=(decision.id,), cause_ids=(option.breach_event_id,))
+                        decision_ids=(decision.id,), cause_ids=(option.breach_event_id,),
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload=_decision_authorship(decision))
     parties = (proposal.proposer_ref, proposal.counterparty_ref)
     reinforced = tuple(memory for memory in
                        (memories_of(candidate, party, option.breach_event_id) for party in parties)
@@ -547,6 +562,8 @@ def remediate_resource_transfer(world, actor, option_id, decision_event_id):
         candidate, "resource_transfer_remediated",
         "Uma remessa material reparou uma obrigação de recurso descumprida.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload=_decision_authorship(decision),
         deltas=(_delta("obligation", obligation.id, "status", "breached", "remediated"),
                 _delta("obligation", obligation.id, "remediation_material_event_id", None,
                        opened.last_event_id),

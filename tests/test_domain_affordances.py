@@ -18,7 +18,10 @@ from src.systems.domain_affordance_registry import (
     DomainAffordanceRegistry,
     StaleAffordanceError,
 )
-from src.systems.domain_decision_interpreter import interpret_domain_affordances
+from src.systems.domain_decision_interpreter import (
+    DomainDecisionFailed,
+    interpret_domain_affordances,
+)
 from src.utils.llm.exceptions import LLMError, ProviderCallError, ProviderFailureKind
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
@@ -108,29 +111,29 @@ async def test_no_affordance_records_deterministic_receipt_without_llm(base_worl
     ],
     ids=["llm-error", "provider-call-error"],
 )
-async def test_provider_failure_maintains_even_for_high_urgency_affordance(
+async def test_provider_failure_is_not_recorded_as_an_actor_decision(
     base_world, failure
 ):
     trigger = Event(base_world.month_stamp, "damage", id="damage-1")
     option = _option(trigger, urgency=1.0)
     provider = AsyncMock(side_effect=failure)
 
-    decision, event = await interpret_domain_affordances(
-        base_world,
-        domain=option.domain,
-        actor_ref=option.actor_ref,
-        actor_label="Actor",
-        trigger_event=trigger,
-        affordances=(option,),
-        task_name="test",
-        template_name="population_interpreter.txt",
-        llm_call=provider,
-    )
+    with pytest.raises(DomainDecisionFailed) as exc_info:
+        await interpret_domain_affordances(
+            base_world,
+            domain=option.domain,
+            actor_ref=option.actor_ref,
+            actor_label="Actor",
+            trigger_event=trigger,
+            affordances=(option,),
+            task_name="test",
+            template_name="population_interpreter.txt",
+            llm_call=provider,
+        )
 
     assert provider.await_count == 1
-    assert decision.decision is DomainDecisionKind.MAINTAIN
-    assert decision.selected_affordance_id is None
-    assert event.causal_payload["decision"]["source"] == "rule"
+    assert exc_info.value.domain == option.domain
+    assert exc_info.value.actor_ref == option.actor_ref
 
 
 @pytest.mark.asyncio

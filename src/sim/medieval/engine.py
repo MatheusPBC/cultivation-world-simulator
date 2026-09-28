@@ -11,7 +11,7 @@ from .phases import advance_monthly_practice
 from .dated import resolve_dated
 from .economy import produce_monthly, consume_monthly, monthly_workforce
 from .permanent_employment import review_permanent_employment_fallback, settle_permanent_employment
-from .expansion import progress_expansions, review_expansions
+from .expansion import _progress_expansions_in_place, review_expansions
 from .research import progress_research
 from .research_policy import review_research
 from .markets import update_markets
@@ -85,7 +85,10 @@ class MedievalSimulator:
             revoke_invalid_detachment_commands(candidate)
             validate_activities(candidate)
             candidate.society.validate(set(candidate.map.regions), candidate)
-            candidate.economy.validate(candidate)
+            # The published economy and relations were validated at their
+            # previous commit (or on load), and neither is changed by the
+            # pre-step command revocation. Their full historical checks run
+            # below on the completed candidate before anything is published.
             candidate.authority.validate(candidate)
             candidate.strategy.validate(candidate)
             # Knowledge is validated on every committed candidate below.  The
@@ -96,7 +99,6 @@ class MedievalSimulator:
             # safety boundary; a tampered candidate still fails before save or
             # publication at the final validation below.
             candidate.research.validate(candidate)
-            candidate.relations.validate(candidate)
             if any(day <= candidate.clock.absolute_day for day in candidate.agenda.due_days):
                 raise ValueError("resolve pending dates before advancing")
             jump = CalendarScheduler.next_jump(candidate.clock, candidate.agenda.due_days)
@@ -109,7 +111,7 @@ class MedievalSimulator:
                 if candidate.config.ai_enabled:
                     await review_diplomacy_with_provider(candidate)
                 else:
-                    review_diplomacy(candidate)
+                    review_diplomacy(candidate, in_monthly_candidate=True)
                 # A dated step may answer, fulfil or repair an aid commitment,
                 # but never opens a new request outside the monthly review.
                 await review_institutional_aid_with_provider(candidate, allow_requests=False)
@@ -135,7 +137,7 @@ class MedievalSimulator:
                 # AI mode would let a deterministic chooser move households
                 # outside the actor's affordance decision.
                 if not candidate.config.ai_enabled:
-                    review_migration(candidate)
+                    review_migration(candidate, in_monthly_candidate=True)
             # 3. Process monthly domains exactly once per month boundary.
             if jump.monthly_boundary:
                 advance_monthly_practice(candidate)
@@ -146,7 +148,9 @@ class MedievalSimulator:
                 settle_permanent_employment(candidate, available)
                 staff_customs_checkpoints(candidate, available)
                 progress_research(candidate, available)
-                progress_expansions(candidate, available)
+                # The engine already owns the enclosing month transaction;
+                # avoid nesting a second full-world copy for this owner.
+                _progress_expansions_in_place(candidate, available)
                 produce_monthly(candidate, available)
                 consume_monthly(candidate)
                 # The subsistence receipt of this very cycle is the only source
@@ -237,7 +241,8 @@ class MedievalSimulator:
                     review_maintenance(candidate)
                     review_supply(candidate)
                 if not candidate.config.ai_enabled:
-                    review_diplomacy(candidate, allow_offers=True)
+                    review_diplomacy(candidate, allow_offers=True,
+                                     in_monthly_candidate=True)
                 if candidate.config.ai_enabled:
                     # The learner's acceptance keeps its own ordered turn for
                     # whoever the composed menu left untouched.
@@ -250,7 +255,7 @@ class MedievalSimulator:
                 # call the aid owner above when a real deadline is due.
                 if not candidate.config.ai_enabled:
                     await review_institutional_aid_with_provider(candidate, allow_requests=True)
-                    review_migration(candidate)
+                    review_migration(candidate, in_monthly_candidate=True)
                 lapse_invalid_claims(candidate)
                 record_event(candidate, "month_closed", "O ciclo mensal foi concluído.")
             # 4. Validate and durably commit the candidate before publishing any change.

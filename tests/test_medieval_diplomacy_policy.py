@@ -133,10 +133,18 @@ async def test_offer_counteroffer_acceptance_payment_teaching_are_distinct_steps
     world = world_with_knowledge(); useful_buyer(world)
     review_diplomacy(world, allow_offers=True)
     proposal = next(p for p in world.relations.proposals.values() if p.counterparty_ref == BUYER)
+    offer_decision = next(event for event in world.events if event.id == proposal.decision_event_id)
+    assert offer_decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "diplomacy_review",
+    }
+    assert offer_decision.causal_origin is CausalOrigin.ACTOR_DECISION
     assert proposal.status == 'offered'
     assert not world.knowledge.knows(BUYER, 'metallurgy')
     await MedievalSimulator(world).step()
     counter = next(p for p in world.relations.proposals.values() if p.parent_id == proposal.id)
+    counter_decision = next(event for event in world.events if event.id == counter.decision_event_id)
+    assert counter_decision.causal_payload["decision_source"]["kind"] == "fallback"
+    assert counter_decision.causal_origin is CausalOrigin.ACTOR_DECISION
     assert counter.clauses[0].amount < proposal.clauses[0].amount
     assert not world.relations.obligations
     await MedievalSimulator(world).step()
@@ -185,6 +193,36 @@ def test_policy_does_not_propose_unknown_techniques_or_repeat_delivered_offers()
     assert len(world.relations.proposals) == count
 
 
+@pytest.mark.asyncio
+async def test_monthly_teaching_disclosure_rolls_back_if_offer_fails(monkeypatch):
+    from src.sim.medieval import diplomacy_policy
+    from src.sim.medieval.engine import MedievalSimulator
+
+    world = world_with_knowledge()
+
+    def fail_after_disclosure(candidate, *_args, **_kwargs):
+        assert candidate.knowledge.technology_sightings
+        raise RuntimeError("offer failed after disclosure")
+
+    monkeypatch.setattr(diplomacy_policy, "offer_proposal", fail_after_disclosure)
+    simulator = MedievalSimulator(world)
+    for _ in range(30):
+        before = world_snapshot(world)
+        events_before = tuple(world.events)
+        rng_before = world.rng.getstate()
+        try:
+            await simulator.step()
+        except RuntimeError as exc:
+            assert str(exc) == "offer failed after disclosure"
+            assert world_snapshot(world) == before
+            assert tuple(world.events) == events_before
+            assert world.rng.getstate() == rng_before
+            assert not world.knowledge.technology_sightings
+            break
+    else:
+        pytest.fail("monthly teaching offer was not reached")
+
+
 def test_persuasion_is_a_causal_attempt_not_an_automatic_acceptance():
     from src.sim.medieval.diplomacy_policy import _execute_persuasion, _persuasion_options
     from src.sim.medieval.events import record_event
@@ -197,7 +235,9 @@ def test_persuasion_is_a_causal_attempt_not_an_automatic_acceptance():
     option = next(item for item in _persuasion_options(world, SELLER)
                   if item.proposal_id == proposal.id)
     decision = record_event(world, 'persuasion_decided', 'A instituição escolheu reforçar a proposta.',
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
     _execute_persuasion(world, option, decision.id)
 
     attempt = next(item for item in world.events
@@ -222,7 +262,9 @@ def test_notified_counterparty_can_persuade_without_accepting_or_changing_terms(
                   if item.proposal_id == proposal.id)
     assert option.counterparty_ref == SELLER
     decision = record_event(world, 'persuasion_decided', 'A contraparte escolheu manter o diálogo aberto.',
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
     _execute_persuasion(world, option, decision.id)
 
     attempt = next(item for item in world.events
@@ -272,6 +314,10 @@ async def test_provider_selects_a_canonical_teaching_offer_without_inventing_ter
     proposal = next(item for item in world.relations.proposals.values() if item.proposer_ref == SELLER)
     event = next(item for item in world.events if item.id == proposal.decision_event_id)
     assert event.decision == option.decision()
+    assert event.causal_payload["decision_source"]["kind"] == "provider"
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    receipt_id = event.causal_payload["decision_source"]["receipt_event_id"]
+    assert receipt_id in {link.cause_event_id for link in event.causal_links}
     assert proposal.clauses[0].amount == option.amount
     save_world(world, tmp_path / 'provider-offer.mws')
     assert world_snapshot(load_world(tmp_path / 'provider-offer.mws')) == world_snapshot(world)
@@ -335,7 +381,7 @@ async def test_promised_teaching_acceptance_that_goes_stale_pauses_before_decisi
     pay(world, f'{proposal.id}:term:0')
     world.clock = world.clock.advance(1)
     teacher = _teaching_options(world, SELLER)[0]
-    teacher_decision = _record_option_decision(world, teacher, ())
+    teacher_decision = _record_option_decision(world, teacher, (), decision_source={"kind": "api"})
     _execute_teaching(world, teacher, teacher_decision.id)
     initial = _learning_options(world, BUYER)
     assert initial

@@ -16,7 +16,7 @@ from typing import Any
 
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for, require_authority
+from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.serialization import validate_actor
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity, SocietyValue
@@ -299,18 +299,17 @@ def _decision(world, decision_event_id: str | None):
 
 
 def _is_material_decision(event: WorldEvent | None) -> bool:
-    """Only an actor/deterministic decision may authorize an owner mutation.
+    """Only an explicit actor decision may authorize a conveyance.
 
     An interpretation can describe an offer, but it is never itself consent
-    to change the Map or Economy.  Deterministic policy decisions remain
-    accepted here because the current medieval runner uses that origin for
-    its non-LLM actor policies; the public proposal/acceptance helpers mark
-    explicit bilateral choices as ``ACTOR_DECISION``.
+    to change the Map or Economy.  Proposal and acceptance helpers record
+    bilateral choices as ``ACTOR_DECISION``; a deterministic copy of their
+    payload is not equivalent to either party's consent.
     """
     return bool(
         event is not None
         and event.fact_kind == FactKind.DECISION
-        and event.causal_origin != CausalOrigin.LLM_INTERPRETATION
+        and event.causal_origin is CausalOrigin.ACTOR_DECISION
         and isinstance(event.decision, dict)
     )
 
@@ -330,7 +329,8 @@ def record_conveyance_proposal(world, option_id: str) -> WorldEvent:
     return record_event(world, "productive_site_conveyance_proposed",
                         "O proprietário apresentou uma proposta bilateral para transferir um workshop.",
                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-                        decision=option.decision(), cause_ids=causes)
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}}, cause_ids=causes)
 
 
 def propose_site_conveyance(world, option_id: str) -> WorldEvent:
@@ -345,6 +345,7 @@ def record_conveyance_acceptance(world, option_id: str, buyer_ref: EntityRef) ->
                         "A contraparte aceitou a proposta bilateral do workshop.",
                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                         decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}},
                         cause_ids=(option.proposal_event_id,))
 
 

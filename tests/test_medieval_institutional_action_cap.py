@@ -34,7 +34,7 @@ def test_zero_cap_is_a_strict_no_op():
         assert ai_decider.actor_within_monthly_cap(world, ACTOR)
 
 
-async def test_cap_blocks_the_actor_only_after_it_is_spent_and_records_a_distinct_failure(monkeypatch):
+async def test_cap_blocks_ai_mode_until_a_real_provider_turn_is_available(monkeypatch):
     world = enable(create_medieval_world(73), cap=2)
     provider(monkeypatch, {"selected_id": ai_decider.NO_ACTION})
 
@@ -45,12 +45,9 @@ async def test_cap_blocks_the_actor_only_after_it_is_spent_and_records_a_distinc
 
     assert not ai_decider.actor_within_monthly_cap(world, ACTOR)
     before = len(world.events)
-    selected = await ai_decider.select_option(world, ACTOR, {}, CHOICES)
-    assert selected is None
-    receipt = world.events[-1]
-    assert len(world.events) == before + 1
-    assert receipt.event_type == ai_decider.FAILED_EVENT
-    assert "teto mensal" in receipt.content
+    with pytest.raises(ai_decider.ProviderDecisionRequired, match="monthly decision cap is exhausted"):
+        await ai_decider.select_option(world, ACTOR, {}, CHOICES)
+    assert len(world.events) == before
 
 
 async def test_cap_is_scoped_per_actor_and_per_month(monkeypatch):

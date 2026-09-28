@@ -63,7 +63,19 @@ def test_dossier_projects_affordability_from_subsistence_receipt_without_private
     assert report["unaffordable_food"] > 0
     assert report["unaffordable_group_count"] > 0
     assert report["affordability_event_id"].startswith("event:")
+    assert report["affordability_observed_day"] == 30
+    assert report["affordability_age_days"] == 0
     assert "household" not in report and "balance" not in report
+
+    # A newer settlement observation may reuse the last material subsistence
+    # receipt; the actor must be able to distinguish that older evidence.
+    world.clock = WorldClock(45)
+    refresh_reports(world)
+    report = next(item for item in build_actor_dossier(world, EntityRef("polity", "auren"))["known_settlement_reports"]
+                  if item["settlement_id"] == target)
+    assert report["observed_day"] == 45
+    assert report["affordability_observed_day"] == 30
+    assert report["affordability_age_days"] == 15
 
 
 def test_affordability_waits_for_an_observation_after_the_material_closing():
@@ -87,6 +99,8 @@ def test_affordability_waits_for_an_observation_after_the_material_closing():
                       if item["settlement_id"] == target)
         assert report["affordability_event_id"] is None
         assert report["unaffordable_food"] == 0
+        assert report["affordability_observed_day"] is None
+        assert report["affordability_age_days"] is None
 
     refresh_reports(world)
     local_report = next(item for item in build_actor_dossier(world, local)["known_settlement_reports"]
@@ -146,7 +160,6 @@ def test_administrator_sees_dated_local_labor_without_foreign_payroll_or_balance
     world = create_medieval_world(73)
     actor = EntityRef("polity", "auren")
     assert build_actor_dossier(world, actor)["own_local_livelihood_readings"] == ()
-
     world.clock = WorldClock(30)
     produce_monthly(world)
     refresh_reports(world)
@@ -172,8 +185,46 @@ def test_administrator_sees_dated_local_labor_without_foreign_payroll_or_balance
     assert build_actor_dossier(world, actor)["own_local_livelihood_readings"] == ()
 
 
+def test_administrator_sees_own_standing_payroll_as_aggregate_local_reading():
+    from src.run.medieval_world import create_medieval_world
+    from src.sim.medieval.intelligence import refresh_reports
+    from src.sim.medieval.permanent_employment import (
+        create_permanent_employment,
+        permanent_employment_options,
+        record_permanent_employment_decision,
+        settle_permanent_employment,
+    )
+    from src.sim.medieval.economy import monthly_workforce
+    from src.systems.time import WorldClock
+
+    world = create_medieval_world(73)
+    actor = EntityRef("polity", "auren")
+    option = next(item for item in permanent_employment_options(world, actor)
+                  if item.cohort_id == "pop:pontenegro:human:farmer")
+    decision = record_permanent_employment_decision(
+        world, actor, option.id, decision_source={"kind": "api"})
+    contract = create_permanent_employment(world, option.id, decision_event_id=decision.id)
+
+    world.clock = WorldClock(30)
+    settle_permanent_employment(world, monthly_workforce(world))
+    refresh_reports(world)
+    dossier = build_actor_dossier(world, actor)
+    reading = next(item for item in dossier["own_local_livelihood_readings"]
+                   if item["settlement_id"] == contract.settlement_id)
+    payroll = world.economy.payrolls[contract.id]
+
+    assert reading["own_standing_employment_paid_workers_by_occupation"] == {
+        contract.occupation: payroll.workers_by_group[contract.cohort_id]
+    }
+    assert payroll.last_event_id in reading["source_event_ids"]
+    assert contract.cohort_id not in repr(reading)
+    assert "balance" not in repr(reading)
+    foreign = build_actor_dossier(world, OTHER)["own_local_livelihood_readings"]
+    assert all(item["settlement_id"] != contract.settlement_id for item in foreign)
+
+
 def test_workshop_choice_and_local_labor_share_one_provider_menu():
-    from src.sim.medieval.economy import produce_monthly
+    from src.sim.medieval.economy import consume_monthly, produce_monthly
     from src.sim.medieval.expansion import site_construction_adapters
     from src.sim.medieval.institutional_decision_turn import _by_id, _composed_situation
     from src.sim.medieval.intelligence import refresh_reports
@@ -184,6 +235,7 @@ def test_workshop_choice_and_local_labor_share_one_provider_menu():
     actor = EntityRef("polity", "auren")
     world.clock = WorldClock(30)
     produce_monthly(world)
+    consume_monthly(world)
     refresh_reports(world)
 
     options = _by_id(world, actor, site_construction_adapters())
@@ -193,6 +245,10 @@ def test_workshop_choice_and_local_labor_share_one_provider_menu():
                  if item["settlement_id"] == "pedraclara")
     assert local["residents_by_occupation"]["artisan"] > 1000
     assert local["own_production_paid_workers_by_occupation"].get("artisan", 0) == 0
+    food_report = next(item for item in context["known_settlement_reports"]
+                       if item["settlement_id"] == "pedraclara")
+    assert food_report["affordability_observed_day"] == 30
+    assert food_report["affordability_age_days"] == 0
 
 
 def test_dossier_projects_overflow_reading_only_for_a_sited_own_report():

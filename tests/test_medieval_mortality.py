@@ -1,5 +1,6 @@
 """Deprivation and age are material laws: nobody chooses them, nothing is drawn."""
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
@@ -104,7 +105,9 @@ async def test_a_lifetime_ends_and_releases_only_the_person():
     option = next(item for item in detachment_command_options(world, owner)
                   if getattr(item, "character_id", None) == character.id)
     decision = record_event(world, "force_decided", "Nomeação de comandante.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
     appoint_detachment_commander(world, owner, option.id, decision.id)
     assert "detachment:fixture" in world.society.detachment_commands
 
@@ -146,3 +149,22 @@ async def test_a_lifetime_ends_and_releases_only_the_person():
         assert item.fact_kind == FactKind.STATE_TRANSITION
         assert all(events_by_id[link.cause_event_id].causal_origin.value != "llm_interpretation"
                    for link in item.causal_links)
+
+
+def test_deterministic_copy_of_commander_affordance_does_not_appoint():
+    world, character = lone_world()
+    owner = garrison(world, character)
+    option = next(item for item in detachment_command_options(world, owner)
+                  if getattr(item, "character_id", None) == character.id)
+    decision = record_event(world, "force_decided", "Payload de nomeação sem escolha do ator.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    try:
+        appoint_detachment_commander(world, owner, option.id, decision.id)
+    except ValueError as exc:
+        assert "current actor decision" in str(exc)
+    else:
+        raise AssertionError("deterministic payload appointed a commander")
+
+    assert world_snapshot(world) == before

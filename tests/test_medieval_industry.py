@@ -7,6 +7,7 @@ from src.sim.medieval.expansion import start_expansion, progress_expansions
 from src.sim.medieval.economy import _delta, monthly_workforce, produce_monthly
 from src.sim.medieval.infrastructure import damage_site
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
+from src.run.medieval_world import create_medieval_world
 from src.systems.time import WorldClock
 
 MINE = 'works:minas-de-ferroalto'
@@ -92,6 +93,22 @@ def test_two_anchor_facilities_cannot_authorize_the_same_line():
     world.economy.facilities['second-anchor'] = world.economy.facilities[MINE].model_copy(update={'id': 'second-anchor'})
     with pytest.raises(ValueError, match='line|existing'):
         build(world, 'charcoal-kilns', 'second-anchor')
+
+
+def test_offline_technology_policy_rechecks_lines_after_each_commit():
+    from src.sim.medieval.research_policy import _apply_known_techniques
+
+    world = industrial_world()
+    world.economy.facilities['second-anchor'] = world.economy.facilities[MINE].model_copy(
+        update={'id': 'second-anchor'})
+
+    _apply_known_techniques(world)
+
+    projects = [project for project in world.economy.expansions.values()
+                if project.blueprint_id == 'charcoal-kilns']
+    assert len(projects) == 1
+    assert len([event for event in world.events if event.event_type == 'adaptation_decided'
+                and event.decision['blueprint_id'] == 'charcoal-kilns']) == 1
 
 
 def test_advanced_knowledge_does_not_manufacture_engines_or_steel():
@@ -181,6 +198,32 @@ def test_monthly_policy_commissions_feasible_line_and_adds_its_input_objective()
     world.strategy.objectives.clear()
     review_investment(world)
     assert any(o.stock_id == 'stock:ferroalto' and o.resource_id == 'wood' for o in world.strategy.objectives.values())
+
+
+def test_offline_investment_decision_is_explicitly_actor_authored():
+    from src.sim.medieval.investment import review_investment
+
+    world = create_medieval_world(73)
+    facility = next(iter(world.economy.facilities.values()))
+    world.clock = WorldClock(30)
+    world.economy.facilities[facility.id] = facility.model_copy(update={
+        'max_batches': 10, 'last_batches': 9, 'last_limitations': ('storage',),
+    })
+    account = world.economy.accounts[facility.payroll_account_id]
+    world.economy.accounts[account.id] = account.model_copy(update={'balance': 1_000_000})
+    stock = world.economy.stocks[facility.stock_id]
+    world.economy.stocks[stock.id] = stock.model_copy(update={
+        'goods': {**stock.goods, 'wood': 1000, 'stone': 1000, 'tools': 1000, 'food': 10000},
+    })
+
+    review_investment(world)
+
+    decision = next(event for event in world.events if event.event_type == 'expansion_decided')
+    assert decision.causal_origin.value == 'actor_decision'
+    assert decision.causal_payload['decision_source'] == {
+        'kind': 'fallback', 'policy': 'routine-rules', 'rule': 'investment',
+    }
+    assert world.economy.expansions
 
 
 @pytest.mark.asyncio

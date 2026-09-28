@@ -39,7 +39,10 @@ class ProductionPriorityOption(SocietyValue):
     owner_ref: EntityRef
     payroll_account_id: str
     settlement_id: str
+    settlement_name: str
     occupation: str
+    facility_name: str
+    output_names: tuple[str, ...]
 
     def decision(self):
         # Keep the decision contract intentionally closed.  The engine derives
@@ -83,6 +86,26 @@ def _conflict_key(facility, stock, recipe):
             stock.location_id, recipe.occupation)
 
 
+def _labor_availability_causes(world, groups):
+    """Facts currently reducing Society's available count for these cohorts."""
+    group_ids = {group.id for group in groups}
+    sources = {group.last_event_id for group in groups if group.last_event_id}
+    sources.update(item.last_event_id for item in world.society.migrations.values()
+                   if item.source_group_id in group_ids)
+    sources.update(item.last_event_id for item in world.society.workforce_transitions.values()
+                   if item.source_group_id in group_ids)
+    sources.update(item.last_event_id for item in world.society.detachments.values()
+                   if item.source_group_id in group_ids and item.stage != "disbanded")
+    sources.update(item.last_event_id for item in world.society.civic_protests.values()
+                   if item.group_id in group_ids and item.stage == "open")
+    sources.update(item.last_event_id for item in world.society.civic_movements.values()
+                   if item.stage in {"active", "rebellion", "revolution", "negotiating"}
+                   and group_ids.intersection(item.participants_by_group))
+    sources.update(item.last_event_id for item in world.society.civic_strikes.values()
+                   if item.stage == "active" and group_ids.intersection(item.participants_by_group))
+    return tuple(sorted(source for source in sources if source))
+
+
 def production_priority_options(world, actor_ref):
     """Recompose every currently valid facility-priority affordance.
 
@@ -111,18 +134,36 @@ def production_priority_options(world, actor_ref):
         owner_ref, payroll_account_id, settlement_id, occupation = key
         for facility_id in sorted(facility_ids):
             facility, _stock, _recipe, _ = contexts[facility_id]
+            site = getattr(world, "map", None)
+            site = getattr(site, "infrastructure_sites", {}).get(facility.site_id)
+            facility_name = getattr(site, "name", facility.id)
+            recipe_outputs = getattr(_recipe, "outputs", {})
+            outputs = tuple(world.economy.resources[resource_id].name
+                            for resource_id in sorted(recipe_outputs)
+                            if resource_id in getattr(world.economy, "resources", {}))
+            settlement = getattr(getattr(world, "society", None), "settlements", {}).get(
+                settlement_id
+            )
+            # Account IDs are owner-internal implementation details.  The
+            # selected facility is the actor-visible choice; execution always
+            # recomposes its current payroll binding before accepting it.
             option_id = (f"production-priority:{owner_ref.kind}:{owner_ref.id}:"
-                         f"{payroll_account_id}:{settlement_id}:{occupation}:{facility_id}")
+                         f"{settlement_id}:{occupation}:{facility_id}")
             options.append(ProductionPriorityOption(
                 id=option_id, actor_ref=actor_ref, facility_id=facility_id,
                 owner_ref=owner_ref, payroll_account_id=payroll_account_id,
-                settlement_id=settlement_id, occupation=occupation))
+                settlement_id=settlement_id,
+                settlement_name=getattr(settlement, "name", settlement_id),
+                occupation=occupation,
+                facility_name=facility_name,
+                output_names=outputs or tuple(sorted(recipe_outputs))))
     return tuple(options)
 
 
 def _decision_event(world, decision_event_id, expected):
     event = next((item for item in world.events if item.id == decision_event_id), None)
     if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.day != world.clock.absolute_day
             or event.decision != expected):
         raise ValueError("production priority requires the exact current actor decision")
@@ -166,13 +207,139 @@ def _provenance(world, draft):
         == (draft.owner_ref, draft.payroll_account_id, draft.settlement_id, draft.occupation)
     )
     account = world.economy.accounts[draft.payroll_account_id]
+    settlement_report = world.knowledge.settlement_report(draft.owner_ref, draft.settlement_id)
+    labor_groups = tuple(
+        group for group in world.society.population.values()
+        if group.settlement_id == draft.settlement_id and group.occupation == draft.occupation
+    )
     return _causes(
         account.last_event_id,
+        settlement_report.event_id if settlement_report is not None else None,
+        *_labor_availability_causes(world, labor_groups),
         *(facility.last_event_id for facility in facilities),
         *(world.economy.stocks[facility.stock_id].last_event_ids.get(resource)
           for facility in facilities
           for resource in world.economy.recipes[facility.recipe_id].inputs),
     )
+
+
+def _priority_situation(world, actor_ref, options):
+    """Show only the actor's local operations and its own dated settlement readings."""
+    groups = {}
+    for option in options:
+        key = (option.payroll_account_id, option.settlement_id, option.occupation)
+        groups.setdefault(key, []).append(option)
+
+    conflicts = []
+    for (_account_id, settlement_id, occupation), group_options in sorted(groups.items()):
+        settlement = world.society.settlements[settlement_id]
+        report = world.knowledge.settlement_report(actor_ref, settlement_id)
+        labor_groups = tuple(
+            group for group in world.society.population.values()
+            if group.settlement_id == settlement_id and group.occupation == occupation
+        )
+        labor_sources = _labor_availability_causes(world, labor_groups)
+        account = world.economy.accounts[_account_id]
+        matching_priorities = tuple(
+            priority for priority in world.economy.production_priorities.values()
+            if (priority.owner_ref, priority.payroll_account_id,
+                priority.settlement_id, priority.occupation)
+            == (actor_ref, _account_id, settlement_id, occupation)
+        )
+        last_applied = max(
+            (item for item in matching_priorities if item.effective_day <= world.clock.absolute_day),
+            key=lambda item: item.effective_day,
+            default=None,
+        )
+        scheduled = min(
+            (item for item in matching_priorities if item.effective_day > world.clock.absolute_day),
+            key=lambda item: item.effective_day,
+            default=None,
+        )
+        next_boundary = ((world.clock.absolute_day // 30) + 1) * 30
+        facility_names = {option.facility_id: option.facility_name for option in group_options}
+        lines = []
+        for option in sorted(group_options, key=lambda item: item.facility_id):
+            facility = world.economy.facilities[option.facility_id]
+            recipe = world.economy.recipes[facility.recipe_id]
+            stock = world.economy.stocks[facility.stock_id]
+            resource_names = {
+                resource_id: world.economy.resources[resource_id].name
+                for resource_id in set(recipe.inputs) | set(recipe.outputs)
+                if resource_id in world.economy.resources
+            }
+            resource_units = {
+                resource_id: world.economy.resources[resource_id].unit
+                for resource_id in set(recipe.inputs) | set(recipe.outputs)
+                if resource_id in world.economy.resources
+            }
+            lines.append({
+                "affordance_id": option.id,
+                "facility_id": facility.id,
+                "facility_name": option.facility_name,
+                "outputs_per_batch": [
+                    {"resource_id": resource_id, "resource_name": resource_names.get(resource_id, resource_id),
+                     "unit": resource_units.get(resource_id), "quantity": quantity}
+                    for resource_id, quantity in sorted(recipe.outputs.items())
+                ],
+                "inputs_per_batch": [
+                    {"resource_id": resource_id, "resource_name": resource_names.get(resource_id, resource_id),
+                     "unit": resource_units.get(resource_id), "quantity": quantity,
+                     "available": stock.goods.get(resource_id, 0),
+                     "source_event_id": stock.last_event_ids.get(resource_id)}
+                    for resource_id, quantity in sorted(recipe.inputs.items())
+                ],
+                "capacity_batches": facility.max_batches,
+                "wage_per_batch": recipe.workers * facility.wage_per_worker,
+                "last_batches": facility.last_batches,
+                "last_limitations": list(facility.last_limitations),
+                "workers_per_batch": recipe.workers,
+                "wage_per_worker": facility.wage_per_worker,
+            })
+        conflict = {
+            "settlement_id": settlement_id,
+            "settlement_name": settlement.name,
+            "occupation": occupation,
+            "shared_payroll": True,
+            "observed_day": world.clock.absolute_day,
+            # This is Society's current available cohort count, not a forecast
+            # of labor left after other owners run at the upcoming boundary.
+            "society_available_workers": sum(
+                world.society.available_count(group.id) for group in labor_groups
+            ),
+            "payroll_balance": account.balance,
+            "payroll_source_event_id": account.last_event_id,
+            "labor_source_event_ids": sorted(labor_sources),
+            "next_effective_day": next_boundary,
+            "lines": lines,
+            "last_applied_priority": ({
+                "facility_id": last_applied.facility_id,
+                "facility_name": facility_names.get(last_applied.facility_id,
+                                                     last_applied.facility_id),
+                "effective_day": last_applied.effective_day,
+                "event_id": last_applied.last_event_id,
+            } if last_applied is not None else None),
+            "scheduled_priority": ({
+                "facility_id": scheduled.facility_id,
+                "facility_name": facility_names.get(scheduled.facility_id,
+                                                     scheduled.facility_id),
+                "effective_day": scheduled.effective_day,
+                "event_id": scheduled.last_event_id,
+            } if scheduled is not None else None),
+            "settlement_report": None,
+        }
+        if report is not None:
+            conflict["settlement_report"] = {
+                "event_id": report.event_id,
+                "observed_day": report.observed_day,
+                "age_days": max(0, world.clock.absolute_day - report.observed_day),
+                "health": report.health,
+                "missing_food": report.missing_food,
+                "unrest": report.unrest,
+                "population": report.present_population,
+            }
+        conflicts.append(conflict)
+    return {"today": world.clock.absolute_day, "payroll_competition": conflicts}
 
 
 def set_production_priority(world, actor_ref, option_id, *, decision_event_id):
@@ -226,10 +393,16 @@ def _option_causes(world, option):
 
 def production_priority_adapters():
     return (DiscretionaryAdapter(
-        name="production_priority", family="production",
+        # This context is intentionally separate from construction's
+        # production context; the composed agenda keeps one situation builder
+        # per family key, so sharing the key would hide payroll tradeoffs.
+        name="production_priority", family="production_priority",
         options_fn=production_priority_options,
-        label_fn=lambda option: f"Dar precedência produtiva a {option.facility_id} no próximo ciclo.",
+        label_fn=lambda option: (
+            f"Priorizar {', '.join(option.output_names)} em {option.facility_name} "
+            f"({option.settlement_name}) no próximo ciclo."),
         causes_fn=_option_causes,
         execute_fn=lambda world, actor, option_id, decision_event_id:
             set_production_priority(world, actor, option_id, decision_event_id=decision_event_id),
+        situation_fn=_priority_situation,
     ),)

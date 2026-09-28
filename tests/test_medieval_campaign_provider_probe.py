@@ -7,8 +7,9 @@ import pytest
 
 from src.classes.causal_origin import CausalOrigin
 from src.sim.medieval import ai_decider
-from src.sim.medieval.persistence import world_snapshot
+from src.sim.medieval.persistence import save_world, world_snapshot
 from src.sim.medieval.strategy_response import defense_adoption_options
+from tools.medieval_causal_audit import audit
 from tools.medieval_campaign_provider_probe import (
     OWNER,
     _occupied_campaign_world,
@@ -81,3 +82,11 @@ def test_campaign_fixture_is_unchanged_by_direct_probe_call(monkeypatch):
     assert after["society"] == before["society"]
     assert after["economy"] == before["economy"]
     assert after["strategy"] == before["strategy"]
+
+
+def test_campaign_fixture_preserves_population_and_causal_roots(tmp_path):
+    world, _, _ = _occupied_campaign_world(73)
+    assert sum(group.count for group in world.society.population.values()) == 10_900
+    path = tmp_path / "campaign-fixture.mws"
+    save_world(world, path)
+    assert audit(path)["ok"] is True

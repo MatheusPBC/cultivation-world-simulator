@@ -14,12 +14,12 @@ from hashlib import sha256
 import math
 
 from src.classes.economy.models import Stock
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Count, Identity, SocietyValue
 from .economy import _apply_stock, _causes, _delta
-from .events import record_event
 from .intelligence import reserve_quantity
 from .logistics import open_order
 from .routing import fiscal_route_options
@@ -138,6 +138,14 @@ def relief_settlement_options(world, polity_id, *, settlement_id=None):
 
 
 def distribute_relief(world, option_id, *, decision_event_id):
+    """Apply a distribution atomically: failed bookkeeping leaves no partial aid."""
+    candidate = deepcopy(world)
+    event = _distribute_relief_in_place(candidate, option_id, decision_event_id=decision_event_id)
+    world.__dict__.update(candidate.__dict__)
+    return event
+
+
+def _distribute_relief_in_place(world, option_id, *, decision_event_id):
     """Move real food out of the granary once, on an exact, current decision."""
     decision = next((event for event in world.events if event.id == decision_event_id), None)
     payload = decision.decision if decision is not None else None
@@ -148,6 +156,7 @@ def distribute_relief(world, option_id, *, decision_event_id):
     polity_id = actor.id if actor is not None and actor.kind == "polity" else None
     option = next((item for item in relief_settlement_options(world, polity_id) if item.id == option_id), None)
     if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("relief distribution option is stale")
     if any(event.event_type == "relief_distributed" and any(link.cause_event_id == decision.id
@@ -319,7 +328,9 @@ def execute_relief_transfer(world, actor, option_id, decision_event_id):
     if option is None:
         raise ValueError("relief transfer option is stale or unknown")
     decision = next((event for event in candidate.events if event.id == decision_event_id), None)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != candidate.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
+            or decision.day != candidate.clock.absolute_day
             or decision.decision != option.decision()):
         raise ValueError("relief transfer requires the selected current decision")
     require_authority(candidate, actor, "supply")

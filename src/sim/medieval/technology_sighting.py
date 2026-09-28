@@ -9,6 +9,7 @@ unchanged.
 
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.knowledge import technology_sighting_id
@@ -86,16 +87,49 @@ def disclosure_options(world, actor_ref):
     return tuple(options)
 
 
-def execute_disclosure(world, option, decision_event_id):
+def execute_disclosure(world, option, decision_event_id, *, authorized_by_teaching_offer=False):
+    """Publish a technical sighting atomically in the Knowledge owner."""
+    candidate = world.transaction_copy()
+    result = _execute_disclosure_in_place(
+        candidate, option, decision_event_id,
+        authorized_by_teaching_offer=authorized_by_teaching_offer)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.knowledge.technology_sightings[result.id]
+
+
+def _execute_disclosure_in_place(world, option, decision_event_id, *, authorized_by_teaching_offer=False):
     """Recompose the selection and persist only its factual, expiring receipt."""
     current = next((candidate for candidate in disclosure_options(world, option.actor_ref)
                     if candidate.id == option.id), None)
     if current is None:
         raise ValueError("technology disclosure option is absent or stale")
     decision_event = next((event for event in world.events if event.id == decision_event_id), None)
+    direct_disclosure = decision_event is not None and decision_event.decision == current.decision()
+    intent = decision_event.decision if decision_event is not None else None
+    teaching_offer = False
+    if authorized_by_teaching_offer and intent is not None:
+        teaching_offer = (
+            intent.get("action") == "offer_proposal"
+            and intent.get("actor_ref") == current.actor_ref.to_dict()
+            and intent.get("counterparty_ref") == current.recipient_ref.to_dict()
+            and any(clause.get("kind") == "teaching"
+                    and clause.get("technology_id") == current.technology_id
+                    and clause.get("debtor_ref") == current.actor_ref.to_dict()
+                    and clause.get("creditor_ref") == current.recipient_ref.to_dict()
+                    for clause in intent.get("clauses", ()))
+        ) or (
+            intent.get("action") == "offer_teaching_bargain"
+            and intent.get("actor_ref") == current.actor_ref.to_dict()
+            and str(intent.get("selected_affordance_id", "")).startswith(
+                f"teaching-offer:{current.actor_ref.kind}:{current.actor_ref.id}:"
+                f"{current.recipient_ref.kind}:{current.recipient_ref.id}:{current.technology_id}:"
+            )
+        )
     if (decision_event is None or decision_event.fact_kind != FactKind.DECISION
+            or decision_event.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision_event.day != world.clock.absolute_day
-            or decision_event.decision != current.decision()):
+            or not (direct_disclosure or teaching_offer)):
         raise ValueError("technology disclosure requires its exact current decision")
     knowledge = next((item for item in world.knowledge.technologies.values()
                       if item.owner_ref == current.actor_ref
@@ -111,6 +145,13 @@ def execute_disclosure(world, option, decision_event_id):
         world, "technology_sighting_received",
         "Uma instituição recebeu indício factual de técnica mantida por outra instituição.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=(decision_event.causal_origin
+                       if direct_disclosure else CausalOrigin.DETERMINISTIC),
+        causal_payload=({"decision_event_id": decision_event.id,
+                         "actor_ref": decision_event.decision["actor_ref"],
+                         "selected_affordance_id": decision_event.decision["selected_affordance_id"]}
+                        if (direct_disclosure
+                            and decision_event.causal_origin is CausalOrigin.ACTOR_DECISION) else None),
         deltas=(_delta("technology_sighting", sighting_id, "source_event_id",
                        previous.source_event_id if previous else None, knowledge.event_id),),
         cause_ids=(decision_event_id, knowledge.event_id),

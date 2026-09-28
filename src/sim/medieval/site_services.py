@@ -85,6 +85,16 @@ def _decision(world, decision_event_id):
 
 
 def set_site_service(world, option_id, *, decision_event_id):
+    """Change an owned site's route service atomically with its causal receipt."""
+    candidate = world.transaction_copy()
+    event = _set_site_service_in_place(candidate, option_id, decision_event_id=decision_event_id)
+    from src.classes.core.infrastructure import validate_infrastructure
+    validate_infrastructure(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.event_index()[event.id]
+
+
+def _set_site_service_in_place(world, option_id, *, decision_event_id):
     """Apply one exact current owner decision without repairing or enabling a site."""
     decision = _decision(world, decision_event_id)
     payload = decision.decision if decision is not None else None
@@ -96,7 +106,8 @@ def set_site_service(world, option_id, *, decision_event_id):
                     for option in service_options(world, site.id, actor_ref)) if actor_ref is not None else ()
     option = next((item for item in options if item.id == option_id), None)
     if (decision is None or decision.day != world.clock.absolute_day
-            or decision.fact_kind != FactKind.DECISION or option is None
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION or option is None
             or decision.decision != option.decision()):
         raise ValueError("site service option is stale")
     if any(event.event_type in {"site_service_suspended", "site_service_resumed"}
@@ -161,11 +172,13 @@ def review_site_services(world, *, excluded_actors=()) -> tuple[str, ...]:
             (f"{site.name}: suspender serviço diante da integridade observada."
              if option.action == "suspend_site_service"
              else f"{site.name}: retomar serviço após recuperação observada."),
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
             decision=option.decision(),
+            causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                "rule": "site_service"}},
             cause_ids=_causes(report.event_id, site.last_event_id),
         )
-        set_site_service(world, option.id, decision_event_id=decision.id)
+        _set_site_service_in_place(world, option.id, decision_event_id=decision.id)
         changed.append(site.id)
     return tuple(changed)
 

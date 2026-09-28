@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
@@ -81,6 +82,10 @@ async def test_character_offer_then_independent_sponsorship_completes_paid_rite(
 
     offer = next(event for event in world.events if event.event_type == "rite_offered")
     assert offer.decision["actor_ref"] == EntityRef("character", healer.id).to_dict()
+    assert offer.causal_origin == CausalOrigin.ACTOR_DECISION
+    offer_source = offer.causal_payload["decision_source"]
+    assert offer_source["kind"] == "provider"
+    assert offer_source["receipt_event_id"] in {link.cause_event_id for link in offer.causal_links}
     assert offer.deltas == ()
     assert world.agenda.get(f"character-rite-sponsor-review:{offer.id}").kind == SPONSOR_REVIEW_KIND
     character_prompt = prompts[0]
@@ -90,6 +95,12 @@ async def test_character_offer_then_independent_sponsorship_completes_paid_rite(
     await advance_review(world)
     rite = next(iter(world.research.rites.values()))
     sponsor_decision = next(event for event in world.events if event.event_type == "rite_sponsorship_decided")
+    assert sponsor_decision.causal_origin == CausalOrigin.ACTOR_DECISION
+    sponsor_source = sponsor_decision.causal_payload["decision_source"]
+    assert sponsor_source["kind"] == "provider"
+    assert sponsor_source["receipt_event_id"] in {
+        link.cause_event_id for link in sponsor_decision.causal_links
+    }
     started = next(event for event in world.events if event.event_type == "rite_started")
     interpretation_ids = {event.id for event in world.events if event.causal_origin.value == "llm_interpretation"}
     assert interpretation_ids
@@ -146,7 +157,8 @@ async def test_character_offer_refuses_or_rejects_all_invalid_local_states_witho
     option = rite_offer_options(invalid, invalid_healer.id)[0]
     before = (len(invalid.events), dict(invalid.economy.needs), dict(invalid.research.rites))
     with pytest.raises(ValueError, match="stale or unknown"):
-        record_rite_offer(invalid, invalid_healer.id, option.id + ":forged")
+        record_rite_offer(invalid, invalid_healer.id, option.id + ":forged",
+                          decision_source={"kind": "api"})
     assert (len(invalid.events), dict(invalid.economy.needs), dict(invalid.research.rites)) == before
     assert invalid.economy.needs[PLACE].health < HEALTH_THRESHOLD
 

@@ -1,5 +1,6 @@
 """Prepared negotiations exercise real authority, accounts and knowledge owners."""
 import pytest
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.events import record_event
@@ -37,13 +38,17 @@ def offer(world, amount=100, parent_id=None):
         option = next(item for item in disclosure_options(world, SELLER)
                       if item.recipient_ref == BUYER and item.technology_id == 'metallurgy')
         disclosed = record_event(world, 'diplomatic_decision', 'Divulgar indício técnico próprio.',
-            fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=option.causes())
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}},
+            decision=option.decision(), cause_ids=option.causes())
         execute_disclosure(world, option, disclosed.id)
     terms = clauses(amount)
     intent = {'action': 'offer_proposal', 'actor_ref': proposer.to_dict(),
         'counterparty_ref': other.to_dict(), 'clauses': [c.model_dump(mode='json') for c in terms],
         'expires_day': 95, 'parent_id': parent_id}
-    event = record_event(world, 'diplomatic_decision', 'Propor condições.', fact_kind=FactKind.DECISION, decision=intent)
+    event = record_event(world, 'diplomatic_decision', 'Propor condições.', fact_kind=FactKind.DECISION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}}, decision=intent)
     return offer_proposal(world, proposer, other, terms, 95, decision_event_id=event.id, parent_id=parent_id)
 
 
@@ -51,6 +56,7 @@ def respond(world, proposal, response='accept', actor=None):
     from src.sim.medieval.diplomacy import respond_proposal
     actor = actor or proposal.counterparty_ref
     event = record_event(world, 'diplomatic_decision', 'Responder à proposta.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={'action':'respond_proposal', 'actor_ref':actor.to_dict(), 'proposal_id':proposal.id, 'response':response})
     return respond_proposal(world, proposal.id, response, decision_event_id=event.id)
 
@@ -79,6 +85,25 @@ def test_counteroffer_preserves_history_and_acceptance_moves_no_assets(tmp_path)
     assert {n.recipient_ref for n in world.knowledge.notices.values()} == {SELLER, BUYER}
     save_world(world, tmp_path / 'negotiation.mws')
     assert world_snapshot(load_world(tmp_path / 'negotiation.mws')) == world_snapshot(world)
+
+
+def test_diplomacy_owner_rejects_deterministic_exact_offer_without_mutation():
+    from src.sim.medieval.diplomacy import offer_proposal
+
+    world = world_with_knowledge()
+    terms = clauses()
+    intent = {'action': 'offer_proposal', 'actor_ref': SELLER.to_dict(),
+              'counterparty_ref': BUYER.to_dict(),
+              'clauses': [clause.model_dump(mode='json') for clause in terms],
+              'expires_day': 95, 'parent_id': None}
+    decision = record_event(world, 'diplomatic_decision', 'Intenção determinística com termos exatos.',
+                            fact_kind=FactKind.DECISION, decision=intent)
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match='exact current actor decision'):
+        offer_proposal(world, SELLER, BUYER, terms, 95, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_third_party_cannot_accept_and_lost_authority_cannot_bind():
@@ -111,6 +136,7 @@ def test_clause_cannot_pledge_third_party_money():
     terms = clauses()
     terms = (terms[0].model_copy(update={'source_account_id': 'treasury:valedouro'}), terms[1])
     event = record_event(world, 'diplomatic_decision', 'Propor condições inválidas.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={'action':'offer_proposal', 'actor_ref':SELLER.to_dict(), 'counterparty_ref':BUYER.to_dict(),
             'clauses':[c.model_dump(mode='json') for c in terms], 'expires_day':95, 'parent_id':None})
     with pytest.raises(ValueError, match='account|owner'):
@@ -124,6 +150,7 @@ def pay(world, obligation_id):
     proposal = world.relations.proposals[obligation.proposal_id]
     clause = proposal.clauses[obligation.clause_index]
     event = record_event(world, 'payment_decided', 'Cumprir pagamento acordado.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={'action':'pay', 'actor_ref':clause.debtor_ref.to_dict(), 'source_id':clause.source_account_id,
             'target_id':clause.target_account_id, 'amount':clause.amount}, cause_ids=(obligation.last_event_id,))
     return fulfill_obligation(world, obligation_id, decision_event_id=event.id)
@@ -133,8 +160,10 @@ def teach(world, obligation_id):
     from src.sim.medieval.commitments import fulfill_obligation
     terms = {'technology_id':'metallurgy', 'teacher_ref':SELLER.to_dict(), 'student_ref':BUYER.to_dict()}
     teacher = record_event(world, 'teaching_decided', 'Cumprir ensino acordado.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action':'teach', 'actor_ref':SELLER.to_dict()})
     student = record_event(world, 'learning_decided', 'Aceitar ensino.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action':'learn', 'actor_ref':BUYER.to_dict()})
     return fulfill_obligation(world, obligation_id, decision_event_id=teacher.id, acceptance_id=student.id)
 

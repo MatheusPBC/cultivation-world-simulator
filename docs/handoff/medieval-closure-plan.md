@@ -1,4 +1,9 @@
-# Plano de conclusão do medieval
+# Registro de planejamento anterior — Medieval
+
+> Este texto é histórico e foi supersedido como plano operacional por
+> [medieval-finalization-plan.md](medieval-finalization-plan.md). A evidência
+> atual fica em `medieval-current-state.md`; os status por requisito ficam em
+> `medieval-closure-matrix.md`.
 
 Data: 2026-09-22. Status: implementação em curso; gates finais ainda incompletos. Evidência atual e limites em `.agent/tasks/medieval-closure-plan/` (registro local) e `medieval-current-state.md`.
 

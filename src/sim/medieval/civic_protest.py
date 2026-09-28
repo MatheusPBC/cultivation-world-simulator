@@ -10,6 +10,7 @@ receipts and releases the people either way.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.knowledge import civic_demand_notice_id
@@ -69,7 +70,9 @@ def _event(world, event_id):
 
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("civic protest requires a current actor decision")

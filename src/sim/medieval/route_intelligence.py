@@ -7,7 +7,8 @@ can actually reach. Nobody learns of a closure without being told.
 """
 
 from src.classes.event import FactKind
-from src.classes.governance.authority import can_actor_act_for
+from src.classes.causal_origin import CausalOrigin
+from src.classes.governance.authority import can_actor_act_for, headquarters_holder
 from src.classes.governance.knowledge import fiscal_route_report_id, route_report_id, site_report_id
 from src.classes.governance.models import (FiscalRouteReport, RouteReport, SiteReport, fiscal_route_observation,
                                            route_observation, site_observation)
@@ -73,8 +74,16 @@ def _observe(world, actor, route_id, day, causes):
             and previous.daily_flow_bulk == daily_flow_bulk):
         return previous
     observation = route_observation(route_id, actor, day, capacity, travel_days, daily_flow_bulk)
+    causal_payload = None
+    if not _causes(*causes, previous.event_id if previous else None):
+        causal_payload = {"root_premise": {
+            "kind": "world_generation", "domain": "route",
+            "source_refs": [{"kind": "route", "id": route_id}],
+            "observed_day": day,
+        }}
     event = record_event(world, "route_observed", _describe(world, route_id, travel_days),
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_payload=causal_payload,
                          deltas=(_delta("route_report", key, "observation",
                                         previous.observation() if previous else None, observation),),
                          # A new dated observation remains grounded in the
@@ -88,6 +97,136 @@ def _observe(world, actor, route_id, day, causes):
                          channel="administrative_route_report", event_id=event.id)
     world.knowledge.route_reports[key] = report
     return report
+
+
+def _observe_from_local_site(world, actor, site, route_id, site_report, day, causes):
+    """Let a present site owner/maintainer observe only its dependent passage.
+
+    This is not an administrative bulletin: the actor learns a route reading
+    from its own current physical inspection of a site on that route.
+    """
+    key = route_report_id(actor, route_id)
+    previous = world.knowledge.route_reports.get(key)
+    capacity, travel_days, daily_flow_bulk = _runtime(world, route_id)
+    if (previous is not None and previous.observed_day == day
+            and previous.operational_capacity == capacity and previous.travel_days == travel_days
+            and previous.daily_flow_bulk == daily_flow_bulk):
+        return previous
+    observation = route_observation(route_id, actor, day, capacity, travel_days, daily_flow_bulk)
+    roles = tuple(role for role, ref in (("owner", site.owner_ref), ("maintainer", site.maintainer_ref))
+                  if ref == actor)
+    if not roles:
+        raise ValueError("local route observation requires site ownership or maintenance responsibility")
+    event = record_event(
+        world, "route_observed", _describe(world, route_id, travel_days),
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"kind": "field_infrastructure_route_observation",
+                        "actor_ref": actor.to_dict(), "site_id": site.id,
+                        "site_roles": roles,
+                        "site_report_event_id": site_report.event_id},
+        deltas=(_delta("route_report", key, "observation",
+                       previous.observation() if previous else None, observation),),
+        cause_ids=_causes(site_report.event_id, site.last_event_id, *causes,
+                          previous.event_id if previous else None),
+    )
+    report = RouteReport(
+        id=key, recipient_ref=actor, publisher_ref=actor, route_id=route_id, observed_day=day,
+        operational_capacity=capacity, travel_days=travel_days, daily_flow_bulk=daily_flow_bulk,
+        channel="field_route_observation", event_id=event.id,
+    )
+    world.knowledge.route_reports[key] = report
+    return report
+
+
+def observe_commander_junction_routes(world, detachment_id, source_event):
+    """A commander observes only routes touching the junction they reached.
+
+    These are personal field observations, not reports pooled from the
+    institution. Movement/hold and appointment receipts ground the observation;
+    remote route conditions are never read on the commander's behalf.
+    """
+    from src.classes.mechanical_language import EntityRef
+    from src.systems.calendar_agenda import ScheduledSituation
+    from .force_command import command_is_attached_to_march, command_is_current
+
+    command = world.society.detachment_commands.get(detachment_id)
+    detachment = world.society.detachments.get(detachment_id)
+    if (command is None or detachment is None or detachment.stage != "marching"
+            or source_event is None or source_event.event_type not in {"detachment_held", "detachment_marched"}
+            or (source_event.causal_payload or {}).get("detachment_id") != detachment_id
+            or not command_is_attached_to_march(world, command)):
+        return ()
+    actor = EntityRef("character", command.character_id)
+    prefix = detachment.route_ids[:detachment.route_index]
+    region_id = world.society.settlements[detachment.location_id].region_id
+    for route_id in prefix:
+        route = world.map.routes.get(route_id)
+        if route is None or region_id not in route.endpoint_region_ids:
+            return ()
+        region_id = next(item for item in route.endpoint_region_ids if item != region_id)
+    blocked_route_id = (source_event.causal_payload or {}).get("blocked_route_id")
+    if (source_event.event_type == "detachment_held"
+            and (blocked_route_id != detachment.route_ids[detachment.route_index]
+                 or region_id not in world.map.routes[blocked_route_id].endpoint_region_ids)):
+        return ()
+
+    observed = []
+    material_change = False
+    route_causes = _route_causes(world, tuple(
+        route.id for route in sorted(world.map.routes.values(), key=lambda item: item.id)
+        if region_id in route.endpoint_region_ids))
+    for route_id in sorted(route_causes):
+        key = route_report_id(actor, route_id)
+        previous = world.knowledge.route_reports.get(key)
+        capacity, travel_days, daily_flow_bulk = _runtime(world, route_id)
+        unchanged = (previous is not None and previous.operational_capacity == capacity
+                     and previous.travel_days == travel_days
+                     and previous.daily_flow_bulk == daily_flow_bulk)
+        if unchanged and world.clock.absolute_day - previous.observed_day < 7:
+            observed.append(previous)
+            continue
+        material_change |= not unchanged
+        observation = route_observation(route_id, actor, world.clock.absolute_day,
+                                        capacity, travel_days, daily_flow_bulk)
+        payload = {
+            "kind": "field_route_observation",
+            "actor_ref": actor.to_dict(),
+            "detachment_id": detachment_id,
+            "position_region_id": region_id,
+            "blocked_route_id": blocked_route_id,
+            "source_event_id": source_event.id,
+            "source_event_type": source_event.event_type,
+            "command_event_id": command.last_event_id,
+        }
+        event = record_event(
+            world, "route_observed", _describe(world, route_id, travel_days),
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload=payload,
+            deltas=(_delta("route_report", key, "observation",
+                           previous.observation() if previous else None, observation),),
+            cause_ids=_causes(source_event.id, command.last_event_id, *route_causes[route_id],
+                              previous.event_id if previous else None))
+        report = RouteReport(id=key, recipient_ref=actor, publisher_ref=actor, route_id=route_id,
+                             observed_day=world.clock.absolute_day, operational_capacity=capacity,
+                             travel_days=travel_days, daily_flow_bulk=daily_flow_bulk,
+                             channel="field_route_observation", event_id=event.id)
+        world.knowledge.route_reports[key] = report
+        observed.append(report)
+
+    prior_event_id = (source_event.causal_payload or {}).get("prior_detachment_event_id")
+    prior_event = world.event_index().get(prior_event_id)
+    new_hold = (source_event.event_type == "detachment_held"
+                and (prior_event is None or prior_event.event_type != "detachment_held"
+                     or (prior_event.causal_payload or {}).get("blocked_route_id") != blocked_route_id))
+    if (source_event.event_type == "detachment_held" and (new_hold or material_change)
+            and command_is_current(world, command) and any(
+            plan.detachment_id == detachment_id and plan.stage in {"mobilized", "blocked"}
+            for plan in world.strategy.plans.values())):
+        identity = f"detachment-march-review:{detachment_id}:{source_event.id}"
+        if world.agenda.get(identity) is None:
+            world.agenda.schedule(ScheduledSituation(
+                identity, "detachment_march_command_review", world.clock.absolute_day + 1))
+    return tuple(observed)
 
 
 def _observe_fiscal(world, checkpoint, route_id, day, causes):
@@ -128,9 +267,17 @@ def _reachable(world, report, recipient, channels):
         if recipient.kind == "population_group":
             group = world.society.population.get(recipient.id)
             targets = [group.settlement_id] if group is not None and world.society.available_count(group.id) > 0 else []
+        elif recipient.kind == "character":
+            character = world.society.characters.get(recipient.id)
+            if character is None or character.death_day is not None:
+                targets = []
+            else:
+                from .character_travel import is_traveling
+
+                targets = [] if is_traveling(world, character.id) else [character.location_id]
         else:
             targets = sorted({o.settlement_id for o in world.strategy.objectives.values() if o.actor_ref == recipient})
-        channels[key] = any(supply_path(world, origin, target) is not None
+        channels[key] = any(origin == target or supply_path(world, origin, target) is not None
                             for origin in origins for target in targets)
     return channels[key]
 
@@ -155,9 +302,12 @@ def _publish(world, report, recipients, day, channels):
     observation = report.observation()
     decision = record_event(world, "route_report_published", _describe(world, report.route_id, report.travel_days),
                             fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.DETERMINISTIC,
                             decision={"action": "publish_route_report", "actor_ref": publisher.to_dict(),
                                       "route_id": report.route_id, "observation": observation,
                                       "recipients": [r.to_dict() for r in targets]},
+                            causal_payload={"decision_source": {"kind": "owner", "owner": "knowledge",
+                                                                  "rule": "monthly_route_bulletin"}},
                             cause_ids=(report.event_id,))
     # Deciding to publish is not delivering: the channel emits its own receipt.
     keys = {recipient: route_report_id(recipient, report.route_id) for recipient in targets}
@@ -169,8 +319,12 @@ def _publish(world, report, recipients, day, channels):
                                                 observation) for recipient in targets),
                             cause_ids=_causes(decision.id, report.event_id))
     for recipient in targets:
-        world.knowledge.route_reports[keys[recipient]] = report.model_copy(update={
+        delivered = report.model_copy(update={
             "id": keys[recipient], "recipient_ref": recipient, "channel": "route_bulletin", "event_id": delivery.id})
+        world.knowledge.route_reports[keys[recipient]] = delivered
+        if recipient.kind == "character":
+            from .strategy_response import schedule_headquarters_route_review
+            schedule_headquarters_route_review(world, delivered)
 
 
 def _publish_fiscal(world, report, recipients, day, channels):
@@ -193,9 +347,13 @@ def _publish_fiscal(world, report, recipients, day, channels):
     description = _fiscal_describe(world, report.route_id, report.checkpoint_id, report.fee_per_bulk)
     decision = record_event(
         world, "fiscal_route_report_published", description, fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.DETERMINISTIC,
         decision={"action": "publish_fiscal_route_report", "actor_ref": publisher.to_dict(),
                   "route_id": report.route_id, "observation": observation,
-                  "recipients": [r.to_dict() for r in targets]}, cause_ids=(report.event_id,))
+                  "recipients": [r.to_dict() for r in targets]},
+        causal_payload={"decision_source": {"kind": "owner", "owner": "knowledge",
+                                             "rule": "monthly_fiscal_route_bulletin"}},
+        cause_ids=(report.event_id,))
     keys = {recipient: fiscal_route_report_id(recipient, report.route_id) for recipient in targets}
     previous = {recipient: world.knowledge.fiscal_route_reports.get(key) for recipient, key in keys.items()}
     delivery = record_event(
@@ -294,16 +452,25 @@ def refresh_site_reports(world, *, site_ids=None):
                 continue
             observation = site_observation(site_id, actor, day, site.integrity, site.enabled, site.service_suspended)
             suffix = ", serviço suspenso." if site.service_suspended else ("." if site.enabled else ", instalação interditada.")
+            causes = _causes(site.last_event_id, previous.event_id if previous else None)
+            causal_payload = None
+            if not causes:
+                causal_payload = {"root_premise": {
+                    "kind": "world_generation", "domain": "infrastructure_site",
+                    "source_refs": [{"kind": "site", "id": site.id}],
+                    "observed_day": day,
+                }}
             event = record_event(world, "site_observed",
                                  f"{site.name}: integridade de {round(site.integrity * 100)}%" + suffix,
                                  fact_kind=FactKind.STATE_TRANSITION,
+                                 causal_payload=causal_payload,
                                  deltas=(_delta("site_report", key, "observation",
                                                 previous.observation() if previous else None, observation),),
                                  # A pristine site has an authored baseline;
                                  # later monthly observations must still retain
                                  # the preceding receipt when no site mutation
                                  # occurred in between.
-                                 cause_ids=_causes(site.last_event_id, previous.event_id if previous else None))
+                                 cause_ids=causes)
             world.knowledge.site_reports[key] = SiteReport(
                 id=key, recipient_ref=actor, publisher_ref=actor, site_id=site_id, observed_day=day,
                 integrity=site.integrity, enabled=site.enabled, service_suspended=site.service_suspended,
@@ -314,6 +481,21 @@ def refresh_route_reports(world, *, route_ids=None):
     """Monthly boundary of the route channel; no quota of closures or crises."""
     day = world.clock.absolute_day
     recipients = {o.actor_ref for o in world.strategy.objectives.values()}
+    # Operational decisions belong to the current office holder, not to an
+    # institution's pooled knowledge. Deliver route bulletins through the
+    # same physical channel when that holder can actually be reached.
+    recipients |= {holder for objective in world.strategy.objectives.values()
+                   if (holder := headquarters_holder(world, objective.actor_ref)) is not None}
+    # A fielded campaign is enough to make the current HQ a relevant reader;
+    # its option composer still requires its own dated route observations.
+    recipients |= {holder for detachment in world.society.detachments.values()
+                   if detachment.stage in {"marching", "present"} and detachment.owner_ref.kind == "polity"
+                   if (holder := headquarters_holder(world, detachment.owner_ref)) is not None}
+    # A campaign column remains a reason for its current HQ to learn route
+    # conditions even before a strategic objective has been registered.
+    recipients |= {holder for detachment in world.society.detachments.values()
+                   if detachment.stage in {"marching", "present"} and detachment.owner_ref.kind == "polity"
+                   if (holder := headquarters_holder(world, detachment.owner_ref)) is not None}
     recipients |= {EntityRef("population_group", group.id) for group in world.society.population.values()
                    if world.society.available_count(group.id) > 0}
     recipients = sorted(recipients, key=lambda r: (r.kind, r.id))
@@ -324,6 +506,17 @@ def refresh_route_reports(world, *, route_ids=None):
         for actor in _administrations(world, world.map.routes[route_id]):
             report = _observe(world, actor, route_id, day, causes[route_id])
             _publish(world, report, recipients, day, channels)
+        # A maintainer may inspect a passage through an asset physically under
+        # its care, but only when its own site report was refreshed this day.
+        # This does not create a route bulletin or grant remote route knowledge.
+        for site in world.map.get_route_dependency_sites(route_id):
+            for actor in {site.owner_ref, site.maintainer_ref} - {None}:
+                site_report = world.knowledge.site_report(actor, site.id)
+                if (site_report is None or site_report.observed_day != day
+                        or site_report.channel != "administrative_site_report"):
+                    continue
+                _observe_from_local_site(world, actor, site, route_id, site_report, day,
+                                         causes[route_id])
         checkpoint = fiscal_runtime(world, route_id)
         if checkpoint is not None:
             site = world.map.infrastructure_sites[checkpoint.site_id]

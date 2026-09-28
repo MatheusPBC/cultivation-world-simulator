@@ -37,6 +37,17 @@ def test_one_menu_carries_several_families_at_once():
         "the composed menu must merge families, not show one vertical at a time"
 
 
+def test_monthly_family_keys_do_not_hide_distinct_context_builders():
+    builders = {}
+    for adapter in monthly_adapters():
+        if adapter.situation_fn is None:
+            continue
+        previous = builders.setdefault(adapter.family_key(), adapter.situation_fn)
+        assert previous is adapter.situation_fn, (
+            f"family {adapter.family_key()} would discard one of its situation builders"
+        )
+
+
 async def test_each_institution_answers_at_most_one_consultation_per_boundary(monkeypatch):
     world = civil_pressure_world()
     world.config = world.config.model_copy(update={"ai_calls_per_step": 256, "ai_max_calls": 1000})

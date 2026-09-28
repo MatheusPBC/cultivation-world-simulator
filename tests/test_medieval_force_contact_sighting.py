@@ -1,6 +1,7 @@
 """Bounded force-contact readings are factual knowledge, never battle data."""
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -25,7 +26,9 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "sighting_test_decided", "Decisão de contato para teste.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def sighting_world():

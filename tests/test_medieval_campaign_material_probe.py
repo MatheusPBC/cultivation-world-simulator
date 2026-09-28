@@ -6,6 +6,7 @@ import json
 from src.sim.medieval import ai_decider
 from src.sim.medieval.persistence import load_world
 from tools.medieval_campaign_material_probe import run
+from tools.medieval_causal_audit import audit
 
 
 def _choose_first(monkeypatch):
@@ -26,8 +27,9 @@ def test_material_probe_adopts_then_raises_and_round_trips(monkeypatch, tmp_path
     assert result["material_changed"] is True
     assert result["force_decision_count"] == 1
     assert result["detachment_count"] == 1
-    assert result["real_ai_calls"] == 2
+    assert result["real_ai_calls"] == 4
     assert result["audit"]["ok"] is True
+    assert audit(tmp_path / "campaign.mws")["ok"] is True
     restored = load_world(tmp_path / "campaign.mws")
     adoption = next(event for event in restored.events
                     if event.event_type == "strategy_defense_adopted")

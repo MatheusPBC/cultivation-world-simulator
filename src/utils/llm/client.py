@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import asyncio
 import os
+import signal
 import shutil
 import subprocess
 import tempfile
@@ -27,6 +28,7 @@ from .test_mode_fallbacks import TestModeLLMUnavailable, resolve_test_mode_task
 _SEMAPHORE: Optional[asyncio.Semaphore] = None
 _SEMAPHORE_LIMIT: Optional[int] = None
 _LLM_FAILURE_HANDLER: Optional[Callable[[str], Awaitable[None] | None]] = None
+_CODEX_CLI_TIMEOUT_SECONDS = 180
 
 _QUOTA_ERROR_CODES = {
     "insufficient_quota",
@@ -436,7 +438,7 @@ def _call_codex(
             schema_path = schema_file.name
 
     command = [
-        *( [node_bin, codex_bin] if node_bin else [codex_bin] ),
+        *([node_bin, codex_bin] if node_bin else [codex_bin]),
         "exec",
         "--ephemeral",
         "--skip-git-repo-check",
@@ -455,24 +457,50 @@ def _call_codex(
         command.extend(["--output-schema", schema_path])
 
     environment = os.environ.copy()
-    # Docker provides CWS_CODEX_HOME for its mounted OAuth volume.  A local
-    # invocation should retain the authenticated CLI's ordinary default
-    # instead of forcing the container-only /codex-home path.
+    # Docker provides CWS_CODEX_HOME for its mounted OAuth volume. A local
+    # invocation should retain the authenticated CLI's ordinary default.
     if codex_home:
         environment["CODEX_HOME"] = codex_home
 
     try:
-        completed = subprocess.run(
+        completed = subprocess.Popen(
             command,
-            input=prompt,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            capture_output=True,
-            timeout=180,
             env=environment,
-            check=False,
+            start_new_session=os.name == "posix",
         )
+        try:
+            stdout, stderr = completed.communicate(
+                input=prompt,
+                timeout=_CODEX_CLI_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            # Codex CLI may start helper processes. Kill the whole session so
+            # they cannot outlive the request or keep inherited pipes open.
+            if os.name == "posix":
+                try:
+                    os.killpg(completed.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                completed.kill()
+            # Do not drain captured pipes after timeout: a helper that detached
+            # from this process group may still hold their write ends open.
+            completed.wait()
+            for stream in (completed.stdin, completed.stdout, completed.stderr):
+                if stream is not None:
+                    stream.close()
+            raise ProviderCallError(
+                ProviderFailureKind.NETWORK,
+                f"Codex CLI timed out after {_CODEX_CLI_TIMEOUT_SECONDS} seconds",
+                cause=exc,
+            ) from exc
+
         if completed.returncode != 0:
-            detail = (completed.stderr or completed.stdout).strip()
+            detail = (stderr or stdout).strip()
             if len(detail) > 500:
                 detail = detail[-500:]
             raise ProviderCallError(
@@ -488,12 +516,6 @@ def _call_codex(
                 "Codex CLI returned an empty response",
             )
         return response
-    except subprocess.TimeoutExpired as exc:
-        raise ProviderCallError(
-            ProviderFailureKind.NETWORK,
-            "Codex CLI timed out after 180 seconds",
-            cause=exc,
-        ) from exc
     except OSError as exc:
         raise ProviderCallError(
             ProviderFailureKind.UNKNOWN,
@@ -543,12 +565,19 @@ async def call_llm(
     
     try:
         async with semaphore:
-            result = await asyncio.to_thread(
+            provider_call = asyncio.create_task(asyncio.to_thread(
                 _call_with_requests,
                 config,
                 provider_prompt,
                 output_schema,
-            )
+            ))
+            # In the Codex CLI path, a completed Popen worker can fail to wake
+            # this loop's selector on some Linux runtimes. A short loop timer
+            # ensures the completed executor future is observed promptly.
+            if config.api_format.lower() == "codex_cli":
+                while not provider_call.done():
+                    await asyncio.sleep(0.05)
+            result = await provider_call
     except Exception as exc:
         failure = classify_llm_error(exc if isinstance(exc, ProviderCallError) else str(exc), base_url=config.base_url)
         if failure.is_config_required:

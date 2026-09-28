@@ -15,6 +15,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity
 from src.classes.state_delta import StateDelta
@@ -23,7 +24,7 @@ from src.systems.calendar_agenda import ScheduledSituation
 from . import ai_decider
 from .ai_decider import ProviderDecisionRequired
 from .activities import Activity, validate_activities
-from .events import record_event
+from .events import record_event, record_no_action_decision
 from .travel import route_duration
 
 TRAVEL_ACTION = "travel_character"
@@ -50,14 +51,20 @@ class TravelOption:
 
 def is_traveling(world, character_id) -> bool:
     """A person on the road is not present anywhere and may not be used."""
-    return any(item.character_id == character_id and item.kind == "travel"
-               for item in world.activities.values())
+    if any(item.character_id == character_id and item.kind == "travel"
+           for item in world.activities.values()):
+        return True
+    return any(command.character_id == character_id
+               and (detachment := world.society.detachments.get(command.detachment_id)) is not None
+               and detachment.stage == "marching"
+               for command in world.society.detachment_commands.values())
 
 
 def _free(world, character_id):
     character = world.society.characters.get(character_id)
     if (character is None or character.death_day is not None
-            or any(item.character_id == character_id for item in world.activities.values())):
+            or any(item.character_id == character_id for item in world.activities.values())
+            or is_traveling(world, character_id)):
         return None
     return character
 
@@ -94,7 +101,9 @@ def travel_options(world, character_id):
 
 def _decision(world, decision_event_id, character_id):
     event = next((item for item in world.events if item.id == decision_event_id), None)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != TRAVEL_ACTION
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}
             or event.decision.get("actor_ref") != EntityRef("character", character_id).to_dict()):
@@ -121,6 +130,10 @@ def travel_character(world, character_id, option_id, decision_event_id):
     record_event(candidate, "character_travel_started",
                  "Uma pessoa deixou o lugar onde estava por uma estrada conhecida.",
                  fact_kind=FactKind.STATE_TRANSITION,
+                 causal_origin=CausalOrigin.ACTOR_DECISION,
+                 causal_payload={"decision_event_id": decision.id,
+                                 "actor_ref": decision.decision["actor_ref"],
+                                 "selected_affordance_id": decision.decision["selected_affordance_id"]},
                  deltas=(StateDelta(owner_kind="activity", owner_id=activity.id, aspect="status",
                                     before="idle", after="active"),),
                  cause_ids=(decision.id,))
@@ -190,7 +203,13 @@ async def _travel_turn(world, character_id):
                                               _situation(world, character), choices)
     interpretations = tuple(event.id for event in world.events[start:]
                             if event.causal_origin.value == "llm_interpretation")
-    if selected in (None, ai_decider.NO_ACTION):
+    if selected == ai_decider.NO_ACTION:
+        record_no_action_decision(
+            world, "character_travel_decided", "A pessoa decidiu permanecer onde está neste turno.",
+            EntityRef("character", character_id), affordance_ids=(option.id for option in options),
+        )
+        return False
+    if selected is None:
         return False
     option = next((item for item in travel_options(world, character_id) if item.id == selected), None)
     if option is None:
@@ -200,7 +219,8 @@ async def _travel_turn(world, character_id):
     # The interpretation may only cause this delta-free decision; the material
     # departure is caused by the decision alone.
     decision = record_event(world, "character_travel_decided", "Uma pessoa escolheu entre suas estradas.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            decision=option.decision(),
                             cause_ids=interpretations)
     try:
         travel_character(world, character_id, option.id, decision.id)

@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.mechanical_language import EntityRef
+from src.classes.causal_origin import CausalOrigin
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.intelligence import refresh_reports
@@ -76,6 +77,12 @@ def test_input_reports_do_not_disclose_other_actors_full_inventory():
     assert any(r.kind == "offer" and r.stock_id == "stock:ferroalto" and r.resource_id == "iron" for r in reports)
     assert not any(r.kind == "inventory" and r.publisher_ref != goal.actor_ref for r in reports)
     assert not any(r.stock_id == "stock:torre-do-ambar" for r in reports)
+    offer_decision = next(event for event in world.events
+                          if event.event_type == "offer_published"
+                          and event.decision["resource_id"] == "iron")
+    assert offer_decision.causal_origin == CausalOrigin.DETERMINISTIC
+    assert offer_decision.causal_payload["decision_source"] == {
+        "kind": "owner", "owner": "knowledge", "rule": "monthly_market_bulletin"}
 
 
 def test_seller_protects_its_own_productive_wood_reserve():

@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment, Garrison
 from src.run.medieval_world import create_medieval_world
@@ -25,11 +26,15 @@ from src.sim.medieval.campaign_ceasefire import (
     campaign_ceasefire_fulfillment_options,
     campaign_ceasefire_offer_options,
     campaign_ceasefire_response_options,
+    campaign_ceasefire_adapters,
+    campaign_withdrawal_remediation_options,
     fulfill_campaign_ceasefire,
     offer_campaign_ceasefire,
+    remediate_campaign_withdrawal,
     respond_campaign_ceasefire,
 )
 from src.sim.medieval.institutional_agenda import monthly_adapters
+from src.sim.medieval.concurrent_civil_decision import concurrent_civil_options
 from src.sim.medieval.administration_concession import administration_concession_offer_options
 from src.sim.medieval.research import learn_technology
 from src.sim.medieval.territorial_control import (establish_territorial_control,
@@ -48,7 +53,9 @@ OTHER_EXIT = "road-brumafria-ferroalto"
 
 def decide(world, option):
     return record_event(world, "siege_campaign_decided", "Decisão militar institucional.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):
@@ -56,7 +63,7 @@ def tick(world):
     resolve_dated(world, world.agenda.pop_due(world.clock.absolute_day))
 
 
-def _prepared_attacker(world, *, count=40):
+def _prepared_attacker(world, *, count=40, provisions=160):
     group = next(item for item in world.society.population.values() if item.settlement_id == "campomanso")
     soldier_id = f"pop:campomanso:{group.people}:soldier"
     world.society.population[soldier_id] = group.model_copy(
@@ -64,10 +71,16 @@ def _prepared_attacker(world, *, count=40):
     arrival = record_event(
         world, "test_siege_attacker_present", "Fixture factual de uma coluna atacante presente.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_force_presence",
+            "source_refs": [{"kind": "scenario", "id": "siege_fixture"},
+                            {"kind": "population_group", "id": soldier_id}],
+            "observed_day": world.clock.absolute_day,
+        }},
         deltas=(_delta("detachment", "detachment:test-siege-attacker", "stage", None, "present"),))
     detachment = Detachment(
         id="detachment:test-siege-attacker", owner_ref=ATTACKER, source_group_id=soldier_id, count=count,
-        location_id=TARGET, destination_id=TARGET, route_ids=(), route_index=0, provisions=160,
+        location_id=TARGET, destination_id=TARGET, route_ids=(), route_index=0, provisions=provisions,
         stage="present", started_day=world.clock.absolute_day, due_day=world.clock.absolute_day + 30,
         decision_event_id=arrival.id, last_event_id=arrival.id)
     world.society.detachments[detachment.id] = detachment
@@ -93,6 +106,12 @@ def _defending_garrison(world, *, count=20, provisions=160):
     arrival = record_event(
         world, "test_siege_defender_present", "Fixture factual de uma guarnição defensora presente.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_force_presence",
+            "source_refs": [{"kind": "scenario", "id": "siege_fixture"},
+                            {"kind": "population_group", "id": soldier_id}],
+            "observed_day": world.clock.absolute_day,
+        }},
         deltas=(_delta("detachment", detachment_id, "stage", None, "present"),))
     detachment = Detachment(
         id=detachment_id, owner_ref=DEFENDER, source_group_id=soldier_id, count=count,
@@ -123,12 +142,12 @@ def _defending_garrison(world, *, count=20, provisions=160):
     return garrison.id
 
 
-def siege_world(*, attacker_count=40, defender_count=20, defender_provisions=160,
+def siege_world(*, attacker_count=40, attacker_provisions=160, defender_count=20, defender_provisions=160,
                 defender_prepared=False):
     world = create_medieval_world(211)
     refresh_settlement_reports(world)
     refresh_route_reports(world)
-    attacker_id = _prepared_attacker(world, count=attacker_count)
+    attacker_id = _prepared_attacker(world, count=attacker_count, provisions=attacker_provisions)
     garrison_id = _defending_garrison(world, count=defender_count, provisions=defender_provisions)
     if defender_prepared:
         defender_id = world.society.garrisons[garrison_id].detachment_id
@@ -172,6 +191,13 @@ def test_own_administered_city_can_pressure_foreign_occupier_then_retake_it(tmp_
     assert settlement.administrator_id == DEFENDER.id and settlement.occupier_id is None
     record_event(world, "test_city_administration_premise", "Fixture factual de administração própria.",
                  fact_kind=FactKind.STATE_TRANSITION,
+                 causal_payload={"root_premise": {
+                     "kind": "scenario_bootstrap", "domain": "test_settlement_administration",
+                     "source_refs": [{"kind": "scenario", "id": "siege_fixture"},
+                                     {"kind": "settlement", "id": TARGET},
+                                     {"kind": "polity", "id": ATTACKER.id}],
+                     "observed_day": world.clock.absolute_day,
+                 }},
                  deltas=(_delta("settlement", TARGET, "administrator_id", DEFENDER.id, ATTACKER.id),))
     world.society.settlements[TARGET] = settlement.model_copy(update={"administrator_id": ATTACKER.id})
     refresh_settlement_reports(world)
@@ -180,6 +206,13 @@ def test_own_administered_city_can_pressure_foreign_occupier_then_retake_it(tmp_
     occupation = record_event(
         world, "test_foreign_occupation_premise", "Fixture factual de ocupação estrangeira.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_settlement_occupation",
+            "source_refs": [{"kind": "scenario", "id": "siege_fixture"},
+                            {"kind": "settlement", "id": TARGET},
+                            {"kind": "polity", "id": DEFENDER.id}],
+            "observed_day": world.clock.absolute_day,
+        }},
         deltas=(_delta("settlement", TARGET, "occupier_id", None, DEFENDER.id),))
     garrison_id = _defending_garrison(world)
     refresh_settlement_reports(world)
@@ -224,6 +257,15 @@ def test_own_administered_city_can_pressure_foreign_occupier_then_retake_it(tmp_
     refresh_settlement_reports(world)
     recovery = next(item for item in siege_occupation_options(world, ATTACKER)
                     if item.campaign_id == campaign.id)
+    deterministic_copy = record_event(
+        world, "siege_occupation_interpreted", "Payload idêntico sem escolha do ator.",
+        fact_kind=FactKind.DECISION, decision=recovery.decision(),
+        cause_ids=(recovery.campaign_event_id,))
+    before_rejected_occupation = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        occupy_after_siege_breach(world, ATTACKER, recovery.id, deterministic_copy.id)
+    assert world_snapshot(world) == before_rejected_occupation
+
     occupied = occupy_after_siege_breach(world, ATTACKER, recovery.id,
                                          decide(world, recovery).id)
     assert world.society.settlements[TARGET].occupier_id == ATTACKER.id
@@ -250,7 +292,14 @@ def _teach_fortification(world):
         causes = (decision.id,) if technology_id == "field_drill" else tuple(
             item.id for item in world.events
             if item.event_type == "technology_discovered" and item.id != decision.id)[-2:]
-        learn_technology(world, DEFENDER, technology_id, "teaching", causes)
+        root = ({"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_technology_premise",
+            "source_refs": [{"kind": "scenario", "id": "siege_fixture"},
+                            {"kind": "polity", "id": DEFENDER.id}],
+            "observed_day": world.clock.absolute_day,
+        }} if not causes else None)
+        learn_technology(world, DEFENDER, technology_id, "teaching", causes,
+                         causal_payload=root)
 
 
 def test_fortification_requires_prepared_supplied_position_for_bounded_defensive_step(tmp_path):
@@ -321,6 +370,33 @@ def test_siege_campaign_persists_daily_progress_and_breach_collapses_garrison_wi
                for delta in collapse.deltas)
 
 
+def test_breach_lapses_defender_territorial_control_without_transferring_occupation():
+    world, _, garrison_id, siege_option = siege_world()
+    refresh_settlement_reports(world)
+    control_option = next(item for item in territorial_control_options(world, DEFENDER)
+                          if item.settlement_id == TARGET)
+    control = establish_territorial_control(
+        world, DEFENDER, control_option.id, decide(world, control_option).id)
+    administrator = world.society.settlements[TARGET].administrator_id
+
+    begin_siege_campaign(world, ATTACKER, siege_option.id, decide(world, siege_option).id)
+    for _ in range(3):
+        tick(world)
+
+    collapsed = world.society.garrisons[garrison_id]
+    current_control = world.society.territorial_controls[control.id]
+    assert collapsed.stage == "collapsed"
+    assert current_control.stage == "lapsed"
+    assert world.society.settlements[TARGET].occupier_id == DEFENDER.id
+    assert world.society.settlements[TARGET].administrator_id == administrator
+    lapse = world.event_index()[current_control.last_event_id]
+    collapse = world.event_index()[collapsed.last_event_id]
+    assert lapse.event_type == "territorial_control_lapsed"
+    assert collapse.event_type == "garrison_collapsed"
+    assert collapse.id in {link.cause_event_id for link in lapse.causal_links}
+    world.society.validate(set(world.map.regions), world)
+
+
 def test_siege_breach_follows_force_supply_and_elapsed_pressure_not_a_fixed_day_count():
     world, _, _, option = siege_world(defender_count=60, defender_provisions=400)
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
@@ -341,7 +417,7 @@ def test_siege_breach_follows_force_supply_and_elapsed_pressure_not_a_fixed_day_
 
 def test_siege_progress_consumes_a_bounded_blockade_ration_from_the_defender():
     world, _, garrison_id, option = siege_world(defender_count=20, defender_provisions=160)
-    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
     defender_id = world.society.garrisons[garrison_id].detachment_id
     before = world.society.detachments[defender_id].provisions
 
@@ -568,6 +644,65 @@ def test_defender_ceasefire_affordance_disappears_once_the_garrison_collapses():
     assert world.society.garrisons[garrison_id].stage == "collapsed"
 
 
+def test_breached_campaign_withdrawal_can_be_materially_remediated_without_erasing_breach(tmp_path):
+    world, attacker_id, _, option = siege_world(attacker_provisions=1200)
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    offer = next(item for item in campaign_ceasefire_offer_options(world, ATTACKER)
+                 if item.campaign_id == campaign.id and item.kind == "mutual")
+    proposal = offer_campaign_ceasefire(world, ATTACKER, offer.id, decide(world, offer).id)
+    response = next(item for item in campaign_ceasefire_response_options(world, DEFENDER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    respond_campaign_ceasefire(world, DEFENDER, response.id, decide(world, response).id)
+
+    # The siege breaches first; neither party fulfills the promised exit by its
+    # deadline.  The attacker still has its own present, supplied column.
+    for _ in range(4):
+        tick(world)
+    obligation = world.relations.obligations[f"{proposal.id}:term:0"]
+    assert obligation.status == "breached"
+    breach = obligation.breach_event_id
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+
+    options = campaign_withdrawal_remediation_options(world, ATTACKER)
+    selected = next(item for item in options if item.obligation_id == obligation.id)
+    adapter = campaign_ceasefire_adapters()[0]
+    assert selected.id in {item.id for item in adapter.options_fn(world, ATTACKER)}
+    assert selected.id in {item.id for item in concurrent_civil_options(world, ATTACKER)}
+    uninformed = deepcopy(world)
+    uninformed.knowledge.notices = {
+        key: notice for key, notice in uninformed.knowledge.notices.items()
+        if not (notice.recipient_ref == ATTACKER and notice.event_id == breach)
+    }
+    assert not campaign_withdrawal_remediation_options(uninformed, ATTACKER)
+    stale = deepcopy(world)
+    stale_decision = decide(stale, selected)
+    stale.map.routes[selected.route_ids[0]].update_runtime(capacity=0, quality=0)
+    with pytest.raises(ValueError, match="stale or unknown"):
+        remediate_campaign_withdrawal(stale, ATTACKER, selected.id, stale_decision.id)
+    assert stale.relations.obligations[obligation.id].status == "breached"
+    assert stale.society.detachments[attacker_id].stage == "present"
+
+    repaired = remediate_campaign_withdrawal(
+        world, ATTACKER, selected.id, decide(world, selected).id)
+
+    assert repaired.status == "remediated"
+    assert repaired.breach_event_id == breach
+    assert repaired.remediation_material_event_id is not None
+    assert world.society.detachments[attacker_id].stage == "marching"
+    assert any(item.event_type == "commitment_breached" and item.id == breach for item in world.events)
+    receipt = next(item for item in world.events if item.id == repaired.last_event_id)
+    assert receipt.event_type == "campaign_withdrawal_remediated"
+    assert {link.cause_event_id for link in receipt.causal_links} >= {breach, repaired.remediation_material_event_id}
+
+    path = tmp_path / "campaign-withdrawal-remediated.mws"
+    save_world(world, path)
+    restored = load_world(path)
+    assert restored.relations.obligations[obligation.id].status == "remediated"
+    assert restored.relations.obligations[obligation.id].breach_event_id == breach
+
 def test_post_occupation_administration_concession_remains_a_current_affordance():
     """A breach/occupation opens negotiation; it never transfers governance."""
     world, _, _, option = siege_world()
@@ -599,6 +734,14 @@ def test_occupied_settlement_can_acquire_durable_control_only_after_a_paid_garri
     establish_garrison(world, ATTACKER, garrison.id, decide(world, garrison).id)
     refresh_settlement_reports(world)
     control = next(item for item in territorial_control_options(world, ATTACKER) if item.settlement_id == TARGET)
+    copied_decision = record_event(world, "copied_control_choice", "Affordance copiada sem autoria.",
+                                   fact_kind=FactKind.DECISION, decision=control.decision())
+    before = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        establish_territorial_control(world, ATTACKER, control.id, copied_decision.id)
+    assert world_snapshot(world) == before
+
+    control = next(item for item in territorial_control_options(world, ATTACKER) if item.settlement_id == TARGET)
     established = establish_territorial_control(world, ATTACKER, control.id, decide(world, control).id)
 
     assert established.stage == "active"
@@ -610,6 +753,15 @@ def test_occupied_settlement_can_acquire_durable_control_only_after_a_paid_garri
     restored = load_world(path)
     assert restored.society.territorial_controls[established.id].stage == "active"
     assert restored.society.settlements[TARGET].administrator_id == administrator
+
+    withdrawal = next(item for item in territorial_control_options(world, ATTACKER)
+                      if item.kind == "withdraw" and item.settlement_id == TARGET)
+    copied_withdrawal = record_event(world, "copied_control_withdrawal", "Affordance copiada sem autoria.",
+                                     fact_kind=FactKind.DECISION, decision=withdrawal.decision())
+    before_withdrawal = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        withdraw_territorial_control(world, ATTACKER, withdrawal.id, copied_withdrawal.id)
+    assert world_snapshot(world) == before_withdrawal
 
     withdrawal = next(item for item in territorial_control_options(world, ATTACKER)
                       if item.kind == "withdraw" and item.settlement_id == TARGET)

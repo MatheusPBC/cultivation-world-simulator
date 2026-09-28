@@ -114,7 +114,10 @@ def review_relief_fallback(world, *, excluded_actors=()):
         decision = record_event(
             world, action, content, fact_kind=FactKind.DECISION,
             causal_origin=CausalOrigin.ACTOR_DECISION,
-            decision=option.decision(), cause_ids=causes)
+            decision=option.decision(),
+            causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                  "rule": "urgent_local_relief"}},
+            cause_ids=causes)
         executed.append(distribute_relief(world, option.id, decision_event_id=decision.id))
     return tuple(executed)
 
@@ -142,6 +145,6 @@ def relief_adapters(on_executed=None):
         causes_fn=_causes, execute_fn=_execute,
         claim_fn=lambda option: ("relief", option.polity_id), situation_fn=_situation),
         DiscretionaryAdapter(
-            name="relief_transfer", family="relief", options_fn=_transfer_options,
+            name="relief_transfer", family="relief_transfer", options_fn=_transfer_options,
             label_fn=_transfer_label, causes_fn=_transfer_causes, execute_fn=_execute_transfer,
             claim_fn=lambda option: ("relief", option.actor_ref.id), situation_fn=_transfer_situation),)

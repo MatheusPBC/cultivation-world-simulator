@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from src.classes.economy.models import Stock
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity
@@ -43,6 +44,35 @@ def _known_destination(world, actor, source):
                and destination.health >= source.health and destination.missing_food <= source.missing_food
                and _route_path(world, actor, source.settlement_id, destination.settlement_id) is not None
                for destination in world.knowledge.settlements_for_actor(actor))
+
+
+def _has_actor_decision_source(world, event_id, actor, action, *, selected_affordance_id=None):
+    """Follow owner receipts back to the actual household/seller selection."""
+    events = world.event_index()
+    target = events.get(event_id)
+    if target is None:
+        return False
+    pending = [event_id]
+    visited = set()
+    while pending:
+        current_id = pending.pop()
+        if current_id in visited:
+            continue
+        visited.add(current_id)
+        event = events.get(current_id)
+        if event is None:
+            continue
+        decision = event.decision if event.fact_kind is FactKind.DECISION else None
+        if (event.causal_origin is CausalOrigin.ACTOR_DECISION
+                and isinstance(decision, dict)
+                and decision.get("action") == action
+                and decision.get("actor_ref") == actor.to_dict()
+                and event.day == target.day
+                and (selected_affordance_id is None
+                     or decision.get("selected_affordance_id") == selected_affordance_id)):
+            return True
+        pending.extend(link.cause_event_id for link in event.causal_links)
+    return False
 
 
 @dataclass(frozen=True)
@@ -130,17 +160,15 @@ def _open_purchase_decisions(world, *, ignore_response_event_id=None):
     paid = set(world.economy.payments)
     response_ids = tuple(
         event.decision["selected_affordance_id"]
-        for event in world.events
-        if event.event_type == "institutional_decision_turn_decided"
-        and event.id != ignore_response_event_id
+        for event in world.events_of_type("institutional_decision_turn_decided")
+        if event.id != ignore_response_event_id
         and isinstance(event.decision, dict)
         and event.decision.get("action") in {"sell_household_provisions", "decline_household_provisions"}
         and isinstance(event.decision.get("selected_affordance_id"), str)
         and event.decision["selected_affordance_id"].startswith("household-provision-sale:"))
-    for event in world.events:
+    for event in world.events_of_type("household_provision_intent"):
         decision = event.decision if event.fact_kind == FactKind.DECISION else None
-        if (event.event_type != "household_provision_intent"
-                or not isinstance(decision, dict) or decision.get("action") != "buy_household_provisions"
+        if (not isinstance(decision, dict) or decision.get("action") != "buy_household_provisions"
                 or event.id in paid
                 or any(response.startswith(f"household-provision-sale:{event.id}:") for response in response_ids)):
             continue
@@ -148,7 +176,10 @@ def _open_purchase_decisions(world, *, ignore_response_event_id=None):
             buyer = EntityRef.from_dict(decision["actor_ref"])
         except (KeyError, TypeError, ValueError):
             continue
-        if buyer.kind != "population_group":
+        if (buyer.kind != "population_group"
+                or not _has_actor_decision_source(
+                    world, event.id, buyer, "buy_household_provisions",
+                    selected_affordance_id=decision.get("selected_affordance_id"))):
             continue
         try:
             option = HouseholdProvisionPurchaseOption(
@@ -198,6 +229,8 @@ def execute_household_provision_purchase(world, actor, option_id, decision_event
     option = next((item for item in household_provision_options(world, actor) if item.id == option_id), None)
     decision = next((item for item in world.events if item.id == decision_event_id), None)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != world.clock.absolute_day
             or decision.decision != option.decision()):
         raise ValueError("household provision purchase option is stale or unknown")
     offer = world.knowledge.reports.get(option.offer_id)
@@ -207,18 +240,29 @@ def execute_household_provision_purchase(world, actor, option_id, decision_event
     terms["report_event_id"] = option.report_event_id
     return record_event(
         world, "household_provision_intent", "A coorte registrou uma intenção de reservar provisões.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
         decision={"action": "buy_household_provisions", "actor_ref": actor.to_dict(), **terms,
                   "selected_affordance_id": option.id},
         cause_ids=_causes(decision.id, option.report_event_id, offer.event_id))
 
 
 def execute_household_provision_sale(world, actor, option_id, decision_event_id):
+    """Apply seller consent, canonical terms and transfer as one transaction."""
+    candidate = world.transaction_copy()
+    event = _execute_household_provision_sale_in_place(candidate, actor, option_id, decision_event_id)
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.event_index()[event.id]
+
+
+def _execute_household_provision_sale_in_place(world, actor, option_id, decision_event_id):
     """Accept or decline one buyer intent, executing material purchase only on acceptance."""
     option = next((item for item in household_provision_sale_options(
         world, actor, ignore_response_event_id=decision_event_id) if item.id == option_id), None)
     decision = next((item for item in world.events if item.id == decision_event_id), None)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != world.clock.absolute_day
             or decision.decision != option.decision()):
         raise ValueError("household provision sale option is stale or unknown")
     if option.response == "decline":
@@ -254,9 +298,10 @@ def execute_household_provision_sale(world, actor, option_id, decision_event_id)
                                     "O fornecedor aceitou os termos atuais da provisão.",
                                     fact_kind=FactKind.DECISION, decision=seller_payload,
                                     cause_ids=_causes(decision.id, offer.event_id))
-    return buy_household_provisions(world, group_id=purchase.group_id, offer_id=purchase.offer_id,
-                                    quantity=purchase.quantity, buyer_decision_id=buyer_material.id,
-                                    seller_decision_id=seller_material.id)
+    return _buy_household_provisions_in_place(
+        world, group_id=purchase.group_id, offer_id=purchase.offer_id,
+        quantity=purchase.quantity, buyer_decision_id=buyer_material.id,
+        seller_decision_id=seller_material.id)
 
 
 def household_provision_adapters():
@@ -287,6 +332,18 @@ def _seller_account(world, stock):
 
 
 def buy_household_provisions(world, *, group_id, offer_id, quantity, buyer_decision_id, seller_decision_id):
+    """Transfer provisions atomically after bilateral validation."""
+    candidate = world.transaction_copy()
+    event = _buy_household_provisions_in_place(
+        candidate, group_id=group_id, offer_id=offer_id, quantity=quantity,
+        buyer_decision_id=buyer_decision_id, seller_decision_id=seller_decision_id)
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.event_index()[event.id]
+
+
+def _buy_household_provisions_in_place(world, *, group_id, offer_id, quantity,
+                                       buyer_decision_id, seller_decision_id):
     """Execute two same-day decisions only after all public and material checks pass."""
     economy = world.economy
     group = world.society.population.get(group_id)
@@ -327,6 +384,7 @@ def buy_household_provisions(world, *, group_id, offer_id, quantity, buyer_decis
         event = events.get(event_id)
         if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
                 or event_id in economy.payments
+                or not _has_actor_decision_source(world, event_id, actor, action)
                 or event.decision != {"action": action, "actor_ref": actor.to_dict(), **terms}):
             raise ValueError("household provisions require matching unused bilateral decisions")
     require_authority(world, seller.owner_ref, "trade")
@@ -390,8 +448,10 @@ def review_household_provisions(world, *, excluded_actors=()):
             terms = _terms(group_id, offer, quantity)
             terms["seller_account_id"] = seller.id
             decision = record_event(world, "household_provisions_purchase_decided", "A coorte reserva alimento diante da pressão observada.",
-                                    fact_kind=FactKind.DECISION,
+                                    fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                     decision={"action": "buy_household_provisions", "actor_ref": actor.to_dict(), **terms},
+                                    causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                        "rule": "household_provisions_purchase"}},
                                     cause_ids=_causes(report.event_id, offer.event_id, buyer.last_event_id))
             pantry = world.economy.stocks.get(household_stock_id(group_id))
             pantry_capacity = max(pantry.capacity, household_food_capacity(world, group_id)) if pantry else household_food_capacity(world, group_id)
@@ -405,15 +465,20 @@ def review_household_provisions(world, *, excluded_actors=()):
             if not accepted:
                 record_event(world, "household_provisions_sale_declined",
                              "O fornecedor recusa a venda pública nas condições atuais.",
-                             fact_kind=FactKind.DECISION,
+                             fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                              decision={"action": "decline_household_provisions", "actor_ref": seller.owner_ref.to_dict(), **terms},
+                             causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                 "rule": "household_provisions_sale"}},
                              cause_ids=_causes(decision.id, offer.event_id, stock.last_event_ids.get("food"),
                                                seller.last_event_id, buyer.last_event_id))
                 break
             consent = record_event(world, "household_provisions_sale_decided", "O fornecedor aceita a venda pública local.",
-                                   fact_kind=FactKind.DECISION,
+                                   fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                    decision={"action": "sell_household_provisions", "actor_ref": seller.owner_ref.to_dict(), **terms},
+                                   causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                       "rule": "household_provisions_sale"}},
                                    cause_ids=_causes(decision.id, offer.event_id, stock.last_event_ids.get("food")))
-            buy_household_provisions(world, group_id=group_id, offer_id=offer.id, quantity=quantity,
-                                     buyer_decision_id=decision.id, seller_decision_id=consent.id)
+            _buy_household_provisions_in_place(
+                world, group_id=group_id, offer_id=offer.id, quantity=quantity,
+                buyer_decision_id=decision.id, seller_decision_id=consent.id)
             break

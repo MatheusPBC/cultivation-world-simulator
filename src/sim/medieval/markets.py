@@ -81,7 +81,10 @@ def _purchase_terms(world, buy_id, sell_id):
     events = world.event_index()
     buy, sell = events.get(buy_id), events.get(sell_id)
     if (buy_id == sell_id or buy is None or sell is None or buy.fact_kind != FactKind.DECISION
-            or sell.fact_kind != FactKind.DECISION or buy.decision is None or sell.decision is None):
+            or sell.fact_kind != FactKind.DECISION
+            or buy.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or sell.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or buy.decision is None or sell.decision is None):
         raise ValueError("purchase requires independent bilateral consent")
     if buy.day != world.clock.absolute_day or sell.day != world.clock.absolute_day:
         raise ValueError("trade decision is stale; consent must be given today")
@@ -91,7 +94,10 @@ def _purchase_terms(world, buy_id, sell_id):
     route_option_id = (buy.decision or {}).get("route_option_id")
     if route_option_id is not None:
         keys.add("route_option_id")
-    if (set(buy.decision) != keys | {"action", "actor_ref"} or set(sell.decision) != keys | {"action", "actor_ref"}
+    consent_keys = keys | {"action", "actor_ref"}
+    allowed_decision_keys = {frozenset(consent_keys), frozenset(consent_keys | {"selected_affordance_id"})}
+    if (frozenset(buy.decision) not in allowed_decision_keys
+            or frozenset(sell.decision) not in allowed_decision_keys
             or buy.decision["action"] != "buy" or sell.decision["action"] != "sell"
             or any(buy.decision[k] != sell.decision[k] for k in keys)):
         raise ValueError("trade consent does not agree on terms")
@@ -184,6 +190,34 @@ def purchase(world, buy_decision_id, sell_decision_id, *,
         account = economy.accounts[account_id]
         economy.accounts[account_id] = account.model_copy(update={"balance": account.balance + change, "last_event_id": event.id})
     economy.payments[buy_decision_id] = event.id
+    # A bilateral sale is a deliberate material act. If it consumes the exact
+    # stock/resource named by a live delivery term and leaves that stock unable
+    # to meet the promised quantity, record the breach now, rooted in both
+    # independent consent and the freight owner receipt. Merely failing to
+    # deliver remains a deadline breach; this does not reserve goods or force
+    # future execution.
+    seller_ref = economy.stocks[terms["source_id"]].owner_ref
+    depleted = economy.stocks[terms["source_id"]].goods.get(terms["resource_id"], 0)
+    from .commitments import conclude_obligation
+    for obligation in sorted(candidate.relations.obligations.values(), key=lambda item: item.id):
+        if obligation.status != "active":
+            continue
+        proposal = candidate.relations.proposals.get(obligation.proposal_id)
+        if proposal is None:
+            continue
+        clause = proposal.clauses[obligation.clause_index]
+        dependencies = (candidate.relations.obligations.get(f"{proposal.id}:term:{index}")
+                        for index in clause.depends_on)
+        if any(dependency is None or dependency.status != "fulfilled" for dependency in dependencies):
+            continue
+        if (clause.kind != "resource_transfer" or clause.debtor_ref != seller_ref
+                or clause.source_stock_id != terms["source_id"]
+                or clause.resource_id != terms["resource_id"]
+                or candidate.clock.absolute_day > clause.due_day
+                or depleted >= clause.quantity):
+            continue
+        conclude_obligation(candidate, obligation, "breached", material_event_id=order.last_event_id,
+                            extra_causes=(sell_decision_id, event.id), materially_incompatible=True)
     economy.validate(candidate)
     world.__dict__.update(candidate.__dict__)
     return world.economy.freight_orders[order.id]

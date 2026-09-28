@@ -1,11 +1,11 @@
 """A prepared position is a dated force fact, not a combat result."""
 
-import asyncio
 import json
 
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -29,7 +29,9 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "force_position_decided", "Decisão canônica de preparo.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):
@@ -91,6 +93,14 @@ async def test_position_prepares_for_three_supplied_days_then_only_sighting_is_f
     prompts = []
     await _prepare_through_contact_provider(world, monkeypatch, prompts)
     position_id = f"force-position:{own_id}"
+    receipt = world.event_index()[world.society.force_positions[position_id].last_event_id]
+    decision = world.event_index()[receipt.causal_payload["decision_event_id"]]
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": decision.decision["selected_affordance_id"],
+    }
     detachment = world.society.detachments[own_id]
     before = detachment.provisions
     assert world.society.force_positions[position_id].stage == "preparing"

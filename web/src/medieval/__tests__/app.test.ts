@@ -11,21 +11,26 @@ let data = structuredClone(fixture)
 let ready = false
 let saved: typeof data | null = null
 const posts: { name: string; body: Record<string, unknown> }[] = []
+let aiAvailable = false
 beforeEach(() => {
-  vi.useRealTimers(); ready = false; saved = null; data = structuredClone(fixture); posts.length = 0
+  vi.useRealTimers(); ready = false; saved = null; aiAvailable = false; data = structuredClone(fixture); posts.length = 0
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const path = url.split('?')[0].split('/').pop()
     if (init?.method === 'POST') {
       const body = JSON.parse(init.body as string)
       posts.push({ name: path!, body })
       if (path === 'create') ready = true
+      if (path === 'ai') {
+        data.world.config.ai_enabled = body.enabled as boolean
+        data.world.config.ai_calls_per_step = body.ai_calls_per_step as number
+      }
       if (path === 'step') { data.world.day += 30; data.status.day = data.world.day }
       if (path === 'save') saved = structuredClone(data)
       if (path === 'load' && saved) data = structuredClone(saved)
       return reply({ ...data.status, ready })
     }
     if (path === 'status') return reply({ ...data.status, ready })
-    if (path === 'options') return reply({ defaults: data.world.config, map_id: data.map.map_id, map_name: data.map.name, ai_available: false })
+    if (path === 'options') return reply({ defaults: data.world.config, map_id: data.map.map_id, map_name: data.map.name, ai_available: aiAvailable })
     if (path === 'observatory') return reply({ ...data, status: { ...data.status, ready } })
     if (path === 'events') return reply({ items: [], next_after: 0, has_more: false })
     if (path === 'saves') return reply(saved ? [{ save_id: 'teste', day: saved.world.day, compatible: true, size_bytes: 4000, modified_at: '2026-09-13T00:00:00Z' }] : [])
@@ -55,6 +60,24 @@ it('opens a settlement from the accessible map list and shows material state', a
   expect(app.get('[data-testid="inspector"]').text()).toContain('Pedraclara')
   expect(app.get('[data-testid="inspector"]').text()).toContain('2.400')
   expect(app.get('[data-testid="inspector"]').text()).toContain('Saúde')
+})
+it('shows a causal battle reading with its source in the settlement inspector', async () => {
+  ready = true
+  data.governance.settlement_reports = [{ id: 'settlement-report:hq:pedraclara',
+    recipient_ref: { kind: 'character', id: 'liwen' }, publisher_ref: { kind: 'polity', id: 'auren' },
+    settlement_id: 'pedraclara', observed_day: 42, population: 2400, present_population: 2380,
+    housing_capacity: 2600, health: 870, missing_food: 4, unrest: 120, event_id: 'event:report',
+    channel: 'settlement_bulletin', field_engagements: [{ event_id: 'event:battle', engagement_id: 'battle:1',
+      challenger_ref: { kind: 'polity', id: 'auren' }, defender_ref: { kind: 'polity', id: 'escarlia' },
+      winner_ref: { kind: 'polity', id: 'auren' }, challenger_casualties: 7, defender_casualties: 11 }] }]
+  const app = await open()
+  await app.get('[data-settlement="pedraclara"]').trigger('click')
+  const reading = app.get('[data-field-reading="battle:1"]')
+  expect(app.get('[data-testid="inspector"]').text()).toContain('Combates observados')
+  expect(reading.text()).toContain('Vitória: Coroa de Auren')
+  expect(reading.text()).toContain('Baixas: Coroa de Auren 7, Conselho de Escárlia 11')
+  await reading.get('[data-field-source="event:battle"]').trigger('click')
+  expect(useObserverStore().focusEventId).toBe('event:battle')
 })
 it('exposes the canonical campaign layer in the atlas', async () => {
   ready = true
@@ -137,6 +160,29 @@ it('keeps provider outcomes, missing affordances and stale affordances visibly d
   expect(strip.text()).toContain('4 falhas técnicas')
   expect(strip.text()).toContain('5 sem affordance')
   expect(strip.text()).toContain('6 affordances obsoletas')
+})
+it('exposes opt-in actor AI only when a provider is available and persists the choice', async () => {
+  ready = true; aiAvailable = true
+  const app = await open()
+  await app.get('[data-testid="ai-toggle"]').trigger('click'); await flushPromises()
+  expect(posts.at(-1)).toEqual({ name: 'ai', body: { enabled: true, ai_calls_per_step: 24 } })
+  expect(app.get('[data-testid="ai-toggle"]').text()).toContain('IA ligada')
+})
+it('lets a paused observer configure the shared provider budget for each simulation advance', async () => {
+  ready = true
+  const app = await open()
+  await app.get('[data-testid="ai-call-budget"]').setValue('48')
+  await app.get('[data-testid="ai-call-budget"]').trigger('change')
+  await flushPromises()
+  expect(posts.at(-1)).toEqual({ name: 'ai', body: { enabled: false, ai_calls_per_step: 48 } })
+  expect((app.get('[data-testid="ai-call-budget"]').element as HTMLInputElement).value).toBe('48')
+  expect(app.text()).toContain('O limite vale para todas as decisões desse avanço')
+})
+it('explains that actor AI needs a provider and keeps the control unavailable', async () => {
+  ready = true
+  const app = await open()
+  expect(app.text()).toContain('Configure um provedor de IA no servidor')
+  expect((app.get('[data-testid="ai-toggle"]').element as HTMLButtonElement).disabled).toBe(true)
 })
 it('loads the saved date through the real save panel workflow', async () => {
   ready = true

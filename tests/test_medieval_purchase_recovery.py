@@ -36,7 +36,9 @@ def total_resource(world, resource_id):
 
 def decide(world, event_type, option, *, origin=CausalOrigin.ACTOR_DECISION):
     return record_event(world, event_type, "A instituição escolheu uma opção atual.",
-                        fact_kind=FactKind.DECISION, causal_origin=origin, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=origin, decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}} if origin is CausalOrigin.ACTOR_DECISION
+                        else None)
 
 
 async def blocked_paid_purchase():
@@ -66,8 +68,16 @@ async def request_case(world, order):
     buyer = world.economy.stocks[order.destination_id].owner_ref
     option = next(item for item in purchase_recovery_request_options(world, buyer)
                   if item.order_id == order.id)
-    return request_purchase_recovery(world, option.id, decision_event_id=decide(
-        world, "purchase_recovery_requested_decision", option).id)
+    decision = decide(world, "purchase_recovery_requested_decision", option)
+    case = request_purchase_recovery(world, option.id, decision_event_id=decision.id)
+    receipt = world.event_index()[case.last_event_id]
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": buyer.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    return case
 
 
 async def test_request_enumeration_skips_foreign_order_reconstruction(monkeypatch):
@@ -143,6 +153,17 @@ async def test_seller_can_re_ship_a_paid_blocked_purchase_without_second_payment
     assert {account.id: account.balance for account in world.economy.accounts.values()} == balances_before
     receipt = world.events[-1]
     assert receipt.event_type == "purchase_recovery_completed"
+    response_decision = world.event_index()[world.economy.freight_recovery_cases[case.id].response_decision_id]
+    expected_authorship = {
+        "decision_event_id": response_decision.id,
+        "actor_ref": seller.to_dict(),
+        "selected_affordance_id": response.id,
+    }
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == expected_authorship
+    successor_receipt = world.event_index()[successor.last_event_id]
+    assert successor_receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert successor_receipt.causal_payload == expected_authorship
     assert {link.cause_event_id for link in receipt.causal_links} >= {
         case.request_decision_id, case.payment_event_id, successor.last_event_id,
     }
@@ -169,9 +190,10 @@ async def test_seller_rejection_keeps_the_paid_cargo_and_material_accounts_uncha
         world.economy.freight_orders[order.id],
     )
 
+    decision = decide(world, "purchase_recovery_response_decision", response)
     assert respond_purchase_recovery(
         world, response.id,
-        decision_event_id=decide(world, "purchase_recovery_response_decision", response).id,
+        decision_event_id=decision.id,
     ) is None
 
     assert (
@@ -181,6 +203,13 @@ async def test_seller_rejection_keeps_the_paid_cargo_and_material_accounts_uncha
         world.economy.freight_orders[order.id],
     ) == material_before
     assert world.economy.freight_recovery_cases[case.id].status == "rejected"
+    receipt = world.events[-1]
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": seller.to_dict(),
+        "selected_affordance_id": response.id,
+    }
     world.economy.validate(world)
 
 

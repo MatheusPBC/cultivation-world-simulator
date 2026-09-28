@@ -61,7 +61,7 @@ class StrategicCapacity:
 
 @dataclass
 class StrategyState(RegistrySerialization):
-    schema_version = 2
+    schema_version = 3
     objectives: dict[str, Objective] = field(default_factory=dict)
     plans: dict[str, StrategicPlan] = field(default_factory=dict)
     registries = {"objectives": Objective, "plans": StrategicPlan}
@@ -84,7 +84,7 @@ class StrategyState(RegistrySerialization):
                 status = "blocked"
             elif any(plan.stage in {"acquire", "await_delivery", "adopted", "mobilized"} for plan in plans):
                 status = "committed"
-            elif plans and all(plan.stage in {"satisfied", "closed"} for plan in plans):
+            elif plans and all(plan.stage in {"satisfied", "closed", "withdrawn"} for plan in plans):
                 status = "ready"
             else:
                 status = "unreviewed"
@@ -92,11 +92,17 @@ class StrategyState(RegistrySerialization):
                 status=status, objective_ids=objectives, plan_ids=tuple(plan.id for plan in plans))
 
         def owned(item):
-            for field in ("owner_ref", "actor_ref", "employer_ref", "sponsor_ref", "debtor_ref",
-                          "proposer_ref", "provider_ref"):
-                if getattr(item, field, None) == actor_ref:
-                    return True
-            return False
+            attributes = ("owner_ref", "actor_ref", "employer_ref", "sponsor_ref", "debtor_ref",
+                          "proposer_ref", "provider_ref")
+            # Most persistent domain records are Pydantic models. Reading their
+            # stored fields directly avoids invoking BaseModel.__getattr__ for
+            # every ownership field that is absent on a record. Keep getattr
+            # for slot-backed records, where there is no instance dictionary.
+            try:
+                values = object.__getattribute__(item, "__dict__")
+            except AttributeError:
+                return any(getattr(item, attribute, None) == actor_ref for attribute in attributes)
+            return any(values.get(attribute) == actor_ref for attribute in attributes)
 
         def derived(registries, active_stages, completed_stages=()):
             """Compose a read-only dimension from persisted records only.
@@ -214,7 +220,7 @@ class StrategyState(RegistrySerialization):
                         or order.destination_id != objective.stock_id):
                     raise ValueError("plan references another objective's freight")
             if objective.kind == "defend_occupied_settlement":
-                if (plan.order_ids or plan.stage not in {"adopted", "mobilized", "closed", "blocked"}
+                if (plan.order_ids or plan.stage not in {"adopted", "mobilized", "closed", "blocked", "withdrawn"}
                         or (plan.stage == "mobilized" and plan.detachment_id is None)
                         or (plan.stage == "adopted" and plan.detachment_id is not None)
                         or plan.detachment_id is not None and (

@@ -1,17 +1,22 @@
 """Knowledge is learned by an actor; applying it needs real work and materials."""
 
+import asyncio
+import json
 import pytest
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
+from src.sim.medieval import ai_decider
+from src.sim.medieval.character_rite_policy import review_character_rites
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 from src.systems.time import WorldClock
 
 
-def test_opening_soldiers_can_assist_paid_military_research_without_fixture_cohorts(tmp_path):
+def test_opening_soldiers_can_assist_paid_military_research_without_fixture_cohorts(tmp_path, monkeypatch):
     from src.sim.medieval.economy import monthly_workforce
-    from src.sim.medieval.research import progress_research
+    from src.sim.medieval.research import progress_research, researcher_work_options
     from src.sim.medieval.research_policy import research_options, execute_research_option
 
     world = create_medieval_world(73)
@@ -21,8 +26,36 @@ def test_opening_soldiers_can_assist_paid_military_research_without_fixture_coho
     stock_before = world.economy.stocks[option.stock_id].goods["tools"]
     money_before = world.economy.accounts[option.account_id].balance
     decision = record_event(world, "research_option_decided", "Financiar pesquisa militar.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
+                                                   "ai_max_calls": 10})
     execute_research_option(world, actor, option.id, decision.id)
+    assert not world.research.projects
+    pending_path = tmp_path / "research-offer-pending.mws"
+    save_world(world, pending_path)
+    resumed_offer = load_world(pending_path)
+    assert world_snapshot(resumed_offer) == world_snapshot(world)
+    world = resumed_offer
+    due_day = decision.day + 1
+    world.clock = WorldClock(due_day)
+    assert next(item for item in researcher_work_options(world, option.researcher_id)
+                if item.technology_id == "field_drill")
+
+    async def call_llm_json(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        selected = next(choice["id"] for choice in payload["choices"]
+                        if "Aceitar trabalhar em Doutrina" in choice["label"])
+        return {"selected_id": selected}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+    asyncio.run(review_character_rites(world, world.agenda.pop_due(due_day)))
+    project = next(iter(world.research.projects.values()))
+    researcher_choice = world.event_index()[project.researcher_decision_id]
+    assert researcher_choice.causal_origin.value == "actor_decision"
+    assert researcher_choice.causal_payload["decision_source"]["kind"] == "provider"
     assert not world.knowledge.knows(actor, "field_drill")
     for day in (30, 60, 90, 120, 150, 180):
         world.clock = WorldClock(day)
@@ -34,6 +67,56 @@ def test_opening_soldiers_can_assist_paid_military_research_without_fixture_coho
     path = tmp_path / "opening-military-research.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_research_owner_rejects_deterministic_exact_affordance_choice_without_mutation():
+    from src.sim.medieval.research_policy import research_options, execute_research_option
+
+    world = create_medieval_world(73)
+    actor = EntityRef("polity", "auren")
+    option = next(item for item in research_options(world, actor) if item.technology_id == "field_drill")
+    decision = record_event(world, "research_option_decided", "Intenção determinística com payload exato.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current actor decision"):
+        execute_research_option(world, actor, option.id, decision.id)
+
+    assert world_snapshot(world) == before
+    assert not any(event.event_type == "research_authorized" for event in world.events)
+
+
+@pytest.mark.parametrize("deterministic_choice", ["sponsor", "researcher"])
+def test_start_research_rejects_deterministic_sponsorship_or_consent(deterministic_choice):
+    from src.sim.medieval.research import start_research
+
+    world = prepared()
+    terms = {"technology_id": "metallurgy", "site_id": "minas-de-ferroalto",
+             "stock_id": "stock:ferroalto", "account_id": "treasury:escarlia",
+             "researcher_id": "character:011"}
+
+    def choice(event_type, text, decision, *, deterministic):
+        return record_event(
+            world, event_type, text, fact_kind=FactKind.DECISION,
+            causal_origin=(CausalOrigin.DETERMINISTIC if deterministic else CausalOrigin.ACTOR_DECISION),
+            causal_payload=None if deterministic else {"decision_source": {"kind": "api"}},
+            decision=decision,
+        )
+
+    sponsor = choice("research_decided", "Financiar pesquisa.",
+                     {**terms, "action": "research", "actor_ref": EntityRef("polity", "escarlia").to_dict()},
+                     deterministic=deterministic_choice == "sponsor")
+    researcher = choice(
+        "research_accepted", "Aceitar trabalho.",
+        {**terms, "action": "research_work", "actor_ref": EntityRef("character", "character:011").to_dict()},
+        deterministic=deterministic_choice == "researcher",
+    )
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="sponsorship and current researcher decision"):
+        start_research(world, **terms, sponsor_decision_id=sponsor.id, researcher_decision_id=researcher.id)
+
+    assert world_snapshot(world) == before
 
 
 def prepared():
@@ -48,8 +131,10 @@ def authorize(world, technology_id='metallurgy', actor_id='escarlia'):
     terms = {'technology_id': technology_id, 'site_id': 'minas-de-ferroalto',
              'stock_id': 'stock:ferroalto', 'account_id': f'treasury:{actor_id}', 'researcher_id': 'character:011'}
     sponsor = record_event(world, 'research_decided', 'Financiar pesquisa.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action': 'research', 'actor_ref': EntityRef('polity', actor_id).to_dict()})
     accepted = record_event(world, 'research_accepted', 'Aceitar trabalho.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action': 'research_work', 'actor_ref': EntityRef('character', 'character:011').to_dict()},
         cause_ids=(sponsor.id,))
     return start_research(world, **terms, sponsor_decision_id=sponsor.id, researcher_decision_id=accepted.id)
@@ -147,6 +232,8 @@ def test_saved_research_and_knowledge_must_match_their_own_receipts(change):
 def apply_metallurgy(world):
     from src.sim.medieval.expansion import start_expansion
     event = record_event(world, 'adaptation_decided', 'Adaptar fornos.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={'action': 'expand', 'actor_ref': EntityRef('polity', 'escarlia').to_dict(),
                   'facility_id': 'works:minas-de-ferroalto', 'blueprint_id': 'efficient-furnaces'})
     return start_expansion(world, 'works:minas-de-ferroalto', 'efficient-furnaces', decision_event_id=event.id)
@@ -156,8 +243,9 @@ def test_discovery_requires_material_adaptation_before_better_production():
     from src.sim.medieval.expansion import progress_expansions, start_expansion
     from src.sim.medieval.economy import monthly_workforce, produce_monthly
     world = prepared()
-    with pytest.raises(ValueError):
-        apply_metallurgy(world)
+    with pytest.raises(ValueError, match='application requires owned technical knowledge'):
+        start_expansion(world, 'works:minas-de-ferroalto', 'efficient-furnaces',
+                        decision_event_id='not-yet-a-decision')
     authorize(world)
     for day in (30, 60, 90):
         work(world, day)
@@ -210,10 +298,12 @@ def test_crop_rotation_requires_its_research_and_changes_food_output():
                  'stock_id': 'stock:campomanso', 'account_id': 'treasury:auren',
                  'researcher_id': 'character:002'}
         sponsor = record_event(world, 'research_decided', 'Financiar pesquisa agrícola.',
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}},
             decision={**terms, 'action': 'research', 'actor_ref': EntityRef('polity', 'auren').to_dict()})
         accepted = record_event(world, 'research_accepted', 'Aceitar pesquisa agrícola.',
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}},
             decision={**terms, 'action': 'research_work',
                       'actor_ref': EntityRef('character', 'character:002').to_dict()},
             cause_ids=(sponsor.id,))
@@ -221,7 +311,7 @@ def test_crop_rotation_requires_its_research_and_changes_food_output():
         return start_research(world, **terms, sponsor_decision_id=sponsor.id,
                               researcher_decision_id=accepted.id)
 
-    irrigation = authorize_at('irrigation', 0)
+    authorize_at('irrigation', 0)
     for day in (30, 60, 90):
         world.clock = WorldClock(day)
         progress_research(world, monthly_workforce(world))
@@ -230,6 +320,8 @@ def test_crop_rotation_requires_its_research_and_changes_food_output():
     world.clock = WorldClock(90)
     expansion_decision = record_event(
         world, 'expansion_decided', 'Aplicar irrigação aos campos.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={'action': 'expand', 'actor_ref': EntityRef('polity', 'auren').to_dict(),
                   'facility_id': 'works:campos-do-lume', 'blueprint_id': 'irrigation-works'})
     irrigation_project = start_expansion(world, 'works:campos-do-lume', 'irrigation-works',
@@ -252,7 +344,7 @@ def test_crop_rotation_requires_its_research_and_changes_food_output():
     stock = world.economy.stocks['stock:campomanso']
     world.economy.stocks[stock.id] = stock.model_copy(
         update={'goods': {**stock.goods, 'tools': stock.goods.get('tools', 0) + 20}})
-    crop_rotation = authorize_at('crop_rotation', 150)
+    authorize_at('crop_rotation', 150)
     for day in (180, 210, 240):
         world.clock = WorldClock(day)
         progress_research(world, monthly_workforce(world))
@@ -261,6 +353,8 @@ def test_crop_rotation_requires_its_research_and_changes_food_output():
     world.clock = WorldClock(240)
     adaptation_decision = record_event(
         world, 'expansion_decided', 'Aplicar rotação de culturas.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={'action': 'expand', 'actor_ref': EntityRef('polity', 'auren').to_dict(),
                   'facility_id': 'works:campos-do-lume', 'blueprint_id': 'crop-rotation-works'})
     project = start_expansion(world, 'works:campos-do-lume', 'crop-rotation-works',
@@ -280,8 +374,12 @@ def teach(world, teacher, student, technology_id):
     from src.sim.medieval.teaching import teach_technology
     terms = {'technology_id': technology_id, 'teacher_ref': teacher.to_dict(), 'student_ref': student.to_dict()}
     offer = record_event(world, 'teaching_offered', 'Compartilhar técnica.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action': 'teach', 'actor_ref': teacher.to_dict()})
     accept = record_event(world, 'teaching_accepted', 'Receber instruções.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={**terms, 'action': 'learn', 'actor_ref': student.to_dict()})
     return teach_technology(world, offer.id, accept.id)
 
@@ -300,6 +398,31 @@ def test_teaching_transmits_only_owned_knowledge_not_material_capability():
     assert world.economy.to_dict() == holdings
     with pytest.raises(ValueError):
         teach(world, a, b, 'metallurgy')
+
+
+def test_teaching_rejects_exact_deterministic_copies_without_learning():
+    from src.sim.medieval.teaching import teach_technology
+
+    world = prepared()
+    teacher, student = EntityRef('polity', 'escarlia'), EntityRef('polity', 'auren')
+    authorize(world)
+    for day in (30, 60, 90):
+        work(world, day)
+    terms = {'technology_id': 'metallurgy', 'teacher_ref': teacher.to_dict(),
+             'student_ref': student.to_dict()}
+    offer = record_event(world, 'teaching_offered', 'Payload copiado sem decisão do ator.',
+        fact_kind=FactKind.DECISION,
+        decision={**terms, 'action': 'teach', 'actor_ref': teacher.to_dict()})
+    acceptance = record_event(world, 'teaching_accepted', 'Payload copiado sem decisão do ator.',
+        fact_kind=FactKind.DECISION,
+        decision={**terms, 'action': 'learn', 'actor_ref': student.to_dict()})
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match='current actor decisions'):
+        teach_technology(world, offer.id, acceptance.id)
+
+    assert world_snapshot(world) == before
+    assert not world.knowledge.knows(student, 'metallurgy')
 
 
 def test_catalog_prerequisites_are_enforced_and_cycles_are_rejected():
@@ -343,6 +466,12 @@ async def test_natural_monthly_policy_starts_feasible_projects_without_daily_ai(
     # project was feasible and an institution does not sponsor two concurrent
     # experiments through this fallback.
     assert world.research.projects
+    assert all(event.causal_origin.value == 'actor_decision'
+               for event in world.events
+               if event.event_type in {'research_decided', 'research_accepted'})
+    assert all(event.causal_payload['decision_source']['kind'] == 'fallback'
+               for event in world.events
+               if event.event_type in {'research_decided', 'research_accepted'})
     assert all(project.stage == 'waiting' for project in world.research.projects.values())
     owners = [project.owner_ref for project in world.research.projects.values()]
     assert len(owners) == len(set(owners))

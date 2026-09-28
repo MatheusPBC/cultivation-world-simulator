@@ -9,6 +9,7 @@ existing settlement-observation event.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.models import EspionageFinding
@@ -133,7 +134,9 @@ def espionage_options(world, actor_ref):
 
 def _decision(world, decision_event_id, option):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision != option.decision()):
         raise ValueError("espionage requires its exact current decision")
     return event

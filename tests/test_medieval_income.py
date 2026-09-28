@@ -3,6 +3,7 @@
 import pytest
 
 from src.run.medieval_world import create_medieval_world
+from src.classes.causal_origin import CausalOrigin
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.economy import produce_monthly
 from src.sim.medieval.persistence import world_snapshot, save_world, load_world
@@ -51,6 +52,8 @@ def test_opted_in_opening_income_is_treasury_funded_causal_and_idempotent(tmp_pa
 
     assert event.event_type == "initial_household_income_allocated"
     assert event.fact_kind.value == "state_transition"
+    assert event.causal_payload["root_premise"]["kind"] == "scenario_bootstrap"
+    assert event.causal_payload["root_premise"]["domain"] == "household_income"
     assert household_money(world) == world.society.total_population * 4
     assert sum(int(delta.after) - int(delta.before) for delta in event.deltas) == 0
     assert {account.last_event_id for account in households} == {event.id}
@@ -88,6 +91,21 @@ def test_production_phase_pays_actual_work_and_taxes_only_that_income():
     assert money(world) == initial
 
 
+def test_initial_production_names_world_generation_as_its_root_premise():
+    world = create_medieval_world(73)
+    produce_monthly(world)
+
+    event = next(event for event in world.events
+                 if event.event_type == "production_completed" and not event.causal_links)
+    root = event.causal_payload["root_premise"]
+    refs = {(item["kind"], item["id"]) for item in root["source_refs"]}
+    assert root["kind"] == "world_generation"
+    assert root["domain"] == "production"
+    assert root["observed_day"] == world.clock.absolute_day
+    assert ("facility", event.causal_payload["production"]["facility_id"]) in refs
+    assert ("stock", event.causal_payload["production"]["stock_id"]) in refs
+
+
 @pytest.mark.parametrize("cash,batches,net", [(19, 0, 0), (20, 1, 18)])
 def test_gross_payroll_budget_limits_batches_without_creating_credit(cash, batches, net):
     world = prepared_farm(cash)
@@ -104,6 +122,8 @@ def tax_decision(world, rate, actor="auren"):
     from src.classes.event import FactKind
     from src.sim.medieval.events import record_event
     return record_event(world, "tax_decided", "Alterar imposto sobre a renda.", fact_kind=FactKind.DECISION,
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
                         decision={"action": "set_income_tax", "actor_ref": {"kind": "polity", "id": actor},
                                   "polity_id": "auren", "income_rate": rate})
 

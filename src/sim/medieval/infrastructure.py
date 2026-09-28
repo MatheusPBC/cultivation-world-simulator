@@ -66,7 +66,7 @@ def current_observation(world, actor_ref, site_id):
         # A registry entry is not evidence by itself.  Recheck the receipt here
         # because this executor can be called directly, outside the runner's
         # whole-world validation boundary.
-        world.knowledge._validate_site_report(world, {event.id: event for event in world.events}, report)
+        world.knowledge._validate_site_report(world, world.event_index(), report)
     except ValueError:
         return None
     if not 0 <= world.clock.absolute_day - report.observed_day < OBSERVATION_DAYS:
@@ -114,7 +114,19 @@ def start_repair(world, site_id, blueprint_id, *, decision_event_id):
     maintainer = site.maintainer_ref
     stock, account = local_holdings(world, maintainer, site)
     decision = _event(world, decision_event_id)
+    current_option = next((item for item in repair_authorization_options(world, maintainer)
+                           if item.site_id == site_id), None)
+    actor_source = (next((source for link in decision.causal_links
+                          if (source := _event(world, link.cause_event_id)) is not None
+                          and source.fact_kind is FactKind.DECISION
+                          and source.causal_origin is CausalOrigin.ACTOR_DECISION
+                          and source.day == decision.day == world.clock.absolute_day
+                          and source.decision == current_option.decision()), None)
+                    if decision is not None and current_option is not None else None)
     if (stock is None or account is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.DETERMINISTIC
+            or not isinstance((decision.causal_payload or {}).get("decision_source"), dict)
+            or actor_source is None
             or decision.day != world.clock.absolute_day
             or decision.decision != repair_intent(maintainer, site_id, blueprint_id, stock.id, account.id)):
         raise ValueError("repair requires the maintainer's own exact current decision and local holdings")
@@ -134,8 +146,12 @@ def start_repair(world, site_id, blueprint_id, *, decision_event_id):
     event = record_event(world, "repair_started",
                          f"{site.name}: reparo autorizado; nenhuma recuperação ainda executada.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_event_id": actor_source.id,
+                                         "actor_ref": actor_source.decision["actor_ref"],
+                                         "selected_affordance_id": actor_source.decision["selected_affordance_id"]},
                          deltas=(_delta("repair", project_id, "stage", None, "waiting"),),
-                         cause_ids=_causes(decision_event_id, report.event_id, site.last_event_id))
+                         cause_ids=_causes(decision_event_id, actor_source.id, report.event_id, site.last_event_id))
     project = RepairProject(id=project_id, site_id=site_id, blueprint_id=blueprint_id, maintainer_ref=maintainer,
                             stock_id=stock.id, account_id=account.id, decision_event_id=decision_event_id,
                             started_day=world.clock.absolute_day, last_event_id=event.id)
@@ -210,8 +226,10 @@ def _progress_repair(world, project, available, day):
     # Executing a batch is its own current decision, revalidated above.
     decision = record_event(world, "repair_batch_decided",
                             f"{site.name}: executar lote de reparo de {units / 10:g}% da instalação.",
-                            fact_kind=FactKind.DECISION,
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
                             decision=batch_intent(project.maintainer_ref, project.id, units),
+                            causal_payload={"decision_source": {"kind": "owner", "owner": "economy",
+                                                                "rule": "advance_authorized_repair_project"}},
                             # The decider cites what it knows: its obligation, its own
                             # observation and its own account, never an unobserved fact.
                             cause_ids=_causes(project.last_event_id, report.event_id, account.last_event_id))
@@ -311,20 +329,22 @@ def site_reactivation_options(world, actor):
 
 def execute_site_reactivation(world, actor, option_id, decision_event_id):
     """Revalidate the current owner decision and reopen only the site flag."""
-    option = next((item for item in site_reactivation_options(world, actor) if item.id == option_id), None)
-    decision = _event(world, decision_event_id)
+    candidate = world.transaction_copy()
+    option = next((item for item in site_reactivation_options(candidate, actor) if item.id == option_id), None)
+    decision = _event(candidate, decision_event_id)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("site reactivation option is stale or unknown")
-    site = world.map.infrastructure_sites.get(option.site_id)
-    report = current_observation(world, actor, option.site_id)
+    site = candidate.map.infrastructure_sites.get(option.site_id)
+    report = current_observation(candidate, actor, option.site_id)
     if (site is None or site.maintainer_ref != actor or site.enabled or site.integrity < 1.0
             or report is None or report.event_id != option.report_event_id or report.enabled
             or report.integrity < 1.0):
         raise ValueError("site reactivation is no longer possible")
-    require_authority(world, actor, "supply")
+    require_authority(candidate, actor, "supply")
     event = record_event(
-        world, "site_reactivated",
+        candidate, "site_reactivated",
         f"{site.name}: o maintainer retomou a operação após a recuperação física.",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_origin=CausalOrigin.ACTOR_DECISION,
@@ -336,10 +356,12 @@ def execute_site_reactivation(world, actor, option_id, decision_event_id):
         deltas=(_delta("site", site.id, "enabled", False, True),),
         cause_ids=_causes(decision.id, report.event_id, site.last_event_id),
     )
-    world.map.update_infrastructure_site_runtime(site.id, enabled=True, last_event_id=event.id)
+    candidate.map.update_infrastructure_site_runtime(site.id, enabled=True, last_event_id=event.id)
     from .route_intelligence import refresh_site_reports
-    refresh_site_reports(world, site_ids=(site.id,))
-    return event
+    refresh_site_reports(candidate, site_ids=(site.id,))
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.event_index()[event.id]
 
 
 def site_reactivation_adapters():
@@ -381,15 +403,17 @@ def repair_authorization_options(world, actor):
     return tuple(options)
 
 
-def _authorize_repair(world, maintainer, option, *, cause_ids=()):
+def _authorize_repair(world, maintainer, option, *, cause_ids=(), decision_source=None):
     """Shared by the deterministic fallback and the menu executor alike."""
     site = world.map.infrastructure_sites[option.site_id]
     blueprint = site_blueprint(world, site)
     stock, account = local_holdings(world, maintainer, site)
     report = current_observation(world, maintainer, option.site_id)
     decision = record_event(world, "repair_decided", f"{site.name}: autorizar o reparo da instalação.",
-                            fact_kind=FactKind.DECISION,
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
                             decision=repair_intent(maintainer, option.site_id, blueprint.id, stock.id, account.id),
+                            causal_payload=({"decision_source": decision_source}
+                                            if decision_source is not None else None),
                             cause_ids=_causes(*cause_ids, report.event_id if report else None))
     project = start_repair(world, option.site_id, blueprint.id, decision_event_id=decision.id)
     if project is not None:
@@ -398,13 +422,22 @@ def _authorize_repair(world, maintainer, option, *, cause_ids=()):
 
 
 def execute_repair_authorization_option(world, actor, option_id, decision_event_id):
-    """Revalidate everything fresh, then delegate to the unmodified start_repair."""
-    option = next((item for item in repair_authorization_options(world, actor) if item.id == option_id), None)
-    decision = _event(world, decision_event_id)
+    """Create the repair obligation and supply objectives as one owner transaction."""
+    candidate = world.transaction_copy()
+    option = next((item for item in repair_authorization_options(candidate, actor)
+                   if item.id == option_id), None)
+    decision = _event(candidate, decision_event_id)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
-            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != candidate.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("repair authorization option is stale or unknown")
-    return _authorize_repair(world, actor, option, cause_ids=(decision_event_id,))
+    source = (decision.causal_payload or {}).get("decision_source")
+    project = _authorize_repair(candidate, actor, option, cause_ids=(decision_event_id,),
+                                decision_source=source)
+    candidate.economy.validate(candidate)
+    candidate.strategy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.repairs[project.id] if project is not None else None
 
 
 def review_maintenance(world, *, exclude_site_ids=(), excluded_actors=()):
@@ -424,7 +457,20 @@ def review_maintenance(world, *, exclude_site_ids=(), excluded_actors=()):
         if site_id in exclude_site_ids or site_id not in options_by_site:
             continue
         maintainer, option = options_by_site[site_id]
-        _authorize_repair(world, maintainer, option)
+        report = current_observation(world, maintainer, site_id)
+        if report is None:
+            continue
+        source = {"kind": "fallback", "policy": "routine-rules", "rule": "maintenance"}
+        decision = record_event(
+            world, "repair_authorization_decided",
+            f"{world.map.infrastructure_sites[site_id].name}: o mantenedor escolheu iniciar manutenção.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            decision=option.decision(), causal_payload={"decision_source": source},
+            cause_ids=(report.event_id,),
+        )
+        _authorize_repair(
+            world, maintainer, option, cause_ids=(decision.id,), decision_source=source,
+        )
 
 
 def _hold_material_objectives(world, project, blueprint, stock):

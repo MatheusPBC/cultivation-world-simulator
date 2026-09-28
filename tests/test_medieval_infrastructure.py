@@ -70,6 +70,23 @@ def test_damage_is_observed_repaired_gradually_and_the_route_recovers():
     assert report.integrity == 0.8 and report.publisher_ref == maintainer == report.recipient_ref
     review_maintenance(world)
     project = next(iter(world.economy.repairs.values()))
+    authorization = next(event for event in world.events if event.id == project.decision_event_id)
+    actor_decision = next(event for event in world.events
+                          if event.event_type == "repair_authorization_decided")
+    started_receipt = world.event_index()[project.last_event_id]
+    assert actor_decision.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert actor_decision.decision["selected_affordance_id"].startswith("repair-authorization:")
+    assert authorization.causal_origin is CausalOrigin.DETERMINISTIC
+    assert actor_decision.id in {link.cause_event_id for link in authorization.causal_links}
+    assert started_receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert started_receipt.causal_payload == {
+        "decision_event_id": actor_decision.id,
+        "actor_ref": maintainer.to_dict(),
+        "selected_affordance_id": actor_decision.decision["selected_affordance_id"],
+    }
+    assert authorization.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "maintenance",
+    }
     assert project.site_id == SITE and project.stage == "waiting" and project.restored_permille == 0
     assert site.integrity == 0.8, "authorizing work repairs nothing by itself"
     blueprint = world.economy.repair_blueprints[project.blueprint_id]
@@ -84,6 +101,11 @@ def test_damage_is_observed_repaired_gradually_and_the_route_recovers():
     assert site.integrity == 1.0
     project = world.economy.repairs[project.id]
     assert project.stage == "completed" and project.restored_permille == 200
+    batch_decisions = [event for event in world.events if event.event_type == "repair_batch_decided"]
+    assert batch_decisions
+    assert all(event.causal_payload["decision_source"] == {
+        "kind": "owner", "owner": "economy", "rule": "advance_authorized_repair_project",
+    } for event in batch_decisions)
     after = world.economy.stocks[project.stock_id]
     assert all(after.goods[rid] == goods[rid] - 2 * amount for rid, amount in blueprint.inputs.items())
     assert sum(a.balance for a in world.economy.accounts.values()) == money
@@ -104,8 +126,9 @@ def authorized(world):
     return next(iter(world.economy.repairs.values()))
 
 
-@pytest.mark.parametrize("rejection", ["stale_observation", "forged_observation", "replayed_decision", "forged_intent",
-                                       "revoked_mandate", "foreign_stock"])
+@pytest.mark.parametrize("rejection", ["stale_observation", "forged_observation", "replayed_decision",
+                                       "deterministic_exact_intent", "forged_intent", "revoked_mandate",
+                                       "foreign_stock"])
 def test_the_owner_refuses_an_authorization_it_cannot_revalidate(rejection):
     from src.classes.economy.maintenance import repair_intent
     from src.sim.medieval.infrastructure import start_repair
@@ -219,7 +242,7 @@ def test_repair_restores_integrity_without_lifting_an_interdiction():
     assert world.map.infrastructure_sites[SITE].enabled is False
 
 
-def test_recovered_interdiction_requires_an_explicit_maintainer_decision():
+def test_recovered_interdiction_requires_an_explicit_maintainer_decision(monkeypatch):
     world = create_medieval_world(73)
     provisioned(world)
     site = world.map.infrastructure_sites[SITE]
@@ -246,8 +269,24 @@ def test_recovered_interdiction_requires_an_explicit_maintainer_decision():
     option = options[0]
     decision = record_event(
         world, "site_reactivation_decided", "O maintainer decidiu reabrir a instalação recuperada.",
-        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(option.report_event_id,),
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=option.decision(), cause_ids=(option.report_event_id,),
     )
+    before = world_snapshot(world)
+    from src.sim.medieval import route_intelligence
+    refresh = route_intelligence.refresh_site_reports
+
+    def fail_after_refresh(candidate, *, site_ids=None):
+        refresh(candidate, site_ids=site_ids)
+        raise RuntimeError("injected failure after site reactivation")
+
+    monkeypatch.setattr(route_intelligence, "refresh_site_reports", fail_after_refresh)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        execute_site_reactivation(world, maintainer, option.id, decision.id)
+    assert world_snapshot(world) == before
+
+    monkeypatch.undo()
     event = execute_site_reactivation(world, maintainer, option.id, decision.id)
     assert event.event_type == "site_reactivated"
     assert event.causal_origin is CausalOrigin.ACTOR_DECISION
@@ -299,6 +338,32 @@ def test_missing_material_becomes_a_standing_supply_objective_not_a_stalled_proj
     plan = world.strategy.plans[f"plan:{objective.id}"]
     assert plan.stage in {"acquire", "await_delivery", "blocked"} and plan.last_review_day == world.clock.absolute_day
     assert plan.stage != "satisfied", "an unmet repair need must stay visibly unmet"
+
+
+def test_blocked_supply_plan_cites_the_repair_that_created_its_material_need():
+    world = create_medieval_world(73)
+    damage(world, SITE, 0.8)
+    refresh_reports(world)
+    review_maintenance(world)
+    project = next(iter(world.economy.repairs.values()))
+    objective = world.strategy.objectives[f"inputs:{project.stock_id}:tools"]
+    world.knowledge.reports = {
+        report_id: report for report_id, report in world.knowledge.reports.items()
+        if not (report.recipient_ref == project.maintainer_ref
+                and report.stock_id == project.stock_id and report.resource_id == "tools"
+                and report.kind == "inventory")
+    }
+
+    from src.sim.medieval.procurement import review_supply
+    review_supply(world)
+
+    update = next(event for event in reversed(world.events)
+                  if event.event_type == "supply_plan_updated"
+                  and any(delta.owner_id == f"plan:{objective.id}" for delta in event.deltas))
+    causes = {link.cause_event_id for link in update.causal_links}
+    assert project.last_event_id in causes
+    assert project.decision_event_id in causes
+    assert "sem relatório local atualizado" in update.content
 
 
 def test_damage_only_applies_a_prepared_material_fact():
@@ -404,7 +469,8 @@ async def test_a_damaged_crossing_delays_cargo_and_the_repaired_one_delivers_aga
     for action, owner in (("buy", destination.owner_ref), ("sell", source.owner_ref)):
         decisions.append(record_event(
             world, f"{action}_decided", "Termos comerciais aceitos.",
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}},
             decision={**terms, "action": action, "actor_ref": owner.to_dict()},
         ).id)
     order = purchase(world, *decisions)
@@ -452,7 +518,9 @@ async def test_a_damaged_crossing_delays_cargo_and_the_repaired_one_delivers_aga
     owner = world.map.infrastructure_sites[SITE].owner_ref
     option, = service_options(world, SITE, owner)
     decision = record_event(world, "site_service_decided", "Retomar serviço das docas.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
     set_site_service(world, option.id, decision_event_id=decision.id)
     assert world.map.get_route_operational_capacity(RIVER) >= 1
 

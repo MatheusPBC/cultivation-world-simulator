@@ -32,9 +32,10 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-# Employment contracts now persist a decision-backed staffing target that can
-# be explicitly suspended at zero. Older saves are rejected without rewriting data.
-SCHEMA = 71
+# Family-credit requests and household notices now expose the financing purpose;
+# older snapshots are rejected without migration.
+# Older saves are rejected without rewriting data.
+SCHEMA = 78
 EVENT_CHUNK_SIZE = 512
 
 

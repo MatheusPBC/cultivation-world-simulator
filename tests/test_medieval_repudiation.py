@@ -3,6 +3,7 @@ import json
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
@@ -22,7 +23,9 @@ from tests.test_medieval_recourse import AUREN, ESCARLIA, breached, wronged_worl
 
 def _decision(world, option):
     return record_event(world, 'diplomatic_decision', 'A instituição escolheu repudiar.',
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision())
 
 
 def test_repudiation_is_a_decision_then_a_separate_transition_and_grants_recourse():

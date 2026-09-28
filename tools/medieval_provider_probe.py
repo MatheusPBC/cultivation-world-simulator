@@ -25,21 +25,41 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
-from src.sim.medieval.actor_dossier import build_actor_dossier
-from src.sim.medieval.concurrent_civil_decision import concurrent_civil_options
+from src.sim.medieval.institutional_agenda import monthly_adapters
 from src.sim.medieval.intelligence import refresh_reports
+from src.sim.medieval.institutional_decision_turn import _by_id, _composed_situation
 from src.sim.medieval.route_intelligence import refresh_route_reports
 
 
+TARGET_FAMILY = "production_priority"
+
+
 def _actor_and_options(world):
+    """Find a polity with competing production options in its full monthly menu."""
     refresh_reports(world)
     refresh_route_reports(world)
+    adapters = monthly_adapters()
     for identity in sorted(world.society.polities):
         actor = EntityRef("polity", identity)
-        options = tuple(concurrent_civil_options(world, actor))
-        if options:
-            return actor, options
-    raise RuntimeError("real provider probe found no current institutional affordance")
+        by_id = _by_id(world, actor, adapters)
+        target_options = tuple(option for adapter, option in by_id.values()
+                               if adapter.name == TARGET_FAMILY)
+        if len(target_options) >= 2:
+            return actor, by_id, target_options
+    raise RuntimeError(
+        "real provider probe found no polity with competing production-priority affordances"
+    )
+
+
+def _provider_request(world, actor, by_id):
+    """Build the same complete labeled menu used by the monthly actor turn."""
+    situation = _composed_situation(world, actor, by_id)
+    choices = [{"id": option_id, "label": adapter.label_fn(option)}
+               for option_id, (adapter, option) in sorted(by_id.items())]
+    if any(not choice["label"].strip() or choice["label"] == choice["id"]
+           for choice in choices):
+        raise RuntimeError("provider probe requires a human-readable label for every affordance")
+    return situation, choices
 
 
 async def run(seed: int = 73, *, calls_per_step: int = 1) -> dict:
@@ -55,11 +75,11 @@ async def run(seed: int = 73, *, calls_per_step: int = 1) -> dict:
         "ai_calls_per_step": calls_per_step,
         "ai_max_calls": calls_per_step,
     })
-    actor, options = _actor_and_options(world)
-    option_ids = {option.id for option in options}
-    choices = [{"id": option.id, "label": f"Selecionar {option.id}"} for option in options]
+    actor, by_id, target_options = _actor_and_options(world)
+    option_ids = set(by_id)
+    situation, choices = _provider_request(world, actor, by_id)
     selected = await ai_decider.select_option(
-        world, actor, {"probe": True, "dossier": build_actor_dossier(world, actor)}, choices
+        world, actor, {"probe": True, **situation}, choices
     )
     receipts = [event for event in world.events if event.event_type in ai_decider.RECEIPT_EVENTS]
     if not receipts:
@@ -74,7 +94,12 @@ async def run(seed: int = 73, *, calls_per_step: int = 1) -> dict:
     return {
         "seed": seed,
         "actor": actor.to_dict(),
-        "affordance_count": len(options),
+        "menu_scope": "full_monthly_institutional_menu",
+        "affordance_count": len(by_id),
+        "target_family": TARGET_FAMILY,
+        "target_option_ids": [option.id for option in target_options],
+        "selected_target_family": selected in {option.id for option in target_options},
+        "offered_choices": [choice["label"] for choice in choices],
         "selected_id": selected,
         "no_action": selected == ai_decider.NO_ACTION,
         "receipt_type": receipt.event_type,

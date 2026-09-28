@@ -21,8 +21,11 @@ e retorna código estável sem caminhos, segredos ou traceback. Erro de entrada 
 Velocidade significa saltos por segundo real, nunca mudança na duração simulada.
 
 Configuração persistente medieval contém seed, contagem inicial de personagens
-(padrão12, 1–60), locale pt-BR e política determinística; não finge IA integrada.
-Saves usam schema60; schemas anteriores são rejeitados e preservados, sem
+(padrão12, 1–60), locale pt-BR e política de fallback determinística. Decisões
+por provider são opt-in por mundo; o controle exige simulação pausada e provider
+disponível, e salva a escolha no autosave. A IA seleciona affordances, enquanto
+owners do motor revalidam e executam as consequências.
+Saves usam schema74; schemas anteriores são rejeitados e preservados, sem
 sobrescrita ou migração. IDs de
 sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras
@@ -123,7 +126,13 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
   Inventário, plano e observação de outra instituição não são copiados. Cada
   entrada factual pode listar `cause_event_ids`, mas somente quando o evento
   causal também pertence ao conjunto conhecido pelo ator; a cadeia completa
-  segue navegável pelo endpoint causal do Dao.
+  segue navegável pelo endpoint causal do Dao. Aceita `after` (cursor opaco,
+  omitido na primeira página) e `limit` (1–100, padrão 50); entradas são
+  ordenadas da evidência mais recentemente aprendida para a mais antiga, depois
+  por categoria, sequência factual e ID. A resposta inclui `next_after` (cursor
+  opaco ou `null`) e `has_more`. A paginação por cursor mantém a fronteira de
+  páginas quando fatos mais recentes chegam; limita o payload sem alterar o
+  conhecimento canônico nem a consulta causal onisciente do Dao.
 - `GET query/society` agora inclui `civic_protests`, `civic_movements` e
   `civic_strikes`, com estágio, coorte,
   participação reservada, demanda e receipts de decisão/relatório. A projeção é
@@ -134,8 +143,13 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
 - GET query/events?after=0&limit=50: fatos em sequência, página máxima100.
 - GET query/causal/{event_id}: fato, causas diretas e efeitos diretos paginados.
 - GET query/saves: IDs dos arquivos, data/tamanho e metadados de compatibilidade.
-- POST command/create: seed, character_count, replace=false.
+- POST command/create: campos de `MedievalRunConfig` e replace=false; `ai_enabled=true`
+  exige provider disponível.
 - POST command/step: um salto; POST command/pause e command/resume.
+- POST command/ai: `enabled` booleano e `ai_calls_per_step` de 0 a 256;
+  habilitar exige provider disponível e qualquer alteração exige simulação
+  pausada. O orçamento é compartilhado por todas as consultas do salto, não é
+  uma cota por ator.
 - POST command/speed: jumps_per_second de1 a20.
 - POST command/save: save_id e overwrite=false; POST command/load: save_id.
 

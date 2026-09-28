@@ -131,7 +131,7 @@ class RouteReport(SocietyValue):
     # Public aggregate traffic reading; no order, stock or owner identity is
     # exposed through this field.
     daily_flow_bulk: Count = 0
-    channel: Literal["administrative_route_report", "route_bulletin"]
+    channel: Literal["administrative_route_report", "field_route_observation", "route_bulletin"]
     event_id: Identity
 
     @model_validator(mode="after")
@@ -240,9 +240,20 @@ class WorkforceOfferNotice(SocietyValue):
                                            self.count, self.stipend_per_person, self.observed_day)
 
 
+class FieldEngagementReading(SocietyValue):
+    """A bounded public reading of a battle materially resolved here."""
+    event_id: Identity
+    engagement_id: Identity
+    challenger_ref: EntityRef
+    defender_ref: EntityRef
+    winner_ref: EntityRef | None = None
+    challenger_casualties: Count
+    defender_casualties: Count
+
+
 def settlement_observation(settlement_id, publisher_ref, observed_day, population, present_population, housing_capacity,
                            health, missing_food, unrest, occupier_id=None, rite_underway=False,
-                           protest_underway=False, warded=False) -> str:
+                           protest_underway=False, warded=False, field_engagements=()) -> str:
     """Stable historical shape for public, aggregate settlement conditions.
 
     ``occupier_id`` is what an observer can see standing in the place: it is a
@@ -253,7 +264,8 @@ def settlement_observation(settlement_id, publisher_ref, observed_day, populatio
                        "housing_capacity": housing_capacity, "health": health,
                        "missing_food": missing_food, "unrest": unrest, "occupier_id": occupier_id,
                        "rite_underway": bool(rite_underway), "protest_underway": bool(protest_underway),
-                       "warded": bool(warded)},
+                       "warded": bool(warded),
+                       "field_engagements": [item.model_dump(mode="json") for item in field_engagements]},
                       sort_keys=True, ensure_ascii=False, allow_nan=False)
 
 
@@ -276,6 +288,7 @@ class SettlementReport(SocietyValue):
     # Finished protective works are legible where they stand; nothing of the
     # rite that raised them, nor of who paid for it, is disclosed.
     warded: bool = False
+    field_engagements: tuple[FieldEngagementReading, ...] = ()
     event_id: Identity
     channel: Literal["local_settlement_report", "settlement_bulletin"]
 
@@ -283,7 +296,7 @@ class SettlementReport(SocietyValue):
         return settlement_observation(self.settlement_id, self.publisher_ref, self.observed_day,
                                       self.population, self.present_population, self.housing_capacity, self.health,
                                       self.missing_food, self.unrest, self.occupier_id, self.rite_underway,
-                                      self.protest_underway, self.warded)
+                                      self.protest_underway, self.warded, self.field_engagements)
 
 
 class CivicDemandNotice(SocietyValue):
@@ -309,6 +322,44 @@ class CivicDemandNotice(SocietyValue):
                 or (self.demand_kind == "organized_strike") != (self.food_quantity == 0 and self.site_id is None)):
             raise ValueError("civic notice demand shape is inconsistent")
         return self
+
+
+class FamilyLoanNotice(SocietyValue):
+    """A local household's dated knowledge of one institution's loan request."""
+
+    id: Identity
+    recipient_ref: EntityRef
+    request_id: Identity
+    borrower_ref: EntityRef
+    settlement_id: Identity
+    purpose: Literal["employment_payroll", "food_production_payroll"]
+    requested_principal: Annotated[int, Field(strict=True, gt=0)]
+    expires_day: Count
+    requested_day: Count
+    learned_day: Count
+    event_id: Identity
+    status: Literal["requested", "funded", "repaid"] = "requested"
+    channel: Literal["local_family_loan_notice"] = "local_family_loan_notice"
+
+    @model_validator(mode="after")
+    def valid_notice(self):
+        if (self.recipient_ref.kind != "population_group" or self.borrower_ref.kind != "polity"
+                or self.recipient_ref == self.borrower_ref or self.expires_day <= self.requested_day
+                or self.learned_day < self.requested_day):
+            raise ValueError("invalid family loan notice")
+        return self
+
+    def observation(self) -> str:
+        return json.dumps({"request_id": self.request_id,
+                           "borrower_ref": self.borrower_ref.to_dict(),
+                           "settlement_id": self.settlement_id,
+                           "purpose": self.purpose,
+                           "requested_principal": self.requested_principal,
+                           "expires_day": self.expires_day,
+                           "requested_day": self.requested_day,
+                           "status": self.status,
+                           "learned_day": self.learned_day},
+                          sort_keys=True, ensure_ascii=False, allow_nan=False)
 
 
 def site_observation(site_id, publisher_ref, observed_day, integrity, enabled, service_suspended) -> str:
@@ -711,7 +762,8 @@ class Objective(SocietyValue):
 class StrategicPlan(SocietyValue):
     id: Identity
     objective_id: Identity
-    stage: Literal["acquire", "await_delivery", "satisfied", "adopted", "mobilized", "closed", "blocked"]
+    stage: Literal["acquire", "await_delivery", "satisfied", "adopted", "mobilized", "closed", "blocked",
+                   "withdrawn"]
     order_ids: tuple[Identity, ...] = ()
     detachment_id: Identity | None = None
     blocker: Identity | None = None

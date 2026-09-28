@@ -9,6 +9,7 @@ import pytest
 from src.classes.environment.geography import GeographyLayer
 from src.classes.environment.tile import TileType
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -16,8 +17,12 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
+from tests.medieval_ai_helpers import provider_selection_stub
 from src.sim.medieval.field_engagement import (field_engagement_join_options, field_engagement_offer_options,
                                                field_strength, join_field_engagement, offer_field_engagement)
+from src.sim.medieval.field_aftermath_policy import (_aftermath_turn,
+                                                     _label as field_aftermath_label,
+                                                     field_aftermath_options)
 from src.sim.medieval.force import (detect_force_standoffs, force_position_options,
                                     prepare_force_position, raise_detachment, raise_options,
                                     withdraw_detachment, withdrawal_options)
@@ -39,7 +44,8 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "field_engagement_decided", "Decisão canônica de campo.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
 
 
 def tick(world):
@@ -60,6 +66,12 @@ def prepared_challenger_world(*, challenger_count=30, defender_count=50, defende
         premise = record_event(
             world, "test_field_food_premise", "Premissa factual de rações da expedição.",
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"root_premise": {
+                "kind": "scenario_bootstrap", "domain": "test_field_food_premise",
+                "source_refs": [{"kind": "scenario", "id": "field_engagement_fixture"},
+                                {"kind": "stock", "id": stock.id}],
+                "observed_day": world.clock.absolute_day,
+            }},
             deltas=(_delta("stock", stock.id, "food", before, before + extra_food),))
         world.economy.stocks[stock.id] = stock.model_copy(update={
             "goods": {**stock.goods, "food": before + extra_food},
@@ -113,6 +125,12 @@ def add_column(world, source_id, *, identity, owner, count, location_id=TARGET, 
     world.society.population[source.id] = source.model_copy(update={"count": source.count + count})
     arrival = record_event(world, "test_reinforcement_present", "Fixture factual de coluna adicional.",
                            fact_kind=FactKind.STATE_TRANSITION,
+                           causal_payload={"root_premise": {
+                               "kind": "scenario_bootstrap", "domain": "test_force_presence",
+                               "source_refs": [{"kind": "scenario", "id": "field_engagement_fixture"},
+                                               {"kind": "population_group", "id": source.id}],
+                               "observed_day": world.clock.absolute_day,
+                           }},
                            deltas=(_delta("detachment", identity, "stage", None, stage),))
     route_ids = () if stage == "present" else (next(iter(world.map.routes)),)
     column = Detachment(
@@ -193,7 +211,7 @@ async def test_prepared_supplied_thirty_beats_hungry_fifty_with_only_field_effec
     assert (engagement.challenger_casualties, engagement.defender_casualties) == (2, 10)
     assert world.society.total_population == people_before - 12
     assert world.society.detachments[own_id].count == 28
-    assert world.society.detachments[rival_id].stage == "disbanded"
+    assert world.society.detachments[rival_id].stage == "present"
     assert all(world.society.detachments[item].count > 0 for item in (own_id, rival_id))
     assert world.society.force_positions[f"force-position:{own_id}"].stage == "prepared"
     assert world.society.force_standoffs[standoff_id].stage == "resolved"
@@ -296,10 +314,15 @@ def test_same_contact_on_open_ground_changes_material_losses(tmp_path):
     assert (int(forest_terrain), int(open_terrain)) == (-1, 0)
     from tools.medieval_causal_audit import audit
     for label, world in (("forest", forest), ("plain", open_ground)):
-        path = tmp_path / f"field-{label}.mws"
-        save_world(world, path)
-        assert world_snapshot(load_world(path)) == world_snapshot(world)
-        assert audit(path)["ok"] is True
+            path = tmp_path / f"field-{label}.mws"
+            save_world(world, path)
+            assert world_snapshot(load_world(path)) == world_snapshot(world)
+            audit_result = audit(path)
+            assert audit_result["ok"] is True, {
+                key: audit_result[key] for key in ("unrooted_material_events", "root_premise_errors",
+                                                   "broken_cause_ids", "decision_authorship_errors",
+                                                   "decision_source_errors") if audit_result[key]
+            }
 
 
 def test_real_days_of_deployment_change_later_field_losses(tmp_path):
@@ -322,10 +345,15 @@ def test_real_days_of_deployment_change_later_field_losses(tmp_path):
             for fact, identity in ((fresh_fact, fresh_id), (veteran_fact, veteran_id))] == [0, 1]
     from tools.medieval_causal_audit import audit
     for label, world in (("fresh", fresh), ("veteran", veteran)):
-        path = tmp_path / f"field-{label}.mws"
-        save_world(world, path)
-        assert world_snapshot(load_world(path)) == world_snapshot(world)
-        assert audit(path)["ok"] is True
+            path = tmp_path / f"field-{label}.mws"
+            save_world(world, path)
+            assert world_snapshot(load_world(path)) == world_snapshot(world)
+            audit_result = audit(path)
+            assert audit_result["ok"] is True, {
+                key: audit_result[key] for key in ("unrooted_material_events", "root_premise_errors",
+                                                   "broken_cause_ids", "decision_authorship_errors",
+                                                   "decision_source_errors") if audit_result[key]
+            }
 
 
 def test_tie_is_symmetric_and_stale_or_provider_off_cannot_start_combat(monkeypatch):
@@ -342,7 +370,7 @@ def test_tie_is_symmetric_and_stale_or_provider_off_cannot_start_combat(monkeypa
     result = join_field_engagement(world, RIVAL, join.id, decide(world, join).id)
     assert result.winner_ref is None and (result.challenger_casualties, result.defender_casualties) == (3, 3)
     assert world.society.detachments[own_id].count == world.society.detachments[rival_id].count == 27
-    assert world.society.force_standoffs[standoff_id].stage == "active"
+    assert world.society.force_standoffs[standoff_id].stage == "resolved"
 
     blocked, _, _, _ = prepared_challenger_world()
     notice = blocked.knowledge.force_contacts_for_actor(OWNER)[0]
@@ -367,7 +395,7 @@ def test_tie_is_symmetric_and_stale_or_provider_off_cannot_start_combat(monkeypa
     assert not silent.knowledge.field_engagement_outcome_notices
 
 
-def test_present_reinforcement_changes_result_debits_cohorts_and_cleans_losing_side():
+def test_present_reinforcement_changes_result_debits_cohorts_and_preserves_loser_decision():
     baseline, _, _, _ = prepared_challenger_world(challenger_count=30, defender_count=70,
                                                    defender_provisions=999)
     assert resolve_offer(baseline).winner_ref == RIVAL
@@ -404,14 +432,65 @@ def test_present_reinforcement_changes_result_debits_cohorts_and_cleans_losing_s
     assert rival_notice.own_detachment_id == rival_id
     assert rival_notice.own_casualties == result.defender_casualties
     assert rival_notice.counterparty_strength_band == "100+"
-    assert world.society.detachments[rival_id].stage == "disbanded"
-    assert world.society.detachments[rival_reinforcement.id].stage == "disbanded"
+    assert world.society.detachments[rival_id].stage == "present"
+    assert world.society.detachments[rival_reinforcement.id].stage == "present"
     assert world.society.detachments[rival_id].count > 0
     assert world.society.detachments[rival_reinforcement.id].count > 0
-    assert all(standoff.stage != "active" or not {rival_id, rival_reinforcement.id}.intersection(standoff.detachment_ids)
-               for standoff in world.society.force_standoffs.values())
-    assert not any(item.stage == "active" and item.detachment_id in {rival_id, rival_reinforcement.id}
-                   for item in world.society.route_interdictions.values())
+    losing_notice = next(item for item in world.knowledge.field_engagement_outcome_notices.values()
+                         if item.recipient_ref == RIVAL)
+    disband_options = [item for item in field_aftermath_options(
+        world, RIVAL, outcome_notice_id=losing_notice.id)
+        if item.decision()["action"] == "disband_detachment"]
+    assert {item.detachment_id for item in disband_options} == {rival_id, rival_reinforcement.id}
+    labels = {item.detachment_id: field_aftermath_label(item) for item in disband_options}
+    assert all(detachment_id in label for detachment_id, label in labels.items())
+    assert len(set(labels.values())) == 2
+    assert all(standoff.stage == "resolved" for standoff in world.society.force_standoffs.values())
+    assert world.society.field_engagements[result.id].status == "resolved"
+
+
+@pytest.mark.asyncio
+async def test_aftermath_context_names_each_own_surviving_column(monkeypatch):
+    world, own_id, rival_id, _ = prepared_challenger_world(
+        challenger_count=30, defender_count=70, defender_provisions=999)
+    primary = world.society.detachments[own_id]
+    press_reinforcement(
+        world, primary.source_group_id, identity="detachment:context-own-reinforcement",
+        owner=OWNER, count=70, commander_id="character:002")
+    rival_primary = world.society.detachments[rival_id]
+    rival_reinforcement, _ = press_reinforcement(
+        world, rival_primary.source_group_id, identity="detachment:context-rival-reinforcement",
+        owner=RIVAL, count=30, commander_id="character:012")
+
+    result = resolve_offer(world, detachment_id=own_id, counterparty_detachment_id=rival_id)
+    assert result.winner_ref == OWNER
+    notice = next(item for item in world.knowledge.field_engagement_outcome_notices.values()
+                  if item.recipient_ref == RIVAL)
+    available = field_aftermath_options(world, RIVAL, outcome_notice_id=notice.id)
+    disband_ids = {item.detachment_id for item in available
+                   if item.decision()["action"] == "disband_detachment"}
+    assert disband_ids == {rival_id, rival_reinforcement.id}
+
+    world.config = world.config.model_copy(update={"ai_enabled": True})
+    captures = []
+
+    async def decline(_world, actor, situation, choices, *, causes):
+        captures.append((actor, situation, choices, causes))
+        return ai_decider.NO_ACTION
+
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(decline))
+    assert not await _aftermath_turn(world, notice.id)
+    actor, situation, choices, causes = captures[0]
+
+    assert actor == RIVAL
+    assert {item["id"] for item in situation["your_detachments"]} == disband_ids
+    assert {item["id"] for item in choices
+            if item["id"] in {option.id for option in available}} >= {
+                option.id for option in available if option.decision()["action"] == "disband_detachment"
+            }
+    assert notice.event_id in causes
+    assert all(item["settlement_id"] == TARGET for item in situation["your_detachments"])
+    assert all(item["count"] > 0 for item in situation["your_detachments"])
 
 
 def test_only_prior_press_columns_reinforce_and_no_action_leaves_offer_open(monkeypatch):

@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.environment.creature import CREATURE_SPECIES, creature_species_definition
 from src.classes.mechanical_language import EntityRef
 from src.classes.research.models import Ward
@@ -173,6 +174,34 @@ async def test_unanswered_demand_can_affect_only_an_anonymous_endpoint_cohort(tm
     assert HAZARD_INTERACTIONS[("river_drake", "population_group")] is DRAKE_POPULATION_DAMAGE_INTERACTION
     assert event.causal_payload["hazard_impact"]["affected_count"] == attack.population_count
     assert drake_population_damage_magnitude(world, group.id) is not None
+    from src.sim.medieval.actor_dossier import build_actor_dossier
+    refresh_settlement_reports(world)
+    settlement = world.society.settlements[group.settlement_id]
+    administrator = EntityRef("polity", settlement.administrator_id)
+    local_report = next(item for item in build_actor_dossier(world, administrator)["known_settlement_reports"]
+                        if item["settlement_id"] == settlement.id)
+    incident = next(item for item in local_report["recent_creature_attacks"]
+                    if item["event_id"] == event.id)
+    assert incident == {"event_id": event.id, "day": event.day,
+                        "hazard_kind": "river_drake", "affected_count": attack.population_count}
+    assert "population_group_id" not in incident
+    from src.sim.medieval.character_rite_policy import _character_situation
+    officiant = next(item for item in world.society.characters.values()
+                     if item.death_day is None and item.location_id == settlement.id)
+    character_ref = EntityRef("character", officiant.id)
+    settlement_report = world.knowledge.settlement_report(character_ref, settlement.id)
+    rite_context = _character_situation(world, officiant, settlement_report)
+    assert rite_context["local_observation"]["recent_creature_attacks"] == [incident]
+    from types import SimpleNamespace
+    from src.sim.medieval.character_rite_policy import _sponsor_situation
+    sponsor_context = _sponsor_situation(
+        world, administrator, SimpleNamespace(settlement_id=settlement.id))
+    assert sponsor_context["local_observation"]["recent_creature_attacks"] == [incident]
+    world.clock = world.clock.advance(31)
+    refresh_settlement_reports(world)
+    aged_report = next(item for item in build_actor_dossier(world, administrator)["known_settlement_reports"]
+                       if item["settlement_id"] == settlement.id)
+    assert aged_report["recent_creature_attacks"] == []
     from src.sim.medieval.persistence import load_world, save_world, world_snapshot
     path = tmp_path / "creature-population-attack.mws"
     save_world(world, path)
@@ -185,6 +214,8 @@ def decide(world, option):
         "wave6_magic_decided",
         "Decisão da vertical de magia e criatura.",
         fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision=option.decision(),
     )
 
@@ -201,7 +232,7 @@ async def test_completed_ward_blunts_one_drake_site_hazard():
         and option.blueprint_id == "rite-of-warding"
         and option.site_id == WARD_SITE
     )
-    offer = record_rite_offer(world, officiant.id, offer_option.id)
+    offer = record_rite_offer(world, officiant.id, offer_option.id, decision_source={"kind": "api"})
     sponsor_option = next(
         option
         for option in rite_sponsor_options(world, WARD_SPONSOR)

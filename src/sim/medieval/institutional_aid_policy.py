@@ -7,25 +7,40 @@ state-changing action per invocation, so a chain advances one step per day
 instead of waiting for a month and breaching by inaction.
 """
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 
 from .diplomacy_policy import schedule_review
-from .events import record_event
+from .events import record_event, record_no_action_decision
 from .institutional_aid import (REQUEST_ACTION, _answered, aid_fulfillment_options, aid_remediation_options,
                                 aid_request_options, aid_response_options, fulfill_institutional_aid,
                                 remediate_institutional_aid, request_institutional_aid, respond_institutional_aid)
-from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
+from .ai_decider import INTERPRETED_EVENT, NO_ACTION, ProviderDecisionRequired, select_option
 from .institutional_memory import institutional_view
 
 
-def _decide(world, option, event_type, content):
+def _provider_decision_source(world):
+    receipt = world.events[-1] if world.events else None
+    if receipt is None or receipt.event_type != INTERPRETED_EVENT:
+        raise ProviderDecisionRequired("provider decision receipt is missing")
+    return {"kind": "provider", "receipt_event_id": receipt.id}
+
+
+def _decide(world, option, event_type, content, *, decision_source=None):
     """The current-day decision, recorded immediately before its executor."""
-    return record_event(world, event_type, content, fact_kind=FactKind.DECISION, decision=option.decision())
+    source = decision_source or {
+        "kind": "fallback", "policy": "routine-rules", "rule": "institutional_food_aid",
+    }
+    receipt_id = source.get("receipt_event_id") if source.get("kind") == "provider" else None
+    return record_event(world, event_type, content, fact_kind=FactKind.DECISION,
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": source},
+                        cause_ids=(receipt_id,) if receipt_id else ())
 
 
 def _event_day(world, event_id):
-    event = next((item for item in world.events if item.id == event_id), None)
+    event = world.event_index().get(event_id)
     return event.day if event is not None else None
 
 
@@ -60,8 +75,9 @@ def _response_candidates(world, actor):
     return answerable, routine, request_event_id
 
 
-def _apply_response(world, actor, chosen):
-    decision = _decide(world, chosen, "aid_response_decided", "A instituição respondeu a um pedido de ajuda.")
+def _apply_response(world, actor, chosen, *, decision_source=None):
+    decision = _decide(world, chosen, "aid_response_decided", "A instituição respondeu a um pedido de ajuda.",
+                        decision_source=decision_source)
     respond_institutional_aid(world, actor, chosen.id, decision.id)
     # A direct review may consume a due review without going through the
     # calendar resolver (as the engine does).  Remove that already-resolved
@@ -109,13 +125,20 @@ async def _respond_with_provider(world, actor):
     choices = [{"id": option.id, "label": labels[option.kind]} for option in answerable]
     selected = await select_option(world, actor, situation, choices,
                                    causes=(notice.event_id,) if notice else ())
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "aid_response_decided", "A instituição decidiu não responder ao pedido de ajuda agora.",
+            actor, affordance_ids=(option.id for option in answerable),
+            cause_ids=(notice.event_id,) if notice else (),
+        )
+        return False
+    if selected is None:
         return False
     chosen = next((option for option in _response_candidates(world, actor)[0] if option.id == selected), None)
     if chosen is None:
         raise _stale(actor, "institutional aid response")
     try:
-        return _apply_response(world, actor, chosen)
+        return _apply_response(world, actor, chosen, decision_source=_provider_decision_source(world))
     except ValueError as exc:
         raise _stale(actor, "institutional aid response") from exc
 
@@ -134,12 +157,19 @@ async def _fulfill_with_provider(world, actor):
         {"obligations": [option.obligation_id for option in options],
          "today": world.clock.absolute_day},
         choices, causes=causes)
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "aid_fulfillment_decided", "A instituição decidiu não cumprir a obrigação neste turno.",
+            actor, affordance_ids=(option.id for option in options), cause_ids=causes,
+        )
+        return False
+    if selected is None:
         return False
     option = next((item for item in aid_fulfillment_options(world, actor) if item.id == selected), None)
     if option is None:
         raise _stale(actor, "institutional aid fulfillment")
-    decision = _decide(world, option, "aid_fulfillment_decided", "A instituição cumpriu a ajuda acordada.")
+    decision = _decide(world, option, "aid_fulfillment_decided", "A instituição cumpriu a ajuda acordada.",
+                       decision_source=_provider_decision_source(world))
     try:
         fulfill_institutional_aid(world, actor, option.id, decision.id)
     except ValueError as exc:
@@ -179,12 +209,20 @@ async def _remediate_with_provider(world, actor):
         {"breaches": [option.breach_event_id for option in options],
          "today": world.clock.absolute_day},
         choices, causes=tuple(sorted({option.breach_event_id for option in options})))
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "aid_remediation_decided", "A instituição decidiu não reparar a obrigação neste turno.",
+            actor, affordance_ids=(option.id for option in options),
+            cause_ids=tuple(sorted({option.breach_event_id for option in options})),
+        )
+        return False
+    if selected is None:
         return False
     option = next((item for item in aid_remediation_options(world, actor) if item.id == selected), None)
     if option is None:
         raise _stale(actor, "institutional aid remediation")
-    decision = _decide(world, option, "aid_remediation_decided", "A instituição reparou uma ajuda descumprida.")
+    decision = _decide(world, option, "aid_remediation_decided", "A instituição reparou uma ajuda descumprida.",
+                       decision_source=_provider_decision_source(world))
     try:
         remediate_institutional_aid(world, actor, option.id, decision.id)
     except ValueError as exc:
@@ -242,9 +280,7 @@ def _own_open_chain(world, requester, settlement_id):
     inspected, whoever the provider is. No foreign holding is read.
     """
     events = world.event_index()
-    for event in world.events:
-        if event.event_type != "institutional_aid_requested":
-            continue
+    for event in world.events_of_type("institutional_aid_requested"):
         decision = next((events[link.cause_event_id] for link in event.causal_links
                          if link.cause_event_id in events
                          and events[link.cause_event_id].fact_kind == FactKind.DECISION
@@ -309,13 +345,20 @@ async def _request_with_provider(world, actor):
         {"settlements_with_current_need": list(pressured),
          "today": world.clock.absolute_day},
         choices, causes=report_events)
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "aid_request_decided", "A instituição decidiu não pedir ajuda neste turno.",
+            actor, affordance_ids=(option.id for option in options), cause_ids=report_events,
+        )
+        return False
+    if selected is None:
         return False
     option = next((item for item in aid_request_options(world, actor) if item.id == selected), None)
     if option is None or option.requester_settlement_id not in pressured or _own_open_chain(
             world, actor, option.requester_settlement_id):
         raise _stale(actor, "institutional aid request")
-    decision = _decide(world, option, "aid_request_decided", "A instituição pediu ajuda alimentar.")
+    decision = _decide(world, option, "aid_request_decided", "A instituição pediu ajuda alimentar.",
+                       decision_source=_provider_decision_source(world))
     request_institutional_aid(world, actor, option.id, decision.id)
     schedule_review(world)
     return True

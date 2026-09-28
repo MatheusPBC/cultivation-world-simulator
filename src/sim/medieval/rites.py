@@ -16,6 +16,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.knowledge import rite_observation_id
@@ -100,6 +101,7 @@ def _event(world, event_id):
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
     if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("rite requires a current actor decision")
@@ -245,7 +247,7 @@ def rite_offer_options(world, officiant_id):
     return tuple(options)
 
 
-def record_rite_offer(world, officiant_id, option_id, *, cause_ids=()):
+def record_rite_offer(world, officiant_id, option_id, *, decision_source, cause_ids=()):
     """The officiant's own decision; it carries no delta and binds nobody."""
     option = next((item for item in rite_offer_options(world, officiant_id) if item.id == option_id), None)
     if option is None:
@@ -253,7 +255,9 @@ def record_rite_offer(world, officiant_id, option_id, *, cause_ids=()):
     if any(event.fact_kind == FactKind.DECISION and event.decision == option.decision() for event in world.events):
         raise ValueError("rite offer decision already exists")
     return record_event(world, "rite_offered", "Um oficiante residente ofereceu conduzir um rito local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
                         cause_ids=_causes(option.report_event_id, *cause_ids))
 
 

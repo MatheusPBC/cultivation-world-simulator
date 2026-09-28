@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.economy.models import Stock
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import monthly_workforce, produce_monthly
@@ -48,6 +49,8 @@ def _depart(world, quantity):
         )
     decision = record_event(
         world, "freight_decided", "Remessa própria autorizada.", fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "freight", "source_id": source.id, "destination_id": destination_id,
                   "resource_id": "food", "quantity": quantity, "route_ids": [RIVER],
                   "actor_ref": source.owner_ref.to_dict()},

@@ -69,6 +69,56 @@ def known_supply_path(world, actor_ref, origin_id, destination_id, resource_id="
     return _search(world, origin_id, destination_id, cost_of)
 
 
+def known_supply_path_from_region(world, actor_ref, origin_region_id, destination_region_id,
+                                  resource_id="food", *, excluded_route_ids=()):
+    """Find one shortest path from a physically occupied map region.
+
+    Unlike ``known_supply_path``, the origin need not be a settlement. This is
+    used only when a moving force has physically reached a route boundary and
+    must decide whether a different, already-observed passage is available.
+    The search still uses the institution's dated readings; current map state
+    is left for the executing owner to revalidate.
+    """
+    if (resource_id not in world.economy.resources
+            or origin_region_id not in world.map.regions
+            or destination_region_id not in world.map.regions):
+        return None
+    if origin_region_id == destination_region_id:
+        return ()
+    day = world.clock.absolute_day
+    bulk = world.economy.resources[resource_id].bulk
+    reports = {report.route_id: report for report in world.knowledge.routes_for_actor(actor_ref)}
+    excluded = set(excluded_route_ids)
+
+    def cost_of(route_id, route):
+        report = reports.get(route_id)
+        if (route_id in excluded or report is None
+                or not 0 <= day - report.observed_day < 30
+                or report.travel_days is None or report.operational_capacity < bulk
+                or route.mode not in {"road", "river"} or not route.allows_resource(resource_id)):
+            return None
+        return report.travel_days
+
+    frontier, visited = [(0, (), origin_region_id)], set()
+    while frontier:
+        duration, path, region_id = heapq.heappop(frontier)
+        if region_id == destination_region_id:
+            return path
+        if region_id in visited:
+            continue
+        visited.add(region_id)
+        for route_id, route in sorted(world.map.routes.items()):
+            if region_id not in route.endpoint_region_ids:
+                continue
+            cost = cost_of(route_id, route)
+            if cost is None:
+                continue
+            other = next(item for item in route.endpoint_region_ids if item != region_id)
+            if other not in visited:
+                heapq.heappush(frontier, (duration + cost + 1, (*path, route_id), other))
+    return None
+
+
 def _fresh_fiscal_readings(world, actor_ref, resource_id):
     """Return routes with current route reports and any current fiscal receipt.
 

@@ -37,7 +37,25 @@ def allocate_opening_household_income(world):
                                  before=str(account.balance), after=str(account.balance + amount)))
     event = record_event(world, EVENT_TYPE,
                          "A premissa inicial transferiu aos domicílios o saldo para uma ração local.",
-                         fact_kind=FactKind.STATE_TRANSITION, deltas=tuple(deltas))
+                         fact_kind=FactKind.STATE_TRANSITION,
+                         causal_payload={
+                             "root_premise": {
+                                 "kind": "scenario_bootstrap",
+                                 "domain": "household_income",
+                                 "source_refs": [
+                                     *({"kind": "account", "id": account_id}
+                                       for account_id in sorted(debits)),
+                                     *({"kind": "account", "id": account_id}
+                                       for account_id in sorted(credits)),
+                                 ],
+                                 "observed_day": world.clock.absolute_day,
+                             },
+                             "transfer": {
+                                 "debits": dict(sorted(debits.items())),
+                                 "credits": dict(sorted(credits.items())),
+                             },
+                         },
+                         deltas=tuple(deltas))
     for account_id, amount in debits.items():
         account = economy.accounts[account_id]
         economy.accounts[account_id] = account.model_copy(update={"balance": account.balance - amount,

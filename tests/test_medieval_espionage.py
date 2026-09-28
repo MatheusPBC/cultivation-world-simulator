@@ -2,6 +2,7 @@ import copy
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.models import AuthorityOffice
 from src.classes.mechanical_language import EntityRef
@@ -37,7 +38,20 @@ def prepared_world(skill=60):
 
 def decide(world, option):
     return record_event(world, "espionage_decided", "A instituição selecionou uma missão de espionagem.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
+
+
+def test_deterministic_intent_cannot_execute_an_espionage_mission():
+    world, _agent, option = prepared_world()
+    decision = record_event(world, "espionage_decided", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="exact current decision"):
+        execute_espionage(world, OWNER, option.id, decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_espionage_success_brings_home_its_own_local_observation_and_survives_save(tmp_path):

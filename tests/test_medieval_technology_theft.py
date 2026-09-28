@@ -4,6 +4,7 @@ import copy
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.models import AuthorityOffice
 from src.classes.mechanical_language import EntityRef
@@ -28,8 +29,10 @@ def prepared_world(skill=60, *, apply=True):
         facility_id = "works:minas-de-ferroalto"
         decision = record_event(world, "theft_fixture_expansion_decided", "Construir a linha de carvão observada.",
                                 fact_kind=FactKind.DECISION,
+                                causal_origin=CausalOrigin.ACTOR_DECISION,
                                 decision={"action": "expand", "actor_ref": EntityRef("polity", "escarlia").to_dict(),
-                                          "facility_id": facility_id, "blueprint_id": "charcoal-kilns"})
+                                          "facility_id": facility_id, "blueprint_id": "charcoal-kilns"},
+                                causal_payload={"decision_source": {"kind": "api"}})
         start_expansion(world, facility_id, "charcoal-kilns", decision_event_id=decision.id)
         for day in (120, 150):
             world.clock = WorldClock(day)
@@ -67,8 +70,24 @@ def test_theft_option_disappears_when_technical_line_stops_operating():
 
 def decide(world, option):
     return record_event(world, "technology_theft_decided", "A instituição selecionou uma tentativa de obtenção técnica.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision(),
                         cause_ids=(option.observation_event_id, option.source_knowledge_event_id))
+
+
+def test_deterministic_copy_of_theft_affordance_cannot_create_a_mission():
+    world, _agent = prepared_world()
+    option = technology_theft_options(world, OWNER)[0]
+    decision = record_event(world, "technology_theft_decided", "Payload idêntico sem escolha do ator.",
+                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            cause_ids=(option.observation_event_id, option.source_knowledge_event_id))
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="exact current decision"):
+        execute_technology_theft(world, OWNER, option.id, decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_success_copies_only_sighted_canonical_technology_and_round_trips(tmp_path):

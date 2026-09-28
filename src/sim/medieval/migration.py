@@ -2,6 +2,7 @@
 
 import math
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.economy.migration import MigrationProvision
 from src.classes.economy.models import MoneyAccount, Stock
 from src.classes.event import FactKind
@@ -11,6 +12,7 @@ from src.systems.calendar_agenda import ScheduledSituation
 from .economy import _causes, _delta
 from .events import record_event
 from .logistics import _route_causes
+from .material_execution import execute_material
 from .migration_policy import PASSENGER_BULK, RATIONS_PER_PERSON, migration_options, recovery_options
 from .travel import route_duration
 
@@ -20,8 +22,18 @@ def _event(world, event_id):
 
 
 def _used_decision(world, decision_event_id):
-    return any(event.event_type == "migration_started" and any(link.cause_event_id == decision_event_id
+    return any(event.event_type in {"migration_authorized", "migration_started"}
+               and any(link.cause_event_id == decision_event_id
                for link in event.causal_links) for event in world.events)
+
+
+def _has_actor_choice_cause(world, authorization, selected_decision):
+    return any((source := _event(world, link.cause_event_id)) is not None
+               and source.fact_kind == FactKind.DECISION
+               and source.causal_origin == CausalOrigin.ACTOR_DECISION
+               and source.day == authorization.day
+               and source.decision == selected_decision
+               for link in authorization.causal_links)
 
 
 def _food_stock(world, group_id):
@@ -65,24 +77,46 @@ def _recovery_detail(option, group_id):
 
 
 def start_migration(world, option_id, *, decision_event_id, character_ids=(), cancel_activity_ids=()):
-    """Commit one current option; all material state is checked before mutation."""
+    """Commit one current option without exposing partial authorization."""
+    return execute_material(
+        world, _start_migration_in_place, option_id,
+        decision_event_id=decision_event_id, character_ids=character_ids,
+        cancel_activity_ids=cancel_activity_ids,
+    )
+
+
+def _start_migration_in_place(world, option_id, *, decision_event_id, character_ids=(), cancel_activity_ids=()):
+    """Execute on a candidate; the public boundary validates before publish."""
     decision = _event(world, decision_event_id)
-    if decision is None or decision.fact_kind != FactKind.DECISION or _used_decision(world, decision_event_id):
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or _used_decision(world, decision_event_id)):
         raise ValueError("migration requires an unused decision")
     group_id = (decision.decision or {}).get("group_id") or _actor_id(decision)
     option = next((item for item in migration_options(world, group_id) if item.id == option_id), None)
     if option is None:
         raise ValueError("migration option is stale or not selected by this group")
+    if decision.day != world.clock.absolute_day:
+        raise ValueError("migration decision is no longer current")
+    expected_detail = _migration_detail(option, character_ids, cancel_activity_ids)
+    selected = option.decision()
+    direct_actor_choice = False
+    if decision.causal_origin == CausalOrigin.ACTOR_DECISION:
+        direct_actor_choice = decision.decision == selected or decision.decision == expected_detail
+    elif (decision.causal_origin == CausalOrigin.DETERMINISTIC
+          and decision.event_type == "migration_authorized"
+          and decision.decision == expected_detail):
+        direct_actor_choice = _has_actor_choice_cause(world, decision, selected)
+    if not direct_actor_choice:
+        raise ValueError("migration requires the current actor decision for its affordance")
     evidence = {world.knowledge.settlement_reports[option.source_report_id].event_id,
                 world.knowledge.settlement_reports[option.destination_report_id].event_id,
                 *(world.knowledge.route_reports[report_id].event_id for report_id in option.route_report_ids)}
-    selected = option.decision()
     if decision.decision == selected:
         # Direct callers may submit the actor-facing ID-only decision.  The
         # owner recomposes material terms once, then executes that authorization.
         authorization = record_event(
             world, "migration_authorized", "O grupo autorizou a jornada escolhida.",
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
             decision=_migration_detail(option, character_ids, cancel_activity_ids),
             cause_ids=(decision.id, *sorted(evidence)))
         decision = authorization
@@ -143,7 +177,13 @@ def start_migration(world, option_id, *, decision_event_id, character_ids=(), ca
 
 
 def recover_migration(world, option_id, *, decision_event_id):
-    """Execute one explicit current recovery choice for a stranded household."""
+    """Execute one explicit recovery choice without publishing partial effects."""
+    return execute_material(world, _recover_migration_in_place, option_id,
+                            decision_event_id=decision_event_id)
+
+
+def _recover_migration_in_place(world, option_id, *, decision_event_id):
+    """Recompose and execute the current choice on an isolated candidate."""
     decision = _event(world, decision_event_id)
     journey_id = (decision.decision or {}).get("journey_id") if decision is not None else None
     if journey_id is None:
@@ -156,10 +196,23 @@ def recover_migration(world, option_id, *, decision_event_id):
     option = next((item for item in recovery_options(world, journey.id) if item.id == option_id), None)
     if option is None:
         raise ValueError("migration recovery option is stale")
+    if decision.day != world.clock.absolute_day:
+        raise ValueError("migration recovery decision is no longer current")
+    selected = option.decision(journey.source_group_id)
+    expected_detail = _recovery_detail(option, journey.source_group_id)
+    if decision.causal_origin == CausalOrigin.ACTOR_DECISION:
+        actor_authored = decision.decision == selected or decision.decision == expected_detail
+    else:
+        actor_authored = (decision.causal_origin == CausalOrigin.DETERMINISTIC
+                          and decision.event_type == "migration_recovery_authorized"
+                          and decision.decision == expected_detail
+                          and _has_actor_choice_cause(world, decision, selected))
+    if not actor_authored:
+        raise ValueError("migration recovery requires the current actor decision for its affordance")
     evidence = {world.knowledge.settlement_reports[report_id].event_id
                 if report_id in world.knowledge.settlement_reports else world.knowledge.route_reports[report_id].event_id
                 for report_id in option.report_ids}
-    if decision.decision == option.decision(journey.source_group_id):
+    if decision.decision == selected:
         # Recovery has no hidden material terms: the owner can recompose the
         # current route/report set directly from the selected affordance.
         pass
@@ -325,7 +378,6 @@ def _arrive(world, journey, causes):
         raise ValueError("destination household account has an invalid owner")
     stock_id = f"household-stock:{target_id}"
     domestic = world.economy.stocks.get(stock_id)
-    food_bulk = world.economy.resources["food"].bulk
     before_capacity = domestic.capacity if domestic else 0
     resident_count = (target.count if target else 0) + journey.count
     capacity = max(before_capacity, _portable_capacity(world, resident_count))
@@ -410,9 +462,8 @@ def _resolve(world, journey, route_causes):
     if route.mode not in {"road", "river"} or route.quality <= 0 or capacity - used < bulk:
         updated = journey.model_copy(update={"due_day": day + 1})
         delay_count = sum(
-            1 for event in world.events
-            if event.event_type == "migration_delayed"
-            and any(delta.owner_kind == "migration" and delta.owner_id == journey.id for delta in event.deltas)
+            1 for event in world.events_of_type("migration_delayed")
+            if any(delta.owner_kind == "migration" and delta.owner_id == journey.id for delta in event.deltas)
         )
         pressure_deltas = ()
         source_need = world.economy.needs.get(world.society.population[journey.source_group_id].settlement_id)

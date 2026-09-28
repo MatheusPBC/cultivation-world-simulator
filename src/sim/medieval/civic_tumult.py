@@ -98,6 +98,7 @@ def civic_tumult_options(world, group_id):
 def _decision(world, decision_event_id):
     decision = _event(world, decision_event_id)
     if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != world.clock.absolute_day
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.decision is None or decision.decision.get("action") != TUMULT_ACTION
             or set(decision.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("civic tumult requires a current actor decision")

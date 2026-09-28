@@ -1,15 +1,21 @@
 """A technique travels with a person who moved, and still buys no installation."""
 
 from dataclasses import replace
+import json
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
+from src.sim.medieval import ai_decider
 from src.sim.medieval.apprenticeship import (apprenticeship_sponsor_options, record_apprenticeship_offer,
                                              _has_migrated, resolve_apprenticeships, specialist_offer_options,
                                              sponsor_apprenticeship)
+from src.sim.medieval.character_rite_policy import review_character_rites, schedule_character_rite_offers
+from src.sim.medieval.institutional_agenda import monthly_adapters, monthly_actors
+from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -23,7 +29,9 @@ TECHNOLOGY = "irrigation"
 
 def decide(world, option, event_type="apprenticeship_decided"):
     return record_event(world, event_type, "Decisão institucional de instrução.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision())
 
 
 def specialist_of(world, settlement_id):
@@ -40,8 +48,12 @@ def trained_specialist_world():
     terms = {"technology_id": TECHNOLOGY, "site_id": "campos-do-lume", "stock_id": "stock:campomanso",
              "account_id": "treasury:auren", "researcher_id": lead.id}
     sponsor = record_event(world, "research_decided", "Financiar pesquisa.", fact_kind=FactKind.DECISION,
+                           causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}},
                            decision={**terms, "action": "research", "actor_ref": ORIGIN.to_dict()})
     accepted = record_event(world, "research_accepted", "Aceitar trabalho.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision={**terms, "action": "research_work",
                                       "actor_ref": EntityRef("character", lead.id).to_dict()},
                             cause_ids=(sponsor.id,))
@@ -87,7 +99,9 @@ def test_arbitrary_relocation_receipt_does_not_count_as_migration():
 def contracted(world, specialist):
     offer_option = next(item for item in specialist_offer_options(world, specialist.id)
                         if item.technology_id == TECHNOLOGY)
-    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id)
+    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id,
+                                        decision_source={"kind": "api"})
+    assert offer.causal_origin.value == "actor_decision"
     sponsor_option = next(item for item in apprenticeship_sponsor_options(world, HOST)
                           if item.offer_event_id == offer.id)
     contract = sponsor_apprenticeship(world, HOST, sponsor_option.id, decide(world, sponsor_option).id)
@@ -100,6 +114,94 @@ def expand(world, facility_id="works:salgueiro-farm", blueprint_id="irrigation-w
                             decision={"action": "expand", "actor_ref": HOST.to_dict(),
                                       "facility_id": facility_id, "blueprint_id": blueprint_id})
     return start_expansion(world, facility_id, blueprint_id, decision_event_id=decision.id)
+
+
+def _select_apprenticeship(monkeypatch, action_label=None, *, no_action=False):
+    async def call_llm_json(prompt, *args, **kwargs):
+        if no_action:
+            return {"selected_id": ai_decider.NO_ACTION}
+        payload = json.loads(prompt[prompt.index("{"):])
+        selected = next(choice["id"] for choice in payload["choices"]
+                        if action_label.casefold() in choice["label"].casefold())
+        return {"selected_id": selected}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
+
+
+async def test_specialist_offer_enters_existing_individual_calendar_turn(monkeypatch):
+    world, specialist = hosting_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
+                                                   "ai_max_calls": 10})
+    _select_apprenticeship(monkeypatch, "Oferecer instrução de Irrigação")
+    scheduled = schedule_character_rite_offers(world)
+    assert scheduled
+    due_day = world.agenda.get(scheduled[0]).due_day
+    world.clock = world.clock.__class__(due_day)
+    due = world.agenda.pop_due(due_day)
+    await review_character_rites(world, due)
+
+    offer = next(event for event in world.events if event.event_type == "apprenticeship_offered")
+    assert offer.decision["actor_ref"] == EntityRef("character", specialist.id).to_dict()
+    assert offer.causal_origin.value == "actor_decision" and offer.deltas == ()
+    source = offer.causal_payload["decision_source"]
+    assert source["kind"] == "provider"
+    assert source["receipt_event_id"] in {link.cause_event_id for link in offer.causal_links}
+    assert {link.cause_event_id for link in offer.causal_links} >= set(
+        next(item for item in specialist_offer_options(world, specialist.id)
+             if item.technology_id == TECHNOLOGY).source_event_ids
+    )
+
+
+async def test_no_action_is_recorded_and_same_learning_option_is_not_reoffered(monkeypatch):
+    world, specialist = hosting_world()
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
+                                                   "ai_max_calls": 10})
+    option = next(item for item in specialist_offer_options(world, specialist.id)
+                  if item.technology_id == TECHNOLOGY)
+    _select_apprenticeship(monkeypatch, no_action=True)
+    scheduled = schedule_character_rite_offers(world)
+    due_day = world.agenda.get(scheduled[0]).due_day
+    world.clock = world.clock.__class__(due_day)
+    await review_character_rites(world, world.agenda.pop_due(due_day))
+
+    refusal = next(event for event in world.events
+                   if event.fact_kind == FactKind.DECISION
+                   and (event.decision or {}).get("action") == "no_action"
+                   and option.id in (event.decision or {}).get("declined_option_ids", ()))
+    assert refusal.causal_origin.value == "actor_decision" and refusal.deltas == ()
+    assert not any(event.event_type == "apprenticeship_offered" for event in world.events)
+    world.clock = world.clock.advance(30)
+    assert not schedule_character_rite_offers(world)
+
+
+async def test_host_sponsors_pending_specialist_offer_in_shared_monthly_menu(monkeypatch):
+    world, specialist = hosting_world()
+    offer_option = next(item for item in specialist_offer_options(world, specialist.id)
+                        if item.technology_id == TECHNOLOGY)
+    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id,
+                                        decision_source={"kind": "api"})
+    world.clock = world.clock.advance(1)
+    options = apprenticeship_sponsor_options(world, HOST)
+    assert any(option.offer_event_id == offer.id for option in options), "offer survives to a later decision"
+    assert HOST in monthly_actors(world), "the existing actor roster includes a feasible sponsor"
+    assert any(adapter.name == "apprenticeship_sponsorship" for adapter in monthly_adapters())
+
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 10,
+                                                   "ai_max_calls": 10})
+    _select_apprenticeship(monkeypatch, "Patrocinar instrução de")
+    await review_institutional_decision_turn(world, HOST, monthly_adapters())
+
+    contract = next(iter(world.research.apprenticeships.values()))
+    decision = next(event for event in world.events if event.event_type == "institutional_decision_turn_decided")
+    assert decision.decision["action"] == "sponsor_apprenticeship"
+    assert decision.causal_origin.value == "actor_decision"
+    source = decision.causal_payload["decision_source"]
+    assert source["kind"] == "provider"
+    assert source["receipt_event_id"] in {link.cause_event_id for link in decision.causal_links}
+    assert contract.specialist_decision_id == offer.id
+    assert contract.started_day == world.clock.absolute_day and contract.stage == "training"
+    assert not world.knowledge.knows(HOST, TECHNOLOGY)
 
 
 def test_a_migrated_specialist_instructs_for_real_wages_before_any_technique_exists(tmp_path):
@@ -166,7 +268,8 @@ def test_no_shortcut_grants_the_technique():
     assert not specialist_offer_options(world, specialist.id)
     world.society.characters[poor.id] = poor
 
-    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id)
+    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id,
+                                        decision_source={"kind": "api"})
     sponsor_option = next(item for item in apprenticeship_sponsor_options(world, HOST)
                           if item.offer_event_id == offer.id)
     before = world_snapshot(world)
@@ -178,11 +281,17 @@ def test_no_shortcut_grants_the_technique():
                                            "selected_affordance_id": sponsor_option.id})
     with pytest.raises(ValueError):
         sponsor_apprenticeship(world, HOST, sponsor_option.id, self_decision.id)
+    unauthored = record_event(world, "apprenticeship_interpreted", "Payload atual sem escolha do host.",
+                              fact_kind=FactKind.DECISION, decision=sponsor_option.decision())
+    before_unauthored = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        sponsor_apprenticeship(world, HOST, sponsor_option.id, unauthored.id)
+    assert world_snapshot(world) == before_unauthored
     forged = decide(world, sponsor_option)
     with pytest.raises(ValueError, match="stale|unknown"):
         sponsor_apprenticeship(world, HOST, sponsor_option.id + ":forged", forged.id)
     assert not world.knowledge.knows(HOST, TECHNOLOGY)
-    assert world_snapshot(world)["event_count"] == before["event_count"] + 2
+    assert world_snapshot(world)["event_count"] == before["event_count"] + 3
 
     contract = sponsor_apprenticeship(world, HOST, sponsor_option.id, forged.id)
     # A used decision cannot be replayed, and an occupied specialist offers nothing.
@@ -218,5 +327,6 @@ def test_migrated_artisan_can_carry_source_institution_knowledge_without_researc
     option = next(item for item in specialist_offer_options(world, artisan.id)
                   if item.technology_id == TECHNOLOGY)
     assert option.source_event_ids
-    offer = record_apprenticeship_offer(world, artisan.id, option.id)
+    offer = record_apprenticeship_offer(world, artisan.id, option.id,
+                                        decision_source={"kind": "api"})
     assert {link.cause_event_id for link in offer.causal_links} == set(option.source_event_ids)

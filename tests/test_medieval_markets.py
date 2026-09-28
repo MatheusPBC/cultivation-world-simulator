@@ -1,6 +1,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
@@ -34,7 +35,8 @@ def consent(world, values):
     for action, stock_field in (("buy", "destination_id"), ("sell", "source_id")):
         owner = world.economy.stocks[values[stock_field]].owner_ref
         decisions.append(record_event(world, f"{action}_decided", "Termos comerciais aceitos.",
-                                       fact_kind=FactKind.DECISION,
+                                       fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                       causal_payload={"decision_source": {"kind": "api"}},
                                        decision={**values, "action": action, "actor_ref": owner.to_dict()}).id)
     return tuple(decisions)
 
@@ -42,7 +44,8 @@ def consent(world, values):
 def decide_one(world, action, stock_field, values):
     owner = world.economy.stocks[values[stock_field]].owner_ref
     return record_event(world, f"{action}_decided", "Termos comerciais aceitos.",
-                        fact_kind=FactKind.DECISION,
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
                         decision={**values, "action": action, "actor_ref": owner.to_dict()}).id
 
 
@@ -110,6 +113,25 @@ def test_trade_cannot_use_only_one_partys_decision():
     before = world_snapshot(world)
     with pytest.raises(ValueError, match="consent"):
         purchase(world, decisions[0], decisions[0])
+    assert world_snapshot(world) == before
+
+
+@pytest.mark.parametrize("unauthored_side", ["buyer", "seller"])
+def test_trade_rejects_matching_terms_without_actor_authorship(unauthored_side):
+    from src.sim.medieval.markets import purchase
+
+    world = market_world()
+    values = terms(world)
+    decisions = list(consent(world, values))
+    original = world.event_index()[decisions[0 if unauthored_side == "buyer" else 1]]
+    forged = record_event(world, f"{unauthored_side}_trade_interpreted", "Payload comercial sem escolha de ator.",
+                          fact_kind=FactKind.DECISION, decision=original.decision)
+    decisions[0 if unauthored_side == "buyer" else 1] = forged.id
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="independent bilateral consent"):
+        purchase(world, *decisions)
+
     assert world_snapshot(world) == before
 
 

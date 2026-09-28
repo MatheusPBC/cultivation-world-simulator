@@ -105,7 +105,9 @@ def set_export_tariff(world, option_id, *, decision_event_id):
         actor = None
     polity_id = actor.id if actor is not None and actor.kind == "polity" else None
     option = next((item for item in tariff_options(world, polity_id) if item.id == option_id), None)
-    if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION or option is None
+    if (decision is None or decision.day != world.clock.absolute_day
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION or option is None
             or decision.decision != option.decision()):
         raise ValueError("export tariff option is stale")
     if any(event.event_type == "export_tariff_changed" and any(link.cause_event_id == decision.id
@@ -164,7 +166,10 @@ def review_export_tariffs(world, *, excluded_actors=()):
         event = record_event(world, "export_tariff_decided",
                              ("A administração protege a próxima folha com receita de exportação."
                               if target else "A administração reduz a tarifa diante da dependência comercial ou da caixa recomposta."),
-                             fact_kind=FactKind.DECISION, decision=option.decision(),
+                             fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                             decision=option.decision(),
+                             causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                 "rule": "export_tariff"}},
                              cause_ids=_causes(payroll.last_event_id if payroll else None,
                                                world.knowledge.reports[option.inventory_report_id].event_id,
                                                world.economy.accounts[option.account_id].last_event_id,

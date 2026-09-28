@@ -8,6 +8,7 @@ Society owns the commitment and Map owns each effective zero-capacity route.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.knowledge import settlement_pressure_notice_id
@@ -138,7 +139,7 @@ def execute_settlement_investment_option(world, actor, option_id, decision_event
         _invest(candidate, option, decision)
     else:
         _lift(candidate, candidate.society.settlement_investments[option.investment_id],
-              cause_ids=(decision.id,), require_decision=True)
+              cause_ids=(decision.id,), decision=decision)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)
@@ -172,6 +173,9 @@ def _invest(world, option, decision):
     event = record_event(
         world, "settlement_invested", "Uma coluna preparada restringiu todos os acessos operacionais do assentamento.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id, "actor_ref": option.actor_ref.to_dict(),
+                        "selected_affordance_id": decision.decision["selected_affordance_id"]},
         deltas=(
             _delta("settlement_investment", identity, "stage", None, "active"),
             _delta("settlement_investment", identity, "route_ids", None, option.route_ids),
@@ -198,10 +202,10 @@ def _invest(world, option, decision):
     return world.society.settlement_investments[identity]
 
 
-def _lift(world, investment, *, cause_ids=(), require_decision=False):
+def _lift(world, investment, *, cause_ids=(), decision=None):
     if investment.stage != "active":
         raise ValueError("settlement investment no longer holds")
-    if require_decision:
+    if decision is not None:
         require_authority(world, investment.actor_ref, "military")
     entries = tuple(world.society.route_interdictions[identity] for identity in investment.route_interdiction_ids)
     if any(entry.stage != "active" or world.map.force_route_interdictors.get(entry.route_id) != entry.id
@@ -211,9 +215,16 @@ def _lift(world, investment, *, cause_ids=(), require_decision=False):
     for entry in entries:
         world.map.clear_force_route_interdictor(entry.route_id, entry.id)
     after = {entry.route_id: world.map.get_route_operational_capacity(entry.route_id) for entry in entries}
+    causal_origin = CausalOrigin.DETERMINISTIC
+    causal_payload = None
+    if decision is not None:
+        causal_origin = CausalOrigin.ACTOR_DECISION
+        causal_payload = {"decision_event_id": decision.id, "actor_ref": investment.actor_ref.to_dict(),
+                          "selected_affordance_id": decision.decision["selected_affordance_id"]}
     event = record_event(
         world, "settlement_investment_lifted", "A pressão física da coluna sobre os acessos do assentamento terminou.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=causal_origin, causal_payload=causal_payload,
         deltas=(
             _delta("settlement_investment", investment.id, "stage", "active", "lifted"),
             *tuple(delta for entry in entries for delta in (

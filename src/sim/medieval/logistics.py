@@ -79,6 +79,7 @@ def queue_freight(world, source_id, destination_id, resource_id, quantity, route
         validate_fiscal_route_option(world, option_id, source.owner_ref, source_id, destination_id, resource_id, quantity)
         expected["route_option_id"] = option_id
     if (source.owner_ref != destination.owner_ref or event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.decision != expected):
         raise ValueError("internal freight requires the owner's matching decision")
     if event.day != world.clock.absolute_day:

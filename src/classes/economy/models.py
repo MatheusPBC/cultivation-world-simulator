@@ -145,6 +145,69 @@ class PermanentEmploymentContract(SocietyValue):
         return self
 
 
+class FamilyLoanRequest(SocietyValue):
+    """A time-bounded public request for one real household-funded loan."""
+
+    id: Identity
+    borrower_ref: EntityRef
+    settlement_id: Identity
+    account_id: Identity
+    purpose: Literal["employment_payroll", "food_production_payroll"]
+    employment_contract_id: Identity | None = None
+    production_facility_id: Identity | None = None
+    source_event_id: Identity
+    principal: Positive
+    created_day: Count
+    expires_day: Count
+    decision_event_id: Identity
+    selected_affordance_id: Identity
+    request_event_id: Identity
+    status: Literal["open", "partially_funded", "funded"] = "open"
+    family_loan_ids: tuple[Identity, ...] = ()
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_request(self):
+        if (self.borrower_ref.kind != "polity" or self.expires_day <= self.created_day
+                or len(set(self.family_loan_ids)) != len(self.family_loan_ids)
+                or ((self.status == "open") != (not self.family_loan_ids))
+                or (self.purpose == "employment_payroll"
+                    and (self.employment_contract_id is None or self.production_facility_id is not None))
+                or (self.purpose == "food_production_payroll"
+                    and (self.production_facility_id is None or self.employment_contract_id is not None))):
+            raise ValueError("invalid family loan request")
+        return self
+
+
+class FamilyLoan(SocietyValue):
+    """Principal-only voluntary loan, repaid only after a fresh borrower decision."""
+
+    id: Identity
+    request_id: Identity
+    borrower_ref: EntityRef
+    lender_ref: EntityRef
+    borrower_account_id: Identity
+    lender_account_id: Identity
+    lender_notice_id: Identity
+    principal: Positive
+    created_day: Count
+    due_day: Count
+    decision_event_id: Identity
+    selected_affordance_id: Identity
+    funded_event_id: Identity
+    status: Literal["active", "repaid"] = "active"
+    repayment_event_id: Identity | None = None
+    last_event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_loan(self):
+        if (self.borrower_ref.kind != "polity" or self.lender_ref.kind != "population_group"
+                or self.borrower_ref == self.lender_ref or self.due_day <= self.created_day
+                or ((self.status == "repaid") != (self.repayment_event_id is not None))):
+            raise ValueError("invalid family loan")
+        return self
+
+
 class SettlementNeeds(SocietyValue):
     id: Identity
     stock_id: Identity

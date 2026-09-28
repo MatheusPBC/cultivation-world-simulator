@@ -215,10 +215,13 @@ def test_money_transfer_is_conservative_and_invalid_payment_is_atomic():
     world = create_medieval_world(73)
     assert hasattr(world, "economy"), "economy missing"
     from src.classes.event import FactKind
+    from src.classes.causal_origin import CausalOrigin
     from src.sim.medieval.events import record_event
     from src.sim.medieval.economy import transfer_money
     source, target = "treasury:auren", "treasury:valedouro"
     decision = record_event(world, "payment_decided", "Pagamento autorizado.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision={"action": "pay", "source_id": source, "target_id": target, "amount": 17,
                                       "actor_ref": world.economy.accounts[source].owner_ref.to_dict()})
     before = {key: a.balance for key, a in world.economy.accounts.items()}
@@ -254,11 +257,14 @@ async def test_destroyed_food_site_is_traceable_as_a_cause_of_subsistence_failur
 
 def test_payment_decision_cannot_be_replayed_after_save_load(tmp_path):
     from src.classes.event import FactKind
+    from src.classes.causal_origin import CausalOrigin
     from src.sim.medieval.events import record_event
     from src.sim.medieval.economy import transfer_money
     world = create_medieval_world(73)
     args = ("treasury:auren", "treasury:valedouro", 17)
     decision = record_event(world, "payment_decided", "Pagamento.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision={"action": "pay", "source_id": args[0], "target_id": args[1], "amount": 17,
                                       "actor_ref": world.economy.accounts[args[0]].owner_ref.to_dict()})
     transfer_money(world, *args, decision_event_id=decision.id)

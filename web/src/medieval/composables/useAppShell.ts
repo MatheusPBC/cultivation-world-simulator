@@ -4,6 +4,7 @@ import { useObserverStore } from '../stores/world'
 
 export function useAppShell() {
   const store = useObserverStore()
+  const aiAvailable = ref(false)
   const booted = ref(false)
   const overlay = ref<'saves' | 'create' | null>(null)
   const seed = ref(73), count = ref(12), replace = ref(false)
@@ -20,7 +21,7 @@ export function useAppShell() {
   }
   onMounted(async () => {
     await store.boot()
-    try { const { data } = await api.query('options'); seed.value = data.defaults.seed; count.value = data.defaults.character_count }
+    try { const { data } = await api.query('options'); seed.value = data.defaults.seed; count.value = data.defaults.character_count; aiAvailable.value = data.ai_available }
     catch (e) { store.error = asError(e) }
     booted.value = true
     if (!stopped) timer = setTimeout(poll, 1000)
@@ -30,5 +31,5 @@ export function useAppShell() {
     const ok = await store.perform(() => api.command('create', { seed: seed.value, character_count: count.value, replace: replace.value }))
     if (ok) { overlay.value = null; replace.value = false }
   }
-  return { store, scene, overlay, seed, count, replace, create }
+  return { store, scene, overlay, seed, count, replace, aiAvailable, create }
 }

@@ -14,7 +14,7 @@ from src.systems.calendar_agenda import ScheduledSituation
 from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
 from .creatures import (creature_options, execute_creature_option, offer_creature_tribute,
                         tribute_options)
-from .events import record_event
+from .events import record_event, record_no_action_decision
 
 REVIEW_KIND = "creature_review"
 
@@ -73,7 +73,7 @@ async def _creature_turn(world, creature_id):
                  "expired_demands": [{"route_id": item.route_id, "due_day": item.due_day}
                                      for item in world.creatures.demands.values()
                                      if item.creature_id == creature_id and item.stage == "open"
-                                     and item.due_day < world.clock.absolute_day],
+                                     and item.due_day <= world.clock.absolute_day],
                  "population_targets": [{"group_id": item.population_group_id,
                                          "affected_count": item.population_count}
                                         for item in options if item.kind == "attack_population"],
@@ -81,10 +81,17 @@ async def _creature_turn(world, creature_id):
     choices = [{"id": item.id, "label": _CREATURE_LABELS[item.kind]} for item in options]
     selected = await select_option(world, EntityRef("creature", creature_id), situation, choices,
                                    causes=(creature.last_event_id,) if creature.last_event_id else ())
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "creature_decided", "A criatura decidiu não agir diante das condições observadas.",
+            EntityRef("creature", creature_id), affordance_ids=(option.id for option in options),
+            cause_ids=(creature.last_event_id,) if creature.last_event_id else (),
+        )
+        return False
+    if selected is None:
         # Silence, provider failure and NO_ACTION leave no autonomous loop.
         # Only a later physical crossing, a newly opened demand's response
-        # day, or that demand's deadline may grant another turn.
+        # day/deadline, or a restriction's one-shot follow-up may grant a turn.
         return False
     chosen = next((item for item in creature_options(world, creature_id) if item.id == selected), None)
     if chosen is None:
@@ -102,6 +109,12 @@ async def _creature_turn(world, creature_id):
                       if item.route_id == chosen.route_id)
         schedule_review(world, creature_id, world.clock.absolute_day + 1)
         schedule_review(world, creature_id, demand.due_day)
+    elif chosen.kind == "restrict":
+        # Restriction removes the open demand and stops physical crossings, so
+        # neither another shipment nor the next hunger threshold can grant the
+        # creature a turn to reconsider reopening. Offer one dated follow-up;
+        # the route remains closed unless the creature explicitly withdraws.
+        schedule_review(world, creature_id, world.clock.absolute_day + 1)
     if chosen.kind in {"restrict", "withdraw"}:
         # Administrations learn the passage changed, as a route fact only.
         from .route_intelligence import refresh_route_reports
@@ -127,7 +140,15 @@ async def _tribute_turn(world, actor):
     selected = await select_option(world, actor, situation, choices,
                                    causes=tuple(sorted({notices[item.demand_id].event_id for item in options
                                                         if item.demand_id in notices})))
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "creature_tribute_decided", "A instituição decidiu não entregar tributo neste turno.",
+            actor, affordance_ids=(option.id for option in options),
+            cause_ids=tuple(sorted({notices[item.demand_id].event_id for item in options
+                                    if item.demand_id in notices})),
+        )
+        return False
+    if selected is None:
         return False
     chosen = next((item for item in tribute_options(world, actor) if item.id == selected), None)
     if chosen is None:

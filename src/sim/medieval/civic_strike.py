@@ -85,6 +85,7 @@ def civic_general_strike_options(world, group_id):
 def _decision(world, decision_event_id):
     decision = _event(world, decision_event_id)
     if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day
             or decision.decision is None or decision.decision.get("action") != STRIKE_ACTION
             or set(decision.decision) != {"action", "actor_ref", "selected_affordance_id"}):

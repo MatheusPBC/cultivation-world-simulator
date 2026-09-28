@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import transfer_money
@@ -16,7 +17,8 @@ def test_payment_requires_the_account_owners_explicit_intent(actor):
     if actor is not None:
         intent["actor_ref"] = actor
     decision = record_event(world, "payment_decided", "Solicitação de pagamento.",
-                            fact_kind=FactKind.DECISION, decision=intent)
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}}, decision=intent)
     before, history = world_snapshot(world), list(world.events)
     with pytest.raises(ValueError, match="decision"):
         transfer_money(world, "treasury:auren", "treasury:valedouro", 17, decision_event_id=decision.id)
@@ -29,7 +31,8 @@ def test_payment_decision_expires_with_its_day_and_a_current_one_executes(tmp_pa
     terms = {"action": "pay", "source_id": "treasury:auren", "target_id": "treasury:valedouro",
              "amount": 17, "actor_ref": {"kind": "polity", "id": "auren"}}
     stale = record_event(world, "payment_decided", "Intenção de pagamento do dia anterior.",
-                         fact_kind=FactKind.DECISION, decision=dict(terms))
+                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}}, decision=dict(terms))
     path = tmp_path / "payment.mws"
     save_world(world, path)
     world = load_world(path)
@@ -44,7 +47,8 @@ def test_payment_decision_expires_with_its_day_and_a_current_one_executes(tmp_pa
     source, target = world.economy.accounts["treasury:auren"], world.economy.accounts["treasury:valedouro"]
     total = sum(a.balance for a in world.economy.accounts.values())
     current = record_event(world, "payment_decided", "Intenção de pagamento de hoje.",
-                           fact_kind=FactKind.DECISION, decision=dict(terms))
+                           fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}}, decision=dict(terms))
     transfer_money(world, "treasury:auren", "treasury:valedouro", 17, decision_event_id=current.id)
     receipt = world.events[-1]
     assert world.economy.accounts["treasury:auren"].balance == source.balance - 17
@@ -60,6 +64,8 @@ def test_payment_decision_expires_with_its_day_and_a_current_one_executes(tmp_pa
 def test_payment_rechecks_current_mandate_after_save_load(tmp_path, revocation):
     world = create_medieval_world(73)
     decision = record_event(world, "payment_decided", "Intenção de pagamento.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision={"action": "pay", "source_id": "treasury:auren",
                                       "target_id": "treasury:valedouro", "amount": 17,
                                       "actor_ref": {"kind": "polity", "id": "auren"}})
@@ -75,3 +81,18 @@ def test_payment_rechecks_current_mandate_after_save_load(tmp_path, revocation):
     assert world_snapshot(world) == before
     assert world.events == history
     assert path.read_bytes() == saved
+
+
+def test_payment_rejects_deterministic_copy_of_the_exact_owner_intent():
+    world = create_medieval_world(73)
+    intent = {"action": "pay", "source_id": "treasury:auren", "target_id": "treasury:valedouro",
+              "amount": 17, "actor_ref": {"kind": "polity", "id": "auren"}}
+    decision = record_event(world, "payment_decided", "Payload exato sem escolha do titular.",
+                            fact_kind=FactKind.DECISION, decision=intent)
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="payment needs a matching"):
+        transfer_money(world, "treasury:auren", "treasury:valedouro", 17,
+                       decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before

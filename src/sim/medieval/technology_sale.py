@@ -10,6 +10,7 @@ There is no inventory of techniques and no transfer of the seller's knowledge.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -19,6 +20,7 @@ from .economy import _causes
 from .events import record_event
 from .economy import transfer_money
 from .research import learn_technology
+from .institutional_decision_turn import DECISION_EVENT_TYPE
 
 
 REQUEST_ACTION = "buy_technology"
@@ -129,6 +131,7 @@ def technology_sale_options(world, buyer):
 
 def _current_request(world, event):
     if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.decision is None or event.decision.get("action") != REQUEST_ACTION
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         return None
@@ -147,14 +150,25 @@ def technology_sale_acceptance_options(world, seller):
             or any(not can_actor_act_for(world, seller, seller, scope) for scope in ("research", "trade"))):
         return ()
     options = []
-    for event in world.events:
-        if event.fact_kind != FactKind.DECISION or event.decision is None:
+    # Buyer requests are generic decision receipts; use the world's
+    # append-only type index instead of scanning unrelated historical facts
+    # for each possible seller.
+    request_events = (*world.events_of_type(DECISION_EVENT_TYPE),
+                      *world.events_of_type("technology_sale_requested"))
+    completed_request_event_ids = {
+        link.cause_event_id
+        for event in world.events_of_type(SALE_RECEIPT)
+        for link in event.causal_links
+    }
+    for event in request_events:
+        if (event.fact_kind != FactKind.DECISION
+                or event.causal_origin is not CausalOrigin.ACTOR_DECISION or event.decision is None
+                or event.decision.get("action") != REQUEST_ACTION):
             continue
         request = _current_request(world, event)
         if request is None or request.seller_ref != seller:
             continue
-        if any(item.event_type == SALE_RECEIPT and event.id in {
-                link.cause_event_id for link in item.causal_links} for item in world.events):
+        if event.id in completed_request_event_ids:
             continue
         options.append(TechnologySaleAcceptance(
             id=f"technology-sale-accept:{event.id}:{request.id}", request_event_id=event.id,
@@ -163,23 +177,27 @@ def technology_sale_acceptance_options(world, seller):
     return tuple(options)
 
 
-def record_technology_sale_request(world, buyer, option_id):
+def record_technology_sale_request(world, buyer, option_id, *, decision_source):
     option = next((item for item in technology_sale_options(world, buyer) if item.id == option_id), None)
     if option is None:
         raise ValueError("technology sale option is stale or unknown")
     return record_event(world, "technology_sale_requested",
                         "Uma instituição pediu comprar uma técnica que pode aplicar.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
                         cause_ids=_causes(option.sighting_event_id, option.source_event_id))
 
 
-def record_technology_sale_acceptance(world, seller, option_id):
+def record_technology_sale_acceptance(world, seller, option_id, *, decision_source):
     option = next((item for item in technology_sale_acceptance_options(world, seller) if item.id == option_id), None)
     if option is None:
         raise ValueError("technology sale acceptance is stale or unknown")
     return record_event(world, "technology_sale_accepted",
                         "O detentor consentiu vender a técnica pelo preço material calculado.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
                         cause_ids=(option.request_event_id,))
 
 
@@ -196,7 +214,11 @@ def execute_technology_sale(world, buyer, option_id, request_event_id, acceptanc
     acceptance_event = next((item for item in candidate.events if item.id == acceptance_event_id), None)
     acceptance = next((item for item in technology_sale_acceptance_options(candidate, option.seller_ref)
                       if item.request_event_id == request_event_id), None)
-    if (acceptance is None or acceptance_event is None or acceptance_event.decision is None
+    if (acceptance is None or acceptance_event is None
+            or acceptance_event.fact_kind != FactKind.DECISION
+            or acceptance_event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or acceptance_event.day != candidate.clock.absolute_day
+            or acceptance_event.decision is None
             or acceptance.id != acceptance_event.decision.get("selected_affordance_id")
             or acceptance_event.decision != acceptance.decision()):
         raise ValueError("technology sale acceptance is stale or unknown")

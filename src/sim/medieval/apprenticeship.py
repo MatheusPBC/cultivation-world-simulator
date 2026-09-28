@@ -13,12 +13,14 @@ nothing by itself; construction and production keep every material gate.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
 from src.classes.research.models import Apprenticeship
 from src.classes.society.models import Identity
 from src.systems.calendar_agenda import ScheduledSituation
+from .institutional_decision_turn import DiscretionaryAdapter
 
 from .economy import _causes, _delta, monthly_workforce
 from .events import record_event
@@ -55,6 +57,7 @@ class ApprenticeshipSponsorOption:
     offer_event_id: Identity
     specialist_id: Identity
     technology_id: Identity
+    technology_name: str
     site_id: Identity
     stock_id: Identity
     account_id: Identity
@@ -78,7 +81,9 @@ def _event(world, event_id):
 
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("apprenticeship requires a current actor decision")
@@ -179,7 +184,6 @@ def specialist_offer_options(world, specialist_id):
     host, settlement = _residence(world, character)
     if host is None or not _has_migrated(world, character, settlement.id):
         return ()
-    day = world.clock.absolute_day
     options = []
     for technology_id, technology in sorted(world.research.technologies.items()):
         source_event_ids = _source_evidence(world, character, technology_id, settlement.id)
@@ -191,13 +195,14 @@ def specialist_offer_options(world, specialist_id):
         if site is None:
             continue
         options.append(ApprenticeshipOfferOption(
-            id=f"apprenticeship-offer:{specialist_id}:{host.id}:{technology_id}:{settlement.id}:{site.id}:{day}",
+            id=(f"apprenticeship-offer:{specialist_id}:{host.id}:{technology_id}:{settlement.id}:{site.id}:"
+                f"{':'.join(source_event_ids)}"),
             specialist_id=specialist_id, host_ref=host, technology_id=technology_id,
             settlement_id=settlement.id, site_id=site.id, source_event_ids=source_event_ids))
     return tuple(options)
 
 
-def record_apprenticeship_offer(world, specialist_id, option_id):
+def record_apprenticeship_offer(world, specialist_id, option_id, *, decision_source, cause_ids=()):
     """The specialist's own decision; it carries no delta and binds nobody."""
     option = next((item for item in specialist_offer_options(world, specialist_id) if item.id == option_id), None)
     if option is None:
@@ -206,8 +211,10 @@ def record_apprenticeship_offer(world, specialist_id, option_id):
         raise ValueError("apprenticeship offer decision already exists")
     return record_event(world, "apprenticeship_offered",
                         "Um especialista residente ofereceu instruir a instituição local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
-                        cause_ids=option.source_event_ids)
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
+                        cause_ids=tuple(dict.fromkeys((*option.source_event_ids, *cause_ids))))
 
 
 def _sponsored(world, offer_event_id):
@@ -224,11 +231,10 @@ def apprenticeship_sponsor_options(world, host):
     if (not isinstance(host, EntityRef)
             or any(not can_actor_act_for(world, host, host, scope) for scope in ("research", "trade", "supply"))):
         return ()
-    day = world.clock.absolute_day
     available = monthly_workforce(world)
     options = []
     for event in world.events:
-        if (event.fact_kind != FactKind.DECISION or event.day != day
+        if (event.fact_kind != FactKind.DECISION
                 or (event.decision or {}).get("action") != OFFER_ACTION or _sponsored(world, event.id)):
             continue
         specialist_id = (event.decision.get("actor_ref") or {}).get("id")
@@ -249,9 +255,24 @@ def apprenticeship_sponsor_options(world, host):
         options.append(ApprenticeshipSponsorOption(
             id=f"apprenticeship-sponsor:{event.id}:{stock.id}:{account.id}:{workers}",
             host_ref=host, offer_event_id=event.id, specialist_id=offer.specialist_id,
-            technology_id=offer.technology_id, site_id=offer.site_id, stock_id=stock.id,
+            technology_id=offer.technology_id, technology_name=technology.name,
+            site_id=offer.site_id, stock_id=stock.id,
             account_id=account.id, workers=workers, wage_per_worker=technology.wage_per_worker))
     return tuple(options)
+
+
+def apprenticeship_sponsor_adapters():
+    """Expose existing dated sponsorship to the single monthly institution menu."""
+    return (DiscretionaryAdapter(
+        name="apprenticeship_sponsorship",
+        options_fn=apprenticeship_sponsor_options,
+        label_fn=lambda option: (
+            f"Patrocinar instrução de {option.technology_name}: {option.workers} trabalhadores, "
+            f"{option.wage_per_worker} moedas por trabalhador, por {APPRENTICESHIP_DAYS} dias."),
+        causes_fn=lambda _world, option: (option.offer_event_id,),
+        execute_fn=sponsor_apprenticeship,
+        family="technology_diffusion",
+    ),)
 
 
 def sponsor_apprenticeship(world, host, option_id, decision_event_id):

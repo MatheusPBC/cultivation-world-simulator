@@ -123,10 +123,13 @@ def consultable(world, actor):
     return within_budget(world) and provider_available() and actor_within_monthly_cap(world, actor)
 
 
-def _receipt(world, event_type, content, *, causes=()):
-    """Interpretations carry no delta and never authorize a mutation."""
+def _receipt(world, event_type, content, *, causes=(), causal_origin=CausalOrigin.LLM_INTERPRETATION,
+             causal_payload=None):
+    """Record only the source facts for this consultation, once each."""
+    cause_ids = tuple(dict.fromkeys(cause for cause in causes if cause is not None))
     return record_event(world, event_type, content, fact_kind=FactKind.OCCURRENCE,
-                        causal_origin=CausalOrigin.LLM_INTERPRETATION, cause_ids=tuple(causes))
+                        causal_origin=causal_origin, causal_payload=causal_payload,
+                        cause_ids=cause_ids)
 
 
 def _prompt(actor, situation, choices):
@@ -151,7 +154,7 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     if not within_budget(world) or not provider_available():
         if not world.config.ai_enabled:
             _receipt(world, FAILED_EVENT, "Consulta ao provedor indisponível; nenhuma ação material foi tomada.",
-                     causes=causes)
+                     causes=causes, causal_origin=CausalOrigin.DETERMINISTIC)
             return None
         raise ProviderDecisionRequired(
             f"provider decision required for {actor.kind}:{actor.id}; no provider or budget is available"
@@ -160,7 +163,7 @@ async def select_option(world, actor, situation, choices, *, causes=()):
         if not world.config.ai_enabled:
             _receipt(world, FAILED_EVENT,
                      "O teto mensal de ações institucionais deste ator foi atingido; nenhuma ação material foi tomada.",
-                     causes=causes)
+                     causes=causes, causal_origin=CausalOrigin.DETERMINISTIC)
             return None
         raise ProviderDecisionRequired(
             f"provider decision required for {actor.kind}:{actor.id}; monthly decision cap is exhausted"
@@ -182,7 +185,11 @@ async def select_option(world, actor, situation, choices, *, causes=()):
     selected = answer.get("selected_id") if isinstance(answer, dict) else None
     known = {item["id"] for item in choices}
     if selected == NO_ACTION:
-        _receipt(world, DECLINED_EVENT, "O provedor optou por não agir.", causes=causes)
+        _receipt(
+            world, DECLINED_EVENT, "O provedor optou por não agir.", causes=causes,
+            causal_payload={"selection": {"actor_ref": actor.to_dict(),
+                                          "selected_affordance_id": NO_ACTION}},
+        )
         return NO_ACTION
     if not isinstance(selected, str) or selected not in known:
         selected = aliases.get(selected, selected)
@@ -191,5 +198,9 @@ async def select_option(world, actor, situation, choices, *, causes=()):
             f"provider decision required for {actor.kind}:{actor.id}: selected affordance is unknown"
         )
     # Only the ID survives: every other word of the answer is discarded.
-    _receipt(world, INTERPRETED_EVENT, "O provedor indicou uma das opções enumeradas.", causes=causes)
+    _receipt(
+        world, INTERPRETED_EVENT, "O provedor indicou uma das opções enumeradas.", causes=causes,
+        causal_payload={"selection": {"actor_ref": actor.to_dict(),
+                                      "selected_affordance_id": selected}},
+    )
     return selected

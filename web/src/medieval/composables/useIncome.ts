@@ -30,6 +30,11 @@ export function useIncome() {
         artisanCash: artisanGroups.reduce((total, group) => total + group.balance, 0),
         artisanGroups, food: stock?.goods.food ?? 0, foodSourceId: stock?.last_event_ids.food ?? null,
         missingFood: need?.missing_food ?? 0, health: need?.health ?? 0,
+        foodPrice: s.food_price ?? 0,
+        householdCashByOccupation: s.household_cash_by_occupation ?? {},
+        estimatedUnaffordable: s.estimated_unaffordable_public_rations ?? 0,
+        estimatedUnaffordableByOccupation: s.estimated_unaffordable_public_rations_by_occupation ?? {},
+        foodAccessEvidenceIds: s.food_access_evidence_event_ids ?? [],
         needSourceId: need?.last_event_id ?? null }
     })
   })

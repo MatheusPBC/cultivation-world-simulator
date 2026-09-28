@@ -1,4 +1,5 @@
 """Deliver offers and bind accepted intentions without executing material clauses."""
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import require_authority
 from src.classes.governance.models import DiplomaticNotice
@@ -11,8 +12,10 @@ from .economy import _delta
 
 def require_decision(world, event_id, intent):
     event = next((e for e in world.events if e.id == event_id), None)
-    if event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day or event.decision != intent:
-        raise ValueError('operation requires an exact current decision')
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day or event.decision != intent):
+        raise ValueError('operation requires an exact current actor decision')
 
 
 def disclose(world, proposal, event):
@@ -24,10 +27,14 @@ def disclose(world, proposal, event):
 
 def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, *, decision_event_id,
                    parent_id=None, intent=None, proposal_kind='negotiated', request_affordance_id=None,
-                   extra_cause_ids=()):
+                   extra_cause_ids=(), in_monthly_candidate=False):
     """``intent`` lets a vertical authorize the offer with its own affordance
     decision shape; the decision still has to be this actor's exact current one."""
-    world.relations.validate(world)
+    # The simulator validates the entire isolated candidate before publishing
+    # its monthly step. Revalidating all historical proposals for every offer
+    # in that same candidate becomes quadratic over a long-lived world.
+    if not in_monthly_candidate:
+        world.relations.validate(world)
     p = DiplomaticProposal(id=f'proposal:{decision_event_id}', proposer_ref=proposer_ref,
         counterparty_ref=counterparty_ref, clauses=clauses, offered_day=world.clock.absolute_day,
         expires_day=expires_day, parent_id=parent_id, decision_event_id=decision_event_id, last_event_id=decision_event_id,
@@ -71,8 +78,12 @@ def offer_proposal(world, proposer_ref, counterparty_ref, clauses, expires_day, 
     return p
 
 
-def respond_proposal(world, proposal_id, response, *, decision_event_id, intent=None):
-    world.relations.validate(world)
+def respond_proposal(world, proposal_id, response, *, decision_event_id, intent=None,
+                     in_monthly_candidate=False):
+    # The enclosing monthly candidate is validated before publication. Direct
+    # executor calls still validate their incoming historical state here.
+    if not in_monthly_candidate:
+        world.relations.validate(world)
     p = world.relations.proposals.get(proposal_id)
     if p is None or p.status != 'offered' or p.expires_day <= world.clock.absolute_day:
         raise ValueError('response requires an open proposal')

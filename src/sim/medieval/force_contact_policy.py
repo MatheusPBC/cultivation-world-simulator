@@ -11,10 +11,12 @@ from src.systems.calendar_agenda import ScheduledSituation
 
 from . import ai_decider
 from .ai_decider import ProviderDecisionRequired
-from .events import record_event
+from .events import record_event, record_no_action_decision
 from .force import (STAND_DOWN_ACTION, WITHDRAW_ACTION, stand_down_from_standoff,
                     standoff_options, withdraw_detachment, withdrawal_options,
                     PREPARE_POSITION_ACTION, force_position_options, prepare_force_position,
+                    REROUTE_ACTION, detachment_reroute_options, reroute_detachment,
+                    detachment_retreat_options, retreat_detachment,
                     GARRISON_ACTION, WITHDRAW_GARRISON_ACTION, ROTATE_GARRISON_ACTION, garrison_options,
                     establish_garrison, withdraw_garrison, rotate_garrison)
 from .force_deescalation import (FULFILL_ACTION, OFFER_ACTION, RESPONSE_ACTION,
@@ -56,6 +58,8 @@ REVIEW_KIND = "force_contact_review"
 _PREFIX = "force-contact-review:"
 COMMAND_REVIEW_KIND = "detachment_command_review"
 _COMMAND_PREFIX = "detachment-command-review:"
+MARCH_COMMAND_REVIEW_KIND = "detachment_march_command_review"
+_MARCH_COMMAND_PREFIX = "detachment-march-review:"
 SIGHTING_MAX_AGE_DAYS = 3
 
 
@@ -81,6 +85,15 @@ def _command_notice_id(situation):
     if situation.kind != COMMAND_REVIEW_KIND or not situation.id.startswith(_COMMAND_PREFIX):
         return None
     return situation.id[len(_COMMAND_PREFIX):] or None
+
+
+def _march_review_ids(situation):
+    if situation.kind != MARCH_COMMAND_REVIEW_KIND or not situation.id.startswith(_MARCH_COMMAND_PREFIX):
+        return None
+    detachment_id, separator, sequence = situation.id[len(_MARCH_COMMAND_PREFIX):].rpartition(":event:")
+    if not separator or not detachment_id or not sequence.isdecimal():
+        return None
+    return detachment_id, f"event:{sequence}"
 
 
 def _schedule_commander_review(world, notice):
@@ -195,7 +208,14 @@ async def _contact_turn(world, notice_id):
         [{"id": option.id, "label": _label(option)} for option in options],
         causes=(notice.event_id,),
     )
-    if selected in (None, ai_decider.NO_ACTION):
+    if selected == ai_decider.NO_ACTION:
+        record_no_action_decision(
+            world, "force_standoff_decided", "A instituição decidiu manter a postura diante do contato armado.",
+            notice.recipient_ref, affordance_ids=(option.id for option in options),
+            cause_ids=(notice.event_id,),
+        )
+        return False
+    if selected is None:
         return False
     option = next((item for item in _current_options(world, notice) if item.id == selected), None)
     if option is None:
@@ -205,7 +225,8 @@ async def _contact_turn(world, notice_id):
         )
     decision = record_event(
         world, "force_standoff_decided", "A instituição escolheu uma opção diante do contato armado.",
-        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,),
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision=option.decision(), cause_ids=(notice.event_id,),
     )
     try:
         action = option.decision()["action"]
@@ -293,12 +314,10 @@ async def _commander_turn(world, notice_id):
         world, actor, situation, [{"id": option.id, "label": _label(option)} for option in options],
         causes=(notice.event_id, command.last_event_id))
     if selected == ai_decider.NO_ACTION:
-        record_event(
+        record_no_action_decision(
             world, "detachment_commander_declined",
             "O comandante local optou por manter a postura atual diante do contato armado.",
-            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-            decision={"action": "no_action", "actor_ref": actor.to_dict(),
-                      "declined_option_ids": tuple(sorted(option.id for option in options))},
+            actor, affordance_ids=(option.id for option in options),
             cause_ids=(notice.event_id, command.last_event_id))
         return False
     if selected is None:
@@ -427,7 +446,106 @@ def _label(option):
         return f"Definir doutrina {option.doctrine} para vigorar no próximo dia."
     if action == COMMAND_RELEASE_ACTION:
         return "Liberar o comandante atual da própria coluna."
+    if action == REROUTE_ACTION:
+        return "Desviar a coluna por uma rota alternativa observada pessoalmente."
+    if action == "retreat_marching_detachment":
+        return "Retornar a uma administração própria por rotas observadas pessoalmente."
     return "Nenhuma ação disponível."
+
+
+async def _commander_march_turn(world, detachment_id, held_event_id):
+    """A field commander independently reacts to a personally observed block."""
+    command = world.society.detachment_commands.get(detachment_id)
+    detachment = world.society.detachments.get(detachment_id)
+    events = world.event_index()
+    scheduled_hold = events.get(held_event_id)
+    held = events.get(detachment.last_event_id) if detachment is not None else None
+    if (command is None or detachment is None or scheduled_hold is None or held is None
+            or detachment.stage != "marching" or held.event_type != "detachment_held"
+            or (scheduled_hold.causal_payload or {}).get("detachment_id") != detachment_id
+            or (held.causal_payload or {}).get("detachment_id") != detachment_id
+            or not command_is_current(world, command)):
+        return False
+    # Dated force resolution happens before the review, so a column that waits
+    # another day has a newer physical hold receipt. Rebase only across that
+    # same column's causal hold chain, never onto a stale or unrelated event.
+    pending = [link.cause_event_id for link in held.causal_links]
+    ancestry = set()
+    while pending:
+        cause_id = pending.pop()
+        if cause_id in ancestry or cause_id not in events:
+            continue
+        ancestry.add(cause_id)
+        pending.extend(link.cause_event_id for link in events[cause_id].causal_links)
+    if held.id != scheduled_hold.id and scheduled_hold.id not in ancestry:
+        return False
+    held_event_id = held.id
+    actor = EntityRef("character", command.character_id)
+    plans = tuple(plan for plan in world.strategy.plans.values()
+                  if plan.detachment_id == detachment_id and plan.stage in {"mobilized", "blocked"})
+    options = tuple(option for plan in plans for option in (
+        *detachment_reroute_options(world, command.institution_ref, plan.id, actor_ref=actor),
+        *detachment_retreat_options(world, command.institution_ref, plan.id, actor_ref=actor)))
+    if not options:
+        return False
+    if not world.config.ai_enabled and not _turn_available(world):
+        return False
+    blocked_route_id = (held.causal_payload or {}).get("blocked_route_id")
+    report = world.knowledge.route_report(actor, blocked_route_id) if blocked_route_id else None
+    character = world.society.characters[command.character_id]
+    causes = tuple(dict.fromkeys((held_event_id, command.last_event_id,
+                                  *(option.blocked_report_id for option in options),
+                                  *(event_id for option in options for event_id in option.route_report_ids))))
+    situation = {
+        "today": world.clock.absolute_day,
+        "your_command": {"detachment_id": detachment_id, "count": detachment.count,
+                         "position_region_id": options[0].start_region_id,
+                         "personality": character.personality.model_dump()},
+        "blocked_route": {"route_id": blocked_route_id,
+                          "observed_day": report.observed_day if report else None,
+                          "travel_days": report.travel_days if report else None,
+                          "capacity": report.operational_capacity if report else None},
+    }
+    selected = await ai_decider.select_option(
+        world, actor, situation,
+        [{"id": option.id, "label": _label(option)} for option in options], causes=causes)
+    if selected == ai_decider.NO_ACTION:
+        record_no_action_decision(
+            world, "detachment_commander_declined_reroute",
+            "O comandante manteve a espera diante da passagem interrompida.",
+            actor, affordance_ids=(option.id for option in options), cause_ids=causes)
+        return False
+    if selected is None:
+        return False
+    fresh = tuple(option for plan in plans for option in (
+        *detachment_reroute_options(world, command.institution_ref, plan.id, actor_ref=actor),
+        *detachment_retreat_options(world, command.institution_ref, plan.id, actor_ref=actor)))
+    option = next((item for item in fresh if item.id == selected), None)
+    if option is None:
+        raise ProviderDecisionRequired(
+            f"provider decision required for character:{actor.id}: march reroute became stale")
+    decision = record_event(
+        world, "detachment_commander_march_decided",
+        "O comandante escolheu como responder ao bloqueio da coluna.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision=option.decision(), cause_ids=causes)
+    try:
+        if option.decision()["action"] == REROUTE_ACTION:
+            reroute_detachment(world, command.institution_ref, option.plan_id,
+                               option.id, decision.id, actor_ref=actor)
+            from .strategy_response import _schedule_review
+            _schedule_review(world, option.plan_id)
+        else:
+            movement = retreat_detachment(world, command.institution_ref, option.plan_id,
+                                           option.id, decision.id, actor_ref=actor)
+            from .strategy_response import _set_plan
+            current_plan = world.strategy.plans[option.plan_id]
+            _set_plan(world, current_plan, "withdrawn", blocker="missão encerrada; coluna em retorno",
+                      detachment_id=detachment_id, causes=(decision.id, movement.id))
+    except ValueError as exc:
+        raise ProviderDecisionRequired(
+            f"provider decision required for character:{actor.id}: march reroute became stale") from exc
+    return True
 
 
 async def review_force_contacts(world, situations):
@@ -451,7 +569,16 @@ async def review_force_contacts(world, situations):
             continue
         reviewed_commanders.add(command.character_id)
         await _commander_turn(world, notice_id)
+    reviewed_marches = set()
+    for situation in sorted(situations, key=lambda item: item.id):
+        review = _march_review_ids(situation)
+        if review is None or review in reviewed_marches:
+            continue
+        reviewed_marches.add(review)
+        detachment_id, held_event_id = review
+        await _commander_march_turn(world, detachment_id, held_event_id)
 
 
-__all__ = ["REVIEW_KIND", "COMMAND_REVIEW_KIND", "contact_sighting_for_provider",
+__all__ = ["REVIEW_KIND", "COMMAND_REVIEW_KIND", "MARCH_COMMAND_REVIEW_KIND",
+           "contact_sighting_for_provider",
            "review_force_contacts", "schedule_contact_review"]

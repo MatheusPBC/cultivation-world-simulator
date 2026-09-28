@@ -17,7 +17,6 @@ from src.classes.governance.diplomacy import (
     DiplomaticProposal,
     Obligation,
     ResourceTransferClause,
-    aid_request_intent,
 )
 from src.classes.governance.knowledge import institutional_aid_notice_id
 from src.classes.governance.models import InstitutionalAidNotice
@@ -127,6 +126,7 @@ def _actor_key(actor):
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
     if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.day != world.clock.absolute_day or event.decision is None
             or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
@@ -138,10 +138,8 @@ def _decision(world, decision_event_id, action):
     return event, actor
 
 
-def _material_authorship(world, decision, actor, option):
-    """Keep routine aid deterministic while preserving a provider's choice."""
-    if decision.causal_origin is not CausalOrigin.ACTOR_DECISION:
-        return CausalOrigin.DETERMINISTIC, None
+def _material_authorship(decision, actor, option):
+    """Carry the selected actor decision into the material aid transition."""
     return CausalOrigin.ACTOR_DECISION, {
         "decision_event_id": decision.id,
         "actor_ref": actor.to_dict(),
@@ -300,8 +298,10 @@ def request_institutional_aid(world, requester, option_id, decision_event_id):
         raise ValueError("institutional aid request option is stale or unknown")
     require_authority(candidate, actor, "diplomacy")
     require_authority(candidate, actor, "supply")
+    causal_origin, causal_payload = _material_authorship(decision, actor, option)
     event = record_event(candidate, "institutional_aid_requested",
                          "Uma instituição solicitou ajuda alimentar.", fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=causal_origin, causal_payload=causal_payload,
         deltas=(_delta("aid_request", f"aid-request:{decision.id}", "status", None, "requested"),
                                  _delta("aid_request", f"aid-request:{decision.id}", "option_id", None, option.id),
                                  _delta("aid_request", f"aid-request:{decision.id}", "requester_settlement_id", None,
@@ -399,8 +399,10 @@ def respond_institutional_aid(world, provider, option_id, decision_event_id):
         request_option, request_notice = next((item, pending) for request_item, _, item, pending
                                               in _pending_requests(candidate, actor)
                                               if request_item.id == request.id)
+        causal_origin, causal_payload = _material_authorship(decision, actor, option)
         event = record_event(candidate, "institutional_aid_rejected", "Ajuda institucional recusada.",
                              fact_kind=FactKind.STATE_TRANSITION,
+                             causal_origin=causal_origin, causal_payload=causal_payload,
                              deltas=(_delta("aid_request", f"aid-request:{request.id}", "status", "requested", "rejected"),
                                      *memory_creation_deltas(candidate, (request_option.actor_ref,))),
                              cause_ids=(decision.id, request.id))
@@ -435,8 +437,10 @@ def respond_institutional_aid(world, provider, option_id, decision_event_id):
                                   decision_event_id=request_decision.id,
                                   last_event_id="pending", proposal_kind="institutional_aid",
                                   request_affordance_id=request_option.id, status="accepted")
+    causal_origin, causal_payload = _material_authorship(decision, actor, option)
     event = record_event(candidate, "institutional_aid_accepted", "Ajuda institucional aceita.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=causal_origin, causal_payload=causal_payload,
                          deltas=(_delta("aid_request", f"aid-request:{request.id}", "status", "requested", "accepted"),
                                  _delta("diplomacy", proposal.id, "status", None, "accepted"),
                                  _delta("obligation", f"{proposal.id}:term:0", "status", None, "active")),
@@ -497,7 +501,7 @@ def fulfill_institutional_aid(world, provider, option_id, decision_event_id):
     proposal = candidate.relations.proposals[obligation.proposal_id]
     validate_fiscal_route_option(candidate, option.route_option_id, actor, option.source_stock_id,
                                  option.destination_stock_id, option.resource_id, option.quantity)
-    causal_origin, causal_payload = _material_authorship(candidate, decision, actor, option)
+    causal_origin, causal_payload = _material_authorship(decision, actor, option)
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id, option.resource_id,
                         option.quantity, option.route_ids, decision_ids=(decision.id,),
                         cause_ids=(obligation.last_event_id, proposal.decision_event_id),
@@ -609,7 +613,7 @@ def remediate_institutional_aid(world, provider, option_id, decision_event_id):
         raise ValueError("institutional aid remediation route is stale") from exc
     if not _has_breach_notice(candidate, proposal.id, actor, obligation.breach_event_id):
         raise ValueError("institutional aid remediation requires the private breach notice")
-    causal_origin, causal_payload = _material_authorship(candidate, decision, actor, option)
+    causal_origin, causal_payload = _material_authorship(decision, actor, option)
     opened = open_order(candidate, option.source_stock_id, option.destination_stock_id, option.resource_id,
                         option.quantity, option.route_ids, decision_ids=(decision.id,),
                         cause_ids=(obligation.breach_event_id,), causal_origin=causal_origin,

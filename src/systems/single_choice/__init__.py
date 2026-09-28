@@ -1,4 +1,8 @@
-from .engine import decide_single_choice, resolve_single_choice
+from .engine import (
+    SingleChoiceDecisionFailed,
+    decide_single_choice,
+    resolve_single_choice,
+)
 from .item_exchange import (
     ItemDisposition,
     ItemExchangeKind,
@@ -29,6 +33,7 @@ __all__ = [
     "FallbackMode",
     "FallbackPolicy",
     "SingleChoiceDecision",
+    "SingleChoiceDecisionFailed",
     "SingleChoiceOption",
     "SingleChoiceOutcome",
     "SingleChoiceRequest",

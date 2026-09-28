@@ -27,6 +27,8 @@ from src.systems.sect_decision_context import SectDecisionContext
 from src.systems.single_choice.models import ChoiceSource, SingleChoiceDecision
 from src.systems.single_choice.sect_recruitment import SectRecruitmentOutcome
 from src.systems.time import Month, Year, create_month_stamp
+from src.systems.domain_decision_interpreter import DomainDecisionFailed
+from src.utils.llm.exceptions import LLMError
 
 
 def _avatar(world, *, avatar_id: str, name: str) -> Avatar:
@@ -188,3 +190,109 @@ async def test_failed_annual_commit_restores_authorized_sect_recruitment(
     assert base_world.institutional_knowledge.to_dict() == knowledge_before
     assert base_world.institutional_relations.to_dict() == relations_before
     assert random.getstate() == random_before
+
+
+@pytest.mark.asyncio
+async def test_collective_provider_failure_rolls_back_prior_sect_decision(
+    base_world, monkeypatch, tmp_path
+) -> None:
+    """A later collective provider failure cannot publish an earlier action."""
+    base_world.month_stamp = create_month_stamp(Year(100), Month.JANUARY)
+    base_world.start_year = 100
+    base_world.run_config_snapshot = {}
+    base_world.event_manager = EventManager.create_with_db(tmp_path / "provider-events.db")
+
+    def sect(sect_id: int, name: str) -> Sect:
+        return Sect(
+            id=sect_id,
+            name=name,
+            desc="",
+            member_act_style="",
+            alignment=Alignment.RIGHTEOUS,
+            headquarter=SectHeadQuarter(name="Hall", desc="", image=Path()),
+            technique_names=[],
+            magic_stone=1000,
+        )
+
+    first_sect = sect(91, "First Sect")
+    second_sect = sect(92, "Second Sect")
+    first_leader = _avatar(base_world, avatar_id="leader-1", name="Leader 1")
+    second_leader = _avatar(base_world, avatar_id="leader-2", name="Leader 2")
+    first_recruit = _avatar(base_world, avatar_id="recruit-1", name="Recruit 1")
+    second_recruit = _avatar(base_world, avatar_id="recruit-2", name="Recruit 2")
+    first_leader.join_sect(first_sect, SectRank.Patriarch)
+    second_leader.join_sect(second_sect, SectRank.Patriarch)
+    for avatar in (first_leader, second_leader, first_recruit, second_recruit):
+        base_world.avatar_manager.register_avatar(avatar)
+    base_world.existed_sects = [first_sect, second_sect]
+    base_world.sect_context.from_existed_sects(base_world.existed_sects)
+    bootstrap_institutional_authority(base_world)
+    contexts = {
+        first_sect.id: _decision_context(first_recruit),
+        second_sect.id: _decision_context(second_recruit),
+    }
+    monkeypatch.setattr(
+        "src.classes.core.sect.get_sect_decision_context",
+        lambda sect, **_kwargs: contexts[sect.id],
+    )
+
+    original_decide = SectDecider.decide.__func__
+
+    async def decide_with_failure(cls, chosen_sect, context, world, **_kwargs):
+        if chosen_sect is first_sect:
+            return await original_decide(
+                cls,
+                chosen_sect,
+                context,
+                world,
+                llm_call=_select_recruitment(first_recruit.id),
+            )
+
+        async def provider_failure(*_args, **_call_kwargs):
+            raise LLMError("provider unavailable")
+
+        return await original_decide(
+            cls, chosen_sect, context, world, llm_call=provider_failure
+        )
+
+    monkeypatch.setattr(SectDecider, "decide", classmethod(decide_with_failure))
+    monkeypatch.setattr(
+        "src.classes.sect_decider.resolve_sect_recruitment",
+        AsyncMock(
+            return_value=SectRecruitmentOutcome(
+                decision=SingleChoiceDecision(
+                    "ACCEPT", "accept", ChoiceSource.LLM, None, False
+                ),
+                result_text="Recruit accepted.",
+                accepted=True,
+                sect_id=int(first_sect.id),
+                avatar_id=first_recruit.id,
+            )
+        ),
+    )
+    month_before = base_world.month_stamp
+    event_count_before = base_world.event_manager.count()
+    authority_before = base_world.institutional_authority.to_dict()
+    knowledge_before = base_world.institutional_knowledge.to_dict()
+    relations_before = base_world.institutional_relations.to_dict()
+
+    with pytest.raises(DomainDecisionFailed):
+        await SimulationPhaseRunner(
+            Simulator(base_world),
+            phases=(
+                SimulationPhase(
+                    "annual_maintenance", 1, "annual_maintenance", annual_maintenance
+                ),
+            ),
+        ).run()
+
+    assert first_recruit.sect is None
+    assert first_recruit.id not in first_sect.members
+    assert first_sect.magic_stone == 1000
+    assert second_recruit.sect is None
+    assert second_sect.magic_stone == 1000
+    assert base_world.event_manager.count() == event_count_before
+    assert base_world.month_stamp == month_before
+    assert base_world.institutional_authority.to_dict() == authority_before
+    assert base_world.institutional_knowledge.to_dict() == knowledge_before
+    assert base_world.institutional_relations.to_dict() == relations_before

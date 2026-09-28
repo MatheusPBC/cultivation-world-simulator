@@ -50,21 +50,40 @@ export function useInspection() {
   const select=(kind:'settlement'|'character'|'polity'|'organization'|'site'|'route'|'detachment',id:string)=>{store.selection={kind,id};tab.value='inspection'}
   const source=(id:string|null|undefined)=>{if(id)store.focusEventId=id}
   const dossier=shallowRef<DossierEntry[]>([]), dossierLoading=ref(false), dossierError=shallowRef<ApiError|null>(null)
+  const dossierHasMore=ref(false), dossierNextAfter=ref<string|null>(null)
   let dossierRequest=0
   const dossierActor=computed(()=>character.value ? { kind: 'character', id: character.value.id } : polity.value ? { kind: 'polity', id: polity.value.id } : organization.value ? { kind: 'organization', id: organization.value.id } : null)
   watch(()=>dossierActor.value, async actor=>{
     const request=++dossierRequest
-    dossier.value=[]; dossierError.value=null
+    dossier.value=[]; dossierError.value=null; dossierHasMore.value=false; dossierNextAfter.value=null
     if(!actor){dossierLoading.value=false;return}
     dossierLoading.value=true
     try {
       const reply=await api.dossier(actor.kind,actor.id)
-      if(request===dossierRequest){dossier.value=reply.data.entries}
+      if(request===dossierRequest){dossier.value=reply.data.entries;dossierHasMore.value=reply.data.has_more;dossierNextAfter.value=reply.data.next_after}
     } catch(error) {
       if(request===dossierRequest)dossierError.value=asError(error)
     } finally {
       if(request===dossierRequest)dossierLoading.value=false
     }
   },{immediate:true})
-  return {store,tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError}
+  async function loadMoreDossier(){
+    const actor=dossierActor.value
+    if(!actor||!dossierHasMore.value||dossierLoading.value)return
+    const request=dossierRequest
+    dossierLoading.value=true; dossierError.value=null
+    try {
+      const reply=await api.dossier(actor.kind,actor.id,dossierNextAfter.value)
+      if(request===dossierRequest){
+        const existing=new Set(dossier.value.map(entry=>entry.category+':'+entry.id))
+        dossier.value=[...dossier.value,...reply.data.entries.filter(entry=>!existing.has(entry.category+':'+entry.id))]
+        dossierHasMore.value=reply.data.has_more;dossierNextAfter.value=reply.data.next_after
+      }
+    } catch(error) {
+      if(request===dossierRequest)dossierError.value=asError(error)
+    } finally {
+      if(request===dossierRequest)dossierLoading.value=false
+    }
+  }
+  return {store,tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}
 }

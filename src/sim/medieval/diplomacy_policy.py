@@ -7,7 +7,7 @@ from src.classes.event import FactKind
 from src.classes.governance.diplomacy import PaymentClause, TeachingClause, offer_intent
 from src.classes.mechanical_language import EntityRef
 from src.systems.calendar_agenda import ScheduledSituation
-from .events import record_event
+from .events import record_event, record_no_action_decision
 from .diplomacy import disclose, offer_proposal, respond_proposal
 from .diplomacy_context import diplomatic_context
 from .commitments import fulfill_obligation, repudiate_obligation
@@ -19,7 +19,7 @@ from .ai_decider import NO_ACTION, ProviderDecisionRequired, select_option
 from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
                                           review_institutional_decision_turn_with_provider)
 from .technology_sighting import (DISCLOSE_TECHNOLOGY_ACTION, disclosure_options,
-                                  execute_disclosure)
+                                  execute_disclosure, _execute_disclosure_in_place)
 
 
 OFFER_ACTION = 'offer_teaching_bargain'
@@ -132,9 +132,12 @@ def schedule_review(world):
         world.agenda.schedule(ScheduledSituation(identity,'diplomatic_review',day))
 
 
-def decision(world, intent, reason, causes=()):
+def decision(world, intent, reason, causes=(), *, decision_source=None):
     return record_event(world,'diplomatic_decision',reason,fact_kind=FactKind.DECISION,
-                        decision=intent,cause_ids=causes)
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=intent,
+                        causal_payload=({"decision_source": decision_source} if decision_source is not None else None),
+                        cause_ids=causes)
 
 
 def teaching_bargain(proposal):
@@ -156,7 +159,7 @@ def teaching_only_term(proposal):
     return None
 
 
-def respond(world, ctx, proposal):
+def respond(world, ctx, proposal, *, decision_source=None, in_monthly_candidate=False):
     bargain = teaching_bargain(proposal)
     remediation = teaching_only_term(proposal)
     if bargain is None and remediation is None:
@@ -171,10 +174,12 @@ def respond(world, ctx, proposal):
                     and set(tech.prerequisites) <= ctx.techniques else 'reject')
         event = decision(world, {'action': 'respond_proposal', 'actor_ref': ctx.actor.to_dict(),
                                  'proposal_id': proposal.id, 'response': response},
-                         'Responder à remediação de ensino.', (proposal.last_event_id,))
+                         'Responder à remediação de ensino.', (proposal.last_event_id,),
+                         decision_source=decision_source)
         if 'diplomacy' not in diplomatic_context(world, proposal.proposer_ref, mechanical_only=True).authority:
             return
-        respond_proposal(world, proposal.id, response, decision_event_id=event.id)
+        respond_proposal(world, proposal.id, response, decision_event_id=event.id,
+                         in_monthly_candidate=in_monthly_candidate)
         if response == 'accept':
             schedule_review(world)
         return
@@ -193,7 +198,8 @@ def respond(world, ctx, proposal):
         elif budget > 0 and proposal.parent_id is None:
             terms = (payment.model_copy(update={'amount':budget}), lesson)
             event = decision(world,offer_intent(ctx.actor,proposal.proposer_ref,terms,proposal.expires_day,proposal.id),
-                'Contrapropor preço compatível com o custo local e o caixa livre.',(proposal.last_event_id,))
+                'Contrapropor preço compatível com o custo local e o caixa livre.',(proposal.last_event_id,),
+                decision_source=decision_source)
             attempt = record_event(
                 world, BARGAIN_ATTEMPT_EVENT_TYPE,
                 'Uma contraproposta foi tentada sobre uma proposta diplomática aberta.',
@@ -209,16 +215,18 @@ def respond(world, ctx, proposal):
     elif lesson.technology_id in ctx.techniques and payment.amount >= max(1,cost*60//100):
         response, reason = 'accept', 'Aceitar receita pelo ensino acima do preço mínimo próprio.'
     event = decision(world,{'action':'respond_proposal','actor_ref':ctx.actor.to_dict(),
-        'proposal_id':proposal.id,'response':response},reason,(proposal.last_event_id,))
+        'proposal_id':proposal.id,'response':response},reason,(proposal.last_event_id,),
+        decision_source=decision_source)
     # If the original signatory lost authority, acceptance cannot bind either side.
     other = diplomatic_context(world,proposal.proposer_ref, mechanical_only=True)
     if 'diplomacy' not in other.authority:
         return
-    respond_proposal(world,proposal.id,response,decision_event_id=event.id)
+    respond_proposal(world,proposal.id,response,decision_event_id=event.id,
+                     in_monthly_candidate=in_monthly_candidate)
     if response == 'accept': schedule_review(world)
 
 
-def fulfill(world, ctx, proposal):
+def fulfill(world, ctx, proposal, *, decision_source=None):
     bargain = teaching_bargain(proposal)
     remediation = teaching_only_term(proposal)
     if bargain is None and remediation is None:
@@ -235,7 +243,8 @@ def fulfill(world, ctx, proposal):
         if clause.kind == 'payment':
             if 'trade' not in ctx.authority or ctx.balance < clause.amount or ctx.account_id != clause.source_account_id: continue
             event = decision(world,{'action':'pay','actor_ref':ctx.actor.to_dict(),'source_id':clause.source_account_id,
-                'target_id':clause.target_account_id,'amount':clause.amount},'Cumprir pagamento negociado.',(obligation.last_event_id,))
+                'target_id':clause.target_account_id,'amount':clause.amount},'Cumprir pagamento negociado.',
+                (obligation.last_event_id,), decision_source=decision_source)
             fulfill_obligation(world,obligation.id,decision_event_id=event.id)
         else:
             learner = diplomatic_context(world,clause.creditor_ref, mechanical_only=True)
@@ -245,15 +254,17 @@ def fulfill(world, ctx, proposal):
                     or not set(tech.prerequisites) <= learner.techniques): continue
             terms = {'technology_id':tech.id,'teacher_ref':ctx.actor.to_dict(),'student_ref':learner.actor.to_dict()}
             offered = decision(world,{**terms,'action':'teach','actor_ref':ctx.actor.to_dict()},
-                'Cumprir ensino prometido após pagamento.',(obligation.last_event_id,))
+                'Cumprir ensino prometido após pagamento.',(obligation.last_event_id,),
+                decision_source=decision_source)
             accepted = decision(world,{**terms,'action':'learn','actor_ref':learner.actor.to_dict()},
-                'Aceitar o ensino contratado.',(offered.id,))
+                'Aceitar o ensino contratado.',(offered.id,), decision_source=decision_source)
             fulfill_obligation(world,obligation.id,decision_event_id=offered.id,acceptance_id=accepted.id)
         schedule_review(world)
         ctx = diplomatic_context(world,ctx.actor, mechanical_only=True)
 
 
-def _disclose_teaching_offer(world, actor, other, technology_id):
+def _disclose_teaching_offer(world, actor, other, technology_id, decision_event_id,
+                             *, in_monthly_candidate=False):
     """A teacher's own offer to teach IS a factual disclosure of its
     technique to that exact counterparty: without this, the counterparty's
     later, legitimate counteroffer (still proposer of the same known
@@ -266,12 +277,18 @@ def _disclose_teaching_offer(world, actor, other, technology_id):
                    if item.recipient_ref == other and item.technology_id == technology_id), None)
     if option is None:
         return
-    event = decision(world, option.decision(),
-                     'Divulgar indício factual da técnica ofertada ao ensino.', option.causes())
-    execute_disclosure(world, option, event.id)
+    if in_monthly_candidate:
+        # MedievalSimulator.step already owns the isolated candidate and
+        # validates it before publication. Do not fork and validate the full
+        # growing world once per teaching offer inside that same transaction.
+        _execute_disclosure_in_place(
+            world, option, decision_event_id, authorized_by_teaching_offer=True)
+    else:
+        execute_disclosure(world, option, decision_event_id, authorized_by_teaching_offer=True)
 
 
-def propose(world, ctx, addresses):
+def propose(world, ctx, addresses, *, decision_source=None,
+            in_monthly_candidate=False):
     if not ctx.account_id or not {'diplomacy','research','trade'} <= ctx.authority: return
     for tech_id in sorted(ctx.techniques):
         for other, account_id in addresses:
@@ -284,14 +301,17 @@ def propose(world, ctx, addresses):
             terms = (PaymentClause(debtor_ref=other,creditor_ref=ctx.actor,due_day=day+20,
                 source_account_id=account_id,target_account_id=ctx.account_id,amount=dict(ctx.research_costs)[tech_id]),
                 TeachingClause(debtor_ref=ctx.actor,creditor_ref=other,due_day=day+25,depends_on=(0,),technology_id=tech_id))
-            _disclose_teaching_offer(world, ctx.actor, other, tech_id)
             event = decision(world,offer_intent(ctx.actor,other,terms,day+15,None),
-                'Oferecer ensino de técnica própria como fonte de receita.')
-            offer_proposal(world,ctx.actor,other,terms,day+15,decision_event_id=event.id)
+                'Oferecer ensino de técnica própria como fonte de receita.',
+                decision_source=decision_source)
+            _disclose_teaching_offer(world, ctx.actor, other, tech_id, event.id,
+                                     in_monthly_candidate=in_monthly_candidate)
+            offer_proposal(world,ctx.actor,other,terms,day+15,decision_event_id=event.id,
+                           in_monthly_candidate=in_monthly_candidate)
             schedule_review(world)
 
 
-def review_diplomacy(world, *, allow_offers=False):
+def review_diplomacy(world, *, allow_offers=False, in_monthly_candidate=False):
     """Deterministic fixture policy.
 
     Real-provider worlds must use :func:`review_diplomacy_with_provider`; this
@@ -301,16 +321,20 @@ def review_diplomacy(world, *, allow_offers=False):
     addresses = sorted({(a.owner_ref,a.id) for a in world.economy.accounts.values()
         if a.owner_ref.kind in {'polity','organization'}},key=lambda x:(x[0].kind,x[0].id,x[1]))
     actors = sorted({ref for ref,_ in addresses},key=lambda r:(r.kind,r.id))
+    source = {"kind": "fallback", "policy": "routine-rules", "rule": "diplomacy_review"}
     for actor in actors:
         ctx = diplomatic_context(world,actor, mechanical_only=True)
         for identity in ctx.proposal_ids:
             p = world.relations.proposals[identity]
             if p.status == 'offered' and p.counterparty_ref == actor and p.offered_day < world.clock.absolute_day < p.expires_day:
-                respond(world,ctx,p)
+                respond(world,ctx,p, decision_source=source,
+                        in_monthly_candidate=in_monthly_candidate)
             elif p.status == 'accepted':
-                fulfill(world,ctx,p)
+                fulfill(world,ctx,p, decision_source=source)
                 ctx = diplomatic_context(world,actor, mechanical_only=True)
-        if allow_offers: propose(world,diplomatic_context(world,actor, mechanical_only=True),addresses)
+        if allow_offers:
+            propose(world,diplomatic_context(world,actor, mechanical_only=True),addresses,
+                    decision_source=source, in_monthly_candidate=in_monthly_candidate)
 
 
 def _addresses(world):
@@ -337,7 +361,7 @@ def _old_enough(world, event_id):
 
 def teaching_offer_options(world, actor, addresses=None):
     """Offers computed from only the speaker's techniques and public addresses."""
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if not ctx.account_id or not {'diplomacy', 'research', 'trade'} <= ctx.authority:
         return ()
     addresses = _addresses(world) if addresses is None else addresses
@@ -365,7 +389,7 @@ def teaching_offer_options(world, actor, addresses=None):
 
 def teaching_request_options(world, actor):
     """Ask only a holder the actor was factually told about, while current."""
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if not ctx.account_id or not {'diplomacy', 'research', 'trade'} <= ctx.authority:
         return ()
     day = world.clock.absolute_day
@@ -403,7 +427,7 @@ def teaching_initiation_options(world, actor):
 
 def _proposal_response_options(world, actor):
     """The responder's actual alternatives for a known open teaching bargain."""
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if not {'diplomacy', 'research'} <= ctx.authority:
         return ()
     day, costs = world.clock.absolute_day, dict(ctx.research_costs)
@@ -445,7 +469,7 @@ def _proposal_response_options(world, actor):
 
 
 def _payment_options(world, actor):
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'trade' not in ctx.authority:
         return ()
     options = []
@@ -480,7 +504,7 @@ def _repudiation_options(world, actor):
     named debtor, still ``active`` and before the clause's own deadline.
     Once the deadline passes the lapse in ``resolve_diplomacy`` takes over
     instead; this option never reaches past its own deadline."""
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'diplomacy' not in ctx.authority:
         return ()
     day = world.clock.absolute_day
@@ -506,7 +530,7 @@ def _renegotiation_options(world, actor):
     A breach notice is required so the option cannot become an omniscient
     strategic planner over another institution's private history.
     """
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'diplomacy' not in ctx.authority:
         return ()
     day = world.clock.absolute_day
@@ -562,7 +586,7 @@ def _payment_remediation_options(world, actor):
     notified of its own concluded term, still controls the source account and
     can pay the exact original amount today.
     """
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'trade' not in ctx.authority:
         return ()
     result = []
@@ -599,7 +623,7 @@ def _persuasion_options(world, actor):
     actor-authored diplomatic act, not an acceptance: the proposal owner and
     its clauses remain untouched until the other side makes its own response.
     """
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'diplomacy' not in ctx.authority:
         return ()
     day = world.clock.absolute_day
@@ -627,7 +651,7 @@ def _persuasion_options(world, actor):
 
 
 def _teaching_options(world, actor):
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'research' not in ctx.authority:
         return ()
     options = []
@@ -665,7 +689,7 @@ def _teacher_decision(world, option):
 
 
 def _learning_options(world, actor):
-    ctx = diplomatic_context(world, actor)
+    ctx = diplomatic_context(world, actor, mechanical_only=True)
     if 'research' not in ctx.authority:
         return ()
     options = []
@@ -726,13 +750,20 @@ async def _choose(world, actor, options, causes):
                                       if getattr(option, 'obligation_id', None)}),
     },
                                    [_choice(option) for option in options], causes=causes)
-    if selected in (None, NO_ACTION):
+    if selected == NO_ACTION:
+        record_no_action_decision(
+            world, "diplomatic_decision", "A instituição decidiu não avançar com uma opção diplomática neste turno.",
+            actor, affordance_ids=(option.id for option in options), cause_ids=causes,
+        )
+        return None
+    if selected is None:
         return None
     return next((option for option in options if option.id == selected), None)
 
 
-def _record_option_decision(world, option, causes):
-    return decision(world, option.decision(), 'A instituição escolheu uma opção diplomática canônica.', causes)
+def _record_option_decision(world, option, causes, *, decision_source=None):
+    return decision(world, option.decision(), 'A instituição escolheu uma opção diplomática canônica.',
+                    causes, decision_source=decision_source)
 
 
 def _execute_response(world, option, decision_event_id):
@@ -785,7 +816,8 @@ def _execute_offer(world, option, decision_event_id):
                                source_account_id=target, target_account_id=account_id, amount=current.amount),
                  TeachingClause(debtor_ref=current.actor_ref, creditor_ref=other, due_day=day + 25,
                                 depends_on=(0,), technology_id=current.technology_id))
-        _disclose_teaching_offer(world, current.actor_ref, other, current.technology_id)
+        _disclose_teaching_offer(world, current.actor_ref, other, current.technology_id,
+                                 decision_event_id)
     else:
         terms = (PaymentClause(debtor_ref=current.actor_ref, creditor_ref=other, due_day=day + 20,
                                source_account_id=account_id, target_account_id=target, amount=current.amount),
@@ -973,9 +1005,9 @@ def _known_counterparty_breaches(world, actor):
     same notice-based channel ``authority_claims._breach_evidence`` already
     relies on -- ``world.knowledge.notices`` -- actually reached this actor
     for that exact breach event. Three distinct facts are surfaced, never a
-    score: ``repudiated`` (the debtor chose not to honor it), ``breached_by_
-    deadline`` (it lapsed unmet) and ``excused`` (its own dependency failed
-    first, so the failure was never this debtor's).
+    score: ``repudiated`` (explicit repudiation), ``materially_breached``
+    (an incompatible material action), ``breached_by_deadline`` (it lapsed
+    unmet) and ``excused`` (its own dependency failed first).
     """
     ctx = diplomatic_context(world, actor)
     records = []
@@ -997,7 +1029,10 @@ def _known_counterparty_breaches(world, actor):
                 kind = 'excused'
             elif any(notice.recipient_ref == actor and notice.event_id == obligation.breach_event_id
                      for notice in world.knowledge.notices.values()):
-                kind = 'repudiated' if _repudiation_cause(world, event) else 'breached_by_deadline'
+                breach_kind = (event.causal_payload or {}).get('breach_kind')
+                kind = ('repudiated' if _repudiation_cause(world, event) else
+                        'materially_breached' if breach_kind == 'materially_incompatible_action' else
+                        'breached_by_deadline')
             else:
                 continue
             records.append({'counterparty': counterparty.to_dict(), 'proposal_id': proposal_id,

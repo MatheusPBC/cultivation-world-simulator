@@ -6,7 +6,7 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 
-from .models import (FreightRecoveryCase, Market, MoneyAccount, Payroll, PermanentEmploymentContract,
+from .models import (FamilyLoan, FamilyLoanRequest, FreightRecoveryCase, Market, MoneyAccount, Payroll, PermanentEmploymentContract,
                      ProductionFacility, ProductionPriority, Recipe, Resource, SettlementNeeds, Stock)
 from .serialization import EconomySerialization, REGISTRIES
 from .logistics import CargoParcel, FreightOrder, RouteFlow, validate_logistics
@@ -42,6 +42,8 @@ class EconomyState(EconomySerialization):
     freight_recovery_cases: dict[str, FreightRecoveryCase] = field(default_factory=dict)
     investigations: dict[str, Investigation] = field(default_factory=dict)
     employment_contracts: dict[str, PermanentEmploymentContract] = field(default_factory=dict)
+    family_loan_requests: dict[str, FamilyLoanRequest] = field(default_factory=dict)
+    family_loans: dict[str, FamilyLoan] = field(default_factory=dict)
 
     def used_capacity(self, stock: Stock) -> int:
         return sum(self.resources[rid].bulk * amount for rid, amount in stock.goods.items())
@@ -111,6 +113,36 @@ class EconomyState(EconomySerialization):
                     or stock.owner_ref != contract.employer_ref or stock.location_id != contract.settlement_id
                     or (world is not None and (site is None or site.owner_ref != contract.employer_ref or not local_site))):
                 raise ValueError("employment contract requires local employer site, stock and account")
+        for request in self.family_loan_requests.values():
+            account = self.accounts.get(request.account_id)
+            if (account is None or account.owner_ref != request.borrower_ref
+                    or request.settlement_id not in (world.society.settlements if world is not None else {request.settlement_id})
+                    or request.principal <= 0):
+                raise ValueError("family loan request requires the borrower's treasury")
+            linked_loans = [self.family_loans.get(loan_id) for loan_id in request.family_loan_ids]
+            if any(loan is None or loan.request_id != request.id for loan in linked_loans):
+                raise ValueError("family loan request must name its funded loans")
+            funded_principal = sum(loan.principal for loan in linked_loans if loan is not None)
+            expected_status = (
+                "open" if funded_principal == 0 else
+                "partially_funded" if funded_principal < request.principal else
+                "funded" if funded_principal == request.principal else "invalid"
+            )
+            if request.status != expected_status:
+                raise ValueError("family loan request status must match contributed principal")
+        for loan in self.family_loans.values():
+            borrower = self.accounts.get(loan.borrower_account_id)
+            lender = self.accounts.get(loan.lender_account_id)
+            if (borrower is None or lender is None or borrower.owner_ref != loan.borrower_ref
+                    or lender.owner_ref != loan.lender_ref or loan.request_id not in self.family_loan_requests):
+                raise ValueError("family loan requires both canonical accounts and its request")
+        for request_id in self.family_loan_requests:
+            request_loans = [loan for loan in self.family_loans.values() if loan.request_id == request_id]
+            lenders = [loan.lender_ref for loan in request_loans]
+            if len(set(lenders)) != len(lenders):
+                raise ValueError("a household may contribute only once to a family loan request")
+            if {loan.id for loan in request_loans} != set(self.family_loan_requests[request_id].family_loan_ids):
+                raise ValueError("family loan request and loan registry links disagree")
         if len({need.stock_id for need in self.needs.values()}) != len(self.needs):
             raise ValueError("settlements cannot share a subsistence stock")
         for need in self.needs.values():
@@ -133,6 +165,156 @@ class EconomyState(EconomySerialization):
                   "character": world.society.characters, "settlement": world.society.settlements,
                   "population_group": world.society.population}
         events = world.event_index()
+        for request in self.family_loan_requests.values():
+            decision = events.get(request.decision_event_id)
+            source = events.get(request.source_event_id)
+            created = events.get(request.request_event_id)
+            last = events.get(request.last_event_id)
+            contract = (self.employment_contracts.get(request.employment_contract_id)
+                        if request.employment_contract_id is not None else None)
+            facility = (self.facilities.get(request.production_facility_id)
+                        if request.production_facility_id is not None else None)
+            production_stock = (self.stocks.get(facility.stock_id)
+                                if facility is not None else None)
+            production_recipe = (self.recipes.get(facility.recipe_id)
+                                 if facility is not None else None)
+            source_payload = source.causal_payload if source is not None else None
+            production_payload = (source_payload.get("production")
+                                  if isinstance(source_payload, dict) else None)
+            production_limits = (production_payload.get("limits")
+                                 if isinstance(production_payload, dict) else None)
+            production_valid = (
+                request.purpose == "food_production_payroll"
+                and facility is not None and production_stock is not None
+                and production_recipe is not None and "food" in production_recipe.outputs
+                and facility.payroll_account_id == request.account_id
+                and production_stock.location_id == request.settlement_id
+                and production_stock.owner_ref == request.borrower_ref
+                and production_payload is not None
+                and source is not None and source.event_type == "production_limited"
+                and production_payload.get("facility_id") == facility.id
+                and production_payload.get("observed_day") == request.created_day
+                and production_payload.get("batches") == 0
+                and production_payload.get("limitations") == ["payroll_funds"]
+                and isinstance(production_limits, dict)
+                and production_limits.get("payroll_funds") == 0
+                and all(value >= 1 for key, value in production_limits.items()
+                        if key != "payroll_funds")
+            )
+            expected = {"action": "request_family_loan",
+                        "actor_ref": request.borrower_ref.to_dict(),
+                        "selected_affordance_id": request.selected_affordance_id}
+            created_values = ({(delta.owner_kind, delta.owner_id, delta.aspect): delta.after
+                               for delta in created.deltas} if created is not None else {})
+            employment_valid = (
+                request.purpose == "employment_payroll"
+                and contract is not None
+                and contract.employer_ref == request.borrower_ref
+                and contract.settlement_id == request.settlement_id
+                and contract.account_id == request.account_id
+                and source is not None
+                and source.event_type == "permanent_employment_unpaid"
+            )
+            if (decision is None or source is None or created is None or last is None
+                    or not (employment_valid or production_valid)
+                    or decision.fact_kind != FactKind.DECISION or decision.decision != expected
+                    or decision.day != request.created_day
+                    or created.event_type != "family_loan_requested"
+                    or created_values.get(("family_loan_request", request.id, "purpose")) != request.purpose
+                    or (request.production_facility_id is not None
+                        and created_values.get(("family_loan_request", request.id, "production_facility_id"))
+                        != request.production_facility_id)
+                    or request.source_event_id not in {link.cause_event_id for link in created.causal_links}
+                    or request.decision_event_id not in {link.cause_event_id for link in created.causal_links}
+                    or source.day != request.created_day
+                    or last.event_type not in {"family_loan_requested", "family_loan_funded"}
+                    or (request.status == "open" and last.id != created.id)
+                    or (request.status in {"partially_funded", "funded"}
+                        and last.event_type != "family_loan_funded")
+                    or request.created_day > world.clock.absolute_day
+                    or request.expires_day <= request.created_day):
+                raise ValueError("invalid family loan request provenance")
+            request_loans = [loan for loan in self.family_loans.values() if loan.request_id == request.id]
+            expected_loan_ids = {loan.id for loan in request_loans}
+            funding_event_ids = {loan.funded_event_id for loan in request_loans}
+            if expected_loan_ids != set(request.family_loan_ids):
+                raise ValueError("family loan request links do not match funding history")
+            if request.status != "open" and last.id not in funding_event_ids:
+                raise ValueError("family loan request must point to its latest contribution")
+            if request.status != "open" and not any(
+                delta.owner_kind == "family_loan_request" and delta.owner_id == request.id
+                and delta.aspect == "family_loan_ids" and delta.after == str(request.family_loan_ids)
+                for delta in last.deltas
+            ):
+                raise ValueError("latest family loan request receipt lacks its contributions")
+            total_funded = sum(loan.principal for loan in request_loans)
+            expected_status = (
+                "open" if total_funded == 0 else
+                "partially_funded" if total_funded < request.principal else
+                "funded" if total_funded == request.principal else "invalid"
+            )
+            if request.status != expected_status:
+                raise ValueError("family loan request principal is inconsistent with its loans")
+        for loan in self.family_loans.values():
+            request = self.family_loan_requests.get(loan.request_id)
+            decision = events.get(loan.decision_event_id)
+            funded = events.get(loan.funded_event_id)
+            last = events.get(loan.last_event_id)
+            lender_notice = world.knowledge.family_loan_notices.get(loan.lender_notice_id)
+            expected = {"action": "lend_to_polity", "actor_ref": loan.lender_ref.to_dict(),
+                        "selected_affordance_id": loan.selected_affordance_id}
+            if (request is None or decision is None or funded is None or last is None
+                    or loan.id not in request.family_loan_ids
+                    or request.status not in {"partially_funded", "funded"}
+                    or decision.fact_kind != FactKind.DECISION or decision.decision != expected
+                    or decision.day != loan.created_day or funded.event_type != "family_loan_funded"
+                    or lender_notice is None or lender_notice.recipient_ref != loan.lender_ref
+                    or loan.created_day > world.clock.absolute_day or loan.due_day <= loan.created_day):
+                raise ValueError("invalid family loan funding provenance")
+            if ((loan.status == "active" and last.id != funded.id)
+                    or (loan.status == "repaid"
+                        and loan.funded_event_id not in {link.cause_event_id for link in last.causal_links})):
+                raise ValueError("family loan lifecycle receipt is not causally continuous")
+            funding_delta = {delta.owner_id: int(delta.after) - int(delta.before)
+                             for delta in funded.deltas
+                             if delta.owner_kind == "account" and delta.aspect == "balance"}
+            if funding_delta != {loan.borrower_account_id: loan.principal,
+                                 loan.lender_account_id: -loan.principal}:
+                raise ValueError("family loan must transfer existing money exactly")
+            if not all(any(delta.owner_kind == "family_loan" and delta.owner_id == loan.id
+                           and delta.aspect == aspect and delta.after == value
+                           for delta in funded.deltas)
+                       for aspect, value in (("principal", str(loan.principal)),
+                                             ("due_day", str(loan.due_day)),
+                                             ("request_id", loan.request_id),
+                                             ("borrower_ref", str(loan.borrower_ref.to_dict())),
+                                             ("lender_ref", str(loan.lender_ref.to_dict())))):
+                raise ValueError("family loan terms lack a factual funding receipt")
+            if loan.status == "repaid":
+                repayment = events.get(loan.repayment_event_id)
+                if (repayment is None or repayment.event_type != "family_loan_repaid"
+                        or repayment.day < loan.due_day or repayment.day > world.clock.absolute_day
+                        or last.id != repayment.id):
+                    raise ValueError("invalid family loan repayment provenance")
+                repayment_decision_id = (repayment.causal_payload.get("decision_event_id")
+                                         if repayment.causal_payload else None)
+                repayment_decision = events.get(repayment_decision_id)
+                if (repayment_decision is None or repayment_decision.fact_kind != FactKind.DECISION
+                        or repayment_decision.decision != {
+                            "action": "repay_family_loan",
+                            "actor_ref": loan.borrower_ref.to_dict(),
+                            "selected_affordance_id": repayment.causal_payload.get("selected_affordance_id"),
+                        }
+                        or repayment_decision_id not in {link.cause_event_id for link in repayment.causal_links}):
+                    raise ValueError("family loan repayment requires the borrower's decision")
+                repayment_delta = {delta.owner_id: int(delta.after) - int(delta.before)
+                                   for delta in repayment.deltas
+                                   if delta.owner_kind == "account" and delta.aspect == "balance"}
+                if repayment_delta != {loan.borrower_account_id: -loan.principal,
+                                      loan.lender_account_id: loan.principal}:
+                    raise ValueError("family loan repayment must return its exact principal")
+            elif loan.repayment_event_id is not None:
+                raise ValueError("active family loan cannot have a repayment receipt")
         for priority in self.production_priorities.values():
             owner = owners.get(priority.owner_ref.kind, {}).get(priority.owner_ref.id)
             facility = self.facilities[priority.facility_id]

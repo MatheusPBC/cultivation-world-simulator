@@ -1,5 +1,7 @@
 """The fallback policy only selects enumerated options and never invents terms."""
 
+from src.classes.causal_origin import CausalOrigin
+from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.institutional_aid_policy import review_institutional_aid
 from src.sim.medieval.intelligence import refresh_trade_reports
@@ -10,9 +12,8 @@ from tests.test_medieval_institutional_aid import prepared_world
 
 
 def pressured_world():
-    """Reuse the aid fixture and give the requester a real blocked food plan."""
+    """Reuse the aid fixture with a current, privately observed food shortfall."""
     world = prepared_world()
-    review_supply(world)
     refresh_route_reports(world)
     return world
 
@@ -67,13 +68,23 @@ def test_routine_aid_can_request_for_second_settlement_while_first_chain_is_open
 
 def test_policy_runs_request_response_and_fulfillment_on_consecutive_days():
     world = pressured_world()
-    assert any(item.stage == "blocked" for item in world.strategy.plans.values())
+    requester = EntityRef("polity", "auren")
+    assert any(report.settlement_id == "pedraclara" and report.missing_food > 0
+               and report.observed_day == world.clock.absolute_day
+               for report in world.knowledge.settlements_for_actor(requester))
 
     review_institutional_aid(world, allow_requests=True)
     notice, requester, provider = first_request(world)
     request = next(item for item in world.events if item.id == notice.request_event_id)
     assert request.event_type == "institutional_aid_requested"
     assert notice.requested_food > 0
+    request_decision = next(item for item in world.events
+                            if item.id in {link.cause_event_id for link in request.causal_links}
+                            and item.fact_kind.value == "decision")
+    assert request_decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "institutional_food_aid",
+    }
+    assert request_decision.causal_origin == CausalOrigin.ACTOR_DECISION
     assert not world.relations.obligations, "a request binds nothing"
 
     def requests_for(place):

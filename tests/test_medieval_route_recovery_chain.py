@@ -28,6 +28,7 @@ from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.routing import supply_path
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 
 from tests.test_medieval_freight_recovery import close_route
 from tests.test_medieval_logistics import DEST, ROAD, SOURCE, cargo_world, ship, total_food
@@ -74,6 +75,8 @@ def prepared_world():
         decision = record_event(
             world, "payment_decided", "A administração destinou renda inicial ao domicílio.",
             fact_kind=FactKind.DECISION,
+            causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}},
             decision={"action": "pay", "source_id": "treasury:auren",
                       "target_id": account_id, "amount": amount,
                       "actor_ref": AUREN.to_dict()},

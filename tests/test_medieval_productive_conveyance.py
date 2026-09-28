@@ -121,6 +121,48 @@ def test_llm_interpretation_cannot_be_used_as_conveyance_consent():
     assert world.economy.facilities == before_facilities
 
 
+def test_exact_copied_deterministic_proposal_is_not_a_seller_offer():
+    world = create_medieval_world(73)
+    seller_option = next(
+        option for option in productive_site_conveyance_options(world, SELLER)
+        if option.buyer_ref == BUYER
+    )
+    record_event(
+        world,
+        "productive_site_conveyance_proposed",
+        "Uma decisão determinística copiou a proposta atual.",
+        fact_kind=FactKind.DECISION,
+        decision=seller_option.decision(),
+    )
+
+    assert conveyance_acceptance_options(world, BUYER) == ()
+
+
+def test_exact_copied_deterministic_acceptance_cannot_convey_site():
+    world, seller_option, proposal, acceptance_option, acceptance = _staged_world()
+    forged = record_event(
+        world,
+        "productive_site_conveyance_accepted",
+        "Uma decisão determinística copiou o aceite atual.",
+        fact_kind=FactKind.DECISION,
+        decision=acceptance.decision,
+        cause_ids=(proposal.id,),
+    )
+    before_sites = copy.deepcopy(world.map.infrastructure_sites)
+    before_facilities = copy.deepcopy(world.economy.facilities)
+    before_events = len(world.events)
+
+    with pytest.raises(ValueError, match="current acceptance decision"):
+        accept_site_conveyance(world, acceptance_option.id, decision_event_id=forged.id)
+
+    assert len(world.events) == before_events
+    assert world.map.infrastructure_sites == before_sites
+    assert world.economy.facilities == before_facilities
+    assert not any(event.event_type == "productive_site_conveyed"
+                   and seller_option.site_id in {delta.owner_id for delta in event.deltas}
+                   for event in world.events)
+
+
 def test_conveyance_changes_only_canonical_bindings_and_later_production_uses_buyer():
     world, seller_option, proposal, acceptance_option, acceptance = _staged_world()
     site = world.map.infrastructure_sites[seller_option.site_id]

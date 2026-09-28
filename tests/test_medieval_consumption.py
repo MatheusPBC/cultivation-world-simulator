@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import consume_monthly
@@ -43,6 +44,14 @@ def test_families_pay_only_whole_received_rations_and_unpaid_demand_stays_missin
     decisions = [e for e in world.events if e.id in {c.cause_event_id for c in purchase.causal_links}
                  and e.fact_kind == FactKind.DECISION]
     assert {e.decision["action"] for e in decisions} == {"buy_rations", "sell_rations"}
+    assert all(e.causal_origin.value == "actor_decision" for e in decisions)
+    assert {e.causal_payload["decision_source"]["rule"] for e in decisions} == {
+        "household_ration_purchase", "household_ration_sale",
+    }
+    assert all(e.causal_origin.value == "actor_decision" for e in decisions)
+    assert {e.causal_payload["decision_source"]["rule"] for e in decisions} == {
+        "household_ration_purchase", "household_ration_sale",
+    }
     assert all(not e.deltas for e in decisions)
     final = next(e for e in world.events if e.id == world.economy.needs["pedraclara"].last_event_id)
     cause_ids = {c.cause_event_id for c in final.causal_links}
@@ -160,12 +169,15 @@ def test_monthly_consumption_is_not_repeated_after_save_load(tmp_path):
     assert (world_snapshot(resumed), resumed.events) == before
 
 
-def decisions(world, group, *, quantity=2, price=4):
+def decisions(world, group, *, quantity=2, price=4, origin=CausalOrigin.ACTOR_DECISION):
     terms = {"group_id": group.id, "stock_id": "stock:pedraclara", "quantity": quantity,
              "unit_price": price, "seller_account_id": "treasury:auren"}
+    source = {"decision_source": {"kind": "api"}} if origin is CausalOrigin.ACTOR_DECISION else None
     buyer = record_event(world, "ration_purchase_decided", "Comprar alimento.", fact_kind=FactKind.DECISION,
+                         causal_origin=origin, causal_payload=source,
                          decision={"action": "buy_rations", "actor_ref": {"kind": "population_group", "id": group.id}, **terms})
     seller = record_event(world, "ration_sale_decided", "Vender alimento.", fact_kind=FactKind.DECISION,
+                          causal_origin=origin, causal_payload=source,
                           decision={"action": "sell_rations", "actor_ref": {"kind": "polity", "id": "auren"}, **terms})
     return buyer.id, seller.id
 
@@ -214,3 +226,18 @@ def test_ration_executor_revalidates_both_parties_before_any_effect(invalid):
     with pytest.raises(ValueError):
         consumption.buy_rations(world, **kwargs)
     assert (world_snapshot(world), world.events) == before
+
+
+def test_ration_purchase_rejects_deterministic_copy_of_both_current_intents():
+    from src.sim.medieval.consumption import buy_rations
+
+    world, group, _ = prepared_consumers()
+    buyer, seller = decisions(world, group, origin=CausalOrigin.DETERMINISTIC)
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="matching unused decisions"):
+        buy_rations(world, group_id=group.id, stock_id="stock:pedraclara", quantity=2,
+                    unit_price=4, seller_account_id="treasury:auren",
+                    buyer_decision_id=buyer, seller_decision_id=seller)
+
+    assert world_snapshot(world) == before

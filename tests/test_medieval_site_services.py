@@ -50,7 +50,9 @@ def _decide(world, site_id=SITE):
     owner = world.map.infrastructure_sites[site_id].owner_ref
     option, = service_options(world, site_id, owner)
     decision = record_event(world, "site_service_decided", "Decisão do proprietário.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision(),
                             cause_ids=(world.knowledge.site_report(owner, site_id).event_id,))
     event = set_site_service(world, option.id, decision_event_id=decision.id)
     assert event.causal_origin is CausalOrigin.ACTOR_DECISION
@@ -73,7 +75,8 @@ async def test_suspension_holds_the_same_parcel_then_resumption_delivers(tmp_pat
     )
     from src.sim.medieval.logistics import queue_freight
     choice = record_event(world, "freight_decided", "Remessa própria autorizada.",
-                          fact_kind=FactKind.DECISION,
+                          fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                          causal_payload={"decision_source": {"kind": "api"}},
                           decision={"action": "freight", "source_id": source.id,
                                     "destination_id": "depot:auren-portovelho", "resource_id": "food",
                                     "quantity": 50, "route_ids": [RIVER],
@@ -119,8 +122,16 @@ def test_maintainer_cannot_suspend_another_owners_port_and_stale_or_forged_choic
 
     owner = world.map.infrastructure_sites[SITE].owner_ref
     option, = service_options(world, SITE, owner)
+    unauthored = record_event(world, "site_service_interpreted", "Payload sem escolha do titular.",
+                              fact_kind=FactKind.DECISION, decision=option.decision())
+    before_unauthored = world_snapshot(world)
+    with pytest.raises(ValueError, match="site service option is stale"):
+        set_site_service(world, option.id, decision_event_id=unauthored.id)
+    assert world_snapshot(world) == before_unauthored
+
     stale = record_event(world, "site_service_decided", "Escolha atrasada.",
-                         fact_kind=FactKind.DECISION, decision=option.decision())
+                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
     world.clock = WorldClock(1)
     before = world_snapshot(world)
     with pytest.raises(ValueError, match="stale"):
@@ -134,7 +145,8 @@ def test_owner_change_invalidates_a_current_option_without_mutation():
     owner = site.owner_ref
     option, = service_options(world, SITE, owner)
     decision = record_event(world, "site_service_decided", "Escolha sob a posse anterior.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
     world.map.infrastructure_sites[SITE] = type(site).from_dict({
         **site.to_dict(), "owner_ref": EntityRef("polity", "auren").to_dict(),
     })
@@ -142,6 +154,30 @@ def test_owner_change_invalidates_a_current_option_without_mutation():
     with pytest.raises(ValueError, match="stale"):
         set_site_service(world, option.id, decision_event_id=decision.id)
     assert world_snapshot(world) == before
+
+
+def test_site_service_map_failure_rolls_back_decision_receipt_and_route_state(monkeypatch):
+    from src.classes.environment.map import Map
+
+    world = _world()
+    owner = world.map.infrastructure_sites[SITE].owner_ref
+    option, = service_options(world, SITE, owner)
+    decision = record_event(world, "site_service_decided", "Suspender serviço após observação.",
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
+    before = world_snapshot(world)
+    update = Map.update_infrastructure_site_runtime
+
+    def fail_after_map_update(map_owner, *args, **kwargs):
+        update(map_owner, *args, **kwargs)
+        raise RuntimeError("injected failure after route service update")
+
+    monkeypatch.setattr(Map, "update_infrastructure_site_runtime", fail_after_map_update)
+    with pytest.raises(RuntimeError, match="after route service update"):
+        set_site_service(world, option.id, decision_event_id=decision.id)
+    assert world_snapshot(world) == before
+    assert world.map.infrastructure_sites[SITE].service_suspended is False
 
 
 def test_disabled_site_never_reenables_when_service_is_resumed():
@@ -173,6 +209,11 @@ async def test_monthly_policy_suspends_from_own_report_and_failed_commit_is_roll
     await MedievalSimulator(world, save_path=path).step()
     assert world.map.infrastructure_sites[SITE].service_suspended is True
     assert world.map.get_route_operational_capacity(RIVER) == 0
+    decision = next(event for event in reversed(world.events) if event.event_type == "site_service_decided")
+    assert decision.causal_origin.value == "actor_decision"
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "site_service",
+    }
 
 
 def test_policy_requires_current_observed_thresholds_and_persistence_requires_service_state():

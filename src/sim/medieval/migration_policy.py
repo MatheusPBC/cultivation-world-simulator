@@ -2,6 +2,7 @@
 
 from collections import deque
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Count, Identity, SocietyValue
 
@@ -200,12 +201,17 @@ def recovery_options(world, journey_id, *, route_reports=None, route_graph=None)
     return tuple(sorted(options, key=lambda option: option.id))
 
 
-def review_migration(world, *, excluded_actors=()):
-    """Groups select conservative options without a completed provider turn."""
+def review_migration(world, *, excluded_actors=(), in_monthly_candidate=False):
+    """Groups select conservative options without a completed provider turn.
+
+    The engine's already-isolated candidate can run owner checks in place;
+    direct callers retain the separate material transaction and rollback.
+    """
     excluded = set(excluded_actors)
     from src.classes.event import FactKind
     from .events import record_event
-    from .migration import recover_migration, start_migration
+    from .migration import (recover_migration, start_migration,
+                            _recover_migration_in_place, _start_migration_in_place)
     from .settlement_intelligence import observe_present_household
 
     # A stranded group is physically at its endpoint and can make a fresh local
@@ -264,9 +270,15 @@ def review_migration(world, *, excluded_actors=()):
                              "report_ids": list(option.report_ids),
                              **({"destination_id": option.destination_id} if option.destination_id is not None else {})}
         decision = record_event(world, "migration_recovery_decided", "O grupo reavalia a jornada a partir de sua posição atual.",
-                                fact_kind=FactKind.DECISION, decision=recovery_decision,
+                                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                decision=recovery_decision,
+                                causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                    "rule": "migration_recovery"}},
                                 cause_ids=tuple(sorted(evidence)))
-        recover_migration(world, option.id, decision_event_id=decision.id)
+        if in_monthly_candidate:
+            _recover_migration_in_place(world, option.id, decision_event_id=decision.id)
+        else:
+            recover_migration(world, option.id, decision_event_id=decision.id)
         recovered_groups.add(journey.source_group_id)
 
     for group_id in sorted(world.society.population):
@@ -300,9 +312,15 @@ def review_migration(world, *, excluded_actors=()):
                               "route_report_ids": list(option.route_report_ids), "character_ids": [],
                               "cancel_activity_ids": []}
         decision = record_event(world, "migration_decided", "O grupo escolhe uma rota conhecida para deixar a pressão local.",
-                                fact_kind=FactKind.DECISION, decision=migration_decision,
+                                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                decision=migration_decision,
+                                causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                    "rule": "migration"}},
                                 cause_ids=tuple(sorted(report_events)))
-        start_migration(world, option.id, decision_event_id=decision.id)
+        if in_monthly_candidate:
+            _start_migration_in_place(world, option.id, decision_event_id=decision.id)
+        else:
+            start_migration(world, option.id, decision_event_id=decision.id)
 
 
 def migration_adapters():
@@ -340,7 +358,7 @@ def migration_adapters():
             raise ValueError("migration option is stale or unknown")
         authorization = record_event(
             world, "migration_authorized", "O grupo autorizou a jornada escolhida.",
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
             decision={"action": "migrate", "actor_ref": actor.to_dict(), "option_id": option.id,
                       "group_id": option.group_id,
                       "destination_id": option.destination_id, "count": option.count, "food": option.food,
@@ -363,12 +381,12 @@ def migration_adapters():
             raise ValueError("migration recovery option is stale or unknown")
         authorization = record_event(
             world, "migration_recovery_authorized", "O grupo autorizou a recuperação escolhida.",
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
             decision={"action": option.action, "actor_ref": actor.to_dict(), "option_id": option.id,
                       "journey_id": option.journey_id, "route_ids": list(option.route_ids),
                       "report_ids": list(option.report_ids),
                       **({"destination_id": option.destination_id} if option.destination_id is not None else {})},
-            cause_ids=(decision_event_id,))
+            cause_ids=(decision_event_id, *causes_for(world, option)))
         return recover_migration(world, option.id, decision_event_id=authorization.id)
 
     return (

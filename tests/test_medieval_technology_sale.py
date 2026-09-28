@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -33,8 +34,12 @@ def researched_world():
              "stock_id": "stock:ferroalto", "account_id": "treasury:escarlia",
              "researcher_id": lead.id}
     sponsor = record_event(world, "research_decided", "Financiar a pesquisa.", fact_kind=FactKind.DECISION,
+                           causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}},
                            decision={**terms, "action": "research", "actor_ref": SELLER.to_dict()})
     worker = record_event(world, "research_accepted", "Aceitar trabalho.", fact_kind=FactKind.DECISION,
+                          causal_origin=CausalOrigin.ACTOR_DECISION,
+                          causal_payload={"decision_source": {"kind": "api"}},
                           decision={**terms, "action": "research_work",
                                     "actor_ref": EntityRef("character", lead.id).to_dict()},
                           cause_ids=(sponsor.id,))
@@ -48,7 +53,9 @@ def researched_world():
     sighting = next(item for item in disclosure_options(world, SELLER)
                     if item.recipient_ref == BUYER and item.technology_id == "metallurgy")
     disclosure_decision = record_event(world, "technology_disclosed", "Divulgar técnica.",
-                                       fact_kind=FactKind.DECISION, decision=sighting.decision(),
+                                       fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                       causal_payload={"decision_source": {"kind": "api"}},
+                                       decision=sighting.decision(),
                                        cause_ids=sighting.causes())
     execute_disclosure(world, sighting, disclosure_decision.id)
     return world
@@ -71,9 +78,12 @@ def test_sale_revalidates_seller_consent_pays_and_persists_causal_evidence(tmp_p
     option = technology_sale_options(world, BUYER)[0]
     buyer_before = world.economy.accounts[option.buyer_account_id].balance
     seller_before = world.economy.accounts[option.seller_account_id].balance
-    request = record_technology_sale_request(world, BUYER, option.id)
+    request = record_technology_sale_request(world, BUYER, option.id, decision_source={"kind": "api"})
+    assert request.causal_origin.value == "actor_decision"
     acceptance_option = technology_sale_acceptance_options(world, SELLER)[0]
-    acceptance = record_technology_sale_acceptance(world, SELLER, acceptance_option.id)
+    acceptance = record_technology_sale_acceptance(
+        world, SELLER, acceptance_option.id, decision_source={"kind": "api"})
+    assert acceptance.causal_origin.value == "actor_decision"
 
     receipt = execute_technology_sale(world, BUYER, option.id, request.id, acceptance.id)
 
@@ -97,6 +107,31 @@ def test_sale_revalidates_seller_consent_pays_and_persists_causal_evidence(tmp_p
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
 
+@pytest.mark.parametrize("unauthored_side", ["buyer", "seller"])
+def test_sale_rejects_exact_but_unauthored_bilateral_consent(unauthored_side):
+    world = researched_world()
+    option = technology_sale_options(world, BUYER)[0]
+    if unauthored_side == "buyer":
+        forged = record_event(world, "technology_sale_interpreted", "Payload de compra sem autoria.",
+                              fact_kind=FactKind.DECISION, decision=option.decision())
+        before = world_snapshot(world)
+        assert not technology_sale_acceptance_options(world, SELLER)
+        assert world_snapshot(world) == before
+        return
+
+    request = record_technology_sale_request(world, BUYER, option.id, decision_source={"kind": "api"})
+    acceptance = technology_sale_acceptance_options(world, SELLER)[0]
+    forged = record_event(world, "technology_sale_interpreted", "Payload de venda sem autoria.",
+                          fact_kind=FactKind.DECISION, decision=acceptance.decision(),
+                          cause_ids=(request.id,))
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="acceptance is stale or unknown"):
+        execute_technology_sale(world, BUYER, option.id, request.id, forged.id)
+
+    assert world_snapshot(world) == before
+
+
 def test_paid_knowledge_unlocks_a_material_production_project():
     world = researched_world()
     from src.sim.medieval.expansion import progress_expansions, start_expansion
@@ -116,15 +151,17 @@ def test_paid_knowledge_unlocks_a_material_production_project():
     world.society.population[local_group.id] = local_group.model_copy(update={"occupation": "artisan"})
 
     option = technology_sale_options(world, BUYER)[0]
-    request = record_technology_sale_request(world, BUYER, option.id)
-    acceptance = record_technology_sale_acceptance(world, SELLER,
-        technology_sale_acceptance_options(world, SELLER)[0].id)
+    request = record_technology_sale_request(world, BUYER, option.id, decision_source={"kind": "api"})
+    acceptance = record_technology_sale_acceptance(
+        world, SELLER, technology_sale_acceptance_options(world, SELLER)[0].id,
+        decision_source={"kind": "api"})
     execute_technology_sale(world, BUYER, option.id, request.id, acceptance.id)
     assert world.knowledge.knows(BUYER, "metallurgy")
 
     expansion_decision = record_event(
         world, "expansion_decided", "Aplicar a metalurgia adquirida na linha local.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "expand", "actor_ref": BUYER.to_dict(),
                   "facility_id": "works:passagem-negra-iron", "blueprint_id": "efficient-furnaces"},
     )
@@ -154,9 +191,10 @@ def test_paid_knowledge_unlocks_a_material_production_project():
 def test_sale_never_spends_or_teaches_when_a_material_gate_disappears(missing):
     world = researched_world()
     option = technology_sale_options(world, BUYER)[0]
-    request = record_technology_sale_request(world, BUYER, option.id)
+    request = record_technology_sale_request(world, BUYER, option.id, decision_source={"kind": "api"})
     acceptance = record_technology_sale_acceptance(
-        world, SELLER, technology_sale_acceptance_options(world, SELLER)[0].id)
+        world, SELLER, technology_sale_acceptance_options(world, SELLER)[0].id,
+        decision_source={"kind": "api"})
     if missing == "funds":
         account = world.economy.accounts[option.buyer_account_id]
         world.economy.accounts[account.id] = account.model_copy(update={"balance": 0})

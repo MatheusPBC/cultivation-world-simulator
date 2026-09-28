@@ -5,6 +5,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -27,7 +28,9 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "withdrawal_test_decided", "Decisão de retirada para teste.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def food_total(world):
@@ -147,8 +150,11 @@ def test_withdrawal_rejects_stale_mandateless_unknown_route_and_active_supply():
     assert not withdrawal_options(route_less, OWNER)
 
     supplied, supplied_id, _, _ = withdrawal_world()
+    from src.sim.medieval.campaign_supply import _warning_threshold
+
+    detachment = supplied.society.detachments[supplied_id]
     supplied.society.detachments[supplied_id] = supplied.society.detachments[supplied_id].model_copy(
-        update={"provisions": 100})
+        update={"provisions": _warning_threshold(supplied, detachment) + 1})
     tick(supplied)  # real upkeep records the low-bag notice; it is not test-authored knowledge.
     assert any(notice.detachment_id == supplied_id and notice.state == "open"
                for notice in supplied.knowledge.campaign_supply_notices.values())

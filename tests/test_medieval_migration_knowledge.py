@@ -4,6 +4,7 @@ import pytest
 
 from src.classes.governance.knowledge import settlement_report_id
 from src.classes.mechanical_language import EntityRef
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.society.migration import MigrationJourney
 from src.run.medieval_world import create_medieval_world
@@ -84,6 +85,9 @@ def test_publication_decision_without_its_delivery_cannot_be_forged_into_knowled
     publication = next(event for event in world.events if event.event_type == "settlement_report_published"
                        and event.decision["settlement_id"] == original.settlement_id
                        and original.recipient_ref.to_dict() in event.decision["recipients"])
+    assert publication.causal_origin == CausalOrigin.DETERMINISTIC
+    assert publication.causal_payload["decision_source"] == {
+        "kind": "owner", "owner": "knowledge", "rule": "monthly_settlement_bulletin"}
     forged = original.model_copy(update={"event_id": publication.id})
     world.knowledge.settlement_reports[forged.id] = forged
     with pytest.raises(ValueError, match="settlement|delivery|receipt"):

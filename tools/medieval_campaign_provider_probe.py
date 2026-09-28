@@ -35,15 +35,39 @@ TARGET = "pedraclara"
 
 def _occupied_campaign_world(seed: int):
     world = create_medieval_world(seed)
-    world.economy.facilities.clear()
     group = next(item for item in world.society.population.values()
-                 if item.settlement_id == SOURCE)
+                 if item.settlement_id == SOURCE and item.occupation == "farmer"
+                 and item.count >= 20)
     soldiers_id = f"pop:{SOURCE}:{group.people}:soldier"
-    world.society.population[soldiers_id] = group.model_copy(
-        update={"id": soldiers_id, "occupation": "soldier", "count": 20})
+    soldiers = world.society.population.get(soldiers_id)
+    if soldiers is None:
+        raise RuntimeError("campaign probe requires an existing soldier cohort")
+    assignment = record_event(
+        world, "campaign_probe_assignment", "Vinte moradores foram designados soldados na premissa do cenário.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "campaign_provider_fixture",
+            "source_refs": [{"kind": "scenario", "id": "campaign_provider_fixture"},
+                            {"kind": "population_group", "id": group.id}],
+            "observed_day": world.clock.absolute_day,
+        }},
+        deltas=(_delta("population_group", group.id, "count", group.count, group.count - 20),
+                _delta("population_group", soldiers_id, "count", soldiers.count,
+                       soldiers.count + 20)),
+    )
+    world.society.population[group.id] = group.model_copy(
+        update={"count": group.count - 20, "last_event_id": assignment.id})
+    world.society.population[soldiers_id] = soldiers.model_copy(
+        update={"count": soldiers.count + 20, "last_event_id": assignment.id})
     occupation = record_event(
         world, "campaign_probe_occupation", "Ocupacao factual observavel para o probe.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "campaign_provider_fixture",
+            "source_refs": [{"kind": "scenario", "id": "campaign_provider_fixture"},
+                            {"kind": "settlement", "id": TARGET}],
+            "observed_day": world.clock.absolute_day,
+        }},
         deltas=(_delta("settlement", TARGET, "occupier_id", None, OCCUPIER.id),))
     world.society.set_occupation(TARGET, OCCUPIER.id)
     refresh_route_reports(world)

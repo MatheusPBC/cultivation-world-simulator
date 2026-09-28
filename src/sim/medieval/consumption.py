@@ -1,5 +1,6 @@
 """Local household purchases, separate from public relief and institutional tax."""
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -59,6 +60,7 @@ def buy_rations(world, *, group_id, stock_id, quantity, unit_price,
                                (seller_decision_id, "sell_rations", seller.owner_ref)):
         event = events.get(eid)
         if (event is None or event.fact_kind != FactKind.DECISION
+                or event.causal_origin != CausalOrigin.ACTOR_DECISION
                 or event.day != world.clock.absolute_day or eid in economy.payments
                 or event.decision != {"action": action, "actor_ref": actor.to_dict(), **terms}):
             raise ValueError("rations require matching unused decisions from both parties")
@@ -100,14 +102,18 @@ def purchase_monthly_rations(world, need, consumed, requirements=None):
         terms = {"group_id": group.id, "stock_id": stock.id, "quantity": quantity,
                  "unit_price": price, "seller_account_id": seller_id}
         decision = record_event(world, "ration_purchase_decided", "O grupo destina parte de seu saldo à alimentação.",
-                                fact_kind=FactKind.DECISION,
+                                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                 decision={"action": "buy_rations", "actor_ref": buyer.owner_ref.to_dict(), **terms},
+                                causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                     "rule": "household_ration_purchase"}},
                                 cause_ids=_causes(buyer.last_event_id, market.last_event_id))
         # Supplier acts for itself, not on a household's authority. The executor
         # rechecks the stock, quote and mandate even after this routine accepts.
         consent = record_event(world, "ration_sale_decided", "O fornecedor aceita vender as rações à cotação local.",
-                               fact_kind=FactKind.DECISION,
+                               fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
                                decision={"action": "sell_rations", "actor_ref": stock.owner_ref.to_dict(), **terms},
+                               causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                                    "rule": "household_ration_sale"}},
                                cause_ids=_causes(decision.id, market.last_event_id,
                                                  economy.stocks[stock.id].last_event_ids.get("food")))
         receipt = buy_rations(world, **terms, buyer_decision_id=decision.id, seller_decision_id=consent.id)

@@ -1,14 +1,35 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 
 from src.utils.llm import call_llm_with_task_name
-from src.utils.llm.exceptions import LLMError, ParseError
+from src.utils.llm.exceptions import LLMError, ParseError, ProviderCallError
+from src.utils.llm.runtime_mode import is_test_mode_enabled
 from src.utils.strings import to_json_str_with_intent
 
 from .models import ChoiceSource, SingleChoiceDecision, SingleChoiceRequest
 from .parser import choose_fallback_key, extract_choice_payload, normalize_choice_key
 from .scenario import OutcomeT, SingleChoiceScenario
+
+
+class SingleChoiceDecisionFailed(RuntimeError):
+    """A required bounded decision failed outside deterministic test mode."""
+
+    def __init__(self, request: SingleChoiceRequest, reason: str):
+        self.task_name = request.task_name
+        self.avatar_id = str(getattr(request.avatar, "id", ""))
+        super().__init__(
+            f"Required single choice failed for {request.task_name} "
+            f"(avatar {self.avatar_id}): {reason}"
+        )
+
+
+def _test_mode(request: SingleChoiceRequest) -> bool:
+    snapshot = getattr(getattr(request.avatar, "world", None), "run_config_snapshot", {})
+    return is_test_mode_enabled() or (
+        isinstance(snapshot, Mapping) and snapshot.get("test_mode") is True
+    )
 
 
 def _build_fallback_decision(request: SingleChoiceRequest, *, reason: str) -> SingleChoiceDecision:
@@ -48,6 +69,7 @@ def _build_prompt_infos(request: SingleChoiceRequest) -> dict:
 async def decide_single_choice(request: SingleChoiceRequest) -> SingleChoiceDecision:
     infos = _build_prompt_infos(request)
     valid_keys = [option.key for option in request.options]
+    test_mode = _test_mode(request)
 
     try:
         response = await call_llm_with_task_name(
@@ -66,16 +88,20 @@ async def decide_single_choice(request: SingleChoiceRequest) -> SingleChoiceDeci
                 used_fallback=False,
             )
 
-        return SingleChoiceDecision(
-            selected_key=choose_fallback_key(valid_keys, request.fallback_policy),
-            thinking=thinking,
-            source=ChoiceSource.FALLBACK,
-            raw_response=response,
-            used_fallback=True,
-            fallback_reason=f"invalid_choice:{choice}",
-        )
-    except (LLMError, ParseError, Exception) as exc:
-        return _build_fallback_decision(request, reason=type(exc).__name__)
+        if test_mode:
+            return SingleChoiceDecision(
+                selected_key=choose_fallback_key(valid_keys, request.fallback_policy),
+                thinking=thinking,
+                source=ChoiceSource.FALLBACK,
+                raw_response=response,
+                used_fallback=True,
+                fallback_reason=f"invalid_choice:{choice}",
+            )
+        raise SingleChoiceDecisionFailed(request, f"unsupported option: {choice!r}")
+    except (LLMError, ParseError, ProviderCallError) as exc:
+        if test_mode:
+            return _build_fallback_decision(request, reason=type(exc).__name__)
+        raise SingleChoiceDecisionFailed(request, str(exc)) from exc
 
 
 def _ensure_request_identity(request: SingleChoiceRequest) -> SingleChoiceRequest:

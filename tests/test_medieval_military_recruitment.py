@@ -6,6 +6,7 @@ from copy import deepcopy
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
@@ -16,7 +17,8 @@ from src.sim.medieval.force import raise_detachment, raise_options
 from src.sim.medieval.institutional_agenda import monthly_actors
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from src.sim.medieval.research import progress_research
+from src.sim.medieval.research import (accept_research_work, progress_research,
+                                       researcher_work_options)
 from src.sim.medieval.research_policy import execute_research_option, research_options
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
@@ -50,7 +52,18 @@ def test_real_mobilization_can_create_research_demand_then_group_recruits(tmp_pa
         world, "research_option_decided", "Financiar pesquisa militar.",
         fact_kind=FactKind.DECISION, decision=research.decision())
     execute_research_option(world, ACTOR, research.id, research_decision.id)
-    project = next(iter(world.research.projects.values()))
+    world.clock = world.clock.advance(1)
+    world.agenda.pop_due(world.clock.absolute_day)
+    work_option = next(option for option in researcher_work_options(world, research.researcher_id)
+                       if option.technology_id == "field_drill")
+    researcher_decision = record_event(
+        world, "research_accepted", "O pesquisador aceitou a proposta de trabalho.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        decision=work_option.decision(),
+        causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                             "rule": "researcher_acceptance"}},
+        cause_ids=(work_option.authorization_event_id, work_option.sponsor_decision_id))
+    project = accept_research_work(world, research.researcher_id, work_option.id, researcher_decision.id)
 
     # Every local soldier leaves via the ordinary force owner, with food and
     # wages; none is erased from Society to fake the research shortage.
@@ -66,7 +79,7 @@ def test_real_mobilization_can_create_research_demand_then_group_recruits(tmp_pa
     assert all(world.society.available_count(group_id) == 0 for group_id in local_soldiers)
     assert world.society.total_population == people_before
 
-    _advance_dated(world, 30)
+    _advance_dated(world, 29)
     progress_research(world, monthly_workforce(world))
     project = world.research.projects[project.id]
     assert project.stage == "blocked" and project.blocker == "labor"

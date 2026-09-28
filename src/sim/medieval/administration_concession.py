@@ -9,6 +9,7 @@ later, and only when that still-current administrator makes a new decision.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.diplomacy import (AdministrationTransferClause, WithdrawalClause,
@@ -201,12 +202,13 @@ def administration_concession_offer_options(world, actor, *, notice_id=None):
             state = _postwar_state(world, actor, settlement.id)
             if state is None or _active_postwar_transfer(world, settlement.id):
                 continue
-            current, control, garrison, detachment, report, _counterparty = state
+            current, control, garrison, detachment, report, counterparty = state
             breached = _breached_postwar_transfer(world, settlement.id)
             kind = "postwar_remediation" if breached is not None else "postwar"
             breach_event_id = breached[0] if breached is not None else None
             options.append(AdministrationConcessionOffer(
-                id=(f"administration-settlement:{settlement.id}:{control.last_event_id}:"
+                id=(f"administration-settlement:{settlement.id}:{counterparty.kind}:{counterparty.id}:"
+                    f"{control.last_event_id}:"
                     f"{garrison.last_event_id}:{detachment.last_event_id}:{report.event_id}:{breach_event_id or '-'}"),
                 actor_ref=actor, notice_id="-", settlement_id=settlement.id,
                 investment_id="-", standoff_id="-", detachment_id=detachment.id,
@@ -261,7 +263,15 @@ def _proposal_still_current(world, proposal):
     if proposal.proposal_kind != "administration_concession":
         return False
     if len(proposal.clauses) == 1 and proposal.clauses[0].kind == "administration_transfer":
-        return _postwar_state(world, proposal.proposer_ref, proposal.clauses[0].settlement_id) is not None
+        transfer = proposal.clauses[0]
+        if (transfer.debtor_ref != proposal.counterparty_ref
+                or transfer.creditor_ref != proposal.proposer_ref):
+            return False
+        state = _postwar_state(world, proposal.proposer_ref, transfer.settlement_id)
+        if state is None:
+            return False
+        current_counterparty = state[-1]
+        return current_counterparty == proposal.counterparty_ref
     if len(proposal.clauses) != 2:
         return False
     transfer, withdrawal = proposal.clauses
@@ -351,12 +361,17 @@ def fulfill_administration_transfer(world, actor, option_id, decision_event_id):
     proposal = candidate.relations.proposals[obligation.proposal_id]
     clause = proposal.clauses[obligation.clause_index]
     settlement = candidate.society.settlements[clause.settlement_id]
+    decision = candidate.event_index()[decision_event_id]
     before = settlement.administrator_id
     candidate.society.transfer_administration(clause.settlement_id, actor.id, clause.creditor_ref.id)
     material = record_event(
         candidate, "settlement_administration_transferred",
         "A administração do assentamento foi cedida por decisão atual de seu administrador.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision.id,
+                        "actor_ref": decision.decision["actor_ref"],
+                        "selected_affordance_id": decision.decision["selected_affordance_id"]},
         deltas=(_delta("settlement", settlement.id, "administrator_id", before, clause.creditor_ref.id),),
         cause_ids=_causes(decision_event_id, obligation.last_event_id, proposal.last_event_id),
     )

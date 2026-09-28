@@ -1,6 +1,9 @@
+import asyncio
+
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.actions import start_practice, start_travel
@@ -18,6 +21,10 @@ async def test_travel_interrupts_monthly_jump_without_migrating_the_population()
     original_group = person.population_group_id
     total = world.society.total_population
     activity = start_travel(world, person.id, "road-campomanso-pedraclara", "pedraclara")
+    decision = next(event for event in world.events if event.id == activity.decision_event_id)
+    assert decision.causal_origin == CausalOrigin.ACTOR_DECISION
+    assert decision.decision["actor_ref"] == {"kind": "character", "id": person.id}
+    assert decision.causal_payload["decision_source"] == {"kind": "player"}
     assert world.society.characters[person.id].location_id == "campomanso"
     await MedievalSimulator(world).step()
     assert world.clock.absolute_day == activity.due_day < 30
@@ -103,6 +110,26 @@ async def test_persistence_failure_does_not_publish_a_partial_step(tmp_path, mon
     assert world_snapshot(load_world(path)) == before
 
 
+@pytest.mark.parametrize("owner_name", ["economy", "relations"])
+async def test_final_owner_validation_failure_discards_step(owner_name, monkeypatch):
+    world = create_medieval_world(73)
+    owner_type = type(getattr(world, owner_name))
+    original_validate = owner_type.validate
+    before = world_snapshot(world)
+    before_events = [event.model_dump(mode="json") for event in world.events]
+
+    def reject_advanced_candidate(owner, candidate=None):
+        if candidate is not None and candidate.clock.absolute_day > 0:
+            raise ValueError("final owner validation failed")
+        return original_validate(owner, candidate)
+
+    monkeypatch.setattr(owner_type, "validate", reject_advanced_candidate)
+    with pytest.raises(ValueError, match="final owner validation failed"):
+        await MedievalSimulator(world).step()
+    assert world_snapshot(world) == before
+    assert [event.model_dump(mode="json") for event in world.events] == before_events
+
+
 async def test_provider_stale_affordance_pauses_and_discards_monthly_candidate(monkeypatch):
     world = create_medieval_world(73)
     world.config = world.config.model_copy(update={
@@ -147,6 +174,32 @@ async def test_provider_budget_exhaustion_discards_the_monthly_candidate(monkeyp
 
     assert world_snapshot(world) == before
     assert [event.model_dump(mode="json") for event in world.events] == before_events
+
+
+async def test_provider_timeout_discards_the_entire_monthly_candidate(monkeypatch):
+    world = create_medieval_world(73)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 32, "ai_max_calls": 100,
+    })
+    before = world_snapshot(world)
+    before_events = [event.model_dump(mode="json") for event in world.events]
+    before_rng = world.rng.getstate()
+    calls = []
+
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+
+    async def timeout(_prompt, *args, **kwargs):
+        calls.append(True)
+        raise asyncio.TimeoutError()
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", timeout)
+    with pytest.raises(ProviderDecisionRequired, match="TimeoutError"):
+        await MedievalSimulator(world).step()
+
+    assert calls, "an actor with current affordances reached the provider boundary"
+    assert world_snapshot(world) == before
+    assert [event.model_dump(mode="json") for event in world.events] == before_events
+    assert world.rng.getstate() == before_rng
 
 
 async def test_offline_monthly_boundary_can_execute_only_an_enumerated_relief_choice():

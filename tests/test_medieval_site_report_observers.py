@@ -8,6 +8,7 @@ than a non-existent ``project.site_id``.
 """
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.sim.medieval.events import record_event
 from src.sim.medieval.expansion import progress_expansions, start_expansion
 from src.sim.medieval.route_intelligence import refresh_site_reports
@@ -19,6 +20,8 @@ def _start_expansion(world):
     facility = world.economy.facilities["works:minas-de-ferroalto"]
     owner = world.economy.stocks[facility.stock_id].owner_ref
     event = record_event(world, "expansion_decided", "Ampliar serraria.", fact_kind=FactKind.DECISION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}},
                          decision={"action": "expand", "actor_ref": owner.to_dict(),
                                    "facility_id": facility.id, "blueprint_id": "workshop-extension"})
     return start_expansion(world, facility.id, "workshop-extension", decision_event_id=event.id), owner

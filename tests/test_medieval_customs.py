@@ -11,6 +11,7 @@ import sqlite3
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.state_delta import StateDelta
 from src.run.medieval_world import create_medieval_world
@@ -46,7 +47,8 @@ ROUTE = "road-pontenegro-ferroalto"
 
 def decided(world, option, event_type="customs_decided"):
     return record_event(world, event_type, "Decisão civil preparada.", fact_kind=FactKind.DECISION,
-                        decision=option.decision())
+                        causal_origin=CausalOrigin.ACTOR_DECISION, decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def prepared_world():
@@ -59,6 +61,20 @@ def prepared_world():
     asyncio.run(MedievalSimulator(world).step())
     assert checkpoint_active(world, world.economy.customs_checkpoints[f"customs:{SITE}"])
     return world
+
+
+def test_deterministic_intent_cannot_open_a_customs_checkpoint():
+    world = create_medieval_world(73)
+    actor = world.map.infrastructure_sites[SITE].owner_ref
+    option = customs_open_options(world, SITE, actor)[0]
+    decision = record_event(world, "customs_open_decided", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="stale"):
+        open_customs_checkpoint(world, option.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def presented_parcel(world):

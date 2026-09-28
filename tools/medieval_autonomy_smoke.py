@@ -104,9 +104,10 @@ solicitado.
 
 import argparse
 import asyncio
-from collections import Counter
+from collections import Counter, defaultdict
 import cProfile
 import json
+import os
 from pathlib import Path
 import pstats
 import resource
@@ -120,6 +121,7 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
+from src.sim.medieval.household_access import public_food_access_projection
 
 GOV_PROFILES = ("desatento", "reativo", "preventivo", "socorro", "alivio", "mercado", "mobilidade", "recuperacao")
 REACTIVE_MISSING_FOOD_THRESHOLD = 100
@@ -144,6 +146,25 @@ def process_high_water_bytes():
     """Return this process' high-water RSS, normalized across Unix platforms."""
     value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return int(value * (1024 if sys.platform.startswith("linux") else 1))
+
+
+def _create_progress_journal(path, record):
+    """Create a new append-only JSONL evidence file without replacing data."""
+    path = Path(path)
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    return path
+
+
+def _append_progress_journal(path, record):
+    if path is None:
+        return
+    with Path(path).open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
 
 
 RESOURCE_EFFECTS = {"production_completed", "production_limited", "subsistence_resolved",
@@ -196,11 +217,91 @@ def monthly_metrics(world):
             "mean_health": round(sum(need.health for need in needs) / len(needs), 2) if needs else 0,
             "mean_unrest": round(sum(need.unrest for need in needs) / len(needs), 2) if needs else 0,
             "deprivation_deaths": deprivation_deaths(world),
+            "payroll_liquidity": _payroll_liquidity(world),
             **{f"{name}_month": monthly[kind] for name, kind in POLITICAL_EVENTS.items()},
             **{f"{name}_total": cumulative[kind] for name, kind in POLITICAL_EVENTS.items()},
             "settlements": {key: {"health": need.health, "unrest": need.unrest,
-                                  "missing_food": need.missing_food}
+                                  "missing_food": need.missing_food,
+                                  **_settlement_economic_access(world, need)}
                             for key, need in sorted(world.economy.needs.items())}}
+
+
+def _payroll_liquidity(world):
+    """Describe shared employer cash and current payroll without changing state.
+
+    Contract targets are attempted-payroll ceilings, not reserved funds.
+    Facility capacity is also only a ceiling: actual production remains limited
+    by labor, inputs, site condition, storage, and available cash in Economy.
+    """
+    day = world.clock.absolute_day
+    facilities_by_account = defaultdict(list)
+    contracts_by_account = defaultdict(list)
+    payroll_owner_by_work = {}
+    for facility in world.economy.facilities.values():
+        facilities_by_account[facility.payroll_account_id].append(facility)
+        payroll_owner_by_work[facility.id] = facility.payroll_account_id
+    for contract in world.economy.employment_contracts.values():
+        contracts_by_account[contract.account_id].append(contract)
+        payroll_owner_by_work[contract.id] = contract.account_id
+
+    actual_gross = Counter()
+    for work_id, payroll in world.economy.payrolls.items():
+        account_id = payroll_owner_by_work.get(work_id)
+        if account_id is not None and payroll.day == day:
+            actual_gross[account_id] += payroll.gross
+
+    events = world.event_index()
+    result = {}
+    account_ids = sorted(set(facilities_by_account) | set(contracts_by_account))
+    for account_id in account_ids:
+        account = world.economy.accounts.get(account_id)
+        if account is None:
+            continue
+        facilities = facilities_by_account[account_id]
+        contracts = contracts_by_account[account_id]
+        outcomes = Counter(contract.last_outcome for contract in contracts
+                           if contract.last_reviewed_day == day)
+        limited = []
+        for facility in facilities:
+            event = events.get(facility.last_event_id)
+            if (event is not None and event.day == day
+                    and "payroll_funds" in facility.last_limitations):
+                limited.append({"facility_id": facility.id, "event_id": event.id})
+        result[account_id] = {
+            "owner_ref": account.owner_ref.to_dict(),
+            "balance": account.balance,
+            "standing_contract_target_payroll_ceiling": sum(
+                contract.staffing_target * contract.wage_per_worker
+                for contract in contracts
+            ),
+            "facility_maximum_payroll_ceiling": sum(
+                facility.max_batches
+                * world.economy.recipes[facility.recipe_id].workers
+                * facility.wage_per_worker
+                for facility in facilities
+            ),
+            "actual_payroll_gross_today": actual_gross[account_id],
+            "employment_outcomes_today": dict(sorted(outcomes.items())),
+            "payroll_limited_facilities_today": sorted(limited, key=lambda item: item["facility_id"]),
+        }
+    return result
+
+
+def _settlement_economic_access(world, need):
+    """Expose the material difference between public stock and household access.
+
+    These values are diagnostic projections only. They do not alter allocation,
+    income, prices, payroll, or the actors' options. The affordability estimate
+    is the public ration share households could not cover from cash at this
+    quote, before private provisions and relief; it is not the final shortfall.
+    """
+    access = public_food_access_projection(world, need.id)
+    payroll_limited = sum(
+        1 for facility in world.economy.facilities.values()
+        if world.economy.stocks[facility.stock_id].location_id == need.id
+        and "payroll_funds" in facility.last_limitations
+    )
+    return {**access, "payroll_limited_facilities": payroll_limited}
 
 
 def _payload_of(prompt):
@@ -438,11 +539,12 @@ def _install_gov_profile(gov_profile):
 
 async def run(seed, days, output, profile=False, gov_profile=None, real_provider=False,
               ai_calls_per_step=256, ai_max_calls=0, checkpoint_days=None,
-              resume_save=None):
+              resume_save=None, progress_jsonl=None):
     # The CLI passes a Path, while callers such as release notebooks and
     # focused probes commonly pass a string.  Normalize at the public
     # boundary so persistence and the returned artifact path use one contract.
     output = Path(output)
+    progress_jsonl = Path(progress_jsonl) if progress_jsonl is not None else None
     if real_provider and gov_profile is not None:
         raise ValueError("real_provider cannot be combined with gov_profile")
     if gov_profile is not None and gov_profile not in GOV_PROFILES:
@@ -462,6 +564,12 @@ async def run(seed, days, output, profile=False, gov_profile=None, real_provider
             raise ValueError("resume_save and output must be different paths")
         if output.exists():
             raise ValueError(f"resume output already exists: {output}")
+    if progress_jsonl is not None:
+        if progress_jsonl.resolve() in {output.resolve(),
+                                        resume_save.resolve() if resume_save is not None else None}:
+            raise ValueError("progress_jsonl must be a different path from output and resume_save")
+        if progress_jsonl.exists():
+            raise ValueError(f"progress_jsonl already exists: {progress_jsonl}")
     if real_provider:
         if not ai_max_calls:
             raise ValueError("real_provider requires an explicit positive ai_max_calls budget")
@@ -470,16 +578,19 @@ async def run(seed, days, output, profile=False, gov_profile=None, real_provider
             raise RuntimeError("real provider is not configured or is disabled in this runtime")
         return await _run(seed, days, output, profile, None, real_provider=True,
                           ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
-                          checkpoint_days=checkpoint_days, resume_save=resume_save)
+                          checkpoint_days=checkpoint_days, resume_save=resume_save,
+                          progress_jsonl=progress_jsonl)
     if gov_profile is None:
         return await _run(seed, days, output, profile, gov_profile,
                           ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
-                          checkpoint_days=checkpoint_days, resume_save=resume_save)
+                          checkpoint_days=checkpoint_days, resume_save=resume_save,
+                          progress_jsonl=progress_jsonl)
     patches = _install_gov_profile(gov_profile)
     with patches[0], patches[1]:
         return await _run(seed, days, output, profile, gov_profile,
                           ai_calls_per_step=ai_calls_per_step, ai_max_calls=ai_max_calls,
-                          checkpoint_days=checkpoint_days, resume_save=resume_save)
+                          checkpoint_days=checkpoint_days, resume_save=resume_save,
+                          progress_jsonl=progress_jsonl)
 
 
 async def advance_world(world, target_day, *, after_step=None):
@@ -503,21 +614,27 @@ async def advance_world(world, target_day, *, after_step=None):
 
 async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
                ai_calls_per_step=256, ai_max_calls=0, checkpoint_days=None,
-               resume_save=None):
+               resume_save=None, progress_jsonl=None):
     world = (load_world(resume_save) if resume_save is not None
              else create_medieval_world(seed, bootstrap_household_income=True))
     # On resume the persisted run configuration, not the CLI default, owns
     # provenance.  A mismatched --seed cannot change the loaded world.
     seed = world.config.seed
-    if resume_save is not None and checkpoint_days:
+    if checkpoint_days:
         # Check absolute-day artifact names after reading the source clock, and
-        # refuse replacing either the source save or prior evidence.
+        # refuse replacing prior evidence for both fresh and resumed runs.
         start_day = world.clock.absolute_day
         for offset in range(checkpoint_days, days + 1, checkpoint_days):
             checkpoint_path = output.with_name(
                 f"{output.stem}.checkpoint-day-{start_day + offset:05d}{output.suffix}")
-            if checkpoint_path.resolve() == Path(resume_save).resolve() or checkpoint_path.exists():
-                raise ValueError(f"resume checkpoint output already exists or is the source save: {checkpoint_path}")
+            if (checkpoint_path.exists()
+                    or (resume_save is not None
+                        and checkpoint_path.resolve() == Path(resume_save).resolve())):
+                raise ValueError(f"checkpoint output already exists or is the source save: {checkpoint_path}")
+            if progress_jsonl is not None and checkpoint_path.resolve() == progress_jsonl.resolve():
+                raise ValueError("progress_jsonl conflicts with a checkpoint path")
+    if progress_jsonl is not None and progress_jsonl.resolve() == output.resolve():
+        raise ValueError("progress_jsonl must be a different path from output and resume_save")
     if gov_profile is not None or real_provider:
         # Consulted for real: enabled, with enough same-day budget that every
         # polity's monthly turn (plus any daily recourse turn sharing the same
@@ -530,15 +647,27 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
     initial_resources = resource_totals(world)
     initial_money = sum(a.balance for a in world.economy.accounts.values())
     elapsed, jumps, boundary, net_resources, metrics = time.perf_counter(), 0, start_day // 30, Counter(), []
+    last_month_mark = elapsed
+    checkpoint_cost_since_month = 0.0
+    monthly_advance_seconds = []
     print(json.dumps({"phase": "start", "gov_profile": gov_profile, "seed": seed, "days": days,
                       "start_day": start_day, "target_day": target_day,
                       "initial_population": world.society.total_population, "initial_money": initial_money,
                       "ai_enabled": world.config.ai_enabled, "policy": world.config.decision_policy,
                       "real_provider": real_provider}), flush=True)
+    if progress_jsonl is not None:
+        _create_progress_journal(progress_jsonl, {
+            "record_type": "run_started", "scenario": "natural-autonomous-supply",
+            "seed": seed, "start_day": start_day, "target_day": target_day,
+            "gov_profile": gov_profile, "real_provider": real_provider,
+            "ai_enabled": world.config.ai_enabled,
+            "policy": world.config.decision_policy,
+            "resume_save": str(Path(resume_save).resolve()) if resume_save is not None else None,
+        })
     checkpoints = []
     checkpointed_days = set()
     def after_step(advanced_world, start):
-        nonlocal jumps, boundary
+        nonlocal jumps, boundary, last_month_mark, checkpoint_cost_since_month
         jumps += 1
         net_resources.update(ledger_resource_effects(advanced_world.events[start:], advanced_world.economy.resources))
         assert resource_totals(advanced_world) == {rid: amount + net_resources[rid] for rid, amount in initial_resources.items()}, "unaccounted resource creation/loss"
@@ -547,9 +676,16 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
             boundary = advanced_world.clock.absolute_day // 30
             metric = monthly_metrics(advanced_world)
             metrics.append(metric)
-            print(json.dumps({**metric, "events": len(advanced_world.events),
-                              "orders": len(advanced_world.economy.freight_orders),
-                              "elapsed_s": round(time.perf_counter()-elapsed, 2)}), flush=True)
+            now = time.perf_counter()
+            monthly_advance_seconds.append(round(now - last_month_mark - checkpoint_cost_since_month, 4))
+            last_month_mark = now
+            checkpoint_cost_since_month = 0.0
+            progress = {**metric, "events": len(advanced_world.events),
+                        "orders": len(advanced_world.economy.freight_orders),
+                        "elapsed_s": round(now-elapsed, 2),
+                        "advance_month_s": monthly_advance_seconds[-1]}
+            print(json.dumps(progress), flush=True)
+            _append_progress_journal(progress_jsonl, {"record_type": "month", **progress})
         day = advanced_world.clock.absolute_day
         if checkpoint_days and (day - start_day) % checkpoint_days == 0 and day not in checkpointed_days:
             checkpointed_days.add(day)
@@ -564,6 +700,7 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
             equivalent = (before_snapshot == world_snapshot(resumed_checkpoint)
                           and before_events == resumed_checkpoint.events)
             checkpoint_elapsed = time.perf_counter() - checkpoint_started
+            checkpoint_cost_since_month += checkpoint_elapsed
             checkpoints.append({
                 "day": day,
                 "path": str(checkpoint_path.resolve()),
@@ -574,7 +711,20 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
                 "save_load_equivalent": equivalent,
             })
             assert equivalent, f"checkpoint save/load mismatch at day {day}"
-    await advance_world(world, target_day, after_step=after_step)
+            _append_progress_journal(progress_jsonl, {
+                "record_type": "checkpoint", **checkpoints[-1],
+                "event_count": len(advanced_world.events),
+            })
+    try:
+        await advance_world(world, target_day, after_step=after_step)
+    except BaseException as exc:
+        _append_progress_journal(progress_jsonl, {
+            "record_type": "run_interrupted", "day": world.clock.absolute_day,
+            "events": len(world.events), "exception_type": type(exc).__name__,
+            "message": str(exc),
+            "latest_checkpoint": checkpoints[-1]["path"] if checkpoints else None,
+        })
+        raise
     final_metrics = monthly_metrics(world)
     measured_events = len(world.events)
     measured_orders = len(world.economy.freight_orders)
@@ -598,7 +748,7 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
     await MedievalSimulator(world).step()
     await MedievalSimulator(resumed).step()
     assert world_snapshot(world) == world_snapshot(resumed) and world.events == resumed.events
-    return {"scenario": "natural-autonomous-supply", "seed": seed, "saved_day": target_day,
+    result = {"scenario": "natural-autonomous-supply", "seed": seed, "saved_day": target_day,
 "start_day": start_day, "advanced_days": days,
 "continuation_day": world.clock.absolute_day, "jumps": jumps, "events": measured_events,
              "money_total": initial_money, "orders": measured_orders,
@@ -610,6 +760,10 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
             "mean_health": final_metrics["mean_health"],
             "deprivation_deaths": final_metrics["deprivation_deaths"],
             "monthly_metrics": metrics,
+            "monthly_advance_seconds": monthly_advance_seconds,
+            "monthly_p95_seconds": (sorted(monthly_advance_seconds)[
+                (95 * len(monthly_advance_seconds) + 99) // 100 - 1]
+                if monthly_advance_seconds else None),
             "health": {key: n.health for key, n in world.economy.needs.items()},
             "balances": {key: a.balance for key, a in world.economy.accounts.items() if a.owner_ref.kind == "polity"},
             "food_conserved": True, "money_conserved": True, "all_resources_accounted": True,
@@ -623,6 +777,19 @@ async def _run(seed, days, output, profile, gov_profile, *, real_provider=False,
              "real_ai_calls": (ai_decider.spent_calls(world) if real_provider else 0),
             "policy": world.config.decision_policy, "elapsed_s": round(time.perf_counter()-elapsed, 2),
             "save": str(output.resolve())}
+    _append_progress_journal(progress_jsonl, {
+        "record_type": "run_completed", "seed": seed, "start_day": start_day,
+        "saved_day": target_day, "continuation_day": world.clock.absolute_day,
+        "events": measured_events, "population": result["population"],
+        "missing_food_total": result["missing_food_total"],
+        "mean_health": result["mean_health"],
+        "deprivation_deaths": result["deprivation_deaths"],
+        "money_conserved": result["money_conserved"],
+        "all_resources_accounted": result["all_resources_accounted"],
+        "save_load_equivalent": result["save_load_equivalent"],
+        "save_bytes": result["save_bytes"], "save": result["save"],
+    })
+    return result
 
 
 if __name__ == "__main__":
@@ -643,6 +810,8 @@ if __name__ == "__main__":
                         help="Escreve e valida um save distinto a cada intervalo múltiplo de 30 dias.")
     parser.add_argument("--resume-save", type=Path,
                         help="Retoma deste save e avança --days dias; --output deve ser um novo arquivo.")
+    parser.add_argument("--progress-jsonl", type=Path,
+                        help="Cria um journal JSONL sem sobrescrita com meses, checkpoints e conclusão/interrupção.")
     args = parser.parse_args()
     if args.days <= 0 or args.days % 30:
         parser.error("days must be a positive multiple of 30")
@@ -654,10 +823,12 @@ if __name__ == "__main__":
         parser.error("resume-save and output must be different paths")
     if args.resume_save is not None and args.output.exists():
         parser.error("resume output must be a new file")
+    if args.progress_jsonl is not None and args.progress_jsonl.exists():
+        parser.error("progress-jsonl must be a new file")
     try:
         result = asyncio.run(run(args.seed, args.days, args.output, args.profile, args.gov_profile,
                                  args.real_provider, args.ai_calls_per_step, args.ai_max_calls,
-                                 args.checkpoint_days, args.resume_save))
+                                 args.checkpoint_days, args.resume_save, args.progress_jsonl))
     except ValueError as exc:
         parser.error(str(exc))
     print(json.dumps(result,

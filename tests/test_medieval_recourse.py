@@ -3,6 +3,7 @@
 import pytest
 
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.diplomacy import ResourceTransferClause, offer_intent
 from src.classes.mechanical_language import EntityRef
@@ -11,7 +12,7 @@ from src.sim.medieval.diplomacy import offer_proposal, respond_proposal
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from src.sim.medieval.recourse_policy import REVIEW_KIND, review_id
+from src.sim.medieval.recourse_policy import REVIEW_KIND, recourse_options, review_id
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
 from tests.test_medieval_creature_autonomy import choose, enable, provider
@@ -36,9 +37,13 @@ def promise(world, due_day, expires_day):
                                     resource_id="food", quantity=OWED, route_ids=ROUTE)
     offered = record_event(world, "diplomatic_decision", "Prometer uma entrega de alimento.",
                            fact_kind=FactKind.DECISION,
+                           causal_origin=CausalOrigin.ACTOR_DECISION,
+                           causal_payload={"decision_source": {"kind": "api"}},
                            decision=offer_intent(ESCARLIA, AUREN, (clause,), expires_day, None))
     proposal = offer_proposal(world, ESCARLIA, AUREN, (clause,), expires_day, decision_event_id=offered.id)
     accepted = record_event(world, "diplomatic_decision", "Aceitar a promessa.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision={"action": "respond_proposal", "actor_ref": AUREN.to_dict(),
                                       "proposal_id": proposal.id, "response": "accept"})
     respond_proposal(world, proposal.id, "accept", decision_event_id=accepted.id)
@@ -86,6 +91,12 @@ async def test_a_breach_earns_a_turn_that_a_provider_can_answer_with_a_real_colu
     assert not any(item.event_type == "recourse_decided" for item in world.events)
 
     observe(world)
+    menu = recourse_options(world, AUREN, ESCARLIA)
+    marches = [option for option, _label in menu
+               if option.decision().get("action") == "raise_detachment"]
+    assert marches
+    assert {option.destination_id for option in marches} == {TARGET}
+
     prompts = provider(monkeypatch, choose("marchar até Ferroalto"))
     await engine.step()
 

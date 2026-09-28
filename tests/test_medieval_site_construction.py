@@ -14,6 +14,7 @@ import pytest
 
 from src.classes.core.infrastructure import validate_infrastructure
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
@@ -36,6 +37,16 @@ SETTLEMENT = "pedraclara"
 BLUEPRINT = "craft-workshop-construction"
 AUTHORED_SITE = "campos-de-pedra-clara"
 FOUNDATION = "craft-workshop-foundation"
+
+
+def _provider_answer(monkeypatch, choose_id):
+    """Mock only the provider JSON boundary so normal receipts are recorded."""
+    async def call_llm_json(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        return {"selected_id": choose_id(payload)}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
 
 
 def prepared():
@@ -68,7 +79,9 @@ def authorize(world, option):
     from src.sim.medieval.expansion import _construction_terms
 
     return record_event(world, "site_construction_authorized", "Autorizar a obra.",
-                        fact_kind=FactKind.DECISION, decision=_construction_terms(option))
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=_construction_terms(option))
 
 
 def build(world, project_id, limit=800):
@@ -128,14 +141,29 @@ def test_every_authored_and_material_gate_is_required(missing):
                 if item.settlement_id == SETTLEMENT]
 
 
-def test_completion_commissions_a_map_owned_site_with_its_authored_capability(tmp_path):
+def test_completion_commissions_a_map_owned_site_with_its_authored_capability(tmp_path, monkeypatch):
     world = prepared()
     option = only_option(world)
     wood_before, stone_before = total(world, "wood"), total(world, "stone")
     money_before = sum(item.balance for item in world.economy.accounts.values())
     sites_before = set(world.map.infrastructure_sites)
 
-    project = start_site_construction(world, option, decision_event_id=authorize(world, option).id)
+    from src.sim.medieval import expansion
+    create_project = expansion._start_site_construction_in_place
+    authorization = authorize(world, option)
+    before_start = world_snapshot(world)
+
+    def fail_after_project(candidate, *args, **kwargs):
+        create_project(candidate, *args, **kwargs)
+        raise RuntimeError("injected failure after construction project creation")
+
+    monkeypatch.setattr(expansion, "_start_site_construction_in_place", fail_after_project)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        start_site_construction(world, option, decision_event_id=authorization.id)
+    assert world_snapshot(world) == before_start
+
+    monkeypatch.undo()
+    project = start_site_construction(world, option, decision_event_id=authorization.id)
     assert option.new_site_id not in world.map.infrastructure_sites, "nada existe antes da obra"
     project = build(world, project.id)
 
@@ -268,7 +296,7 @@ def test_a_construction_blueprint_is_never_opened_as_an_anchor_expansion():
         start_expansion(world, facility.id, BLUEPRINT, decision_event_id="event:1")
 
 
-def test_the_new_site_lets_c98_found_the_line_and_pay_idle_artisans():
+def test_the_new_site_lets_c98_found_the_line_and_pay_idle_artisans(monkeypatch):
     """site -> line -> wages: the chain the settlement could not have before."""
     world = prepared()
     option = only_option(world)
@@ -282,8 +310,38 @@ def test_the_new_site_lets_c98_found_the_line_and_pay_idle_artisans():
     line_option = next(item for item in foundation_options(world, AUREN)
                        if item.blueprint_id == FOUNDATION and item.site_id == option.new_site_id)
     from src.sim.medieval.expansion import _foundation_terms
+    from src.sim.medieval import expansion
+    actor_choice = record_event(
+        world, "line_foundation_selected", "A instituição escolheu fundar a linha.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=line_option.decision(),
+    )
+    before_menu_foundation = world_snapshot(world)
+    create_project = expansion._start_foundation_in_place
+
+    def fail_after_project(candidate, *args, **kwargs):
+        create_project(candidate, *args, **kwargs)
+        raise RuntimeError("injected failure after foundation project creation")
+
+    monkeypatch.setattr(expansion, "_start_foundation_in_place", fail_after_project)
+    adapter = expansion.foundation_adapters()[0]
+    with pytest.raises(RuntimeError, match="injected failure"):
+        adapter.execute_fn(world, AUREN, line_option.id, actor_choice.id)
+    assert world_snapshot(world) == before_menu_foundation
+    monkeypatch.undo()
+
     decision = record_event(world, "line_foundation_authorized", "Fundar a linha.",
-                            fact_kind=FactKind.DECISION, decision=_foundation_terms(line_option))
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=_foundation_terms(line_option))
+    create_project = expansion._start_foundation_in_place
+    before_foundation = world_snapshot(world)
+    monkeypatch.setattr(expansion, "_start_foundation_in_place", fail_after_project)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        start_foundation(world, line_option, decision_event_id=decision.id)
+    assert world_snapshot(world) == before_foundation
+
+    monkeypatch.undo()
     line = build(world, start_foundation(world, line_option, decision_event_id=decision.id).id)
     assert line.stage == "completed"
 
@@ -316,15 +374,16 @@ async def test_informed_administrator_can_choose_workshop_without_free_employmen
     world = prepared()
     world.clock = WorldClock(30)
     produce_monthly(world)
+    consume_monthly(world)
     refresh_reports(world)
     option = only_option(world)
     world.config = world.config.model_copy(update={
         "ai_enabled": True, "ai_calls_per_step": 1, "ai_max_calls": 1,
     })
-    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     seen = []
 
-    async def choose(_world, _actor, situation, choices, **_kwargs):
+    def choose(payload):
+        situation, choices = payload["situation"], payload["choices"]
         local = next(item for item in situation["own_local_livelihood_readings"]
                      if item["settlement_id"] == SETTLEMENT)
         assert local["residents_by_occupation"]["artisan"] > 1000
@@ -333,7 +392,7 @@ async def test_informed_administrator_can_choose_workshop_without_free_employmen
         seen.append(local["source_event_ids"])
         return option.id
 
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    _provider_answer(monkeypatch, choose)
     before_money = sum(account.balance for account in world.economy.accounts.values())
 
     _claims, covered = await review_institutional_decision_turn(
@@ -343,8 +402,17 @@ async def test_informed_administrator_can_choose_workshop_without_free_employmen
     assert any(project.blueprint_id == BLUEPRINT for project in world.economy.expansions.values())
     assert option.new_site_id not in world.map.infrastructure_sites
     assert sum(account.balance for account in world.economy.accounts.values()) == before_money
-    assert any(event.event_type == "institutional_decision_turn_decided"
-               and event.decision == option.decision() for event in world.events)
+    actor_decision = next(event for event in reversed(world.events)
+                          if event.event_type == "institutional_decision_turn_decided"
+                          and event.decision == option.decision())
+    decision_causes = {link.cause_event_id for link in actor_decision.causal_links}
+    assert set(seen[0]) <= decision_causes
+    assert world.economy.accounts[option.account_id].last_event_id in decision_causes
+    from src.sim.medieval.actor_dossier import _latest_food_affordability
+    report = world.knowledge.settlement_report(AUREN, SETTLEMENT)
+    affordability_id = _latest_food_affordability(world, report)["affordability_event_id"]
+    assert affordability_id is not None
+    assert affordability_id in decision_causes
 
 
 @pytest.mark.asyncio
@@ -363,10 +431,10 @@ async def test_chosen_workshop_pays_artisans_and_improves_food_access_against_no
     world.config = world.config.model_copy(update={
         "ai_enabled": True, "ai_calls_per_step": 2, "ai_max_calls": 2,
     })
-    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     chosen = []
 
-    async def choose(_world, _actor, situation, choices, **_kwargs):
+    def choose(payload):
+        situation, choices = payload["situation"], payload["choices"]
         ids = {choice["id"] for choice in choices}
         if option.id in ids:
             local = next(item for item in situation["own_local_livelihood_readings"]
@@ -375,13 +443,13 @@ async def test_chosen_workshop_pays_artisans_and_improves_food_access_against_no
             assert local["own_production_paid_workers_by_occupation"].get("artisan", 0) == 0
             selected = option.id
         else:
-            selected = next(item.id for item in foundation_options(_world, AUREN)
+            selected = next(item.id for item in foundation_options(world, AUREN)
                             if item.blueprint_id == FOUNDATION and item.site_id == option.new_site_id)
             assert selected in ids
         chosen.append(selected)
         return selected
 
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    _provider_answer(monkeypatch, choose)
     await review_institutional_decision_turn(world, AUREN, site_construction_adapters())
     site_project = next(project for project in world.economy.expansions.values()
                         if project.blueprint_id == BLUEPRINT)
@@ -458,6 +526,30 @@ async def test_chosen_workshop_pays_artisans_and_improves_food_access_against_no
     assert audit(path)["ok"] is True
 
 
+def test_site_construction_menu_rolls_back_authorization_when_project_creation_fails(monkeypatch):
+    from src.sim.medieval import expansion
+
+    world = prepared()
+    option = only_option(world)
+    actor_decision = record_event(
+        world, "site_construction_selected", "Escolher construir oficina.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision(),
+    )
+    before = world_snapshot(world)
+    create_project = expansion._start_site_construction_in_place
+
+    def fail_after_project(candidate, *args, **kwargs):
+        create_project(candidate, *args, **kwargs)
+        raise RuntimeError("injected failure after construction project creation")
+
+    monkeypatch.setattr(expansion, "_start_site_construction_in_place", fail_after_project)
+    adapter = expansion.site_construction_adapters()[0]
+    with pytest.raises(RuntimeError, match="injected failure"):
+        adapter.execute_fn(world, AUREN, option.id, actor_decision.id)
+    assert world_snapshot(world) == before
+
+
 @pytest.mark.asyncio
 async def test_workshop_choice_reappears_as_foundation_in_the_normal_monthly_engine(monkeypatch, tmp_path):
     """The phase runner, not a test-only owner sequence, advances the chain."""
@@ -468,23 +560,30 @@ async def test_workshop_choice_reappears_as_foundation_in_the_normal_monthly_eng
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     chosen = []
 
-    async def choose(_world, actor, _situation, choices, **_kwargs):
-        ids = {choice["id"] for choice in choices}
+    current_day = {"value": 0}
+    target_site_id = constructed_site_id(SETTLEMENT, world.economy.expansion_blueprints[BLUEPRINT])
+
+    def choose(payload):
+        actor = EntityRef(**payload["you_are"])
+        choices = payload["choices"]
         if actor == AUREN:
-            if option := next((item for item in site_construction_options(_world, actor)
-                               if item.settlement_id == SETTLEMENT and item.id in ids), None):
-                chosen.append(("site", _world.clock.absolute_day, option.id))
-                return option.id
-            if option := next((item for item in foundation_options(_world, actor)
-                               if item.blueprint_id == FOUNDATION and item.id in ids), None):
-                chosen.append(("line", _world.clock.absolute_day, option.id))
-                return option.id
+            site = next((item for item in choices
+                         if item["id"].startswith(f"site-construction:polity:auren:{SETTLEMENT}:")), None)
+            if site is not None:
+                chosen.append(("site", current_day["value"], site["id"]))
+                return site["id"]
+            line = next((item for item in choices
+                         if item["id"].startswith(f"foundation:polity:auren:{target_site_id}:{FOUNDATION}:")), None)
+            if line is not None:
+                chosen.append(("line", current_day["value"], line["id"]))
+                return line["id"]
         return ai_decider.NO_ACTION
 
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    _provider_answer(monkeypatch, choose)
     engine = MedievalSimulator(world)
     line_id = f"line:{constructed_site_id(SETTLEMENT, world.economy.expansion_blueprints[BLUEPRINT])}:toolmaking"
     for _ in range(60):
+        current_day["value"] = engine.world.clock.absolute_day
         await engine.step()
         if any(event.event_type == "production_completed" and event.causal_payload
                and event.causal_payload.get("production", {}).get("facility_id") == line_id
@@ -514,15 +613,16 @@ async def test_unmodified_seed_offers_workshop_beside_dated_livelihood_reading(m
     world.config = world.config.model_copy(update={
         "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 2000,
     })
-    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     observed = []
 
-    async def observe(_world, actor, situation, choices, **_kwargs):
-        if actor == AUREN and any(item["id"].startswith("site-construction:") for item in choices):
-            observed.append((situation, choices))
+    def observe(payload):
+        if (payload["you_are"] == AUREN.to_dict()
+                and any(item["id"].startswith("site-construction:")
+                        for item in payload["choices"])):
+            observed.append((payload["situation"], payload["choices"]))
         return ai_decider.NO_ACTION
 
-    monkeypatch.setattr(ai_decider, "select_option", observe)
+    _provider_answer(monkeypatch, observe)
     engine = MedievalSimulator(world)
     while engine.world.clock.absolute_day < 30:
         await engine.step()
@@ -537,6 +637,15 @@ async def test_unmodified_seed_offers_workshop_beside_dated_livelihood_reading(m
     paid = reading["own_production_paid_workers_by_occupation"].get("artisan", 0)
     assert residents > paid
     assert reading["source_event_ids"]
+    opportunity = next(item for item in situation["production"]["site_construction_opportunities"]
+                       if item["settlement_id"] == SETTLEMENT)
+    blueprint = world.economy.expansion_blueprints[BLUEPRINT]
+    assert opportunity["affordance_id"] in {choice["id"] for choice in choices}
+    assert opportunity["worker_units_over_project"] == blueprint.workers_per_unit * blueprint.required_units
+    assert opportunity["total_project_wages"] == opportunity["worker_units_over_project"] * blueprint.wage_per_worker
+    assert opportunity["minimum_cash_for_missing_inputs_and_wages"] <= opportunity["own_treasury_balance"]
+    assert opportunity["result_scope"] == "opens_site_capability_only; production_requires_a_separate_line"
+    assert "stock_id" not in opportunity and "account_id" not in opportunity
     assert not engine.world.economy.expansions, "NO_ACTION não constrói a oficina"
 
 
@@ -548,41 +657,40 @@ async def test_unmodified_seed_can_fund_workshop_and_pay_artisans_without_extra_
         candidate.config = candidate.config.model_copy(update={
             "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 2000,
         })
-    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     mode = {"build": False, "jobs": False}
     chosen = []
     chosen_jobs = []
+    current_day = {"value": 0}
+    target_site_id = constructed_site_id(SETTLEMENT, world.economy.expansion_blueprints[BLUEPRINT])
 
-    async def choose(candidate, actor, _situation, choices, **_kwargs):
-        if mode["build"] and actor == AUREN:
-            offered = {item["id"] for item in choices}
-            option = next((item for item in site_construction_options(candidate, actor)
-                           if item.id in offered and item.settlement_id == SETTLEMENT
-                           and item.blueprint_id == BLUEPRINT), None)
-            if option is None:
-                site_id = constructed_site_id(SETTLEMENT, candidate.economy.expansion_blueprints[BLUEPRINT])
-                option = next((item for item in foundation_options(candidate, actor)
-                               if item.id in offered and item.site_id == site_id
-                               and item.blueprint_id == FOUNDATION), None)
+    def choose(payload):
+        actor = EntityRef(**payload["you_are"])
+        choices = payload["choices"]
+        if actor == AUREN and mode["build"]:
+            site = next((item for item in choices
+                         if item["id"].startswith(f"site-construction:polity:auren:{SETTLEMENT}:")), None)
+            line = next((item for item in choices
+                         if item["id"].startswith(f"foundation:polity:auren:{target_site_id}:{FOUNDATION}:")), None)
+            selected = site or line
+            if selected is not None:
+                chosen.append((current_day["value"], BLUEPRINT if site else FOUNDATION))
+                return selected["id"]
+        if actor == AUREN and mode["jobs"]:
+            option = next((item for item in choices
+                           if item["id"].startswith(
+                               f"permanent-employment:polity:auren:{SETTLEMENT}:")
+                           and ":artisan:" in item["id"]), None)
             if option is not None:
-                chosen.append((candidate.clock.absolute_day, option.blueprint_id))
-                return option.id
-        if mode["jobs"] and actor == AUREN:
-            offered = {item["id"] for item in choices}
-            option = next((item for item in sorted(permanent_employment_options(candidate, actor),
-                                                  key=lambda item: (-item.workforce_limit, item.id))
-                           if item.id in offered and item.settlement_id == SETTLEMENT
-                           and item.occupation == "artisan"), None)
-            if option is not None:
-                chosen_jobs.append((candidate.clock.absolute_day, option.cohort_id))
-                return option.id
+                chosen_jobs.append((current_day["value"], option["id"]))
+                return option["id"]
         return ai_decider.NO_ACTION
 
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    _provider_answer(monkeypatch, choose)
     built, unchanged = MedievalSimulator(world), MedievalSimulator(control)
     for engine, wants_workshop in ((built, True), (unchanged, False)):
         mode["build"] = wants_workshop
         while engine.world.clock.absolute_day < 240:
+            current_day["value"] = engine.world.clock.absolute_day
             await engine.step()
 
     assert [blueprint for _, blueprint in chosen] == [BLUEPRINT, FOUNDATION]
@@ -606,9 +714,11 @@ async def test_unmodified_seed_can_fund_workshop_and_pay_artisans_without_extra_
                for option in permanent_employment_options(world, AUREN))
     mode["build"], mode["jobs"] = False, True
     while built.world.clock.absolute_day < 390:
+        current_day["value"] = built.world.clock.absolute_day
         await built.step()
     mode["jobs"] = False
     while unchanged.world.clock.absolute_day < 390:
+        current_day["value"] = unchanged.world.clock.absolute_day
         await unchanged.step()
     assert len(chosen_jobs) >= 2
     assert any(event.event_type == "permanent_employment_settled" for event in world.events)

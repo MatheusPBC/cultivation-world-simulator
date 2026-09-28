@@ -1,6 +1,8 @@
 """Internal executors: checked intent -> decision fact -> owner state change."""
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
+from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Skills
 from src.classes.state_delta import StateDelta
 from src.systems.calendar_agenda import ScheduledSituation
@@ -20,8 +22,13 @@ def _available_actor(world, character_id):
 
 def _begin(world, activity):
     record_event(world, "activity_decided", "Uma nova atividade foi escolhida.", fact_kind=FactKind.DECISION,
-                 decision={"character_id": activity.character_id, "action": activity.kind,
-                           "skill": activity.skill, "destination_id": activity.destination_id, "route_id": activity.route_id})
+                 causal_origin=CausalOrigin.ACTOR_DECISION,
+                 decision={"character_id": activity.character_id,
+                           "actor_ref": EntityRef("character", activity.character_id).to_dict(),
+                           "action": activity.kind,
+                           "skill": activity.skill, "destination_id": activity.destination_id,
+                           "route_id": activity.route_id},
+                 causal_payload={"decision_source": {"kind": "player"}})
     world.activities[activity.id] = activity
     if activity.due_day is not None:
         world.agenda.schedule(ScheduledSituation(activity.id, "activity", activity.due_day))

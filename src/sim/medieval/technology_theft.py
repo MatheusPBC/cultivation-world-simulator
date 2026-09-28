@@ -10,6 +10,7 @@ discovery leave knowledge unchanged.
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.knowledge import site_report_id
@@ -150,7 +151,9 @@ def technology_theft_options(world, actor_ref):
 
 def _decision(world, decision_event_id, option):
     event = next((item for item in world.events if item.id == decision_event_id), None)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision != option.decision()):
         raise ValueError("technology theft requires its exact current decision")
     return event

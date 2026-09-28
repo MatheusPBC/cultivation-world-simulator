@@ -13,6 +13,7 @@ successor shipment over another route, or the existing contraband channel. The
 target is told nothing by decree; it learns when its own cargo comes back.
 """
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -37,12 +38,6 @@ class EmbargoOption(SocietyValue):
     def decision(self):
         return {"action": DECLARE_ACTION if self.kind == "declare" else LIFT_ACTION,
                 "actor_ref": self.actor_ref.to_dict(), "selected_affordance_id": self.id}
-
-
-def _terms(option):
-    return {"action": option.decision()["action"], "actor_ref": option.actor_ref.to_dict(),
-            "target_id": option.target_id, "checkpoint_id": option.checkpoint_id,
-            "policy_id": option.actor_ref.id}
 
 
 def operated_checkpoints(world, actor):
@@ -107,7 +102,8 @@ def execute_embargo(world, option, *, decision_event_id):
         raise ValueError(f"trade embargo unavailable: {blocker}")
     decision = next((item for item in world.events if item.id == decision_event_id), None)
     if (decision is None or decision.fact_kind != FactKind.DECISION
-            or decision.day != world.clock.absolute_day or decision.decision != _terms(option)):
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("trade embargo needs a new matching owner decision")
     require_authority(world, option.actor_ref, "taxation")
     before = tuple(policy.embargoed_ids)
@@ -134,12 +130,7 @@ def embargo_adapters():
         option = next((item for item in embargo_options(world, actor) if item.id == option_id), None)
         if option is None:
             raise ValueError("trade embargo option is stale or unknown")
-        # The turn carries only the affordance ID; the owner recomposes the
-        # counterparty and the post into its own dated authorization.
-        authorization = record_event(
-            world, "trade_embargo_authorized", "A instituição autorizou a medida comercial escolhida.",
-            fact_kind=FactKind.DECISION, decision=_terms(option), cause_ids=(decision_event_id,))
-        execute_embargo(world, option, decision_event_id=authorization.id)
+        execute_embargo(world, option, decision_event_id=decision_event_id)
 
     return (DiscretionaryAdapter(
         name="trade_embargo", family="customs", options_fn=embargo_options,

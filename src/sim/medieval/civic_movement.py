@@ -208,6 +208,7 @@ def civic_movement_join_options(world, group_id):
 def _decision(world, decision_event_id, action=MOVEMENT_ACTION):
     decision = _event(world, decision_event_id)
     if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day
             or decision.decision is None or decision.decision.get("action") != action
             or set(decision.decision) != {"action", "actor_ref", "selected_affordance_id"}):

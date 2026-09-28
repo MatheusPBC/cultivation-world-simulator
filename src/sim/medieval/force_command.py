@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Literal
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, headquarters_holder, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -88,14 +89,31 @@ def command_is_current(world, command):
     character = world.society.characters.get(command.character_id)
     office = world.authority.offices.get(command.office_id)
     day = world.clock.absolute_day
+    attached_march = command_is_attached_to_march(world, command)
+    local = (detachment is not None and character is not None and detachment.stage == "present"
+             and character.location_id == detachment.location_id
+             and not any(item.character_id == character.id for item in world.activities.values()))
     return (detachment is not None and character is not None and office is not None
-            and detachment.stage == "present" and character.death_day is None
+            and (local or attached_march) and character.death_day is None
             and EntityRef("character", character.id) != headquarters_holder(world, command.institution_ref)
-            and character.location_id == detachment.location_id
-            and not is_traveling(world, character.id)
             and office.institution_ref == command.institution_ref and "military" in office.scopes
             and office.starts_day <= day and (office.ends_day is None or day < office.ends_day)
             and can_actor_act_for(world, command.institution_ref, command.institution_ref, "military"))
+
+
+def command_is_attached_to_march(world, command):
+    """A commander assigned on departure remains physically with that column.
+
+    ``Character.location_id`` stays at the departure settlement until the
+    column arrives; this persisted command-to-detachment relation is the
+    location evidence while moving, not a second travel route.
+    """
+    detachment = world.society.detachments.get(command.detachment_id)
+    character = world.society.characters.get(command.character_id)
+    return (detachment is not None and character is not None and character.death_day is None
+            and detachment.stage == "marching" and command.appointed_day == detachment.started_day
+            and character.location_id == detachment.location_id
+            and not any(item.character_id == character.id for item in world.activities.values()))
 
 
 def effective_doctrine(world, detachment_id):
@@ -135,7 +153,10 @@ def detachment_command_options(world, actor, *, detachment_id=None):
     for detachment in sorted(world.society.detachments.values(), key=lambda item: item.id):
         if detachment_id is not None and detachment.id != detachment_id:
             continue
-        if detachment.owner_ref != actor or detachment.stage != "present":
+        attach_before_departure = (detachment.stage == "marching" and detachment.route_index == 0
+                                   and detachment.started_day == world.clock.absolute_day
+                                   and detachment.due_day > world.clock.absolute_day)
+        if detachment.owner_ref != actor or not (detachment.stage == "present" or attach_before_departure):
             continue
         command = world.society.detachment_commands.get(detachment.id)
         if command is None and not _engagement_started_today(world, detachment.id):
@@ -162,8 +183,10 @@ def detachment_command_options(world, actor, *, detachment_id=None):
 
 def _decision(world, decision_event_id, action):
     event = next((item for item in world.events if item.id == decision_event_id), None)
-    if event is None or event.fact_kind != FactKind.DECISION or event.decision is None:
-        raise ValueError("detachment command requires an exact decision")
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day or event.decision is None):
+        raise ValueError("detachment command requires an exact current actor decision")
     if event.decision.get("action") != action:
         raise ValueError("detachment command has the wrong decision action")
     return event
@@ -172,6 +195,14 @@ def _decision(world, decision_event_id, action):
 def _actor_from_decision(event):
     raw = event.decision.get("actor_ref") if event.decision else None
     return EntityRef.from_dict(raw)
+
+
+def _decision_authorship(decision):
+    return {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": decision.decision["selected_affordance_id"],
+    }
 
 
 def appoint_detachment_commander(world, actor, option_id, decision_event_id):
@@ -203,6 +234,8 @@ def appoint_detachment_commander(world, actor, option_id, decision_event_id):
     event = record_event(
         candidate, "detachment_commander_appointed", "Uma pessoa real assumiu o comando da coluna no local.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload=_decision_authorship(decision),
         deltas=(_delta("detachment_command", command.id, "character_id", None, character.id),
                 _delta("detachment_command", command.id, "office_id", None, office.id),
                 _delta("detachment_command", command.id, "appointed_day", None, command.appointed_day)),
@@ -233,6 +266,8 @@ def set_detachment_doctrine(world, actor, option_id, decision_event_id):
     event = record_event(
         candidate, "detachment_doctrine_set", "A coluna recebeu uma doutrina que só vale no próximo dia.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload=_decision_authorship(decision),
         deltas=(_delta("detachment_command", command.id, "doctrine", command.doctrine, option.doctrine),
                 _delta("detachment_command", command.id, "doctrine_effective_day", command.doctrine_effective_day,
                        effective_day),
@@ -290,10 +325,15 @@ def revoke_detachment_command_for(world, detachment, *, cause_ids=(), reason="pr
 def revoke_invalid_detachment_commands(world):
     """Dated maintenance for death, divergence or loss of the appointing scope."""
     for command in tuple(sorted(world.society.detachment_commands.values(), key=lambda item: item.id)):
-        if not command_is_current(world, command):
+        # Office authority may lapse en route, but that does not teleport the
+        # living person off the column. They remain a passenger until arrival;
+        # the office no longer authorizes any tactical choice in the meantime.
+        if (not command_is_current(world, command)
+                and not command_is_attached_to_march(world, command)):
+            detachment = world.society.detachments.get(command.detachment_id)
             _release_command(world, command, event_type="detachment_commander_released",
                              content="O comando cessou porque a pessoa, a coluna ou o office não permaneceu válido.",
-                             cause_ids=())
+                             cause_ids=(detachment.last_event_id,) if detachment is not None else ())
 
 
 def execute_detachment_command_option(world, actor, option_id, decision_event_id):

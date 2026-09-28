@@ -197,7 +197,8 @@ def fulfill_force_withdrawal(world, actor, option_id, decision_event_id):
                        if item.id == option.withdrawal_option_id), None)
     if withdrawal is None:
         raise ValueError("force withdrawal fulfillment is stale or unknown")
-    material = _begin_withdrawal(candidate, actor, withdrawal, decision_event_id)
+    material = _begin_withdrawal(candidate, actor, withdrawal, decision_event_id,
+                                 selected_affordance_id=option.id)
     conclude_obligation(candidate, obligation, "fulfilled", material.id)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.relations.validate(candidate)

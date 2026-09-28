@@ -17,8 +17,7 @@ from src.systems.calendar_agenda import ScheduledSituation
 from .economy import _causes, _delta
 from .events import record_event
 from .force_command import effective_doctrine
-from .force import (_active_pair, _dissolve, _position_id, _strength_band,
-                    POSITION_PREPARATION_DAYS)
+from .force import _active_pair, _position_id, _strength_band
 
 
 OFFER_ACTION = "offer_field_engagement"
@@ -381,17 +380,17 @@ def join_field_engagement(world, actor, option_id, decision_event_id):
     challenger_prepared, challenger_supplied = challenger_primary[2:4]
     defender_prepared, defender_supplied = defender_primary[2:4]
     if challenger_strength > defender_strength:
-        winner, loser = challenger, defender
+        winner = challenger
         ratio = defender_strength * 1000 // challenger_strength
         challenger_losses = _casualties(challenger_count, 200 * ratio // 1000, len(challenger_columns))
         defender_losses = _casualties(defender_count, 200, len(defender_columns))
     elif defender_strength > challenger_strength:
-        winner, loser = defender, challenger
+        winner = defender
         ratio = challenger_strength * 1000 // defender_strength
         challenger_losses = _casualties(challenger_count, 200, len(challenger_columns))
         defender_losses = _casualties(defender_count, 200 * ratio // 1000, len(defender_columns))
     else:
-        winner = loser = None
+        winner = None
         ratio = 1000
         challenger_losses = _casualties(challenger_count, 100, len(challenger_columns))
         defender_losses = _casualties(defender_count, 100, len(defender_columns))
@@ -462,6 +461,8 @@ def join_field_engagement(world, actor, option_id, decision_event_id):
         _delta("field_engagement_outcome_notice", notice.id, "own_casualties", None, notice.own_casualties),
         _delta("field_engagement_outcome_notice", notice.id, "counterparty_strength_band", None,
                notice.counterparty_strength_band),
+        _delta("field_engagement_outcome_notice", notice.id, "own_prepared", None, notice.own_prepared),
+        _delta("field_engagement_outcome_notice", notice.id, "own_supplied", None, notice.own_supplied),
     ))
     event = record_event(
         candidate, "field_engagement_resolved",
@@ -488,20 +489,28 @@ def join_field_engagement(world, actor, option_id, decision_event_id):
     for notice in notices:
         candidate.knowledge.field_engagement_outcome_notices[notice.id] = notice.model_copy(update={"event_id": event.id})
     candidate.agenda.cancel(engagement.id)
-    if loser is not None:
-        loser_columns = challenger_columns if loser.owner_ref == engagement.challenger_ref else defender_columns
-        for column in loser_columns:
-            current_loser = candidate.society.detachments[column.id]
-            _dissolve(candidate, current_loser, "field_engagement_loser_dissolved",
-                      "Após a derrota, os sobreviventes da coluna se dispersaram; nenhum território mudou de dono.",
-                      causes=(event.id,))
-    # Only a surviving winner gets one later chance to choose an existing force
-    # action.  The outcome notice, rather than hidden engagement state, is the
-    # provenance for that private review.
-    if winner is not None:
-        winner_notice = next(notice for notice in notices if notice.outcome == "won")
-        from .field_aftermath_policy import schedule_field_aftermath_review
-        schedule_field_aftermath_review(candidate, winner_notice, candidate.clock.absolute_day + REVIEW_DAYS)
+    # The battle closes this contact, but does not disperse the defeated side.
+    # Each institution receives its own result and decides later what to do
+    # with its surviving column.  This also prevents an immediate rematch from
+    # reusing the same pre-battle contact receipt.
+    engaged_ids = {item.id for item in columns}
+    for current_standoff in sorted(candidate.society.force_standoffs.values(), key=lambda item: item.id):
+        if current_standoff.stage != "active" or not engaged_ids.intersection(current_standoff.detachment_ids):
+            continue
+        closed = record_event(
+            candidate, "armed_standoff_resolved",
+            "O contato armado terminou com a resolução do combate; as colunas sobreviventes continuam no local.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            deltas=(_delta("force_standoff", current_standoff.id, "stage", "active", "resolved"),),
+            cause_ids=_causes(event.id, current_standoff.last_event_id),
+        )
+        candidate.society.force_standoffs[current_standoff.id] = current_standoff.model_copy(
+            update={"stage": "resolved", "resolved_day": candidate.clock.absolute_day,
+                    "last_event_id": closed.id})
+    from .field_aftermath_policy import schedule_field_aftermath_review
+    for notice in notices:
+        delay = REVIEW_DAYS if notice.outcome == "lost" else REVIEW_DAYS + 1
+        schedule_field_aftermath_review(candidate, notice, candidate.clock.absolute_day + delay)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)

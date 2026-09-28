@@ -224,10 +224,14 @@ async def test_observatory_projects_canonical_campaign_threat_and_claim_without_
     from src.sim.medieval.authority_claims import authority_claim_options, execute_option as execute_claim
     from src.sim.medieval.creatures import creature_options, execute_creature_option
     from src.sim.medieval.dated import resolve_dated
+    from src.sim.medieval.economy import _delta
+    from src.sim.medieval.engine import MedievalSimulator
     from src.sim.medieval.events import record_event
     from src.sim.medieval.force import force_options, occupy_settlement
+    from src.sim.medieval.markets import purchase
     from src.sim.medieval.persistence import world_snapshot
     from tests.test_medieval_campaign_supply import OWNER, campaign_world, decide
+    from tests.test_medieval_markets import consent, terms
 
     world, detachment_id = await campaign_world()
     occupy = next(option for option in force_options(world, OWNER) if option.kind == "occupy")
@@ -252,13 +256,35 @@ async def test_observatory_projects_canonical_campaign_threat_and_claim_without_
     # Build a validated pending threat from the same existing drake/site rules.
     # The observation endpoint must read it but never distribute its full state.
     creature = world.creatures.creatures[DRAKE_ID]
-    perception = record_event(world, "creature_perceived_cargo", "Percepção factual da passagem para fixture.",
-                               fact_kind=FactKind.OCCURRENCE)
+    order = purchase(world, *consent(world, terms(world, quantity=10)))
+    engine = MedievalSimulator(world)
+    for _ in range(30):
+        await engine.step()
+        creature = world.creatures.creatures[creature.id]
+        perception = next((world.event_index()[event_id] for event_id in reversed(creature.memory_event_ids)
+                           if world.event_index()[event_id].event_type == "creature_perceived_cargo"), None)
+        if perception is not None:
+            break
+    else:
+        pytest.fail("a real shipment did not cross the creature's river")
+    assert order.route_ids[1] == "river-pedraclara-portovelho"
+    bootstrap = record_event(
+        world, "fixture_creature_hungry", "Premissa inicial de fome para o dossiê controlado.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "observatory_campaign_threat_fixture",
+            "source_refs": [{"kind": "scenario", "id": "observatory_campaign_threat_fixture"},
+                            {"kind": "creature", "id": creature.id}],
+            "observed_day": world.clock.absolute_day,
+        }},
+        deltas=(_delta("creature", creature.id, "condition", creature.condition,
+                       creature.hunger_threshold - 1),),
+    )
     world.creatures.creatures[creature.id] = creature.model_copy(update={
         "condition": creature.hunger_threshold - 1,
         "perceived_crossings": 1,
         "last_perceived_day": world.clock.absolute_day,
-        "last_event_id": perception.id,
+        "last_event_id": bootstrap.id,
     })
     request = next(option for option in creature_options(world, creature.id) if option.kind == "request")
     execute_creature_option(world, creature.id, request.id, decide(world, request).id)
@@ -339,6 +365,30 @@ async def test_authority_claim_rejects_a_prior_day_decision_without_mutation():
 
 
 @pytest.mark.asyncio
+async def test_authority_claim_rejects_deterministic_copy_of_current_affordance():
+    from src.classes.event import FactKind
+    from src.sim.medieval.authority_claims import authority_claim_options, execute_option as execute_claim
+    from src.sim.medieval.events import record_event
+    from src.sim.medieval.force import force_options, occupy_settlement
+    from src.sim.medieval.persistence import world_snapshot
+    from tests.test_medieval_campaign_supply import OWNER, campaign_world, decide
+
+    world, _ = await campaign_world()
+    occupy = next(item for item in force_options(world, OWNER) if item.kind == "occupy")
+    occupy_settlement(world, OWNER, occupy.id, decide(world, occupy).id)
+    option = next(item for item in authority_claim_options(world, OWNER)
+                  if item.evidence_kind == "held_occupation")
+    copied = record_event(world, "authority_claim_interpreted", "Payload sem autoria de ator.",
+                          fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="exact canonical decision"):
+        execute_claim(world, OWNER, option.id, copied.id)
+
+    assert world_snapshot(world) == before
+
+
+@pytest.mark.asyncio
 async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(tmp_path):
     """A Dao read joins completed sale evidence, without making it actor knowledge."""
     from src.sim.medieval.persistence import SCHEMA, load_world, save_world, world_snapshot
@@ -351,16 +401,17 @@ async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(
 
     world = researched_world()
     option = technology_sale_options(world, BUYER)[0]
-    request = record_technology_sale_request(world, BUYER, option.id)
+    request = record_technology_sale_request(world, BUYER, option.id, decision_source={"kind": "api"})
     acceptance = record_technology_sale_acceptance(
-        world, SELLER, technology_sale_acceptance_options(world, SELLER)[0].id)
+        world, SELLER, technology_sale_acceptance_options(world, SELLER)[0].id,
+        decision_source={"kind": "api"})
     receipt = execute_technology_sale(world, BUYER, option.id, request.id, acceptance.id)
     payment_event_id = world.economy.payments[request.id]
     learned = next(item for item in world.knowledge.technologies.values()
                    if item.owner_ref == BUYER and item.technology_id == option.technology_id)
-    save_path = tmp_path / "sale-schema-71.mws"
+    save_path = tmp_path / "sale-schema-76.mws"
     save_world(world, save_path)
-    assert SCHEMA == 71
+    assert SCHEMA == 78
     world = load_world(save_path)
 
     app = create_app(save_dir=lambda: tmp_path / "runtime")

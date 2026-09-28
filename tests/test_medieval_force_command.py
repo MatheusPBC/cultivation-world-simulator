@@ -4,18 +4,25 @@ import asyncio
 
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
+from src.run.medieval_world import create_medieval_world
 from src.systems.calendar_agenda import ScheduledSituation
 from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.field_engagement import field_engagement_offer_options, field_strength
-from src.sim.medieval.force import withdraw_detachment, withdrawal_options
+from src.sim.medieval.economy import _delta
+from src.sim.medieval.force import raise_detachment, raise_options, withdraw_detachment, withdrawal_options
+from src.sim.medieval.character_travel import is_traveling, travel_options
 from src.sim.medieval.force_contact_policy import (COMMAND_REVIEW_KIND, REVIEW_KIND,
                                                    review_force_contacts, review_id)
 from src.sim.medieval.force_command import (APPOINT_ACTION, SET_DOCTRINE_ACTION,
                                             appoint_detachment_commander, detachment_command_options,
                                             effective_doctrine, set_detachment_doctrine)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from tests.medieval_ai_helpers import provider_selection_stub
+from src.sim.medieval.route_intelligence import refresh_route_reports
 from tests.test_medieval_field_engagement import OWNER, decide, prepared_challenger_world, tick
+from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
+from src.sim.medieval.events import record_event
 
 
 def _commanded_world():
@@ -27,7 +34,15 @@ def _commanded_world():
     world.society.characters[person.id] = person.model_copy(update={"location_id": "salgueiro"})
     option = next(item for item in detachment_command_options(world, OWNER, detachment_id=own_id)
                   if item.decision()["action"] == APPOINT_ACTION)
-    command = appoint_detachment_commander(world, OWNER, option.id, decide(world, option).id)
+    decision = decide(world, option)
+    command = appoint_detachment_commander(world, OWNER, option.id, decision.id)
+    receipt = world.event_index()[command.last_event_id]
+    assert receipt.causal_origin.value == "actor_decision"
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": OWNER.to_dict(),
+        "selected_affordance_id": option.id,
+    }
     return world, own_id, person.id, command
 
 
@@ -35,7 +50,127 @@ def _set(world, detachment_id, doctrine):
     actor = EntityRef("character", world.society.detachment_commands[detachment_id].character_id)
     option = next(item for item in detachment_command_options(world, actor, detachment_id=detachment_id)
                   if item.decision()["action"] == SET_DOCTRINE_ACTION and item.doctrine == doctrine)
-    return set_detachment_doctrine(world, actor, option.id, decide(world, option).id)
+    decision = decide(world, option)
+    command = set_detachment_doctrine(world, actor, option.id, decision.id)
+    receipt = world.event_index()[command.last_event_id]
+    assert receipt.causal_origin.value == "actor_decision"
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": actor.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    return command
+
+
+def _raised_with_commander(destination="salgueiro"):
+    world = create_medieval_world(73)
+    world.economy.facilities.clear()
+    stock = next(item for item in world.economy.stocks.values()
+                 if item.owner_ref == OWNER and item.location_id == "campomanso")
+    food_before = stock.goods.get("food", 0)
+    premise = record_event(
+        world, "test_force_food_premise", "Premissa factual de rações da expedição.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("stock", stock.id, "food", food_before, food_before + 2000),))
+    world.economy.stocks[stock.id] = stock.model_copy(update={
+        "goods": {**stock.goods, "food": food_before + 2000},
+        "last_event_ids": {**stock.last_event_ids, "food": premise.id}})
+    group = next(item for item in world.society.population.values() if item.settlement_id == "campomanso")
+    soldiers_id = f"pop:campomanso:{group.people}:soldier"
+    world.society.population[soldiers_id] = group.model_copy(
+        update={"id": soldiers_id, "occupation": "soldier", "count": 30})
+    person = world.society.characters["character:002"]
+    world.society.characters[person.id] = person.model_copy(update={"location_id": "campomanso"})
+    refresh_settlement_reports(world)
+    refresh_route_reports(world)
+
+    raised = next(item for item in raise_options(world, OWNER, days=20)
+                  if item.group_id == soldiers_id and item.destination_id == destination)
+    detachment = raise_detachment(world, OWNER, raised.id, decide(world, raised).id, days=20)
+    appointment = next(item for item in detachment_command_options(world, OWNER, detachment_id=detachment.id)
+                       if item.character_id == person.id)
+    command = appoint_detachment_commander(world, OWNER, appointment.id, decide(world, appointment).id)
+    return world, detachment, person, command
+
+
+def test_commander_attached_at_departure_travels_with_the_same_column(tmp_path):
+    world, detachment, person, command = _raised_with_commander()
+
+    assert is_traveling(world, person.id)
+    assert travel_options(world, person.id) == ()
+    assert world.society.characters[person.id].location_id == "campomanso"
+    path = tmp_path / "commander-on-the-march.mws"
+    save_world(world, path)
+    world = load_world(path)
+    assert world_snapshot(world) == world_snapshot(load_world(path))
+    while world.society.detachments[detachment.id].stage == "marching":
+        tick(world)
+
+    arrival = next(event for event in reversed(world.events) if event.event_type == "detachment_arrived"
+                   and any(delta.owner_kind == "character" and delta.owner_id == person.id
+                           for delta in event.deltas))
+    assert world.society.characters[person.id].location_id == "salgueiro"
+    assert command.id in world.society.detachment_commands
+    assert not is_traveling(world, person.id)
+    assert command.last_event_id in {link.cause_event_id for link in arrival.causal_links}
+
+
+def test_expired_office_removes_tactical_authority_without_teleporting_marching_commander():
+    world, detachment, person, command = _raised_with_commander(destination="ferroalto")
+    office = world.authority.offices[command.office_id]
+    world.authority.offices[office.id] = office.model_copy(
+        update={"ends_day": world.clock.absolute_day + 1})
+    assert len(detachment.route_ids) > 1
+
+    tick(world)
+    assert world.society.detachments[detachment.id].stage == "marching"
+    assert command.id in world.society.detachment_commands
+    assert is_traveling(world, person.id)
+    assert detachment_command_options(world, EntityRef("character", person.id), detachment_id=detachment.id) == ()
+
+    while world.society.detachments[detachment.id].stage == "marching":
+        tick(world)
+    assert world.society.characters[person.id].location_id == "ferroalto"
+    assert command.id not in world.society.detachment_commands
+    arrival = next(event for event in reversed(world.events) if event.event_type == "detachment_arrived"
+                   and any(delta.owner_kind == "character" and delta.owner_id == person.id
+                           for delta in event.deltas))
+    released = next(event for event in reversed(world.events)
+                    if event.event_type == "detachment_commander_released")
+    assert arrival.id in {link.cause_event_id for link in released.causal_links}
+
+
+def test_marching_commander_personally_observes_only_routes_at_a_physical_block(tmp_path):
+    world, detachment, person, command = _raised_with_commander(destination="ferroalto")
+    blocked_route_id = detachment.route_ids[0]
+    blocked = world.map.routes[blocked_route_id]
+    record_event(world, "fixture_field_route_closed", "A passagem à frente foi fechada.",
+                 fact_kind=FactKind.STATE_TRANSITION,
+                 deltas=(_delta("route", blocked.id, "enabled", blocked.enabled, False),))
+    blocked.update_runtime(enabled=False)
+
+    tick(world)
+    held = next(event for event in reversed(world.events) if event.event_type == "detachment_held"
+                and (event.causal_payload or {}).get("detachment_id") == detachment.id)
+    actor = EntityRef("character", person.id)
+    report = world.knowledge.route_report(actor, blocked_route_id)
+    assert report is not None
+    assert report.channel == "field_route_observation"
+    assert report.travel_days is None
+    receipt = world.event_index()[report.event_id]
+    causes = {link.cause_event_id for link in receipt.causal_links}
+    assert held.id in causes and command.last_event_id in causes
+    assert receipt.causal_payload["position_region_id"] in blocked.endpoint_region_ids
+    assert receipt.causal_payload["actor_ref"] == actor.to_dict()
+    assert all(world.knowledge.route_report(actor, route.id) is not None
+               for route in world.map.routes.values()
+               if receipt.causal_payload["position_region_id"] in route.endpoint_region_ids)
+    world.knowledge.validate(world)
+
+    path = tmp_path / "commander-field-observation.mws"
+    save_world(world, path)
+    restored = load_world(path)
+    assert world_snapshot(restored) == world_snapshot(world)
 
 
 def test_real_commander_is_thresholded_local_delayed_and_round_trips(tmp_path):
@@ -111,7 +246,7 @@ def test_contact_gives_the_named_commander_a_separate_later_turn(monkeypatch, tm
         assert actor == EntityRef("character", person_id)
         return next(item["id"] for item in choices if ":press:" in item["id"])
 
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose))
     institutional = ScheduledSituation(review_id(notice.id), REVIEW_KIND, world.clock.absolute_day)
     asyncio.run(review_force_contacts(world, (institutional,)))
     assert asked == [OWNER]
@@ -143,7 +278,7 @@ def test_commander_no_action_is_a_decision_without_a_doctrine(monkeypatch):
         assert actor == EntityRef("character", person_id)
         return ai_decider.NO_ACTION
 
-    monkeypatch.setattr(ai_decider, "select_option", decline)
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(decline))
     situation = ScheduledSituation(f"detachment-command-review:{notice.id}", COMMAND_REVIEW_KIND,
                                    world.clock.absolute_day)
     asyncio.run(review_force_contacts(world, (situation,)))

@@ -5,12 +5,13 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.character_travel import (REVIEW_KIND, TRAVEL_ACTION, is_traveling,
                                                review_character_travel, schedule_character_travel_reviews,
-                                               travel_options)
+                                               travel_character, travel_options)
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
@@ -22,7 +23,7 @@ from tests.test_medieval_creature_autonomy import provider
 def lone_world():
     """One named person, so a bounded provider budget reaches their turn."""
     world = create_medieval_world(73, character_count=1)
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 64,
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 256,
                                                    "ai_max_calls": 10000})
     character = next(iter(world.society.characters.values()))
     world.society.characters[character.id] = character.model_copy(
@@ -65,6 +66,19 @@ def appointable(world, owner, character_id):
                for item in detachment_command_options(world, owner))
 
 
+def test_deterministic_copy_of_a_travel_option_cannot_move_the_character():
+    world, character = lone_world()
+    option = next(item for item in travel_options(world, character.id))
+    decision = record_event(world, "character_travel_decided", "Payload idêntico sem escolha pessoal.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current decision of this person"):
+        travel_character(world, character.id, option.id, decision.id)
+
+    assert world_snapshot(world) == before
+
+
 async def depart(world, engine, character_id):
     """Step until the granted turn is actually taken; other dated work may
     occupy the days in between, so this waits for the fact, not for a count."""
@@ -105,10 +119,20 @@ async def test_a_person_walks_one_real_leg_and_is_absent_until_arrival(tmp_path,
     decided = next(item for item in world.events if item.event_type == "character_travel_decided")
     started = next(item for item in world.events if item.event_type == "character_travel_started")
     assert decided.fact_kind == FactKind.DECISION and not decided.deltas
+    assert decided.causal_origin == CausalOrigin.ACTOR_DECISION
+    source = decided.causal_payload["decision_source"]
+    assert source["kind"] == "provider"
+    assert source["receipt_event_id"] in {link.cause_event_id for link in decided.causal_links}
     assert set(decided.decision) == {"action", "actor_ref", "selected_affordance_id"}
     assert decided.decision["action"] == TRAVEL_ACTION
     assert decided.decision["actor_ref"] == EntityRef("character", character.id).to_dict()
     assert {link.cause_event_id for link in started.causal_links} == {decided.id}
+    assert started.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert started.causal_payload == {
+        "decision_event_id": decided.id,
+        "actor_ref": decided.decision["actor_ref"],
+        "selected_affordance_id": decided.decision["selected_affordance_id"],
+    }
 
     await reach(world, engine, journey.due_day)
 

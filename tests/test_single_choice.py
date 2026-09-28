@@ -13,11 +13,14 @@ from src.systems.single_choice import (
     ItemExchangeKind,
     ItemExchangeRequest,
     RejectMode,
+    SingleChoiceDecisionFailed,
     SingleChoiceRequest,
     decide_single_choice,
     resolve_item_exchange,
 )
 from src.utils.config import CONFIG
+from src.utils.llm.exceptions import LLMError, ProviderCallError, ProviderFailureKind
+from src.utils.llm.runtime_mode import llm_test_mode_scope
 
 
 class MockAvatar:
@@ -84,7 +87,7 @@ async def test_decide_single_choice_accepts_valid_choice():
 
 
 @pytest.mark.asyncio
-async def test_decide_single_choice_falls_back_on_invalid_choice():
+async def test_decide_single_choice_rejects_invalid_choice_outside_test_mode():
     avatar = MockAvatar()
     request = SingleChoiceRequest(
         task_name="single_choice",
@@ -103,11 +106,97 @@ async def test_decide_single_choice_falls_back_on_invalid_choice():
         new_callable=AsyncMock,
     ) as mock_llm:
         mock_llm.return_value = {"choice": "UNKNOWN"}
-        decision = await decide_single_choice(request)
+        with pytest.raises(SingleChoiceDecisionFailed):
+            await decide_single_choice(request)
 
-    assert decision.selected_key == "ACCEPT"
+
+@pytest.mark.asyncio
+async def test_single_choice_fallback_is_explicitly_limited_to_test_mode():
+    avatar = MockAvatar()
+    request = SingleChoiceRequest(
+        task_name="single_choice",
+        template_path=CONFIG.paths.templates / "single_choice.txt",
+        avatar=avatar,
+        situation="Context",
+        options=[
+            Mock(key="ACCEPT", title="Accept", description="Accept new item"),
+            Mock(key="REJECT", title="Reject", description="Reject new item"),
+        ],
+        fallback_policy=FallbackPolicy(FallbackMode.PREFERRED_KEY, preferred_key="REJECT"),
+    )
+
+    with patch(
+        "src.systems.single_choice.engine.call_llm_with_task_name",
+        new_callable=AsyncMock,
+    ) as mock_llm:
+        mock_llm.return_value = {"choice": ""}
+        with llm_test_mode_scope(True):
+            decision = await decide_single_choice(request)
+
+    assert decision.selected_key == "REJECT"
     assert decision.source == ChoiceSource.FALLBACK
     assert decision.used_fallback is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [
+        LLMError("provider unavailable"),
+        ProviderCallError(ProviderFailureKind.NETWORK, "connection refused"),
+    ],
+    ids=["llm-error", "transport-error"],
+)
+async def test_single_choice_provider_failure_does_not_choose_fallback(failure):
+    avatar = MockAvatar()
+    request = SingleChoiceRequest(
+        task_name="single_choice",
+        template_path=CONFIG.paths.templates / "single_choice.txt",
+        avatar=avatar,
+        situation="Context",
+        options=[
+            Mock(key="ACCEPT", title="Accept", description="Accept new item"),
+            Mock(key="REJECT", title="Reject", description="Reject new item"),
+        ],
+        fallback_policy=FallbackPolicy(FallbackMode.PREFERRED_KEY, preferred_key="ACCEPT"),
+    )
+
+    with patch(
+        "src.systems.single_choice.engine.call_llm_with_task_name",
+        new_callable=AsyncMock,
+        side_effect=failure,
+    ) as mock_llm:
+        with pytest.raises(SingleChoiceDecisionFailed):
+            await decide_single_choice(request)
+
+    mock_llm.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_item_exchange_provider_failure_does_not_auto_accept_new_weapon():
+    avatar = MockAvatar()
+    current_weapon = MockItem("CurrentSword")
+    offered_weapon = MockItem("OfferedSword")
+    avatar.weapon = current_weapon
+
+    with patch(
+        "src.systems.single_choice.engine.call_llm_with_task_name",
+        new_callable=AsyncMock,
+        side_effect=LLMError("provider unavailable"),
+    ):
+        with pytest.raises(SingleChoiceDecisionFailed):
+            await resolve_item_exchange(
+                ItemExchangeRequest(
+                    avatar=avatar,
+                    new_item=offered_weapon,
+                    kind=ItemExchangeKind.WEAPON,
+                    scene_intro="A weapon was offered.",
+                    reject_mode=RejectMode.ABANDON_NEW,
+                    auto_accept_when_empty=True,
+                )
+            )
+
+    assert avatar.weapon is current_weapon
 
 
 @pytest.mark.asyncio

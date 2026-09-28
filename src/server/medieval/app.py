@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import queries
-from .contracts import (CausalView, CreateRequest, DiplomacyView, DossierView, EconomyView, EmptyRequest, Envelope, EventsView, GovernanceView, LoadRequest,
+from .contracts import (AISettingRequest, CausalView, CreateRequest, DiplomacyView, DossierView, EconomyView, EmptyRequest, Envelope, EventsView, GovernanceView, LoadRequest,
                         MapView, ObservatoryView, OptionsView, ResearchView, SaveRequest, SaveView, SocietyView, SpeedRequest, StatusView, WorldView)
 from .errors import RuntimeProblem
 from .runtime import MedievalRuntime
@@ -117,8 +117,10 @@ def create_app(*, save_dir=None, frontend_dir=None):
         return await runtime.read(lambda r: queries.diplomacy_view(r.require_world()))
 
     @app.get("/api/v2/query/dossier/{actor_kind}/{actor_id}", response_model=Envelope[DossierView])
-    async def dossier(actor_kind: str, actor_id: str):
-        return await runtime.read(lambda r: queries.actor_dossier(r.require_world(), actor_kind, actor_id))
+    async def dossier(actor_kind: str, actor_id: str, after: str | None = Query(None, max_length=512),
+                     limit: int = Query(50, ge=1, le=100)):
+        return await runtime.read(lambda r: queries.actor_dossier(
+            r.require_world(), actor_kind, actor_id, after, limit))
 
     @app.get("/api/v2/query/causal/{event_id}", response_model=Envelope[CausalView])
     async def causal(event_id: str, after: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
@@ -143,6 +145,10 @@ def create_app(*, save_dir=None, frontend_dir=None):
     @app.post("/api/v2/command/resume", response_model=Envelope[StatusView])
     async def resume(req: EmptyRequest):
         return await runtime.resume()
+
+    @app.post("/api/v2/command/ai", response_model=Envelope[StatusView])
+    async def set_ai(req: AISettingRequest):
+        return await runtime.set_ai_enabled(req)
 
     @app.post("/api/v2/command/speed", response_model=Envelope[StatusView])
     async def speed(req: SpeedRequest):

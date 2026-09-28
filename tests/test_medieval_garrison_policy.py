@@ -1,11 +1,12 @@
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.models import AuthorityOffice
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import (establish_garrison, force_options, occupy_settlement,
-                                    raise_detachment, raise_options)
+from src.sim.medieval.force import (force_options, occupy_settlement, raise_detachment,
+                                    raise_options)
 from src.sim.medieval.garrison_policy import garrison_adapters, garrison_actors
 from src.sim.medieval.institutional_agenda import monthly_actors, monthly_adapters
 from src.sim.medieval.route_intelligence import refresh_route_reports
@@ -17,7 +18,9 @@ OWNER = EntityRef("polity", "auren")
 
 def _decision(world, option):
     return record_event(world, "garrison_policy_decided", "Decisão sobre guarnição.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def test_owner_garrison_is_available_without_a_foreign_contact():

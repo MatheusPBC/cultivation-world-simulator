@@ -12,8 +12,15 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   JSON DTO snapshots while holding it. Pause must drain the in-flight jump.
 - Keep domain state in canonical owners. Public controls do not authorize edits
   to characters, materials, territories, decisions or outcomes.
+- A new V1 direct material owner command must run through
+  `src.sim.medieval.material_execution.execute_material`: recompose and check
+  its affordance/authority/resources inside the candidate, emit a caused
+  state-transition receipt with deltas, and publish only after validation.
+  Dated/monthly phases already run inside `MedievalSimulator.step`'s candidate
+  boundary and must not create a second planner or mutate the published world.
+  Add a focused rejection/rollback check for each new direct command.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 71 (Society schema 21, economy schema 16, Strategy schema 2) requires the current snapshot shape and rejects incomplete
+  save schema 78 (Society schema 21, economy schema 19, Knowledge schema 10, Strategy schema 3) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -34,13 +41,26 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   authorization and material executors revalidate independently. No private
   foreign inventory in actor context; an order is not delivered stock.
 - `RouteReport` (route_intelligence.py) is a dated observation, not a copy of the
-  Map's canonical route. Only an endpoint administration with a current supply
-  mandate observes its own passage; that self-observation needs no open road.
-  Monthly publication is a `publish_route_report` decision that delivers one
-  receipt per recipient (`route_bulletin`) over the physical network reachable
+  Map's canonical route. An endpoint administration with a current supply
+  mandate observes its own passage; that self-observation needs no open road. An
+  attached commander may separately observe only routes touching the column's
+  physically derived current junction after a march/hold, through a personal
+  `field_route_observation` report causally linked to that movement and command
+  appointment. This field observation is not a bulletin and is not pooled with
+  institutional knowledge. A present site owner/maintainer may also observe
+  only routes explicitly dependent on that site, and only from its own same-day
+  administrative site report; that local reading is private and is not
+  retransmitted as a bulletin.
+  Monthly publication currently runs as the knowledge owner's deterministic
+  policy, recorded as a `publish_route_report` intent (not a provider-selected
+  actor choice), and delivers one receipt per recipient (`route_bulletin`) over
+  the physical network reachable
   only from the publisher's administered endpoints of the observed route
   itself, never from its other, disconnected settlements; a recipient
   co-located at that endpoint is reachable even with no open road out. The
+  current headquarters holder for an active strategic objective is also an
+  eligible recipient; a route choice by HQ requires its own delivered, current
+  route reports, not the institution's pooled report.
   supply planner treats a report 30+ days old as too stale to
   act on; Map identity (topology/mode/allowed resources) stays public and
   static, but capacity/travel time are only known through a report. The route
@@ -141,6 +161,22 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   offer. Society owns the paid 30-day occupational transition; Force still
   requires a later separate raise decision, food and payroll. No population,
   force or victory is created by the plan or the invitation alone.
+- Family loans are Economy-owned and exist only after either a current permanent
+  public payroll has a factual `unpaid_funds` receipt, or a food-producing
+  facility has a current `production_limited` receipt whose only limit is
+  `payroll_funds` and whose next batch is otherwise feasible; an authorized
+  polity must choose to request help. Production requests cover one next-batch
+  wage amount only; they do not reserve production or execute it. Local
+  population groups receive a dated notice, can lend only
+  their own real account balance beyond one day's locally priced food need, and
+  decide independently. The no-interest principal is due after 180 days; no
+  transfer, household contribution or repayment is automatic. Expired requests
+  stop offering without erasing history; an overdue loan persists until a
+  separate borrower decision repays it. Multiple households may independently
+  contribute once each; a partial contribution leaves the remaining request open,
+  bounded by its original principal and expiry. Save schema 78, Economy 19 and
+  Knowledge 10 reject older snapshots; there is no credit creation, interest,
+  default, partial repayment or public manual command.
 - Institutional food aid is a prepared/direct-executor vertical. The requester
   uses only its own current causal `SettlementReport.missing_food` and selects a
   transient engine-enumerated option; the persisted notice contains only
@@ -170,7 +206,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 71 are rejected and preserved
+  older than schema 78 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction

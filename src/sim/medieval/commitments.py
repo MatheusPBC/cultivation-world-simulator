@@ -8,12 +8,14 @@ from .institutional_memory import apply_memory_creation, memory_creation_deltas
 from .teaching import teach_technology
 
 
-def conclude_obligation(world, obligation, status, material_event_id=None, extra_causes=(), repudiated=False):
+def conclude_obligation(world, obligation, status, material_event_id=None, extra_causes=(), repudiated=False,
+                        materially_incompatible=False):
     causes = tuple(dict.fromkeys((obligation.last_event_id, *extra_causes,
                                  *((material_event_id,) if material_event_id else ()))))
     text = {'fulfilled':'Obrigação cumprida por execução material.',
-        'breached':'A promessa foi repudiada pelo próprio devedor antes do prazo.' if repudiated
-                   else 'Prazo descumprido; nenhuma transferência forçada.',
+        'breached': ('A promessa foi repudiada pelo próprio devedor antes do prazo.' if repudiated
+                     else 'O devedor executou uma ação material incompatível com a entrega prometida.'
+                     if materially_incompatible else 'Prazo descumprido; nenhuma transferência forçada.'),
         'excused':'Obrigação dispensada porque sua condição não foi cumprida.'}[status]
     proposal = world.relations.proposals[obligation.proposal_id]
     # A breached material delivery or withdrawal promise matters to both
@@ -36,6 +38,9 @@ def conclude_obligation(world, obligation, status, material_event_id=None, extra
             'status': status,
             'material_event_id': material_event_id,
             'repudiated': repudiated,
+            'breach_kind': ('repudiated' if repudiated else
+                            'materially_incompatible_action' if materially_incompatible else
+                            'deadline_lapse' if status == 'breached' else None),
         },
         deltas=(_delta('obligation', obligation.id, 'status', obligation.status, status),
                 *memory_creation_deltas(world, remembering)),

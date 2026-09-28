@@ -49,7 +49,8 @@ class ResearchState(RegistrySerialization):
             if p.stage not in {'completed', 'superseded'}:
                 if p.owner_ref in owners or p.researcher_id in researchers:
                     raise ValueError('concurrent research contract')
-                owners.add(p.owner_ref); researchers.add(p.researcher_id)
+                owners.add(p.owner_ref)
+                researchers.add(p.researcher_id)
             if world is None:
                 continue
             validate_actor(world, p.owner_ref)
@@ -59,12 +60,37 @@ class ResearchState(RegistrySerialization):
                     or (p.last_work_day is not None and p.last_work_day > world.clock.absolute_day)):
                 raise ValueError('invalid research references or dates')
             terms = research_terms(p)
-            for eid, action, actor in ((p.sponsor_decision_id, 'research', p.owner_ref),
-                    (p.researcher_decision_id, 'research_work', EntityRef('character', p.researcher_id))):
-                decision = events.get(eid)
-                if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != p.started_day
-                        or decision.decision != {**terms, 'action': action, 'actor_ref': actor.to_dict()}):
-                    raise ValueError('research requires both contract receipts')
+            sponsor = events.get(p.sponsor_decision_id)
+            researcher = events.get(p.researcher_decision_id)
+            authorization = next((item for item in reversed(world.events_of_type('research_authorized'))
+                                  if p.sponsor_decision_id in {link.cause_event_id for link in item.causal_links}),
+                                 None)
+            sponsor_data = sponsor.decision if sponsor is not None else None
+            researcher_data = researcher.decision if researcher is not None else None
+            sponsor_valid = (sponsor is not None and sponsor.fact_kind == FactKind.DECISION
+                             and sponsor.day <= p.started_day
+                             and sponsor_data.get('action') == 'research'
+                             and sponsor_data.get('actor_ref') == p.owner_ref.to_dict())
+            if authorization is not None:
+                auth_data = authorization.decision or {}
+                auth_terms = {key: auth_data.get(key) for key in terms}
+                sponsor_valid = (sponsor_valid and authorization.day == sponsor.day and auth_terms == terms)
+            else:
+                sponsor_valid = (sponsor_valid and sponsor.day == p.started_day
+                                 and all(sponsor_data.get(key) == value for key, value in terms.items()))
+            researcher_expected = {**terms, 'action': 'research_work',
+                                   'actor_ref': EntityRef('character', p.researcher_id).to_dict()}
+            researcher_valid = (researcher is not None and researcher.fact_kind == FactKind.DECISION
+                                and researcher.day == p.started_day
+                                and researcher_data.get('actor_ref') == researcher_expected['actor_ref']
+                                and (researcher_data == researcher_expected
+                                     or authorization is not None
+                                     and researcher_data == {'action': 'research_work',
+                                         'actor_ref': researcher_expected['actor_ref'],
+                                         'selected_affordance_id':
+                                             f'research-work:{authorization.id}:{p.researcher_id}'}))
+            if not sponsor_valid or not researcher_valid:
+                raise ValueError('research requires prior sponsor authorization and current researcher decision')
             event = events.get(p.last_event_id)
             if event is None:
                 raise ValueError('missing research receipt')
@@ -73,8 +99,9 @@ class ResearchState(RegistrySerialization):
                         or event.day != p.started_day
                         or not any(d.owner_kind == 'research' and d.owner_id == p.id and d.aspect == 'stage'
                                    and d.before == 'None' and d.after == 'waiting' for d in event.deltas)
-                        or not {p.sponsor_decision_id, p.researcher_decision_id}.issubset(
-                            link.cause_event_id for link in event.causal_links)):
+                        or not {p.sponsor_decision_id, p.researcher_decision_id,
+                                *((authorization.id,) if authorization is not None else ())}.issubset(
+                                    link.cause_event_id for link in event.causal_links)):
                     raise ValueError('invalid initial research receipt')
             elif (event.day != p.last_work_day or event.event_type != 'research_progressed'
                   or not any(d.owner_kind == 'research' and d.owner_id == p.id and d.aspect == 'stage'
@@ -105,13 +132,17 @@ class ResearchState(RegistrySerialization):
                 raise ValueError('apprenticeship requires its own dated completion')
             if a.stage != 'training' and scheduled is not None:
                 raise ValueError('a concluded apprenticeship cannot stay on the agenda')
-            for eid, actor in ((a.specialist_decision_id, EntityRef('character', a.specialist_id)),
-                               (a.sponsor_decision_id, a.host_ref)):
+            for eid, actor, action, must_be_current in (
+                    (a.specialist_decision_id, EntityRef('character', a.specialist_id),
+                     'offer_apprenticeship', False),
+                    (a.sponsor_decision_id, a.host_ref, 'sponsor_apprenticeship', True)):
                 decision = events.get(eid)
                 if (decision is None or decision.fact_kind != FactKind.DECISION
-                        or decision.day != a.started_day
+                        or decision.day > a.started_day
+                        or (must_be_current and decision.day != a.started_day)
+                        or (decision.decision or {}).get('action') != action
                         or (decision.decision or {}).get('actor_ref') != actor.to_dict()):
-                    raise ValueError('apprenticeship requires both current contract receipts')
+                    raise ValueError('apprenticeship requires a prior specialist offer and current sponsor decision')
             event = events.get(a.last_event_id)
             expected = {'training': 'apprenticeship_started', 'completed': 'apprenticeship_completed',
                         'failed': 'apprenticeship_failed'}[a.stage]

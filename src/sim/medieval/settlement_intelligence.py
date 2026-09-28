@@ -1,9 +1,10 @@
 """Dated, aggregate settlement observations and physically delivered bulletins."""
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for, headquarters_holder, political_holder
 from src.classes.governance.knowledge import settlement_report_id
-from src.classes.governance.models import SettlementReport
+from src.classes.governance.models import FieldEngagementReading, SettlementReport
 from src.classes.mechanical_language import EntityRef
 from .economy import _causes, _delta
 from .events import record_event
@@ -34,6 +35,23 @@ def _occupation_source(world, settlement_id, occupier_id):
     return None
 
 
+def _field_engagement_readings(world, settlement_id, day):
+    """Bounded after-action facts visible at the settlement, not private plans."""
+    readings = []
+    events = world.event_index()
+    for engagement in sorted(world.society.field_engagements.values(), key=lambda item: item.id):
+        event = events.get(engagement.last_event_id)
+        if (engagement.status != "resolved" or engagement.settlement_id != settlement_id or event is None
+                or event.event_type != "field_engagement_resolved" or not day - 30 <= event.day <= day):
+            continue
+        readings.append(FieldEngagementReading(
+            event_id=event.id, engagement_id=engagement.id,
+            challenger_ref=engagement.challenger_ref, defender_ref=engagement.defender_ref,
+            winner_ref=engagement.winner_ref, challenger_casualties=engagement.challenger_casualties,
+            defender_casualties=engagement.defender_casualties))
+    return tuple(readings)
+
+
 def _observe(world, actor, settlement_id, *, presence_causes=()):
     day = world.clock.absolute_day
     key = settlement_report_id(actor, settlement_id)
@@ -44,6 +62,7 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
                            for protest in world.society.civic_protests.values())
     warded = any(ward.settlement_id == settlement_id and ward.until_day > day
                  for ward in world.research.wards.values())
+    field_engagements = _field_engagement_readings(world, settlement_id, day)
     settlement = world.society.settlements[settlement_id]
     need = world.economy.needs[settlement_id]
     population = world.society.population_at(settlement_id)
@@ -55,7 +74,7 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
             and previous.health == need.health and previous.missing_food == need.missing_food
             and previous.unrest == need.unrest and previous.occupier_id == settlement.occupier_id
             and previous.rite_underway == rite_underway and previous.protest_underway == protest_underway
-            and previous.warded == warded):
+            and previous.warded == warded and previous.field_engagements == field_engagements):
         return previous
     report = SettlementReport(id=key, recipient_ref=actor, publisher_ref=actor, settlement_id=settlement_id,
                               observed_day=day, population=population,
@@ -69,19 +88,37 @@ def _observe(world, actor, settlement_id, *, presence_causes=()):
                               protest_underway=protest_underway,
                               # Standing protective works are visible; the rite
                               # that raised them and its sponsor are not.
-                              warded=warded,
+                              warded=warded, field_engagements=field_engagements,
                               channel="local_settlement_report", event_id="pending")
     occupation_source = (_occupation_source(world, settlement_id, settlement.occupier_id)
                          if previous is None or previous.occupier_id != settlement.occupier_id else None)
+    causes = _causes(*_sources(world, settlement_id),
+                     previous.event_id if previous is not None else None,
+                     occupation_source,
+                     *(item.event_id for item in field_engagements),
+                     *presence_causes)
+    causal_payload = None
+    if not causes:
+        # The first observation of a newly generated settlement may precede
+        # every owner receipt. Preserve that world-generation premise
+        # explicitly instead of emitting an unrooted report transition.
+        causal_payload = {"root_premise": {
+            "kind": "world_generation",
+            "domain": "settlement_observation",
+            "source_refs": [
+                {"kind": "settlement", "id": settlement_id},
+                {"kind": "settlement_needs", "id": need.id},
+                {"kind": "stock", "id": need.stock_id},
+                {"kind": "observer", "id": f"{actor.kind}:{actor.id}"},
+            ],
+            "observed_day": day,
+        }}
     event = record_event(world, "settlement_observed",
                          f"{settlement.name}: {report.present_population}/{report.population} presentes, saúde {report.health}/1000.",
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("settlement_report", key, "observation",
                                         previous.observation() if previous else None, report.observation()),),
-                         cause_ids=_causes(*_sources(world, settlement_id),
-                                           previous.event_id if previous is not None else None,
-                                           occupation_source,
-                                           *presence_causes))
+                         causal_payload=causal_payload, cause_ids=causes)
     report = report.model_copy(update={"event_id": event.id})
     world.knowledge.settlement_reports[key] = report
     return report
@@ -204,9 +241,12 @@ def _publish(world, report):
     decision = record_event(world, "settlement_report_published",
                             f"Boletim público de {world.society.settlements[report.settlement_id].name} publicado.",
                             fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.DETERMINISTIC,
                             decision={"action": "publish_settlement_report", "actor_ref": publisher.to_dict(),
                                       "settlement_id": report.settlement_id, "observation": observation,
                                       "recipients": [recipient.to_dict() for recipient in targets]},
+                            causal_payload={"decision_source": {"kind": "owner", "owner": "knowledge",
+                                                                  "rule": "monthly_settlement_bulletin"}},
                             cause_ids=(report.event_id,))
     keys = {recipient: settlement_report_id(recipient, report.settlement_id) for recipient in targets}
     previous = {recipient: world.knowledge.settlement_reports.get(key) for recipient, key in keys.items()}
@@ -218,8 +258,17 @@ def _publish(world, report):
                                                 observation) for recipient in targets),
                             cause_ids=_causes(decision.id, report.event_id))
     for recipient in targets:
-        world.knowledge.settlement_reports[keys[recipient]] = report.model_copy(update={
+        delivered = report.model_copy(update={
             "id": keys[recipient], "recipient_ref": recipient, "channel": "settlement_bulletin", "event_id": delivery.id})
+        world.knowledge.settlement_reports[keys[recipient]] = delivered
+        if (recipient == headquarters_holder(world, publisher)
+                and any(publisher in {item.challenger_ref, item.defender_ref}
+                        for item in report.field_engagements)):
+            from .field_aftermath_policy import schedule_headquarters_field_response
+            schedule_headquarters_field_response(world, delivered)
+        if recipient == political_holder(world, publisher) and report.field_engagements:
+            from .strategy_response import schedule_political_campaign_result_review
+            schedule_political_campaign_result_review(world, delivered)
 
 
 def refresh_settlement_reports(world):
@@ -244,6 +293,10 @@ def refresh_settlement_reports(world):
             owner for owner in sorted(site_owners, key=lambda item: (item.kind, item.id))
             if can_actor_act_for(world, owner, owner, "supply")
         )
+        field_observers = {detachment.owner_ref for detachment in world.society.detachments.values()
+                           if detachment.stage == "present" and detachment.location_id == settlement_id}
+        actors.extend(owner for owner in sorted(field_observers, key=lambda item: (item.kind, item.id))
+                      if can_actor_act_for(world, owner, owner, "trade"))
         actors.extend(EntityRef("population_group", group_id) for group_id in sorted(world.society.population)
                       if world.society.population[group_id].settlement_id == settlement_id
                       and world.society.available_count(group_id) > 0)

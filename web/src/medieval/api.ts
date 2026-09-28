@@ -2,8 +2,9 @@ import type { CausalView, CreateRequest, EventsView, LoadRequest, ObservatoryVie
   SaveRequest, SaveView, SpeedRequest, StatusView, ResearchView, DiplomacyView, DossierView } from '../types/medieval-api'
 
 type Queries = { status: StatusView; options: OptionsView; observatory: ObservatoryView; research: ResearchView; diplomacy: DiplomacyView; saves: SaveView[]; events: EventsView }
+type AISettingRequest = { enabled: boolean; ai_calls_per_step: number }
 type Commands = { create: CreateRequest; step: Record<string, never>; pause: Record<string, never>;
-  resume: Record<string, never>; speed: SpeedRequest; save: SaveRequest; load: LoadRequest }
+  resume: Record<string, never>; ai: AISettingRequest; speed: SpeedRequest; save: SaveRequest; load: LoadRequest }
 export type Command = keyof Commands
 export type Reply<T> = { ok: true; data: T; revision: number }
 export class ApiError extends Error {
@@ -35,8 +36,11 @@ async function request<T>(path: string, body?: unknown): Promise<Reply<T>> {
 export const api = {
   query<K extends keyof Queries>(name: K, params = '') { return request<Queries[K]>('query/' + name + params) },
   causal(id: string, after = 0) { return request<CausalView>('query/causal/' + encodeURIComponent(id) + '?after=' + after) },
-  dossier(actorKind: string, actorId: string) {
-    return request<DossierView>('query/dossier/' + encodeURIComponent(actorKind) + '/' + encodeURIComponent(actorId))
+  dossier(actorKind: string, actorId: string, after: string | null = null, limit = 50) {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (after) params.set('after', after)
+    return request<DossierView>('query/dossier/' + encodeURIComponent(actorKind) + '/'
+      + encodeURIComponent(actorId) + '?' + params.toString())
   },
   command<K extends Command>(name: K, body: Commands[K]) { return request<StatusView>('command/' + name, body) },
 }

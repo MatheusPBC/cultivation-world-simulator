@@ -114,6 +114,13 @@ class SettlementView(Settlement):
     health: int
     unrest: int
     missing_food: int
+    public_food_stock: int
+    food_price: int
+    household_cash: int
+    household_cash_by_occupation: dict[str, int]
+    estimated_unaffordable_public_rations: int
+    estimated_unaffordable_public_rations_by_occupation: dict[str, int]
+    food_access_evidence_event_ids: list[str]
 
 
 class SocietyView(SocietyValue):
@@ -151,6 +158,8 @@ class DossierView(SocietyValue):
     """Private perspective assembled only from facts already known by an actor."""
     actor_ref: EntityRef
     entries: list[DossierEntry]
+    next_after: str | None = None
+    has_more: bool = Field(default=False, strict=True)
 
 
 class OccupationView(SocietyValue):
@@ -391,6 +400,11 @@ class SaveView(SocietyValue):
 
 class EmptyRequest(SocietyValue):
     pass
+
+
+class AISettingRequest(SocietyValue):
+    enabled: bool = Field(strict=True)
+    ai_calls_per_step: int = Field(strict=True, ge=0, le=256)
 
 
 class CreateRequest(MedievalRunConfig):

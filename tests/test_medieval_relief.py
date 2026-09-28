@@ -4,6 +4,7 @@ standing rate. See docs/handoff/plano-consequencia-causal.md (Passo 4)."""
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import consume_monthly
@@ -35,7 +36,9 @@ def _prepared_shortage():
 def _decide(world, option):
     report = world.knowledge.settlement_reports[option.report_id]
     return record_event(world, "relief_distribution_decided", "Decisão: distribuir ajuda alimentar do próprio celeiro.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(report.event_id,))
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision(), cause_ids=(report.event_id,))
 
 
 def test_relief_act_moves_real_food_and_reduces_the_real_shortfall():
@@ -47,6 +50,13 @@ def test_relief_act_moves_real_food_and_reduces_the_real_shortfall():
     options = relief_settlement_options(world, world.economy.stocks[need_before.stock_id].owner_ref.id)
     option = next(item for item in options if item.settlement_id == TARGET)
     assert option.quantity > 0
+    copied = record_event(world, "relief_interpreted", "Payload idêntico sem escolha do ator.",
+                          fact_kind=FactKind.DECISION, decision=option.decision())
+    before_rejected_relief = world_snapshot(world)
+    with pytest.raises(ValueError, match="relief distribution option is stale"):
+        distribute_relief(world, option.id, decision_event_id=copied.id)
+    assert world_snapshot(world) == before_rejected_relief
+
     decision = _decide(world, option)
 
     event = distribute_relief(world, option.id, decision_event_id=decision.id)
@@ -67,6 +77,29 @@ def test_relief_act_moves_real_food_and_reduces_the_real_shortfall():
     )
     assert household_food == option.quantity
     assert event.causal_payload["relief_distribution"]["quantity"] == option.quantity
+
+
+def test_relief_distribution_rolls_back_if_local_observation_refresh_fails(monkeypatch):
+    world = _prepared_shortage()
+    refresh_reports(world)
+    need = world.economy.needs[TARGET]
+    polity_id = world.economy.stocks[need.stock_id].owner_ref.id
+    option = next(item for item in relief_settlement_options(world, polity_id)
+                  if item.settlement_id == TARGET)
+    decision = _decide(world, option)
+    before = world_snapshot(world)
+
+    def fail_refresh(*_args, **_kwargs):
+        raise RuntimeError("observer refresh failed")
+
+    monkeypatch.setattr(
+        "src.sim.medieval.settlement_intelligence.refresh_existing_local_settlement_reports",
+        fail_refresh,
+    )
+    with pytest.raises(RuntimeError, match="observer refresh failed"):
+        distribute_relief(world, option.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_relief_only_reaches_households_with_unpaid_rations(tmp_path):
@@ -186,7 +219,7 @@ def test_relief_is_registered_in_the_composed_civil_menu():
     assert all(option.decision()["selected_affordance_id"] == option.id for option in relief)
 
 
-def test_offline_relief_fallback_selects_an_urgent_current_option_and_keeps_authorship():
+def test_offline_relief_fallback_selects_an_urgent_current_option_and_keeps_authorship(tmp_path):
     world = _prepared_shortage()
     refresh_reports(world)
     before = world.economy.needs[TARGET].missing_food
@@ -205,7 +238,16 @@ def test_offline_relief_fallback_selects_an_urgent_current_option_and_keeps_auth
                     and event.fact_kind == FactKind.DECISION)
     assert decision.causal_origin.value == "actor_decision"
     assert decision.decision["selected_affordance_id"].startswith("relief-distribute:")
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "urgent_local_relief",
+    }
     assert world.economy.needs[TARGET].missing_food < before
+
+    save_path = tmp_path / "relief-fallback.mws"
+    save_world(world, save_path)
+    restored = load_world(save_path)
+    restored_decision = next(event for event in restored.events if event.id == decision.id)
+    assert restored_decision.causal_payload["decision_source"] == decision.causal_payload["decision_source"]
 
 
 def test_offline_relief_fallback_maintains_when_only_a_tiny_remainder_is_observed():
@@ -252,7 +294,8 @@ def test_owner_can_choose_a_routed_surplus_transfer_between_own_settlements():
     option = relief_transfer_options(world, actor)[0]
     decision = record_event(
         world, "relief_transfer_decided", "Decisão de enviar excedente alimentar por rota observada.",
-        fact_kind=FactKind.DECISION, decision=option.decision(),
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision(),
         cause_ids=(option.source_inventory_event_id,
                    world.knowledge.settlement_reports[option.destination_report_id].event_id))
 

@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+import pytest
+
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
@@ -43,8 +45,16 @@ def _build_barrier(world):
     account = world.economy.accounts[option.account_id]
     materials_before = {resource: stock.goods[resource] for resource in ("wood", "stone", "tools")}
     balance_before = account.balance
-    authorization = record_event(world, "site_construction_authorized", "Construir paliçada.",
-                                 fact_kind=FactKind.DECISION, decision=_construction_terms(option))
+    actor_decision = record_event(
+        world, "site_construction_selected", "A instituição escolheu construir uma paliçada.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision(),
+    )
+    authorization = record_event(
+        world, "site_construction_authorized", "Construir paliçada.",
+        fact_kind=FactKind.DECISION, decision=_construction_terms(option),
+        cause_ids=(actor_decision.id,),
+    )
     project = start_site_construction(world, option, decision_event_id=authorization.id)
     learned = world.knowledge.technologies["technology:polity:escarlia:defensive_barriers"]
     start = world.event_index()[project.last_event_id]
@@ -115,7 +125,7 @@ def test_built_barrier_resists_siege_until_a_material_impact_disables_it(tmp_pat
         assert audit(path)["ok"] is True
 
 
-def test_damaged_barrier_needs_observed_paid_repair_to_resist_again(tmp_path):
+def test_damaged_barrier_needs_observed_paid_repair_to_resist_again(tmp_path, monkeypatch):
     world = create_medieval_world(211)
     site = _build_barrier(world)
     impact = record_event(world, "fixture_falling_tree", "Impacto físico externo sobre a paliçada.",
@@ -130,8 +140,24 @@ def test_damaged_barrier_needs_observed_paid_repair_to_resist_again(tmp_path):
     option = next(item for item in repair_authorization_options(world, DEFENDER)
                   if item.site_id == site.id)
     decision = record_event(world, "repair_authorization_decided", "Reparar a paliçada.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision(),
                             cause_ids=(world.knowledge.site_report(DEFENDER, site.id).event_id,))
+    from src.sim.medieval import infrastructure
+    hold_objectives = infrastructure._hold_material_objectives
+    before_authorization = world_snapshot(world)
+
+    def fail_after_project(candidate, *args):
+        hold_objectives(candidate, *args)
+        raise RuntimeError("injected failure after repair project creation")
+
+    monkeypatch.setattr(infrastructure, "_hold_material_objectives", fail_after_project)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        execute_repair_authorization_option(world, DEFENDER, option.id, decision.id)
+    assert world_snapshot(world) == before_authorization
+
+    monkeypatch.undo()
     project = execute_repair_authorization_option(world, DEFENDER, option.id, decision.id)
     assert project.stage == "waiting" and _barrier_reading(world, DEFENDER, TARGET)[1] == 0
     stock_before = dict(world.economy.stocks[project.stock_id].goods)

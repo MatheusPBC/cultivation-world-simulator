@@ -1,11 +1,15 @@
 # Roadmap do fork medieval
 
-Atualizado em 14/09/2026. Este é o plano de produto que substitui o roteiro
-herdado de xianxia para o fork medieval. Este roadmap e
-`docs/handoff/medieval-current-state.md`, ambos versionados, são a fonte
-canônica do plano e do estado atual. `.agent/tasks/medieval-world-simulator/`
-é apenas registro local de orquestração/retomada, não versionado e não
-substitui nem complementa a autoridade destes dois documentos.
+> Execução vigente em 28/09/2026: [contrato de conclusão](../../medieval-completion-contract.md).
+> Os estados históricos abaixo devem ser lidos junto da matriz corrente.
+
+Atualizado em 14/09/2026. Este é o roadmap de produto que substitui o roteiro
+herdado de xianxia para o fork medieval. Para execução, consulte
+o [contrato de conclusão](../../medieval-completion-contract.md); os estados por requisito
+estão na [matriz](medieval-closure-matrix.md), e resultados/medições em
+`medieval-current-state.md`. `.agent/tasks/medieval-world-simulator/` é apenas
+registro local de orquestração/retomada, não versionado, e não substitui esses
+documentos versionados.
 
 ## Regras que permanecem inegociáveis
 
@@ -120,9 +124,14 @@ cronologia investigável.
 
 O primeiro caminho de decisão por provider V1 está integrado: o provider recebe
 apenas contexto/avisos do ator e escolhe um ID enumerado; a interpretação é receipt
-sem delta e falha/indisponibilidade retorna ao fallback determinístico. Ainda não
-há validação de provider remoto em produção, nem autonomia geral ou observabilidade
-completa.
+sem delta. No comportamento atual, indisponibilidade, erro ou resposta inválida
+com `ai_enabled=True` bloqueia e reverte o passo do mundo para aguardar uma
+decisão válida; não substitui a escolha por fallback. As políticas
+determinísticas explícitas só rodam no modo offline (`ai_enabled=False`) e devem
+ser reportadas como fallback, nunca como decisão de IA. Ainda não há validação
+remota atual nem autonomia geral ou observabilidade completa. Evidência:
+`src/sim/medieval/ai_decider.py` (`select_option`) e
+`src/sim/medieval/engine.py` (rollback e separação por `ai_enabled`).
 
 **Aceite:** rodar três seeds naturais por dez anos e cenários preparados para cada
 vertical, com artefatos, auditoria causal e custo de IA registrados. Erros do

@@ -1,10 +1,10 @@
 """A prepared column can close one local route without gaining its assets."""
 
-import asyncio
 import copy
 import json
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -31,7 +31,9 @@ ROAD = "road-campomanso-pedraclara"
 
 def decide(world, option):
     return record_event(world, "route_interdiction_decided", "Decisão canônica de interdição.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):

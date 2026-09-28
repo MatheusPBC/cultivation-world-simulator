@@ -49,6 +49,8 @@ class MedievalWorld:
         default=None, repr=False, compare=False)
     _event_type_cache: tuple[int, int, dict[str, tuple["WorldEvent", ...]]] | None = field(
         default=None, repr=False, compare=False)
+    _actor_decision_cache: tuple[int, int, dict[tuple[str, str], tuple["WorldEvent", ...]]] | None = field(
+        default=None, repr=False, compare=False)
     _strategic_capacity_cache: tuple[tuple[int, int], dict[tuple[str, str], dict]] | None = field(
         default=None, repr=False, compare=False)
     _diplomatic_context_cache: tuple[tuple[int, int, int], dict[tuple[str, str], object]] | None = field(
@@ -95,9 +97,17 @@ class MedievalWorld:
             if name == "events":
                 setattr(candidate, name, list(self.events))
             elif name == "_event_index_cache":
-                setattr(candidate, name, self._event_index_cache)
+                cached = self._event_index_cache
+                # A candidate may append events. Give it its own index map so
+                # incremental updates cannot leak into the published world.
+                setattr(candidate, name, (cached[0], cached[1], dict(cached[2]))
+                        if cached is not None else None)
             elif name == "_event_type_cache":
-                setattr(candidate, name, self._event_type_cache)
+                cached = self._event_type_cache
+                setattr(candidate, name, (cached[0], cached[1], dict(cached[2]))
+                        if cached is not None else None)
+            elif name == "_actor_decision_cache":
+                setattr(candidate, name, self._actor_decision_cache)
             elif name == "_strategic_capacity_cache":
                 setattr(candidate, name, self._strategic_capacity_cache)
             elif name == "_diplomatic_context_cache":
@@ -148,6 +158,23 @@ class MedievalWorld:
                       {kind: tuple(items) for kind, items in grouped.items()})
             self._event_type_cache = cached
         return cached[2].get(event_type, ())
+
+    def decisions_by_actor(self, actor_kind: str, actor_id: str) -> tuple["WorldEvent", ...]:
+        """Return this actor's authored decisions from a transient event index."""
+        last_identity = id(self.events[-1]) if self.events else 0
+        cached = self._actor_decision_cache
+        if cached is None or cached[0] != len(self.events) or cached[1] != last_identity:
+            grouped = {}
+            for event in self.events:
+                actor_ref = (event.decision or {}).get("actor_ref")
+                if (isinstance(actor_ref, dict)
+                        and isinstance(actor_ref.get("kind"), str)
+                        and isinstance(actor_ref.get("id"), str)):
+                    grouped.setdefault((actor_ref["kind"], actor_ref["id"]), []).append(event)
+            cached = (len(self.events), last_identity,
+                      {actor: tuple(items) for actor, items in grouped.items()})
+            self._actor_decision_cache = cached
+        return cached[2].get((actor_kind, actor_id), ())
 
     def __deepcopy__(self, memo):
         """Use the transactional clone for the medieval world's atomic forks."""

@@ -10,7 +10,7 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
-from src.sim.medieval.force import (disband_detachment, establish_garrison, force_options, garrison_options,
+from src.sim.medieval.force import (establish_garrison, force_options, garrison_options,
                                     occupy_settlement, raise_detachment, raise_options, rotate_garrison,
                                     withdraw_garrison)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -27,7 +27,9 @@ OWN_TARGET = "pedraclara"
 
 def decide(world, option):
     return record_event(world, "force_decided", "Decisão militar institucional.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def soldier_world(count=20):
@@ -64,7 +66,28 @@ TARGET = "salgueiro"
 
 def raised(world, destination=TARGET):
     option = next(item for item in raise_options(world, OWNER) if item.destination_id == destination)
-    return option, raise_detachment(world, OWNER, option.id, decide(world, option).id)
+    decision = decide(world, option)
+    detachment = raise_detachment(world, OWNER, option.id, decision.id)
+    receipt = world.event_index()[detachment.last_event_id]
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": OWNER.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    return option, detachment
+
+
+def test_force_owner_rejects_deterministic_raise_decision_without_mutation():
+    world = soldier_world()
+    option = next(item for item in raise_options(world, OWNER) if item.destination_id == TARGET)
+    decision = record_event(world, "fixture_non_actor_raise", "Não é decisão do ator.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current actor decision"):
+        raise_detachment(world, OWNER, option.id, decision.id)
+    assert world_snapshot(world) == before
 
 
 def test_held_column_cites_the_physical_route_closure():

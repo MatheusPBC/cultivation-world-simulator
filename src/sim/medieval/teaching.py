@@ -1,4 +1,5 @@
 """Explicit bilateral institutional disclosure, not global technology unlocks."""
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.authority import require_authority
@@ -11,9 +12,11 @@ def teach_technology(world, offer_id, acceptance_id, *, teacher_intent=None, lea
     offer, acceptance = events.get(offer_id), events.get(acceptance_id)
     keys = {'technology_id', 'teacher_ref', 'student_ref'}
     if (offer is None or acceptance is None or offer_id == acceptance_id
-            or any(e.fact_kind != FactKind.DECISION or e.day != world.clock.absolute_day or e.decision is None
+            or any(e.fact_kind != FactKind.DECISION
+                   or e.causal_origin is not CausalOrigin.ACTOR_DECISION
+                   or e.day != world.clock.absolute_day or e.decision is None
                    for e in (offer, acceptance))):
-        raise ValueError('teaching requires two current decisions')
+        raise ValueError('teaching requires two current actor decisions')
     a, b = offer.decision, acceptance.decision
     if teacher_intent is None:
         if (set(a) != keys | {'action', 'actor_ref'} or set(b) != keys | {'action', 'actor_ref'}

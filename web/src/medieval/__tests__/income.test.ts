@@ -78,6 +78,30 @@ it('shows local food beside artisan purchasing money without treating stock as i
   panel.unmount()
 })
 
+it('shows the current public-food affordability projection and lets the Dao inspect its inputs', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  const settlement = data.society.settlements[0]
+  settlement.food_price = 2
+  settlement.household_cash_by_occupation = { artisan: 9, farmer: 40 }
+  settlement.estimated_unaffordable_public_rations = 17
+  settlement.estimated_unaffordable_public_rations_by_occupation = { artisan: 12, farmer: 5 }
+  settlement.food_access_evidence_event_ids = ['event:food-stock', 'event:food-price', 'event:household-balance']
+  store.snapshot = data
+
+  const panel = mount(IncomePanel, { global: { plugins: [pinia, medievalI18n] } })
+  const city = panel.findAll('[data-income-settlement]')
+    .find(item => item.attributes('data-income-settlement') === settlement.id)!
+  expect(city.get('[data-testid="unaffordable-rations"]').text()).toBe('17')
+  expect(city.text()).toContain('Artesãos')
+  expect(city.text()).toContain('12')
+  const source = city.findAll('button').find(button => button.text().includes('event:food-price'))!
+  await source.trigger('click')
+  expect(store.focusEventId).toBe('event:food-price')
+  panel.unmount()
+})
+
 it('rejects snapshots that omit financial registries instead of breaking the panel later', async () => {
   const { acceptSnapshot } = await import('../mappers')
   const data = structuredClone(fixture)

@@ -68,8 +68,8 @@ def strategic_evidence(world, actor=None):
     # direct response is visible to its author and to the accusing institution;
     # unrelated actors cannot infer it merely because they can see the ledger.
     notices = world.knowledge.investigation_accusation_notices
-    for event in world.events:
-        if event.event_type != "investigation_accusation_response" or not event.causal_payload:
+    for event in world.events_of_type("investigation_accusation_response"):
+        if not event.causal_payload:
             continue
         notice = notices.get(event.causal_payload.get("notice_id"))
         actor_payload = event.causal_payload.get("actor_ref")

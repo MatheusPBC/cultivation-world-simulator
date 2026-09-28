@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.economy import produce_monthly
@@ -19,6 +20,7 @@ from src.sim.medieval.workforce import (accept_workforce_transition, labor_short
                                          workforce_transition_options, _transition_situation)
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval import ai_decider
+from tests.medieval_ai_helpers import provider_selection_stub
 
 
 CUSTOMS_SITE = "passagem-negra"
@@ -73,7 +75,9 @@ def labour_limited_world():
 def decide(world, option):
     notice = world.knowledge.workforce_offer_notices[option.notice_id]
     return record_event(world, "workforce_transition_decided", "O grupo avaliou sua oferta local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(notice.event_id,))
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision(), cause_ids=(notice.event_id,))
 
 
 @pytest.mark.asyncio
@@ -84,7 +88,7 @@ async def test_population_group_can_choose_workforce_offer_from_the_composed_tur
     monkeypatch.setattr(ai_decider, "within_budget", lambda _world: True)
     async def choose(*_args, **_kwargs):
         return option.id
-    monkeypatch.setattr(ai_decider, "select_option", choose)
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose))
 
     _claims, covered = await review_institutional_decision_turn(world, actor, workforce_adapters())
 
@@ -387,11 +391,17 @@ def test_offline_workforce_fallback_prioritizes_farming_when_food_is_missing(mon
     chosen = []
     monkeypatch.setattr(workforce, "workforce_transition_options", lambda _world, _group_id: options)
     monkeypatch.setattr(workforce, "accept_workforce_transition",
-                        lambda _world, option_id, *, decision_event_id: chosen.append(option_id))
+                        lambda _world, option_id, *, decision_event_id: chosen.append(
+                            (option_id, decision_event_id)))
 
     workforce.review_workforce_transition_fallback(world)
 
-    assert chosen == ["option:farmer"]
+    assert [option_id for option_id, _ in chosen] == ["option:farmer"]
+    decision = next(event for event in world.events if event.id == chosen[0][1])
+    assert decision.causal_origin.value == "actor_decision"
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "workforce_transition",
+    }
 
 
 def test_offline_workforce_fallback_prefers_local_food_production(monkeypatch):
@@ -518,13 +528,19 @@ def test_repair_labour_limit_is_an_equivalent_material_demand_source():
     assert report.recipient_ref == report.sponsor_ref
 
 
-@pytest.mark.parametrize("mode", ["invented", "stale", "funds", "authority", "busy"])
+@pytest.mark.parametrize("mode", ["invented", "unauthored", "stale", "funds", "authority", "busy"])
 def test_invalid_acceptance_never_executes_a_transition(mode):
     world, group, facility, option = labour_limited_world()
     if mode == "invented":
         decision = record_event(world, "workforce_transition_decided", "ID inventado.", fact_kind=FactKind.DECISION,
+                                causal_origin=CausalOrigin.ACTOR_DECISION,
+                                causal_payload={"decision_source": {"kind": "api"}},
                                 decision={**option.decision(), "option_id": "workforce_transition:invented"})
         selected = "workforce_transition:invented"
+    elif mode == "unauthored":
+        decision = record_event(world, "workforce_transition_interpreted", "Payload correto sem escolha do grupo.",
+                                fact_kind=FactKind.DECISION, decision=option.decision())
+        selected = option.id
     else:
         decision = decide(world, option)
         selected = option.id
@@ -542,7 +558,9 @@ def test_invalid_acceptance_never_executes_a_transition(mode):
         transition = accept_workforce_transition(world, option.id, decision_event_id=decision.id)
         before = (copy.deepcopy(world.society.workforce_transitions), copy.deepcopy(world.economy.accounts))
         second = record_event(world, "workforce_transition_decided", "Oferta já indisponível.",
-                              fact_kind=FactKind.DECISION, decision=option.decision(),
+                              fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                              causal_payload={"decision_source": {"kind": "api"}},
+                              decision=option.decision(),
                               cause_ids=(world.knowledge.workforce_offer_notices[option.notice_id].event_id,))
         with pytest.raises(ValueError, match="stale|selected"):
             accept_workforce_transition(world, option.id, decision_event_id=second.id)
@@ -621,12 +639,16 @@ def customs_staff_shortfall_world():
     operator = world.map.infrastructure_sites[CUSTOMS_SITE].owner_ref
     opening = customs_open_options(world, CUSTOMS_SITE, operator)[0]
     opened = record_event(world, "customs_open_decided", "Abrir posto civil.", fact_kind=FactKind.DECISION,
+                          causal_origin=CausalOrigin.ACTOR_DECISION,
+                          causal_payload={"decision_source": {"kind": "api"}},
                           decision=opening.decision())
     open_customs_checkpoint(world, opening.id, decision_event_id=opened.id)
     simulator = MedievalSimulator(world)
     asyncio.run(simulator.step())
     for index in range(3):
         freight = record_event(world, "freight_decided", "Remessa preparada.", fact_kind=FactKind.DECISION,
+                               causal_origin=CausalOrigin.ACTOR_DECISION,
+                               causal_payload={"decision_source": {"kind": "api"}},
                                decision={"action": f"prepared_freight_{index}"})
         open_order(world, "stock:ferroalto", "stock:pontenegro", "food", 10, [CUSTOMS_ROUTE],
                    decision_ids=(freight.id,))
@@ -635,7 +657,9 @@ def customs_staff_shortfall_world():
         option = next(item for item in customs_cargo_options(world, operator)
                       if item.action == "attempt_customs_fee_evasion")
         decision = record_event(world, "customs_decided", "A carga escolheu sua via.",
-                                fact_kind=FactKind.DECISION, decision=option.decision())
+                                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                causal_payload={"decision_source": {"kind": "api"}},
+                                decision=option.decision())
         attempt_customs_fee_evasion(world, option.id, decision_event_id=decision.id)
     report = next(item for item in world.knowledge.workforce_demand_reports.values()
                   if item.work_kind == "customs")
@@ -702,7 +726,9 @@ def test_customs_workforce_acceptance_revalidates_current_material_boundary(fail
         # cannot turn the same unavailable people into a second merchant staff.
         accepted = accept_workforce_transition(world, option.id, decision_event_id=decision.id)
         again = record_event(world, "workforce_transition_decided", "Grupo já reservado.",
-                             fact_kind=FactKind.DECISION, decision=option.decision(),
+                             fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                             causal_payload={"decision_source": {"kind": "api"}},
+                             decision=option.decision(),
                              cause_ids=(notice.event_id,))
         before = (copy.deepcopy(world.society.workforce_transitions), copy.deepcopy(world.economy.accounts))
         with pytest.raises(ValueError, match="stale|selected"):

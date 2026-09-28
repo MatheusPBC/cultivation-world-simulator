@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -78,7 +79,9 @@ def establish_territorial_control(world, actor, option_id, decision_event_id):
     """Persist control without changing administration, ownership or claims."""
     candidate = deepcopy(world)
     decision = next((event for event in candidate.events if event.id == decision_event_id), None)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != candidate.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != candidate.clock.absolute_day
             or decision.decision is None or decision.decision.get("action") != CONTROL_ACTION
             or decision.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("territorial control requires a current actor decision")
@@ -113,7 +116,9 @@ def withdraw_territorial_control(world, actor, option_id, decision_event_id):
     """End only the control mandate; the physical column remains for its own decision."""
     candidate = deepcopy(world)
     decision = next((event for event in candidate.events if event.id == decision_event_id), None)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != candidate.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or decision.day != candidate.clock.absolute_day
             or decision.decision is None or decision.decision.get("action") != WITHDRAW_CONTROL_ACTION
             or decision.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("territorial control withdrawal requires a current actor decision")

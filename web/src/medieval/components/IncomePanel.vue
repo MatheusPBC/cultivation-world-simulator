@@ -21,10 +21,22 @@ const { savings, totalSavings, payrolls, employmentContracts, policies, source }
           <dt>{{ t('artisanPeople') }}</dt><dd>{{ n(s.artisanPeople) }}</dd>
           <dt>{{ t('artisanSavings') }}</dt><dd data-testid="artisan-savings">{{ n(s.artisanCash) }}</dd>
           <dt>{{ t('localFoodStock') }}</dt><dd data-testid="local-food-stock">{{ n(s.food) }}</dd>
+          <dt>{{ t('foodPrice') }}</dt><dd>{{ n(s.foodPrice) }}</dd>
+          <dt>{{ t('estimatedUnaffordableRations') }}</dt><dd data-testid="unaffordable-rations">{{ n(s.estimatedUnaffordable) }}</dd>
           <dt>{{ t('missing') }}</dt><dd>{{ n(s.missingFood) }}</dd>
           <dt>{{ t('health') }}</dt><dd>{{ n(s.health) }} / 1.000</dd></dl>
         <button v-if="s.foodSourceId" @click="source(s.foodSourceId)">{{ t('source') }} · {{ t('localFoodStock') }}</button>
         <button v-if="s.needSourceId" @click="source(s.needSourceId)">{{ t('source') }} · {{ t('lastSubsistence') }}</button>
+        <details v-if="Object.keys(s.estimatedUnaffordableByOccupation).length">
+          <summary>{{ t('unaffordableByOccupation') }}</summary>
+          <dl><template v-for="(quantity, occupation) in s.estimatedUnaffordableByOccupation" :key="occupation">
+            <dt>{{ t('kinds.' + occupation) }} · {{ t('estimatedUnaffordableRations') }}</dt><dd>{{ n(quantity) }}</dd>
+            <dt>{{ t('kinds.' + occupation) }} · {{ t('householdSavings') }}</dt><dd>{{ n(s.householdCashByOccupation[occupation] ?? 0) }}</dd>
+          </template></dl>
+        </details>
+        <details v-if="s.foodAccessEvidenceIds.length"><summary>{{ t('foodAccessEvidence') }}</summary>
+          <button v-for="eventId in s.foodAccessEvidenceIds" :key="eventId" @click="source(eventId)">{{ t('source') }} · {{ eventId }}</button>
+        </details>
         <details v-if="s.artisanGroups.length"><summary>{{ t('artisanGroups') }}</summary>
           <div v-for="group in s.artisanGroups" :key="group.id" class="stock-card">
             <p>{{ t('kinds.' + group.people) }} · {{ n(group.count) }} {{ t('workers') }}</p>

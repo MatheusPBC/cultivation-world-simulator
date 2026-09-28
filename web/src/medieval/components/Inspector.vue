@@ -9,8 +9,9 @@ import ResearchPanel from './ResearchPanel.vue'
 import DiplomacyPanel from './DiplomacyPanel.vue'
 import MigrationPanel from './MigrationPanel.vue'
 import WorkforcePanel from './WorkforcePanel.vue'
+import type { EntityRef } from '../../types/medieval-api'
 const {t,te}=useI18n()
-const {tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError}=useInspection()
+const {tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
 const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs).map(([id,amount])=>`${resourceName(id)}: ${n(amount)}`).join(', ')
 const checkpointsForSite=(siteId:string)=>data.value.economy.customs_checkpoints.filter(checkpoint=>checkpoint.site_id===siteId)
@@ -24,7 +25,22 @@ const checkpointLabel=(checkpointId:string)=>{
   return site ? site.name + ' (' + checkpointId + ')' : checkpointId
 }
 const dossierCategory=(category:string)=>t('dossierCategories.'+category,{default:category})
-const dossierText=(entry:{id:string;payload:Record<string,unknown>})=>String(entry.payload.content??entry.payload.result??entry.payload.name??entry.payload.kind??entry.id)
+const dossierText=(entry:{category:string;id:string;payload:Record<string,unknown>})=>{
+  const payload=entry.payload
+  if(entry.category==='institutional_aid_notices'){
+    const requesterRef=payload.requester_ref
+    const requester=requesterRef&&typeof requesterRef==='object'
+      ?entityName(data.value,requesterRef as EntityRef):'instituição'
+    const quantity=typeof payload.requested_food==='number'?n(payload.requested_food):'—'
+    if(payload.kind==='request')return t('dossierAidNotices.request',{requester,settlement:placeName(String(payload.requester_settlement_id??'')),quantity})
+    if(payload.kind==='response'&&(payload.response_status==='accepted'||payload.response_status==='rejected'))
+      return t('dossierAidNotices.response',{status:t('aidAnswered.'+payload.response_status),requester,quantity})
+  }
+  return String(payload.content??payload.result??payload.name??payload.kind??entry.id)
+}
+const characterHistory=computed(()=>dossier.value.filter(entry=>entry.category==='known_fact')
+  .sort((a,b)=>(b.learned_day??-1)-(a.learned_day??-1)||b.id.localeCompare(a.id)).slice(0,10))
+const nonFactDossier=computed(()=>dossier.value.filter(entry=>entry.category!=='known_fact'))
 const defensePlans=computed(()=>polity.value ? data.value.governance.plans.flatMap(plan=>{
   const objective=data.value.governance.objectives.find(item=>item.id===plan.objective_id)
   return objective?.actor_ref.kind==='polity' && objective.actor_ref.id===polity.value!.id && objective.kind==='defend_occupied_settlement'
@@ -44,6 +60,19 @@ const detachmentSieges=computed(()=>detachment.value ? data.value.campaigns.sieg
 const detachmentInterdictions=computed(()=>detachment.value ? data.value.campaigns.route_interdictions.filter(item=>item.stage==='active' && item.detachment_id===detachment.value!.id) : [])
 const detachmentInvestments=computed(()=>detachment.value ? data.value.campaigns.settlement_investments.filter(item=>item.stage==='active' && item.detachment_id===detachment.value!.id) : [])
 const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.assembly_denials.filter(item=>item.detachment_id===detachment.value!.id) : [])
+const fieldBattles=computed(()=>{
+  if(!settlement.value) return []
+  const latest=new Map<string,{reading:typeof data.value.governance.settlement_reports[number]['field_engagements'][number];observed_day:number}>()
+  for(const report of data.value.governance.settlement_reports){
+    if(report.settlement_id!==settlement.value.id) continue
+    for(const reading of report.field_engagements){
+      const previous=latest.get(reading.engagement_id)
+      if(!previous || report.observed_day>previous.observed_day)
+        latest.set(reading.engagement_id,{reading,observed_day:report.observed_day})
+    }
+  }
+  return [...latest.values()].sort((a,b)=>b.observed_day-a.observed_day || a.reading.engagement_id.localeCompare(b.reading.engagement_id))
+})
 </script>
 <template>
   <aside class="inspector panel" data-testid="inspector">
@@ -64,6 +93,17 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
           <p v-if="settlement.missing_food" class="notice warning">{{t('missing')}}: {{n(settlement.missing_food)}}</p>
           <dl><dt>{{t('administrator')}}</dt><dd>{{polityName(settlement.administrator_id)}}</dd><dt>{{t('occupier')}}</dt><dd>{{polityName(settlement.occupier_id)}}</dd><dt>{{t('claimants')}}</dt><dd>{{settlement.claimant_ids.map(polityName).join(', ')||t('none')}}</dd><dt>{{t('capacity')}}</dt><dd>{{n(settlement.housing_capacity)}} {{t('inhabitants')}}</dd></dl>
           <button v-if="data.economy.needs.find(x=>x.id===settlement!.id)?.last_event_id" class="text-button" @click="source(data.economy.needs.find(x=>x.id===settlement!.id)?.last_event_id)">{{t('source')}} →</button>
+          <template v-if="fieldBattles.length">
+            <h3>{{t('fieldBattles')}}</h3>
+            <article v-for="{reading,observed_day} in fieldBattles" :key="reading.engagement_id" class="stock-card" :data-field-reading="reading.engagement_id">
+              <h4>{{entityName(data,reading.challenger_ref)}} × {{entityName(data,reading.defender_ref)}}</h4>
+              <p v-if="reading.winner_ref">{{t('fieldBattleWinner')}}: {{entityName(data,reading.winner_ref)}}</p>
+              <p v-else>{{t('fieldBattleIndecisive')}}</p>
+              <p>{{t('fieldBattleCasualties')}}: {{entityName(data,reading.challenger_ref)}} {{n(reading.challenger_casualties)}}, {{entityName(data,reading.defender_ref)}} {{n(reading.defender_casualties)}}</p>
+              <p class="muted">{{t('observedOn')}}: {{calendar(observed_day)}}</p>
+              <button :data-field-source="reading.event_id" @click="source(reading.event_id)">{{t('source')}}</button>
+            </article>
+          </template>
           <h3>{{t('stocks')}}</h3><p class="muted">{{t('privateStock')}}</p>
           <article v-for="stock in stocks" :key="stock.id" class="stock-card"><h4>{{entityName(data,stock.owner_ref)}}</h4>
             <table><thead><tr><th>{{t('resource')}}</th><th>{{t('quantity')}}</th><th>{{t('price')}}</th></tr></thead><tbody><tr v-for="(quantity,id) in stock.goods" :key="id"><td>{{resourceName(id)}}</td><td>{{n(quantity)}}</td><td>{{market?.prices[id]??'—'}}</td></tr></tbody></table>
@@ -135,6 +175,7 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
             <p class="muted" v-if="entry.learned_day !== null">{{t('learnedOn')}}: {{calendar(entry.learned_day)}} · {{t('causalDepth')}}: {{entry.causal_depth}}</p>
             <button v-if="entry.event_id" @click="source(entry.event_id)">{{t('source')}}</button>
           </article>
+          <button v-if="dossierHasMore" :disabled="dossierLoading" @click="loadMoreDossier">{{t('loadMoreDossier')}}</button>
         </template>
         <template v-else-if="organization">
           <p class="eyebrow">{{t('organizations')}} · {{label(organization.kind)}}</p><h2>{{organization.name}}</h2>
@@ -150,6 +191,7 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
             <p class="muted" v-if="entry.learned_day !== null">{{t('learnedOn')}}: {{calendar(entry.learned_day)}} · {{t('causalDepth')}}: {{entry.causal_depth}}</p>
             <button v-if="entry.event_id" @click="source(entry.event_id)">{{t('source')}}</button>
           </article>
+          <button v-if="dossierHasMore" :disabled="dossierLoading" @click="loadMoreDossier">{{t('loadMoreDossier')}}</button>
         </template>
         <template v-else-if="character">
           <p class="eyebrow">{{label(character.people)}} · {{character.death_day===null?t('living'):t('deceased')}}</p><h2>{{character.name}}</h2><p>{{character.age_years}} {{t('years')}}</p>
@@ -159,16 +201,27 @@ const detachmentDenials=computed(()=>detachment.value ? data.value.campaigns.ass
           <h3>{{t('organizations')}}</h3><p v-for="o in data.society.organizations.filter(o=>o.member_ids.includes(character!.id))" :key="o.id">{{o.name}}</p>
           <h3>{{t('activity')}}</h3><p v-if="!data.society.activities.some(a=>a.character_id===character!.id)" class="muted">{{t('noActivities')}}</p>
           <p v-for="a in data.society.activities.filter(a=>a.character_id===character!.id)" :key="a.id">{{label(a.kind)}} <button @click="source(a.decision_event_id)">{{t('source')}}</button></p>
-          <h3>{{t('knownDossier')}}</h3>
+          <details class="route-knowledge">
+          <summary>{{t('characterHistory')}} ({{characterHistory.length}})</summary>
           <p v-if="dossierLoading" class="muted">{{t('loadingDossier')}}</p>
           <p v-else-if="dossierError" class="notice warning">{{dossierError.message}}</p>
-          <p v-else-if="!dossier.length" class="muted">{{t('noKnownDossier')}}</p>
-          <article v-for="entry in dossier" v-else :key="entry.category + ':' + entry.id" class="stock-card" :data-dossier-entry="entry.id">
+          <p v-else-if="!characterHistory.length" class="muted">{{t('noCharacterHistory')}}</p>
+          <article v-for="entry in characterHistory" :key="entry.id" class="stock-card" :data-character-history="entry.id">
+            <p class="muted">{{entry.learned_day!==null?calendar(entry.learned_day):''}} · {{label(String(entry.payload.fact_kind??'occurrence'))}}</p>
+            <p>{{dossierText(entry)}}</p>
+            <button v-if="entry.event_id" @click="source(entry.event_id)">{{t('source')}}</button>
+          </article>
+          </details>
+          <h3>{{t('knownDossier')}}</h3>
+          <p v-if="dossierLoading" class="muted">{{t('loadingDossier')}}</p>
+          <p v-else-if="!nonFactDossier.length" class="muted">{{t('noKnownDossier')}}</p>
+          <article v-for="entry in nonFactDossier" v-else :key="entry.category + ':' + entry.id" class="stock-card" :data-dossier-entry="entry.id">
             <h4>{{dossierCategory(entry.category)}}</h4>
             <p>{{dossierText(entry)}}</p>
             <p class="muted" v-if="entry.learned_day !== null">{{t('learnedOn')}}: {{calendar(entry.learned_day)}} · {{t('causalDepth')}}: {{entry.causal_depth}}</p>
             <button v-if="entry.event_id" @click="source(entry.event_id)">{{t('source')}}</button>
           </article>
+          <button v-if="dossierHasMore" :disabled="dossierLoading" @click="loadMoreDossier">{{t('loadMoreDossier')}}</button>
         </template>
         <template v-else-if="site">
           <p class="eyebrow">{{t('sites')}}</p><h2>{{site.name}}</h2><dl><dt>{{t('owner')}}</dt><dd>{{entityName(data,site.owner_ref)}}</dd><dt>{{t('maintainer')}}</dt><dd>{{entityName(data,site.maintainer_ref)}}</dd><dt>{{t('integrity')}}</dt><dd>{{n(site.integrity*100)}}%</dd><dt>{{t('activity')}}</dt><dd>{{site.enabled?t('enabled'):t('disabled')}}</dd><dt>{{t('serviceSuspended')}}</dt><dd>{{site.service_suspended?t('serviceSuspended'):t('serviceOperating')}}</dd></dl>

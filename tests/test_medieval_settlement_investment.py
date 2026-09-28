@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
@@ -30,7 +31,8 @@ OTHER_EXIT = "road-brumafria-ferroalto"
 
 def decide(world, option):
     return record_event(world, "settlement_investment_decided", "Decisão canônica de pressão local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):
@@ -51,6 +53,12 @@ def prepared_foreign_column(*, with_route_reports=True):
     arrival = record_event(
         world, "test_column_present", "Fixture factual de uma coluna estrangeira já presente.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_fixture_column_presence",
+            "source_refs": [{"kind": "scenario", "id": "foreign_column_present"},
+                            {"kind": "population_group", "id": soldier_id}],
+            "observed_day": world.clock.absolute_day,
+        }},
         deltas=(_delta("detachment", "detachment:test-investment", "stage", None, "present"),),
     )
     detachment = Detachment(
@@ -77,7 +85,8 @@ def queue_existing_cargo(world):
                        if item.owner_ref == DEFENDER and item.location_id == TARGET)
     decision = record_event(
         world, "freight_decided", "Frete canônico existente para testar o atraso físico.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "freight", "source_id": source.id, "destination_id": destination.id,
                   "resource_id": "food", "quantity": 1, "route_ids": [OTHER_EXIT],
                   "actor_ref": DEFENDER.to_dict()},
@@ -98,6 +107,14 @@ def test_investment_closes_every_exit_delays_existing_cargo_and_hides_column(tmp
     investment = execute_settlement_investment_option(world, ATTACKER, option.id, decide(world, option).id)
 
     assert investment.stage == "active"
+    receipt = world.event_index()[investment.last_event_id]
+    decision = world.event_index()[investment.decision_event_id]
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": ATTACKER.to_dict(),
+        "selected_affordance_id": option.id,
+    }
     assert all(world.map.get_route_operational_capacity(route_id) == 0 for route_id in investment.route_ids)
     pressure = next(item for item in world.knowledge.settlement_pressures_for_actor(DEFENDER)
                     if item.investment_id == investment.id)
@@ -127,6 +144,9 @@ def test_too_small_has_no_option_and_lift_preserves_an_external_closure():
     lift = next(item for item in settlement_investment_options(world, ATTACKER, detachment_id=detachment_id)
                 if item.kind == "lift")
     execute_settlement_investment_option(world, ATTACKER, lift.id, decide(world, lift).id)
+    lift_receipt = next(event for event in reversed(world.events)
+                        if event.event_type == "settlement_investment_lifted")
+    assert lift_receipt.causal_origin is CausalOrigin.ACTOR_DECISION
     assert world.map.get_route_operational_capacity(ROAD) == 0
     assert world.map.get_route_operational_capacity(OTHER_EXIT) > 0
     assert next(item for item in world.society.settlement_investments.values()).stage == "lifted"

@@ -22,6 +22,18 @@ The people moving together and the portion of household property accompanying
 them. Named people are included in its population, not added to it.
 _Avoid_: Additional population, newly created wealth.
 
+## Medieval world — family credit
+
+**Family loan request**:
+An authorized polity's time-bounded request for a specific current public-payroll
+shortfall. Local households decide independently whether to contribute existing
+lendable balances; each household may contribute once, and partial contributions
+leave only the unfunded remainder open. The request closes when fully funded or
+stops offering at expiry. Each contribution is its own loan and repayment remains
+a later borrower decision.
+_Avoid_: Pooled household treasury, automatic lending, automatic repayment,
+credit creation, or a partial contribution marked as full funding.
+
 ## Medieval world — technology diffusion
 
 **Technology sale**:
@@ -30,6 +42,21 @@ institution that already has a usable site for the technique and its
 prerequisites. Payment changes accounts; the seller keeps its knowledge, and
 the buyer still needs later material application work.
 _Avoid_: Free global unlock, transfer of an installation, automatic production.
+
+## Medieval world — causal roots
+
+**World-generation premise**:
+A canonical starting condition established before the simulation, such as an
+initial stock, route, site or population group. It may ground a deterministic
+fact without a prior event; the fact must label this root and retain its own
+mechanical evidence.
+_Avoid_: Missing cause, invented prehistory, Story cause.
+
+**Root premise**:
+Structured evidence on a fact that identifies which pre-simulation premise
+grounds it when no earlier event exists in the ledger. It is not a synthetic
+event and does not excuse broken or omitted links to events that do exist.
+_Avoid_: Fake genesis event, generic fallback cause.
 
 ## Current implementation ledger (2026-09-04)
 

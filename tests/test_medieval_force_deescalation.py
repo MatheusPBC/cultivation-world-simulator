@@ -6,6 +6,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -14,7 +15,7 @@ from src.sim.medieval import ai_decider
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.events import record_event, validate_history
 from src.sim.medieval.force import (detect_force_standoffs, force_options, occupy_settlement,
-                                    raise_detachment, raise_options, withdrawal_options)
+                                    raise_detachment, raise_options)
 from src.sim.medieval.force_contact_policy import review_force_contacts
 from src.sim.medieval.force_deescalation import (force_deescalation_offer_options,
                                                  force_deescalation_response_options,
@@ -35,7 +36,9 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "force_deescalation_decided", "Decisão canônica sobre contato armado.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):

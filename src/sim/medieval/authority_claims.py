@@ -166,7 +166,8 @@ def all_options(world, actor):
 def _decision(world, event_id, action, actor):
     event = next((item for item in world.events if item.id == event_id), None)
     if (event is None or event.day != world.clock.absolute_day
-            or event.fact_kind != FactKind.DECISION or event.decision is None
+            or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION or event.decision is None
             or event.decision.get("action") != action
             or event.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("authority claim requires its exact canonical decision")

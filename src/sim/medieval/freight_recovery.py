@@ -137,7 +137,7 @@ def execute_freight_recovery(world, option_id, *, decision_event_id):
     world.economy.validate(world)
     decision = next((event for event in world.events if event.id == decision_event_id), None)
     if (decision is None or decision.fact_kind != FactKind.DECISION
-            or decision.causal_origin == CausalOrigin.LLM_INTERPRETATION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day or not isinstance(decision.decision, dict)
             or decision.decision.get("action") != RECOVERY_ACTION):
         raise ValueError("freight recovery requires a current actor decision")
@@ -157,5 +157,10 @@ def execute_freight_recovery(world, option_id, *, decision_event_id):
     validate_fiscal_route_option(world, option.route_option_id, actor_ref, option.source_id,
                                  option.destination_id, option.resource_id, option.quantity)
     blocked = world.economy.freight_orders[option.order_id]
-    return open_order(world, option.source_id, option.destination_id, option.resource_id, option.quantity,
-                      option.route_ids, decision_ids=(decision_event_id,), cause_ids=(blocked.last_event_id,))
+    candidate = world.transaction_copy()
+    successor = open_order(candidate, option.source_id, option.destination_id,
+                           option.resource_id, option.quantity, option.route_ids,
+                           decision_ids=(decision_event_id,), cause_ids=(blocked.last_event_id,))
+    candidate.economy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.economy.freight_orders[successor.id]

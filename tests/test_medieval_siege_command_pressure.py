@@ -12,6 +12,8 @@ every authored siege wears exactly as it did before.
 """
 
 from src.classes.mechanical_language import EntityRef
+from src.classes.causal_origin import CausalOrigin
+from src.classes.governance.authority import headquarters_holder
 from src.sim.medieval.siege_campaign import _command_pressure, _garrison_wear
 from src.sim.medieval.force_command import effective_doctrine
 
@@ -25,7 +27,8 @@ def _command(world, detachment_id, doctrine, *, institution=ATTACKER, effective_
 
     detachment = world.society.detachments[detachment_id]
     holder = next(item for item in world.society.characters.values()
-                  if item.death_day is None and item.location_id == detachment.location_id)
+                  if item.death_day is None and item.location_id == detachment.location_id
+                  and EntityRef("character", item.id) != headquarters_holder(world, institution))
     office = world.authority.offices[f"office:{institution.kind}:{institution.id}"]
     world.authority.offices[office.id] = AuthorityOffice(
         id=office.id, institution_ref=institution, holder_ref=EntityRef("character", holder.id),
@@ -35,7 +38,8 @@ def _command(world, detachment_id, doctrine, *, institution=ATTACKER, effective_
 
     choice = record_event(
         world, "test_command_decided", "Doutrina escolhida pelo comandante.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "set_detachment_doctrine", "actor_ref": EntityRef("character", holder.id).to_dict(),
                   "detachment_id": detachment_id, "doctrine": doctrine})
     from src.sim.medieval.economy import _delta

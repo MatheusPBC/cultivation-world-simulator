@@ -185,7 +185,10 @@ def diplomacy_view(world):
                 and cause.decision.get("action") == "repudiate_obligation"
                 for link in event.causal_links
             )
-            kind = "commitment_repudiated" if deliberate else "commitment_breached"
+            breach_kind = (event.causal_payload or {}).get("breach_kind")
+            kind = ("commitment_repudiated" if deliberate else
+                    "commitment_materially_breached"
+                    if breach_kind == "materially_incompatible_action" else "commitment_breached")
         memories.append(InstitutionalMemoryView(
             **memory.model_dump(), effective_salience=effective_salience(world, memory), kind=kind))
     observers = sorted({memory.institution_ref for memory in world.relations.memories.values()},
@@ -299,13 +302,17 @@ def world_view(world):
 
 
 def settlements(world):
+    from src.sim.medieval.household_access import public_food_access_projection
+
     result = []
     for item in ordered(world.society.settlements):
         needs = world.economy.needs[item.id]
+        food_access = public_food_access_projection(world, item.id)
         result.append(SettlementView(**item.model_dump(), population=world.society.population_at(item.id),
                                       present_population=world.society.present_population_at(item.id),
                                       center=world.map.regions[item.region_id].center_loc,
-                                      health=needs.health, unrest=needs.unrest, missing_food=needs.missing_food))
+                                      health=needs.health, unrest=needs.unrest, missing_food=needs.missing_food,
+                                      **food_access))
     return result
 
 
@@ -322,7 +329,45 @@ def society_view(world):
                        civic_amnesties=ordered(world.society.civic_amnesties))
 
 
-def actor_dossier(world, actor_kind, actor_id):
+def _dossier_entry_key(entry):
+    sequence = 0
+    if entry.category == "known_fact" and entry.event_id:
+        prefix, separator, raw_sequence = entry.event_id.partition(":")
+        if prefix == "event" and separator and raw_sequence.isdecimal():
+            sequence = int(raw_sequence)
+    return (entry.learned_day is None, -(entry.learned_day or 0), entry.category,
+            -sequence, entry.id)
+
+
+def _encode_dossier_cursor(entry):
+    import base64
+    import json
+
+    raw = json.dumps(_dossier_entry_key(entry), separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_dossier_cursor(cursor):
+    import base64
+    import binascii
+    import json
+
+    if cursor is None:
+        return None
+    try:
+        decoded = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+        key = json.loads(decoded)
+    except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
+        raise RuntimeProblem("INVALID_DOSSIER_CURSOR", "Cursor de dossiê inválido.", 422) from exc
+    if (not isinstance(key, list) or len(key) != 5
+            or not isinstance(key[0], bool) or not isinstance(key[1], int)
+            or not isinstance(key[2], str) or not isinstance(key[3], int)
+            or not isinstance(key[4], str)):
+        raise RuntimeProblem("INVALID_DOSSIER_CURSOR", "Cursor de dossiê inválido.", 422)
+    return tuple(key)
+
+
+def actor_dossier(world, actor_kind, actor_id, after=None, limit=50):
     """Project one actor's current private perspective without inventing facts.
 
     KnowledgeState remains the only owner of notices and findings.  This query
@@ -341,7 +386,7 @@ def actor_dossier(world, actor_kind, actor_id):
         raise RuntimeProblem("ACTOR_NOT_FOUND", "Ator não encontrado.", 404) from exc
 
     entries = []
-    events = {event.id: event for event in world.events}
+    events = world.event_index()
 
     def add(category, item):
         payload = item.model_dump(mode="json")
@@ -372,11 +417,7 @@ def actor_dossier(world, actor_kind, actor_id):
             add("strategic_plan", item)
     # An actor necessarily knows its own decisions.  This makes an investigation
     # useful without granting it foreign private state.
-    own_decision_ids = {
-        event.id for event in world.events
-        if event.decision is not None
-        and event.decision.get("actor_ref") == actor.to_dict()
-    }
+    own_decision_ids = {event.id for event in world.decisions_by_actor(actor.kind, actor.id)}
     known_event_ids = sorted({item.event_id for item in entries if item.event_id} | own_decision_ids)
     known_event_set = set(known_event_ids)
     # Roots are facts delivered directly by a notice/read-model or decisions
@@ -419,13 +460,21 @@ def actor_dossier(world, actor_kind, actor_id):
             "deltas": [delta.to_dict() for delta in event.deltas],
         }
         known_causes = [link.cause_event_id for link in event.causal_links
-                        if link.cause_event_id in known_event_ids]
+                        if link.cause_event_id in known_event_set]
         entries.append(DossierEntry(category="known_fact", id=f"fact:{event.id}",
                                     event_id=event.id, learned_day=event.day,
                                     cause_event_ids=known_causes,
                                     causal_depth=causal_depth.get(event.id, 0), payload=payload))
-    entries.sort(key=lambda item: (item.category, item.id))
-    return DossierView(actor_ref=actor, entries=entries)
+    # Keyset paging keeps the recent-history boundary stable when newer facts
+    # arrive while the observer is reading older pages.
+    entries.sort(key=_dossier_entry_key)
+    cursor_key = _decode_dossier_cursor(after)
+    remaining = [item for item in entries
+                 if cursor_key is None or _dossier_entry_key(item) > cursor_key]
+    page = remaining[:limit]
+    has_more = len(remaining) > len(page)
+    next_after = _encode_dossier_cursor(page[-1]) if has_more and page else None
+    return DossierView(actor_ref=actor, entries=page, next_after=next_after, has_more=has_more)
 
 
 def economy_view(world):

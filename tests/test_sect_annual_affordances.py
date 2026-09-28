@@ -28,7 +28,10 @@ from src.systems.domain_affordance_registry import (
     DOMAIN_AFFORDANCES,
     StaleAffordanceError,
 )
-from src.systems.domain_decision_interpreter import interpret_domain_affordances
+from src.systems.domain_decision_interpreter import (
+    DomainDecisionFailed,
+    interpret_domain_affordances,
+)
 from src.systems.single_choice.models import ChoiceSource, SingleChoiceDecision
 from src.systems.single_choice.sect_recruitment import SectRecruitmentOutcome
 from src.systems.time import Month, Year, create_month_stamp
@@ -135,7 +138,7 @@ async def test_registered_executor_rejects_absent_or_other_option_decision(base_
 
 
 @pytest.mark.asyncio
-async def test_test_mode_isolated_and_provider_failure_maintains(base_world):
+async def test_test_mode_isolated_and_provider_failure_aborts_decision(base_world):
     sect, patriarch, breaker, rogue = _setup(base_world)
     breaker.alignment = patriarch.alignment
     patriarch.magic_stone = MagicStone(300)
@@ -148,11 +151,11 @@ async def test_test_mode_isolated_and_provider_failure_maintains(base_world):
     assert deterministic.decision_event.causal_payload["interpretation"]["decision"] == "maintain"
 
     base_world.run_config_snapshot = {}
-    failed = await SectDecider.decide(
-        sect, _ctx(patriarch, breaker, recruit=rogue), base_world,
-        llm_call=AsyncMock(side_effect=LLMError("provider unavailable")),
-    )
-    assert failed.decision_event.causal_payload["interpretation"]["decision"] == "maintain"
+    with pytest.raises(DomainDecisionFailed):
+        await SectDecider.decide(
+            sect, _ctx(patriarch, breaker, recruit=rogue), base_world,
+            llm_call=AsyncMock(side_effect=LLMError("provider unavailable")),
+        )
     assert rogue.sect is None and breaker.sect is sect
 
 

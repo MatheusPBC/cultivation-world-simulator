@@ -95,6 +95,20 @@ def _name(world, settlement_id):
     return world.society.settlements[settlement_id].name
 
 
+def _breach_source_settlements(world, creditor, debtor):
+    """Physical targets grounded in a known, still-answerable delivery breach."""
+    if debtor is None:
+        return None
+    settlements = set()
+    for clause, _breach, _notice in _known_breaches(world, creditor):
+        if clause.debtor_ref != debtor:
+            continue
+        stock = world.economy.stocks.get(clause.source_stock_id)
+        if stock is not None and stock.owner_ref == debtor and stock.location_id in world.society.settlements:
+            settlements.add(stock.location_id)
+    return settlements
+
+
 def recourse_options(world, creditor, debtor=None):
     """The bounded menu of current actions this institution could take today.
 
@@ -103,6 +117,7 @@ def recourse_options(world, creditor, debtor=None):
     aim at a place the creditor already observes and can already reach.
     """
     menu = []
+    breach_targets = _breach_source_settlements(world, creditor, debtor)
     if debtor is not None:
         for option in reciprocal_supply_options(world, creditor, counterparty=debtor):
             menu.append((option, f"Propor a {world.society.polities[debtor.id].name} entregar "
@@ -111,12 +126,16 @@ def recourse_options(world, creditor, debtor=None):
     for option in raise_options(world, creditor):
         if not _reported(world, creditor, option.destination_id):
             continue
+        if breach_targets is not None and option.destination_id not in breach_targets:
+            continue
         menu.append((option, f"Levantar {option.count} soldados em {_name(world, option.settlement_id)} "
                              f"e marchar até {_name(world, option.destination_id)} com "
                              f"{option.provisions} rações próprias."))
     for option in force_options(world, creditor):
         detachment = world.society.detachments[option.detachment_id]
         if option.kind == "occupy":
+            if breach_targets is not None and detachment.location_id not in breach_targets:
+                continue
             menu.append((option, f"Ocupar {_name(world, detachment.location_id)} com a coluna já presente."))
         elif option.kind == "withdraw":
             menu.append((option, f"Retirar a guarnição de {_name(world, detachment.location_id)} sem mover a coluna."))
@@ -126,6 +145,8 @@ def recourse_options(world, creditor, debtor=None):
             menu.append((option, f"Dissolver a coluna em {_name(world, detachment.location_id)} "
                                  f"e devolver as pessoas a uma coorte local."))
     for option in territorial_control_options(world, creditor):
+        if breach_targets is not None and option.settlement_id not in breach_targets:
+            continue
         menu.append((option, f"Formalizar o controle territorial de {_name(world, option.settlement_id)} "
                              "sem alterar a administração vigente."))
     return tuple(menu)

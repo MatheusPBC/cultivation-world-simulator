@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -31,10 +32,8 @@ SETTLEMENT = "campomanso"
 def world_with_column():
     world = create_medieval_world(73)
     group = next(item for item in world.society.population.values()
-                 if item.settlement_id == SETTLEMENT)
-    source_id = f"pop:{SETTLEMENT}:{group.people}:soldier:drill"
-    world.society.population[source_id] = group.model_copy(
-        update={"id": source_id, "occupation": "soldier", "count": 20})
+                 if item.settlement_id == SETTLEMENT and item.occupation == "soldier")
+    source_id = group.id
     decision = record_event(world, "fixture_column_decided", "Coluna presente na premissa pressionada.",
                             fact_kind=FactKind.DECISION,
                             decision={"action": "raise_detachment", "actor_ref": OWNER.to_dict()})
@@ -43,7 +42,7 @@ def world_with_column():
                            deltas=(_delta("detachment", "detachment:drill", "stage", None, "present"),),
                            cause_ids=(decision.id,))
     column = Detachment(id="detachment:drill", owner_ref=OWNER, source_group_id=source_id,
-                        count=20, location_id=SETTLEMENT, destination_id=SETTLEMENT,
+                        count=group.count, location_id=SETTLEMENT, destination_id=SETTLEMENT,
                         provisions=220, stage="present", started_day=world.clock.absolute_day,
                         due_day=world.clock.absolute_day + 1,
                         decision_event_id=decision.id, last_event_id=arrival.id)
@@ -62,7 +61,8 @@ def learn(world, technology_id):
 
 def decide(world, option):
     return record_event(world, "detachment_training_decided", "Instrução da coluna escolhida.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision())
 
 
 def tick(world):
@@ -72,7 +72,8 @@ def tick(world):
 
 def test_knowledge_alone_grants_no_strength_but_paid_dated_training_does(tmp_path):
     world, column_id = world_with_column()
-    baseline = field_strength(world, world.society.detachments[column_id])[0]
+    column = world.society.detachments[column_id]
+    baseline = field_strength(world, column)[0]
     learn(world, "field_drill")
     assert field_strength(world, world.society.detachments[column_id])[0] == baseline
     option = training_options(world, OWNER, detachment_id=column_id)[0]
@@ -88,14 +89,14 @@ def test_knowledge_alone_grants_no_strength_but_paid_dated_training_does(tmp_pat
         assert field_strength(world, world.society.detachments[column_id])[0] == baseline
     tick(world)
     assert world.society.detachment_trainings[training.id].stage == "completed"
-    assert field_strength(world, world.society.detachments[column_id])[0] == baseline + 20
+    assert field_strength(world, world.society.detachments[column_id])[0] == baseline + column.count
     completion = world.event_index()[world.society.detachment_trainings[training.id].last_event_id]
     assert completion.event_type == "detachment_training_completed"
     path = tmp_path / "trained-column.mws"
     save_world(world, path)
     restored = load_world(path)
     assert world_snapshot(restored) == world_snapshot(world)
-    assert field_strength(restored, restored.society.detachments[column_id])[0] == baseline + 20
+    assert field_strength(restored, restored.society.detachments[column_id])[0] == baseline + column.count
     restored.society.detachment_trainings[training.id] = restored.society.detachment_trainings[
         training.id].model_copy(update={"knowledge_event_id": "event:1"})
     with pytest.raises(ValueError, match="training lacks"):
@@ -114,13 +115,16 @@ def test_stale_selection_and_supply_lapse_cannot_train_or_create_strength():
     training = start_training(world, OWNER, option.id, decision.id)
     column = world.society.detachments[column_id]
     world.society.detachments[column_id] = column.model_copy(update={"provisions": column.count})
+    unsupplied_strength = field_strength(world, world.society.detachments[column_id])[0]
     tick(world)
     assert world.society.detachment_trainings[training.id].stage == "lapsed"
-    assert field_strength(world, world.society.detachments[column_id])[0] == 40
+    assert field_strength(world, world.society.detachments[column_id])[0] == unsupplied_strength
 
 
 def test_siegecraft_requires_separate_instruction_after_field_drill():
     world, column_id = world_with_column()
+    column = world.society.detachments[column_id]
+    baseline = field_strength(world, column)[0]
     learn(world, "field_drill")
     learn(world, "siegecraft")
     assert not any(item.technology_id == "siegecraft" for item in training_options(world, OWNER))
@@ -134,7 +138,7 @@ def test_siegecraft_requires_separate_instruction_after_field_drill():
     for _ in range(3):
         tick(world)
     assert world.society.detachment_trainings[training.id].stage == "completed"
-    assert field_strength(world, world.society.detachments[column_id])[0] == 100
+    assert field_strength(world, world.society.detachments[column_id])[0] == baseline + 2 * column.count
 
 
 def test_field_logistics_equips_existing_bag_only_after_own_dated_training(tmp_path):
@@ -189,10 +193,8 @@ def test_field_battle_cites_the_column_training_instead_of_institutional_knowled
     completed = world.society.detachment_trainings[training.id].last_event_id
 
     resident = next(item for item in world.society.population.values()
-                    if item.settlement_id == "ferroalto")
-    source_id = f"pop:ferroalto:{resident.people}:soldier:battle"
-    world.society.population[source_id] = resident.model_copy(
-        update={"id": source_id, "occupation": "soldier", "count": 20})
+                    if item.settlement_id == "ferroalto" and item.occupation == "soldier")
+    source_id = resident.id
     rival_decision = record_event(world, "fixture_rival_decided", "Coluna rival presente.",
                                   fact_kind=FactKind.DECISION,
                                   decision={"action": "raise_detachment", "actor_ref": RIVAL.to_dict()})
@@ -201,7 +203,7 @@ def test_field_battle_cites_the_column_training_instead_of_institutional_knowled
                            deltas=(_delta("detachment", "detachment:drill-rival", "stage", None, "present"),),
                            cause_ids=(rival_decision.id,))
     rival = Detachment(id="detachment:drill-rival", owner_ref=RIVAL, source_group_id=source_id,
-                       count=20, location_id=SETTLEMENT, destination_id=SETTLEMENT,
+                       count=resident.count, location_id=SETTLEMENT, destination_id=SETTLEMENT,
                        provisions=160, stage="present", started_day=world.clock.absolute_day,
                        due_day=world.clock.absolute_day + 1,
                        decision_event_id=rival_decision.id, last_event_id=arrival.id)

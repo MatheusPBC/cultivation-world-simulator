@@ -27,12 +27,13 @@ from .demand import reserve_quantity
 from .economy import _causes, _delta, monthly_workforce
 from .events import record_event
 from .labor import settle_work
-from .routing import known_supply_path
+from .routing import known_supply_path, known_supply_path_from_region
 from .travel import route_duration
 
 
 RAISE_ACTION = "raise_detachment"
 MARCH_ACTION = "march_detachment"
+REROUTE_ACTION = "reroute_detachment"
 OCCUPY_ACTION = "occupy_settlement"
 DISBAND_ACTION = "disband_detachment"
 STAND_DOWN_ACTION = "stand_down_from_standoff"
@@ -60,6 +61,45 @@ class RaiseOption:
 
     def decision(self):
         return {"action": RAISE_ACTION, "actor_ref": self.actor_ref.to_dict(), "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class DetachmentRerouteOption:
+    """One current, institution-known alternate path around a blocked leg."""
+    id: Identity
+    actor_ref: EntityRef
+    institution_ref: EntityRef
+    plan_id: Identity
+    detachment_id: Identity
+    blocked_route_id: Identity
+    blocked_report_id: Identity
+    start_region_id: int
+    route_ids: tuple[Identity, ...]
+    route_report_ids: tuple[Identity, ...]
+
+    def decision(self):
+        return {"action": REROUTE_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class DetachmentRetreatOption:
+    """A halted column's current HQ-known route back to own administration."""
+    id: Identity
+    actor_ref: EntityRef
+    institution_ref: EntityRef
+    plan_id: Identity
+    detachment_id: Identity
+    blocked_route_id: Identity
+    blocked_report_id: Identity
+    start_region_id: int
+    destination_id: Identity
+    route_ids: tuple[Identity, ...]
+    route_report_ids: tuple[Identity, ...]
+
+    def decision(self):
+        return {"action": "retreat_marching_detachment", "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
 
 
 @dataclass(frozen=True)
@@ -149,6 +189,47 @@ class WithdrawalOption:
 
 
 @dataclass(frozen=True)
+class HeadquartersWithdrawalOption:
+    """A current QG decision to return its institution's winning campaign column."""
+    id: Identity
+    actor_ref: EntityRef
+    institution_ref: EntityRef
+    plan_id: Identity | None
+    engagement_id: Identity
+    engagement_event_id: Identity
+    settlement_report_event_id: Identity
+    detachment_id: Identity
+    destination_id: Identity
+    route_ids: tuple[Identity, ...]
+    route_report_ids: tuple[Identity, ...]
+
+    def decision(self):
+        return {"action": WITHDRAW_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
+class CampaignLogisticsWithdrawalOption:
+    """QG may end a supplied campaign after a real, resolved freight delay."""
+    id: Identity
+    actor_ref: EntityRef
+    institution_ref: EntityRef
+    plan_id: Identity | None
+    detachment_id: Identity
+    delay_notice_ids: tuple[Identity, ...]
+    delay_notice_event_ids: tuple[Identity, ...]
+    delay_event_ids: tuple[Identity, ...]
+    position_report_id: Identity
+    destination_id: Identity
+    route_ids: tuple[Identity, ...]
+    route_report_ids: tuple[Identity, ...]
+
+    def decision(self):
+        return {"action": WITHDRAW_ACTION, "actor_ref": self.actor_ref.to_dict(),
+                "selected_affordance_id": self.id}
+
+
+@dataclass(frozen=True)
 class ForcePositionOption:
     """One own supplied column may prepare where it already stands."""
     id: Identity
@@ -175,6 +256,7 @@ def _event(world, event_id):
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
     if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("force action requires a current actor decision")
@@ -183,6 +265,14 @@ def _decision(world, decision_event_id, action):
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("force decision has an invalid actor") from exc
     return event, actor
+
+
+def _decision_authorship(decision):
+    return {
+        "decision_event_id": decision.id,
+        "actor_ref": decision.decision["actor_ref"],
+        "selected_affordance_id": decision.decision["selected_affordance_id"],
+    }
 
 
 def _commands(world, actor):
@@ -271,6 +361,327 @@ def raise_options(world, actor, days=10):
     return tuple(sorted(options, key=lambda item: item.id))
 
 
+def detachment_reroute_options(world, institution_ref, plan_id, *, actor_ref=None):
+    """Offer one alternate path using only the deciding actor's fresh reports.
+
+    The HQ retains its existing path. A named commander may use the same owner
+    only while physically attached to this column and only from their own
+    first-hand reports; the search never consults current Map capacity as actor
+    knowledge.
+    """
+    from .strategy_response import _political_order
+
+    plan = world.strategy.plans.get(plan_id)
+    objective = world.strategy.objectives.get(plan.objective_id) if plan else None
+    detachment = world.society.detachments.get(plan.detachment_id) if plan else None
+    holder = headquarters_holder(world, institution_ref)
+    actor = holder if actor_ref is None else actor_ref
+    actor_authorized = actor is not None and (
+        can_actor_act_for(world, institution_ref, institution_ref, "military")
+        if actor == holder else actor.kind == "character")
+    if (plan is None or objective is None or objective.actor_ref != institution_ref
+            or plan.stage not in {"mobilized", "blocked"} or detachment is None
+            or detachment.owner_ref != institution_ref or detachment.stage != "marching"
+            or not 0 <= detachment.route_index < len(detachment.route_ids)
+            or actor is None or not actor_authorized
+            or _political_order(world, plan, objective) is None):
+        return ()
+    if actor != holder:
+        from .force_command import command_is_current
+        command = world.society.detachment_commands.get(detachment.id)
+        if (actor.kind != "character" or command is None or command.character_id != actor.id
+                or command.institution_ref != institution_ref or command.detachment_id != detachment.id):
+            return ()
+        if not command_is_current(world, command):
+            return ()
+    held = world.event_index().get(detachment.last_event_id)
+    blocked_route_id = detachment.route_ids[detachment.route_index]
+    blocked_route = world.map.routes.get(blocked_route_id)
+    bulk = world.economy.resources["food"].bulk if "food" in world.economy.resources else None
+    report = world.knowledge.route_report(actor, blocked_route_id)
+    if (held is None or held.event_type != "detachment_held" or blocked_route is None or bulk is None
+            or world.map.get_route_operational_capacity(blocked_route_id) > 0
+            or report is None or report.travel_days is not None or report.operational_capacity >= bulk
+            or not 0 <= world.clock.absolute_day - report.observed_day < 30):
+        return ()
+
+    if detachment.route_index == 0:
+        start_region_id = world.society.settlements[detachment.location_id].region_id
+    else:
+        previous = world.map.routes.get(detachment.route_ids[detachment.route_index - 1])
+        shared = set(previous.endpoint_region_ids) & set(blocked_route.endpoint_region_ids) if previous else set()
+        if len(shared) != 1:
+            return ()
+        start_region_id = next(iter(shared))
+    destination = world.society.settlements.get(objective.settlement_id)
+    if destination is None:
+        return ()
+    alternative = known_supply_path_from_region(
+        world, actor, start_region_id, destination.region_id, "food",
+        excluded_route_ids=(*detachment.route_ids[:detachment.route_index], blocked_route_id))
+    if not alternative:
+        return ()
+    reports = tuple(world.knowledge.route_report(actor, route_id) for route_id in alternative)
+    if any(item is None for item in reports):
+        return ()
+    report_ids = tuple(item.event_id for item in reports)
+    option_id = (f"detachment-reroute:{plan.id}:{detachment.id}:{held.id}:{blocked_route_id}:"
+                 f"{'-'.join(alternative)}:{report.event_id}:{'-'.join(report_ids)}")
+    return (DetachmentRerouteOption(
+        id=option_id, actor_ref=actor, institution_ref=institution_ref, plan_id=plan.id,
+        detachment_id=detachment.id, blocked_route_id=blocked_route_id,
+        blocked_report_id=report.event_id, start_region_id=start_region_id,
+        route_ids=tuple(alternative), route_report_ids=report_ids),)
+
+
+def reroute_detachment(world, institution_ref, plan_id, option_id, decision_event_id, *, actor_ref=None):
+    """Revalidate and change only the route of a halted, real column."""
+    candidate = deepcopy(world)
+    option = next((item for item in detachment_reroute_options(
+        candidate, institution_ref, plan_id, actor_ref=actor_ref)
+                   if item.id == option_id), None)
+    if option is None:
+        raise ValueError("detachment reroute option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, REROUTE_ACTION)
+    if decided_by != option.actor_ref or decision.decision != option.decision():
+        raise ValueError("detachment reroute has the wrong decision")
+    require_authority(candidate, institution_ref, "military")
+    is_current_headquarters = decided_by == headquarters_holder(candidate, institution_ref)
+    if not is_current_headquarters:
+        command = candidate.society.detachment_commands.get(option.detachment_id)
+        from .force_command import command_is_current
+        if (command is None or command.character_id != decided_by.id
+                or command.institution_ref != institution_ref or not command_is_current(candidate, command)):
+            raise ValueError("detachment reroute actor no longer commands this column")
+    plan = candidate.strategy.plans[option.plan_id]
+    objective = candidate.strategy.objectives[plan.objective_id]
+    from .strategy_response import _political_order
+    if _political_order(candidate, plan, objective) is None:
+        raise ValueError("detachment reroute no longer has a current political order")
+
+    detachment = candidate.society.detachments[option.detachment_id]
+    prefix = detachment.route_ids[:detachment.route_index]
+    region = candidate.society.settlements[detachment.location_id].region_id
+    for route_id in prefix:
+        route = candidate.map.routes.get(route_id)
+        if (route is None or region not in route.endpoint_region_ids
+                or candidate.map.get_route_operational_capacity(route_id) <= 0):
+            raise ValueError("detachment reroute prefix is no longer possible")
+        region = next(item for item in route.endpoint_region_ids if item != region)
+    if region != option.start_region_id:
+        raise ValueError("detachment reroute origin is stale")
+    updated_route_ids = (*prefix, *option.route_ids)
+    destination_region = candidate.society.settlements[objective.settlement_id].region_id
+    for route_id in option.route_ids:
+        route = candidate.map.routes.get(route_id)
+        if (route is None or region not in route.endpoint_region_ids
+                or not route.allows_resource("food")
+                or candidate.map.get_route_operational_capacity(route_id) <= 0):
+            raise ValueError("detachment reroute path is no longer physically possible")
+        region = next(item for item in route.endpoint_region_ids if item != region)
+    if region != destination_region:
+        raise ValueError("detachment reroute does not reach the objective")
+
+    updated = detachment.model_copy(update={"route_ids": tuple(updated_route_ids),
+                                             "due_day": candidate.clock.absolute_day + 1})
+    event = _record(
+        candidate, detachment, updated, "detachment_rerouted",
+        "O QG escolheu uma rota alternativa já observada para a coluna parada.",
+        deltas=(_delta("detachment", detachment.id, "route_ids", detachment.route_ids, updated.route_ids),
+                _delta("detachment", detachment.id, "due_day", detachment.due_day, updated.due_day)),
+        causes=_causes(decision.id, detachment.last_event_id, option.blocked_report_id,
+                       *option.route_report_ids))
+    candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return event
+
+
+def detachment_retreat_options(world, institution_ref, plan_id, *, actor_ref=None):
+    """Offer a valid HQ or attached commander a retreat from a held leg.
+
+    The current map region is derived from the already-completed route prefix;
+    the blocked leg itself is never traversed. Every return leg must have a
+    fresh report owned by the deciding actor. A commander may return only to
+    the known departure settlement of their own column.
+    """
+    from .strategy_response import _political_order
+    from .campaign_supply import campaign_baggage_ready_for_departure
+
+    plan = world.strategy.plans.get(plan_id)
+    objective = world.strategy.objectives.get(plan.objective_id) if plan else None
+    detachment = world.society.detachments.get(plan.detachment_id) if plan else None
+    holder = headquarters_holder(world, institution_ref)
+    actor = holder if actor_ref is None else actor_ref
+    actor_authorized = actor is not None and (
+        can_actor_act_for(world, institution_ref, institution_ref, "military")
+        if actor == holder else actor.kind == "character")
+    if (plan is None or objective is None or objective.actor_ref != institution_ref
+            or plan.stage not in {"mobilized", "blocked"} or detachment is None
+            or detachment.owner_ref != institution_ref or detachment.stage != "marching"
+            or not 0 <= detachment.route_index < len(detachment.route_ids)
+            or holder is None or not actor_authorized
+            or _political_order(world, plan, objective) is None
+            or not campaign_baggage_ready_for_departure(world, detachment)):
+        return ()
+    if actor != holder:
+        from .force_command import command_is_current
+        command = world.society.detachment_commands.get(detachment.id)
+        if (actor.kind != "character" or command is None or command.character_id != actor.id
+                or command.institution_ref != institution_ref or not command_is_current(world, command)):
+            return ()
+    events = world.event_index()
+    held = events.get(detachment.last_event_id)
+    blocked_route_id = detachment.route_ids[detachment.route_index]
+    blocked_route = world.map.routes.get(blocked_route_id)
+    bulk = world.economy.resources.get("food")
+    blocked_report = world.knowledge.route_report(actor, blocked_route_id)
+    if (held is None or held.event_type != "detachment_held" or blocked_route is None or bulk is None
+            or world.map.get_route_operational_capacity(blocked_route_id) > 0
+            or blocked_report is None or blocked_report.travel_days is not None
+            or blocked_report.operational_capacity >= bulk.bulk
+            or not 0 <= world.clock.absolute_day - blocked_report.observed_day < 30):
+        return ()
+
+    region_id = world.society.settlements[detachment.location_id].region_id
+    for route_id in detachment.route_ids[:detachment.route_index]:
+        route = world.map.routes.get(route_id)
+        if route is None or region_id not in route.endpoint_region_ids:
+            return ()
+        region_id = next(item for item in route.endpoint_region_ids if item != region_id)
+    if region_id not in blocked_route.endpoint_region_ids:
+        return ()
+
+    if actor != holder:
+        # A field commander can always consider retracing the material route
+        # their own column already traversed. This needs no cargo-capacity
+        # assumption: the bag is empty and the column carries its provisions.
+        destination = world.society.settlements[detachment.location_id]
+        route_ids = tuple(reversed(detachment.route_ids[:detachment.route_index]))
+        route_reports = tuple(world.knowledge.route_report(actor, route_id) for route_id in route_ids)
+        if (destination.administrator_id != institution_ref.id or not route_ids
+                or any(report is None or report.travel_days is None
+                       or not 0 <= world.clock.absolute_day - report.observed_day < 30
+                       for report in route_reports)):
+            return ()
+        current_region = region_id
+        for route_id in route_ids:
+            route = world.map.routes.get(route_id)
+            if (route is None or current_region not in route.endpoint_region_ids
+                    or not route.allows_resource("food")
+                    or world.map.get_route_operational_capacity(route_id) <= 0):
+                return ()
+            current_region = next(item for item in route.endpoint_region_ids if item != current_region)
+        if current_region != destination.region_id:
+            return ()
+        report_ids = tuple(item.event_id for item in route_reports)
+        option_id = (f"detachment-retreat:{plan.id}:{detachment.id}:{held.id}:{blocked_route_id}:"
+                     f"{destination.id}:{'-'.join(route_ids)}:{blocked_report.event_id}:"
+                     f"{'-'.join(report_ids)}")
+        return (DetachmentRetreatOption(
+            id=option_id, actor_ref=actor, institution_ref=institution_ref, plan_id=plan.id,
+            detachment_id=detachment.id, blocked_route_id=blocked_route_id,
+            blocked_report_id=blocked_report.event_id, start_region_id=region_id,
+            destination_id=destination.id, route_ids=route_ids, route_report_ids=report_ids),)
+
+    options = []
+    destinations = ([world.society.settlements[detachment.location_id]] if actor != holder else
+                    sorted(world.society.settlements.values(), key=lambda item: item.id))
+    for destination in destinations:
+        if destination.administrator_id != institution_ref.id or destination.region_id == region_id:
+            continue
+        if actor == holder:
+            destination_report = world.knowledge.settlement_report(holder, destination.id)
+            if (destination_report is None or destination_report.settlement_id != destination.id
+                    or not 0 <= world.clock.absolute_day - destination_report.observed_day < 31):
+                continue
+        route_ids = known_supply_path_from_region(
+            world, actor, region_id, destination.region_id, "food",
+            excluded_route_ids=(blocked_route_id,))
+        if not route_ids:
+            continue
+        route_reports = tuple(world.knowledge.route_report(actor, route_id) for route_id in route_ids)
+        if any(report is None for report in route_reports):
+            continue
+        report_ids = tuple(report.event_id for report in route_reports)
+        option_id = (f"detachment-retreat:{plan.id}:{detachment.id}:{held.id}:{blocked_route_id}:"
+                     f"{destination.id}:{'-'.join(route_ids)}:{blocked_report.event_id}:"
+                     f"{'-'.join(report_ids)}")
+        options.append(DetachmentRetreatOption(
+            id=option_id, actor_ref=actor, institution_ref=institution_ref, plan_id=plan.id,
+            detachment_id=detachment.id, blocked_route_id=blocked_route_id,
+            blocked_report_id=blocked_report.event_id, start_region_id=region_id,
+            destination_id=destination.id, route_ids=tuple(route_ids), route_report_ids=report_ids))
+    return tuple(sorted(options, key=lambda item: item.id))
+
+
+def retreat_detachment(world, institution_ref, plan_id, option_id, decision_event_id, *, actor_ref=None):
+    """Replace only the untraversed route of a held column with its chosen return."""
+    candidate = deepcopy(world)
+    option = next((item for item in detachment_retreat_options(
+        candidate, institution_ref, plan_id, actor_ref=actor_ref)
+                   if item.id == option_id), None)
+    if option is None:
+        raise ValueError("detachment retreat option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, "retreat_marching_detachment")
+    if decided_by != option.actor_ref or decision.decision != option.decision():
+        raise ValueError("detachment retreat has the wrong decision")
+    require_authority(candidate, institution_ref, "military")
+    is_current_headquarters = decided_by == headquarters_holder(candidate, institution_ref)
+    if not is_current_headquarters:
+        command = candidate.society.detachment_commands.get(option.detachment_id)
+        from .force_command import command_is_current
+        if (command is None or command.character_id != decided_by.id
+                or command.institution_ref != institution_ref or not command_is_current(candidate, command)):
+            raise ValueError("detachment retreat actor no longer commands this column")
+    plan = candidate.strategy.plans[option.plan_id]
+    objective = candidate.strategy.objectives[plan.objective_id]
+    from .strategy_response import _political_order
+    if _political_order(candidate, plan, objective) is None:
+        raise ValueError("detachment retreat no longer has a current political order")
+    detachment = candidate.society.detachments[option.detachment_id]
+    region_id = candidate.society.settlements[detachment.location_id].region_id
+    prefix = detachment.route_ids[:detachment.route_index]
+    for route_id in prefix:
+        route = candidate.map.routes.get(route_id)
+        if route is None or region_id not in route.endpoint_region_ids:
+            raise ValueError("detachment retreat position is no longer current")
+        region_id = next(item for item in route.endpoint_region_ids if item != region_id)
+    if region_id != option.start_region_id:
+        raise ValueError("detachment retreat origin is stale")
+    route_ids = (*prefix, *option.route_ids)
+    for route_id in option.route_ids:
+        route = candidate.map.routes.get(route_id)
+        if route is None:
+            raise ValueError("detachment retreat route no longer exists")
+        field_commander = (decided_by.kind == "character"
+                           and decided_by != headquarters_holder(candidate, institution_ref))
+        minimum_capacity = (0 if field_commander else candidate.economy.resources["food"].bulk)
+        capacity = candidate.map.get_route_operational_capacity(route_id)
+        if (region_id not in route.endpoint_region_ids or not route.allows_resource("food")
+                or (capacity <= 0 if field_commander else capacity < minimum_capacity)):
+            raise ValueError("detachment retreat path is no longer physically possible")
+        region_id = next(item for item in route.endpoint_region_ids if item != region_id)
+    if region_id != candidate.society.settlements[option.destination_id].region_id:
+        raise ValueError("detachment retreat does not reach its selected administration")
+    updated = detachment.model_copy(update={"destination_id": option.destination_id,
+                                             "route_ids": tuple(route_ids),
+                                             "due_day": candidate.clock.absolute_day + 1})
+    event = _record(
+        candidate, detachment, updated, "detachment_retreat_started",
+        "O QG encerrou a missão e enviou a coluna parada de volta por uma rota conhecida.",
+        deltas=(_delta("detachment", detachment.id, "destination_id", detachment.destination_id,
+                       option.destination_id),
+                _delta("detachment", detachment.id, "route_ids", detachment.route_ids, tuple(route_ids)),
+                _delta("detachment", detachment.id, "due_day", detachment.due_day, updated.due_day)),
+        causes=_causes(decision.id, plan.last_event_id, detachment.last_event_id,
+                       option.blocked_report_id, *option.route_report_ids))
+    candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.knowledge.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return event
+
+
 def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, operational_plan_id=None):
     """Soldiers and rations leave their owners; wages are paid at once."""
     candidate = deepcopy(world)
@@ -294,6 +705,7 @@ def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, ope
         briefing_holder, briefing = _headquarters_briefing(candidate, objective) if objective else (None, None)
         political_order = _political_order(candidate, plan, objective) if objective else None
         if (holder is None or decision is None or decision.fact_kind != FactKind.DECISION
+                or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
                 or decision.day != candidate.clock.absolute_day or decision.decision != expected
                 or briefing_holder != holder or briefing is None
                 or briefing.event_id not in {link.cause_event_id for link in decision.causal_links}
@@ -319,6 +731,8 @@ def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, ope
     event = record_event(candidate, "detachment_raised",
                          f"{option.count} soldados partiram com {option.provisions} rações.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload=_decision_authorship(decision),
                          deltas=(_delta("stock", stock.id, "food", food, food - option.provisions),
                                  _delta("detachment", identity, "stage", None, "marching"),
                                  _delta("detachment", identity, "provisions", 0, option.provisions)),
@@ -340,7 +754,8 @@ def raise_detachment(world, actor, option_id, decision_event_id, *, days=10, ope
     payroll_available[option.group_id] += option.count
     settle_work(candidate, work_id=detachment.id, account_id=option.account_id, stock_id=option.stock_id,
                 occupation="soldier", worker_count=option.count, wage=WAGE_PER_SOLDIER,
-                available=payroll_available, production_event_id=event.id)
+                available=payroll_available, production_event_id=event.id,
+                required_workers={option.group_id: option.count})
     candidate.agenda.schedule(ScheduledSituation(detachment.id, "force", detachment.due_day))
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
@@ -646,6 +1061,222 @@ def _route_is_current(world, origin_id, destination_id, route_ids):
     return region == target
 
 
+def headquarters_withdrawal_options(world, institution_ref, report):
+    """Enumerate withdrawals grounded in the current QG's own battle and route reports."""
+    from .campaign_supply import campaign_baggage_ready_for_departure
+
+    headquarters = headquarters_holder(world, institution_ref)
+    if (institution_ref.kind != "polity" or headquarters is None
+            or not can_actor_act_for(world, headquarters, institution_ref, "operations")
+            or not can_actor_act_for(world, institution_ref, institution_ref, "military")
+            or report.recipient_ref != headquarters or report.channel != "settlement_bulletin"
+            or not 0 <= world.clock.absolute_day - report.observed_day < 30):
+        return ()
+    options = []
+    for reading in report.field_engagements:
+        engagement = world.society.field_engagements.get(reading.engagement_id)
+        event = world.event_index().get(reading.event_id)
+        if (engagement is None or event is None or engagement.status != "resolved"
+                or engagement.last_event_id != event.id
+                or institution_ref not in {engagement.challenger_ref, engagement.defender_ref}
+                or reading.winner_ref != engagement.winner_ref
+                or engagement.settlement_id != report.settlement_id
+                or event.event_type != "field_engagement_resolved"):
+            continue
+        own_detachment_id = (engagement.challenger_detachment_id
+                             if engagement.challenger_ref == institution_ref
+                             else engagement.defender_detachment_id)
+        detachment = world.society.detachments.get(own_detachment_id)
+        if (detachment is None or detachment.owner_ref != institution_ref or detachment.stage != "present"
+                or detachment.location_id != report.settlement_id or detachment.provisions <= 0
+                or not campaign_baggage_ready_for_departure(world, detachment)):
+            continue
+        plan = next((item for item in world.strategy.plans.values()
+                     if item.detachment_id == detachment.id and item.stage in {"mobilized", "blocked"}), None)
+        for destination_id, destination in sorted(world.society.settlements.items()):
+            if (destination.administrator_id != institution_ref.id or destination_id == detachment.location_id):
+                continue
+            destination_report = world.knowledge.settlement_report(headquarters, destination_id)
+            if (destination_report is None or destination_report.channel not in {
+                    "local_settlement_report", "settlement_bulletin"}
+                    or not 0 <= world.clock.absolute_day - destination_report.observed_day < 30):
+                continue
+            route_ids = known_supply_path(world, headquarters, detachment.location_id, destination_id, "food")
+            if not route_ids:
+                continue
+            route_reports = tuple(world.knowledge.route_report(headquarters, route_id) for route_id in route_ids)
+            if any(item is None or not 0 <= world.clock.absolute_day - item.observed_day < 30
+                   for item in route_reports):
+                continue
+            report_ids = tuple(item.event_id for item in route_reports)
+            identity = (f"hq-withdraw:{institution_ref.id}:{engagement.id}:{detachment.id}:"
+                        f"{destination_id}:{'-'.join(route_ids)}:{report.event_id}:{'-'.join(report_ids)}")
+            options.append(HeadquartersWithdrawalOption(
+                id=identity, actor_ref=headquarters, institution_ref=institution_ref,
+                plan_id=plan.id if plan is not None else None, engagement_id=engagement.id,
+                engagement_event_id=event.id, settlement_report_event_id=report.event_id,
+                detachment_id=detachment.id, destination_id=destination_id,
+                route_ids=tuple(route_ids), route_report_ids=report_ids))
+    return tuple(sorted(options, key=lambda item: item.id))
+
+
+def campaign_logistics_withdrawal_options(world, institution_ref, plan_id=None, *, detachment_id=None):
+    """Return only QG-known withdrawals after delayed campaign freight resolved.
+
+    A dispatched notice or live parcel blocks departure. An open, undispatched
+    notice may be lapsed by the explicit withdrawal decision. Delay evidence is
+    historical and factual; it only unlocks a later choice, never moves cargo.
+    A plan-linked operation retains its political mandate; an unplanned column
+    may be reviewed from its explicit raise decision.
+    """
+    from .campaign_supply import _reported_delay_events, campaign_baggage_ready_for_departure
+    from .strategy_response import _plan_status, _political_order
+
+    plan = world.strategy.plans.get(plan_id)
+    objective = world.strategy.objectives.get(plan.objective_id) if plan is not None else None
+    if plan_id is not None and (plan is None or objective is None or plan.stage != "mobilized"
+                                or plan.detachment_id is None or objective.actor_ref != institution_ref
+                                or _plan_status(world, objective)[0] is not None
+                                or _political_order(world, plan, objective) is None):
+        return ()
+    if plan is None and detachment_id is None:
+        return ()
+    target_detachment_id = plan.detachment_id if plan is not None else detachment_id
+    if plan is None and any(item.detachment_id == target_detachment_id
+                            for item in world.strategy.plans.values()):
+        return ()
+    headquarters = headquarters_holder(world, institution_ref)
+    detachment = world.society.detachments.get(target_detachment_id)
+    if (headquarters is None or not can_actor_act_for(world, headquarters, institution_ref, "operations")
+            or not can_actor_act_for(world, institution_ref, institution_ref, "military")
+            or detachment is None or detachment.owner_ref != institution_ref
+            or detachment.stage != "present" or detachment.provisions <= 0
+            or any(notice.detachment_id == detachment.id and notice.state == "dispatched"
+                   for notice in world.knowledge.campaign_supply_notices.values())
+            or not campaign_baggage_ready_for_departure(world, detachment, ignore_notice=True)):
+        return ()
+    notices = tuple(sorted((notice for notice in world.knowledge.campaign_supply_notices.values()
+                            if notice.detachment_id == detachment.id
+                            and notice.recipient_ref == institution_ref
+                            and notice.state in {"open", "fulfilled", "lapsed"}
+                            and _reported_delay_events(world, notice)), key=lambda item: item.id))
+    if not notices:
+        return ()
+    delay_event_ids = tuple(sorted({event_id for notice in notices
+                                    for event_id in _reported_delay_events(world, notice)}))
+    position = world.knowledge.settlement_report(headquarters, detachment.location_id)
+    if (position is None or position.recipient_ref != headquarters
+            or position.settlement_id != detachment.location_id
+            or position.channel not in {"local_settlement_report", "settlement_bulletin"}
+            or not 0 <= world.clock.absolute_day - position.observed_day < 30):
+        return ()
+    options = []
+    for destination_id, destination in sorted(world.society.settlements.items()):
+        if destination_id == detachment.location_id or destination.administrator_id != institution_ref.id:
+            continue
+        destination_report = world.knowledge.settlement_report(headquarters, destination_id)
+        if (destination_report is None or destination_report.settlement_id != destination_id
+                or not 0 <= world.clock.absolute_day - destination_report.observed_day < 30):
+            continue
+        route_ids = known_supply_path(world, headquarters, detachment.location_id, destination_id, "food")
+        if not route_ids or not _route_is_current(world, detachment.location_id, destination_id, route_ids):
+            continue
+        route_reports = tuple(world.knowledge.route_report(headquarters, route_id) for route_id in route_ids)
+        if any(report is None or not 0 <= world.clock.absolute_day - report.observed_day < 30
+               for report in route_reports):
+            continue
+        report_ids = tuple(report.event_id for report in route_reports)
+        plan_identity = plan.id if plan is not None else "standalone"
+        option_id = (f"campaign-delay-withdraw:{plan_identity}:{detachment.id}:{position.event_id}:"
+                     f"{'-'.join(item.id for item in notices)}:{destination_id}:"
+                     f"{'-'.join(route_ids)}:{'-'.join(report_ids)}")
+        options.append(CampaignLogisticsWithdrawalOption(
+            id=option_id, actor_ref=headquarters, institution_ref=institution_ref,
+            plan_id=plan.id if plan is not None else None,
+            detachment_id=detachment.id, delay_notice_ids=tuple(item.id for item in notices),
+            delay_notice_event_ids=tuple(sorted({event_id for item in notices
+                                                 for event_id in (item.event_id, item.last_event_id)})),
+            delay_event_ids=delay_event_ids, position_report_id=position.event_id,
+            destination_id=destination_id, route_ids=tuple(route_ids), route_report_ids=report_ids))
+    return tuple(sorted(options, key=lambda item: item.id))
+
+
+def withdraw_campaign_after_supply_delay(world, institution_ref, plan_id, option_id, decision_event_id,
+                                         *, detachment_id=None):
+    """Recompose QG logistics evidence, then let Force start a physical return."""
+    candidate = deepcopy(world)
+    option = next((item for item in campaign_logistics_withdrawal_options(
+        candidate, institution_ref, plan_id, detachment_id=detachment_id) if item.id == option_id), None)
+    if option is None:
+        raise ValueError("campaign logistics withdrawal option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, WITHDRAW_ACTION)
+    if decided_by != option.actor_ref or decision.decision != option.decision():
+        raise ValueError("campaign logistics withdrawal has the wrong decision")
+    detachment = candidate.society.detachments[option.detachment_id]
+    if not _route_is_current(candidate, detachment.location_id, option.destination_id, option.route_ids):
+        raise ValueError("campaign logistics withdrawal route is no longer current")
+    from .campaign_supply import _lapse_campaign_notices
+    supply_lapsed = _lapse_campaign_notices(candidate, detachment.id, decision.id)
+    owner_option = WithdrawalOption(id=option.id, actor_ref=institution_ref,
+                                    detachment_id=option.detachment_id,
+                                    destination_id=option.destination_id, route_ids=option.route_ids)
+    movement = _begin_withdrawal(candidate, institution_ref, owner_option, decision.id,
+                                 decision_actor_ref=option.actor_ref)
+    if plan_id is not None:
+        from .strategy_response import _set_plan
+        plan = candidate.strategy.plans[plan_id]
+        _set_plan(candidate, plan, "withdrawn", blocker="QG encerrou a campanha após atraso de abastecimento",
+                  causes=(decision.id, movement.id, supply_lapsed.id if supply_lapsed else None,
+                          *option.delay_event_ids,
+                          *option.delay_notice_event_ids, option.position_report_id, *option.route_report_ids),
+                  detachment_id=detachment.id)
+    candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    candidate.strategy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.society.detachments[option.detachment_id]
+
+
+def withdraw_detachment_by_headquarters(world, institution_ref, report_event_id, option_id, decision_event_id):
+    """Revalidate a QG's own sourced decision before the force owner begins retreat."""
+    candidate = deepcopy(world)
+    headquarters = headquarters_holder(candidate, institution_ref)
+    report = next((item for item in candidate.knowledge.settlement_reports.values()
+                   if item.recipient_ref == headquarters and item.event_id == report_event_id), None)
+    option = next((item for item in headquarters_withdrawal_options(candidate, institution_ref, report)
+                   if item.id == option_id), None) if report is not None else None
+    if option is None:
+        raise ValueError("headquarters withdrawal option is stale or unknown")
+    decision, decided_by = _decision(candidate, decision_event_id, WITHDRAW_ACTION)
+    if (decided_by != headquarters or decision.decision != option.decision()
+            or not can_actor_act_for(candidate, headquarters, institution_ref, "operations")
+            or not can_actor_act_for(candidate, institution_ref, institution_ref, "military")):
+        raise ValueError("headquarters withdrawal has the wrong authority or decision")
+    detachment = candidate.society.detachments[option.detachment_id]
+    if (detachment.stage != "present" or detachment.owner_ref != institution_ref
+            or not _route_is_current(candidate, detachment.location_id, option.destination_id, option.route_ids)):
+        raise ValueError("headquarters withdrawal is no longer materially possible")
+    owner_option = WithdrawalOption(
+        id=option.id, actor_ref=institution_ref, detachment_id=option.detachment_id,
+        destination_id=option.destination_id, route_ids=option.route_ids)
+    movement = _begin_withdrawal(candidate, institution_ref, owner_option, decision.id,
+                                 decision_actor_ref=option.actor_ref)
+    if option.plan_id is not None:
+        from .strategy_response import _set_plan
+        plan = candidate.strategy.plans.get(option.plan_id)
+        if plan is None or plan.detachment_id != detachment.id or plan.stage not in {"mobilized", "blocked"}:
+            raise ValueError("headquarters campaign plan is no longer active")
+        _set_plan(candidate, plan, "withdrawn", blocker="QG encerrou a campanha após relatório de combate",
+                  causes=(decision.id, movement.id), detachment_id=detachment.id)
+    candidate.society.validate(set(candidate.map.regions), candidate)
+    candidate.economy.validate(candidate)
+    candidate.knowledge.validate(candidate)
+    candidate.strategy.validate(candidate)
+    world.__dict__.update(candidate.__dict__)
+    return world.society.detachments[option.detachment_id]
+
+
 def withdrawal_options(world, actor, *, detachment_id=None, allow_open_campaign_supply=False,
                        campaign_authorized=False):
     """Only own present columns may choose a reported route to own government.
@@ -734,6 +1365,8 @@ def prepare_force_position(world, actor, option_id, decision_event_id):
     event = record_event(
         candidate, "force_position_preparing", "A coluna iniciou três dias de preparo no local onde está.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload=_decision_authorship(decision),
         deltas=(_delta("force_position", position.id, "stage", None, "preparing"),
                 _delta("force_position", position.id, "settlement_id", None, position.settlement_id),
                 _delta("force_position", position.id, "anchor_site_id", None, position.anchor_site_id),
@@ -800,7 +1433,8 @@ def resolve_force_positions(world, situations):
         observe_rites(world, settlement_id=detachment.location_id)
 
 
-def _record(world, detachment, updated, event_type, content, *, deltas=(), causes=()):
+def _record(world, detachment, updated, event_type, content, *, deltas=(), causes=(), causal_payload=None,
+            causal_origin=CausalOrigin.DETERMINISTIC):
     lifted = ()
     assembly_lifted = ()
     command_released = None
@@ -809,11 +1443,21 @@ def _record(world, detachment, updated, event_type, content, *, deltas=(), cause
             or updated.provisions < updated.count * RATIONS_PER_SOLDIER_DAY):
         from .force_training import lapse_training_for
         training_lapsed = lapse_training_for(world, detachment, cause_ids=causes)
-    # A command is a real person's local duty, never a passenger hidden inside
-    # a marching or dissolved record.  End it before the force transition so
-    # both receipts explain the same physical change and the person remains at
-    # the column's current location.
-    if updated.stage != "present" or updated.location_id != detachment.location_id:
+    # A commander assigned at departure rides with the same physical column.
+    # A pre-existing local command still ends when a present column leaves.
+    command = world.society.detachment_commands.get(detachment.id)
+    attached_command = False
+    if command is not None:
+        from .force_command import command_is_attached_to_march, revoke_detachment_command_for
+        attached_command = (command_is_attached_to_march(world, command)
+                            and updated.stage in {"marching", "present"}
+                            and (updated.stage == "marching" or updated.location_id == updated.destination_id))
+        if attached_command:
+            if event_type in {"detachment_marched", "detachment_arrived"}:
+                causes = _causes(*causes, command.last_event_id)
+        elif updated.stage != "present" or updated.location_id != detachment.location_id:
+            command_released = revoke_detachment_command_for(world, detachment, cause_ids=causes)
+    elif updated.stage != "present" or updated.location_id != detachment.location_id:
         from .force_command import revoke_detachment_command_for
         command_released = revoke_detachment_command_for(world, detachment, cause_ids=causes)
     if (updated.stage != "present" or updated.location_id != detachment.location_id
@@ -831,7 +1475,8 @@ def _record(world, detachment, updated, event_type, content, *, deltas=(), cause
     position = world.society.force_positions.get(_position_id(detachment.id))
     if position is not None and (updated.stage != "present" or updated.location_id != position.settlement_id):
         abandoned = _abandon_force_position(world, detachment, cause_ids=causes)
-    event = record_event(world, event_type, content, fact_kind=FactKind.STATE_TRANSITION, deltas=deltas,
+    event = record_event(world, event_type, content, fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=causal_origin, causal_payload=causal_payload, deltas=deltas,
                          cause_ids=_causes(detachment.last_event_id, *causes,
                                             *(item.id for item in lifted),
                                             *(item.id for item in assembly_lifted),
@@ -1001,7 +1646,7 @@ def _withdraw_garrison(world, actor, option, decision):
     return event
 
 
-def _dissolve(world, detachment, event_type, content, causes=()):
+def _dissolve(world, detachment, event_type, content, causes=(), *, decision=None, actor=None):
     """One fact: occupation clears, people land, the duty ends."""
     garrison_event = _lapse_garrison(world, detachment,
                                       reason="A guarnição cessou quando a coluna perdeu sua sustentação física.",
@@ -1011,10 +1656,19 @@ def _dissolve(world, detachment, event_type, content, causes=()):
     moved = _return_home(world, detachment)
     ended = detachment.model_copy(update={"stage": "disbanded", "provisions": 0,
                                           "due_day": world.clock.absolute_day})
+    causal_payload = None
+    causal_origin = CausalOrigin.DETERMINISTIC
+    if decision is not None:
+        if actor is None or decision.decision is None:
+            raise ValueError("voluntary disband requires its actor decision")
+        causal_origin = CausalOrigin.ACTOR_DECISION
+        causal_payload = {"decision_event_id": decision.id, "actor_ref": actor.to_dict(),
+                          "selected_affordance_id": decision.decision["selected_affordance_id"]}
     event = _record(world, detachment, ended, event_type, content,
                     deltas=(*deltas, *moved,
                             _delta("detachment", detachment.id, "stage", detachment.stage, "disbanded")),
-                    causes=_causes(*causes, *( (garrison_event.id,) if garrison_event else ())))
+                    causes=_causes(*causes, *((garrison_event.id,) if garrison_event else ())),
+                    causal_origin=causal_origin, causal_payload=causal_payload)
     # A campaign bag is an Economy stock, never a hidden field on a force.
     # Dispose of anything already co-located before this physical presence is
     # forgotten; later cargo is handled by the same campaign owner.
@@ -1119,7 +1773,7 @@ def execute_force_option(world, actor, option_id, decision_event_id, action):
     else:
         _dissolve(candidate, detachment, "detachment_disbanded",
                   "O destacamento foi dissolvido; as pessoas voltaram a uma coorte local.",
-                  causes=(decision.id,))
+                  causes=(decision.id,), decision=decision, actor=actor)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     world.__dict__.update(candidate.__dict__)
@@ -1162,7 +1816,7 @@ def stand_down_from_standoff(world, actor, option_id, decision_event_id):
         raise ValueError("armed contact is no longer current")
     _dissolve(candidate, detachment, "detachment_stood_down",
               "A coluna baixou as armas e foi dissolvida onde estava; nenhum território mudou de dono.",
-              causes=(decision.id,))
+              causes=(decision.id,), decision=decision, actor=actor)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)
@@ -1187,7 +1841,8 @@ def withdraw_detachment(world, actor, option_id, decision_event_id):
     return world.society.detachments[option.detachment_id]
 
 
-def _begin_withdrawal(world, actor, option, decision_event_id):
+def _begin_withdrawal(world, actor, option, decision_event_id, *, decision_actor_ref=None,
+                      selected_affordance_id=None):
     """Owner-side material start shared by direct and commitment fulfillment."""
     require_authority(world, actor, "military")
     detachment = world.society.detachments[option.detachment_id]
@@ -1201,9 +1856,13 @@ def _begin_withdrawal(world, actor, option, decision_event_id):
     updated = detachment.model_copy(update={"destination_id": option.destination_id, "route_ids": option.route_ids,
                                              "route_index": 0, "stage": "marching",
                                              "due_day": world.clock.absolute_day + 1})
+    decision_actor = decision_actor_ref or actor
     event = _record(
         world, detachment, updated, "detachment_withdrawal_started",
         "A coluna deixou a ocupação e iniciou a retirada por uma rota conhecida até sua própria administração.",
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_event_id": decision_event_id, "actor_ref": decision_actor.to_dict(),
+                        "selected_affordance_id": selected_affordance_id or option.id},
         deltas=(*_clear_occupation(world, detachment),
                 _delta("detachment", detachment.id, "destination_id", detachment.destination_id, option.destination_id),
                 _delta("detachment", detachment.id, "route_ids", detachment.route_ids, option.route_ids),
@@ -1220,29 +1879,80 @@ def _advance(world, detachment):
     day = world.clock.absolute_day
     if world.map.get_route_operational_capacity(route_id) <= 0:
         from .logistics import _route_causes
-        return _record(world, detachment, detachment.model_copy(update={"due_day": day + 1}),
-                       "detachment_held", "Passagem indisponível; a coluna aguarda.",
-                       deltas=(_delta("detachment", detachment.id, "due_day", detachment.due_day, day + 1),),
-                       causes=_route_causes(world, (route_id,))[route_id])
+        command = world.society.detachment_commands.get(detachment.id)
+        causes = _route_causes(world, (route_id,))[route_id]
+        region_id = world.society.settlements[detachment.location_id].region_id
+        for route_id_before_hold in detachment.route_ids[:detachment.route_index]:
+            prior = world.map.routes.get(route_id_before_hold)
+            if prior is None or region_id not in prior.endpoint_region_ids:
+                return _record(world, detachment, detachment.model_copy(update={"due_day": day + 1}),
+                               "detachment_held", "Passagem indisponível; a coluna aguarda.",
+                               deltas=(_delta("detachment", detachment.id, "due_day",
+                                              detachment.due_day, day + 1),),
+                               causes=causes)
+            region_id = next(item for item in prior.endpoint_region_ids if item != region_id)
+        if command is not None:
+            from .force_command import command_is_attached_to_march
+            if command_is_attached_to_march(world, command):
+                causes = _causes(*causes, command.last_event_id)
+        held = _record(
+            world, detachment, detachment.model_copy(update={"due_day": day + 1}),
+            "detachment_held", "Passagem indisponível; a coluna aguarda.",
+            deltas=(_delta("detachment", detachment.id, "due_day", detachment.due_day, day + 1),),
+            causes=causes, causal_payload={"detachment_id": detachment.id,
+                                           "blocked_route_id": route_id,
+                                           "position_region_id": region_id,
+                                           "prior_detachment_event_id": detachment.last_event_id})
+        if command is not None:
+            from .route_intelligence import observe_commander_junction_routes
+            observe_commander_junction_routes(world, detachment.id, held)
+        return held
     index = detachment.route_index + 1
     arrived = index >= len(detachment.route_ids)
     location = detachment.destination_id if arrived else detachment.location_id
     updated = detachment.model_copy(update={"route_index": index, "location_id": location,
                                             "stage": "present" if arrived else "marching",
                                             "due_day": day + (1 if arrived else route_duration(world, route_id))})
+    commander = None
+    command = world.society.detachment_commands.get(detachment.id)
+    if arrived and command is not None:
+        from .force_command import command_is_attached_to_march
+        character = world.society.characters.get(command.character_id)
+        if (character is not None and character.location_id == detachment.location_id
+                and command_is_attached_to_march(world, command)):
+            commander = character
+    movement_deltas = [_delta("detachment", detachment.id, "route_index", detachment.route_index, index),
+                       _delta("detachment", detachment.id, "location_id", detachment.location_id, location),
+                       _delta("detachment", detachment.id, "stage", detachment.stage, updated.stage),
+                       *_move_empty_campaign_baggage(world, detachment, location)]
+    if commander is not None:
+        movement_deltas.append(_delta("character", commander.id, "location_id",
+                                      commander.location_id, location))
+    position_region_id = None
+    if not arrived:
+        position_region_id = world.society.settlements[detachment.location_id].region_id
+        for traversed_route_id in updated.route_ids[:index]:
+            traversed = world.map.routes[traversed_route_id]
+            position_region_id = next(item for item in traversed.endpoint_region_ids
+                                      if item != position_region_id)
     event = _record(world, detachment, updated,
                     "detachment_arrived" if arrived else "detachment_marched",
                     "A coluna chegou ao destino." if arrived else "A coluna avançou um trecho.",
-                    deltas=(_delta("detachment", detachment.id, "route_index", detachment.route_index, index),
-                            _delta("detachment", detachment.id, "location_id", detachment.location_id, location),
-                            _delta("detachment", detachment.id, "stage", detachment.stage, updated.stage),
-                            *_move_empty_campaign_baggage(world, detachment, location)))
+                    deltas=tuple(movement_deltas),
+                    causal_payload={"detachment_id": detachment.id,
+                                    "position_region_id": (world.society.settlements[location].region_id
+                                                           if arrived else position_region_id)})
+    if commander is not None:
+        world.society.characters[commander.id] = commander.model_copy(update={"location_id": location})
     if arrived:
         # Standing there is observation, not control: the owner learns the
         # place through its own dated report and gains nothing else.
         from .settlement_intelligence import observe_present_force
         observe_present_force(world, detachment.id)
         detect_force_standoffs(world, detachment.id)
+    else:
+        from .route_intelligence import observe_commander_junction_routes
+        observe_commander_junction_routes(world, detachment.id, event)
     return event
 
 

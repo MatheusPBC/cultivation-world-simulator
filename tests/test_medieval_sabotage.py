@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment, ForcePosition
 from src.run.medieval_world import create_medieval_world
@@ -30,19 +31,33 @@ PLACE = "ferroalto"
 
 def decide(world, option):
     return record_event(world, "sabotage_decided", "Decisão de teste sobre uma affordance canônica.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
+
+
+def test_deterministic_intent_cannot_sabotage_a_site():
+    world = _sabotage_world()
+    option = next(item for item in sabotage_options(world, ESCARLIA) if item.site_id == SITE)
+    decision = record_event(world, "sabotage_decided", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current actor decision"):
+        execute_sabotage_option(world, ESCARLIA, option.id, decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def _present_force(world, actor, identity, *, prepared=True):
     group = next(item for item in world.society.population.values()
-                 if item.settlement_id == PLACE and not any(
-                     other.settlement_id == PLACE and other.people == item.people and other.occupation == "soldier"
-                     for other in world.society.population.values()))
-    soldiers = group.model_copy(update={"id": f"pop:{PLACE}:{actor.id}:{identity}:soldier",
-                                        "occupation": "soldier", "count": 5})
-    world.society.population[soldiers.id] = soldiers
+                 if item.settlement_id == PLACE and item.occupation == "soldier"
+                 and item.count > sum(force.count for force in world.society.detachments.values()
+                                      if force.source_group_id == item.id and force.stage != "disbanded"))
+    already_committed = sum(force.count for force in world.society.detachments.values()
+                            if force.source_group_id == group.id and force.stage != "disbanded")
+    count = min(5, group.count - already_committed)
     origin = record_event(world, "force_fixture", "Premissa material da coluna de teste.")
-    force = Detachment(id=identity, owner_ref=actor, source_group_id=soldiers.id, count=5,
+    force = Detachment(id=identity, owner_ref=actor, source_group_id=group.id, count=count,
                        location_id=PLACE, destination_id=PLACE, route_ids=(), route_index=0,
                        provisions=100, stage="present", started_day=0, due_day=100,
                        decision_event_id=origin.id, last_event_id=origin.id)
@@ -132,6 +147,14 @@ def test_foreign_prepared_force_spends_tools_damages_only_integrity_and_victim_r
     assert world_snapshot(load_world(path)) == world_snapshot(world)
 
 
+def test_actor_cannot_sabotage_the_same_site_twice_in_one_day():
+    world = _sabotage_world()
+    option = next(item for item in sabotage_options(world, ESCARLIA) if item.site_id == SITE)
+    execute_sabotage_option(world, ESCARLIA, option.id, decide(world, option).id)
+
+    assert all(item.site_id != SITE for item in sabotage_options(world, ESCARLIA))
+
+
 async def test_creature_damage_offers_owner_a_canonical_investigation():
     world = await crossed_world()
     request = next(item for item in creature_options(world, DRAKE_ID) if item.kind == "request")
@@ -197,7 +220,7 @@ def test_attributed_finding_can_be_deliberately_accused_without_creating_guilt_o
     sabotage = next(item for item in sabotage_options(world, ESCARLIA) if item.site_id == SITE)
     execute_sabotage_option(world, ESCARLIA, sabotage.id, decide(world, sabotage).id)
     option = investigation_options(world, AUREN)[0]
-    investigation = open_investigation(world, AUREN, option.id, decide(world, option).id)
+    open_investigation(world, AUREN, option.id, decide(world, option).id)
     world.clock = world.clock.advance(30)
     resolve_dated(world, world.agenda.pop_due(world.clock.absolute_day))
 

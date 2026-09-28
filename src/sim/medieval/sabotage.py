@@ -13,7 +13,7 @@ from src.classes.economy.investigation import Investigation
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
-from src.classes.governance.models import InvestigationAccusationNotice, InvestigationFinding, SiteReport
+from src.classes.governance.models import InvestigationAccusationNotice, InvestigationFinding
 from src.classes.governance.knowledge import investigation_accusation_notice_id
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.models import Identity
@@ -165,27 +165,40 @@ def _eligible_sabotage_presence(world, actor, site):
     return None
 
 
-def _sabotaged_by_actor_today(world, actor, site_id):
-    for event in world.events:
-        if event.event_type != "site_sabotaged" or event.day != world.clock.absolute_day:
+def _sabotaged_site_ids_today(world, actor):
+    """Find this actor's already-sabotaged sites without rescanning history per site."""
+    actor_ref = actor.to_dict()
+    decision_ids = {
+        event.id for event in world.decisions_by_actor(actor.kind, actor.id)
+        if event.day == world.clock.absolute_day
+        and event.fact_kind == FactKind.DECISION
+        and event.decision is not None
+        and event.decision.get("action") == SABOTAGE_ACTION
+        and event.decision.get("actor_ref") == actor_ref
+    }
+    if not decision_ids:
+        return set()
+
+    sabotaged = set()
+    for event in world.events_of_type("site_sabotaged"):
+        if (event.day != world.clock.absolute_day
+                or not any(link.cause_event_id in decision_ids for link in event.causal_links)):
             continue
-        linked = [_event(world, link.cause_event_id) for link in event.causal_links]
-        if any(decision is not None and decision.fact_kind == FactKind.DECISION
-               and decision.decision is not None and decision.decision.get("action") == SABOTAGE_ACTION
-               and decision.decision.get("actor_ref") == actor.to_dict()
-               for decision in linked) and any(
-                   delta.owner_kind == "site" and delta.owner_id == site_id and delta.aspect == "integrity"
-                   for delta in event.deltas):
-            return True
-    return False
+        sabotaged.update(
+            delta.owner_id for delta in event.deltas
+            if delta.owner_kind == "site" and delta.aspect == "integrity"
+        )
+    return sabotaged
 
 
 def sabotage_options(world, actor):
     if not isinstance(actor, EntityRef) or actor.kind not in {"polity", "organization"}:
         return ()
+    sabotaged_site_ids = _sabotaged_site_ids_today(world, actor)
     options = []
     for site in sorted(world.map.infrastructure_sites.values(), key=lambda item: item.id):
-        if actor in {site.owner_ref, site.maintainer_ref} or site.integrity <= 0 or _sabotaged_by_actor_today(world, actor, site.id):
+        if (actor in {site.owner_ref, site.maintainer_ref} or site.integrity <= 0
+                or site.id in sabotaged_site_ids):
             continue
         report = _current_site_report(world, actor, site.id)
         presence = _eligible_sabotage_presence(world, actor, site)
@@ -205,7 +218,9 @@ def sabotage_options(world, actor):
 
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("sabotage action requires a current actor decision")
@@ -227,9 +242,10 @@ def execute_sabotage_option(world, actor, option_id, decision_event_id):
     stock = candidate.economy.stocks[option.stock_id]
     report = _current_site_report(candidate, actor, site.id)
     presence = _eligible_sabotage_presence(candidate, actor, site)
+    sabotaged_site_ids = _sabotaged_site_ids_today(candidate, actor)
     if (stock.owner_ref != actor or report is None or report.event_id != option.report_event_id
             or presence is None or stock.goods.get("tools", 0) < TOOLS_RESERVE + SABOTAGE_TOOLS
-            or _sabotaged_by_actor_today(candidate, actor, site.id)):
+            or site.id in sabotaged_site_ids):
         raise ValueError("sabotage is no longer possible")
     kind, detachment_id = presence
     require_authority(candidate, actor, "military" if kind == "force" else "supply")

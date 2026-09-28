@@ -130,6 +130,7 @@ def produce_monthly(world, available=None) -> None:
         if priority.effective_day == world.clock.absolute_day
         and can_actor_act_for(world, priority.owner_ref, priority.owner_ref, "trade")
     }
+    event_index = world.event_index()
     for facility in _rotated_facilities(world):
         payroll = economy.payrolls.get(facility.id)
         if payroll is not None and payroll.day == world.clock.absolute_day:
@@ -178,6 +179,16 @@ def produce_monthly(world, available=None) -> None:
             if "labor" in limitations else 0
         )
         priority = active_priorities.get(facility.id)
+        payroll_release_events = tuple(
+            contract.last_event_id
+            for contract in economy.employment_contracts.values()
+            if contract.account_id == facility.payroll_account_id
+            and contract.last_reviewed_day == world.clock.absolute_day
+            and contract.last_outcome == "paused"
+            and (paused := event_index.get(contract.last_event_id)) is not None
+            and paused.day == world.clock.absolute_day
+            and paused.event_type == "permanent_employment_paused"
+        )
         event = _apply_stock(world, stock, goods, "production_completed" if batches else "production_limited",
                              f"{site.name}: {batches} lotes de produção concluídos.",
                              cause_ids=_causes(site.last_event_id, facility.last_event_id,
@@ -186,13 +197,14 @@ def produce_monthly(world, available=None) -> None:
                                                *(group.last_event_id for group in world.society.population.values()
                                                  if group.settlement_id == stock.location_id and group.occupation == recipe.occupation),
                                                *(stock.last_event_ids.get(r) for r in recipe.inputs),
-                                               priority.last_event_id if priority is not None else None),
+                                               priority.last_event_id if priority is not None else None,
+                                               *payroll_release_events),
                              extra_deltas=changes)
         # Keep the engine's calculation alongside the scalar deltas.  Why views
         # and diagnostics can now explain the binding limit without reparsing
         # prose or guessing from a later state snapshot; the payload is not an
         # instruction and never changes the owner-side execution.
-        event = event.model_copy(update={"causal_payload": {
+        causal_payload = {
             "production": {
                 "facility_id": facility.id,
                 "site_id": facility.site_id,
@@ -208,7 +220,28 @@ def produce_monthly(world, available=None) -> None:
                 "production_priority_event_id": priority.last_event_id if priority is not None else None,
                 "observed_day": world.clock.absolute_day,
             }
-        }})
+        }
+        if not event.causal_links:
+            # Initial stock, site and workforce are world-generation premises,
+            # not missing historical receipts. Keep that root explicit so the
+            # causal view can distinguish it from a broken/missing event link.
+            causal_payload["root_premise"] = {
+                "kind": "world_generation",
+                "domain": "production",
+                "source_refs": [
+                    {"kind": "facility", "id": facility.id},
+                    {"kind": "site", "id": facility.site_id},
+                    {"kind": "stock", "id": stock.id},
+                    {"kind": "account", "id": facility.payroll_account_id},
+                    {"kind": "settlement", "id": stock.location_id},
+                    *({"kind": "population_group", "id": group.id}
+                      for group in sorted(world.society.population.values(), key=lambda item: item.id)
+                      if group.settlement_id == stock.location_id
+                      and group.occupation == recipe.occupation),
+                ],
+                "observed_day": world.clock.absolute_day,
+            }
+        event = event.model_copy(update={"causal_payload": causal_payload})
         world.events[-1] = event
         economy.facilities[facility.id] = updated.model_copy(update={"last_event_id": event.id})
         settle_labor(world, facility, batches, available, event.id)
@@ -279,27 +312,48 @@ def consume_monthly(world) -> None:
             if world.map.get_route_operational_capacity(route_id) <= 0
             for cause in _route_causes(world, (route_id,)).get(route_id, ())
         )
+        subsistence_causes = _causes(
+            need.last_event_id, stock.last_event_ids.get("food"), market.last_event_id,
+            *domestic_receipts, *receipts, *interrupted_route_causes,
+            *(economy.accounts[f"household:{group_id}"].last_event_id
+              for group_id in required_by_group
+              if f"household:{group_id}" in economy.accounts),
+            *(group.last_event_id for group in groups),
+            *(facility.last_event_id for facility in economy.facilities.values()
+              if facility.stock_id == stock.id and "food" in economy.recipes[facility.recipe_id].outputs),
+            *(order.last_event_id for order in economy.freight_orders.values()
+              if order.destination_id == stock.id and order.resource_id == "food"
+              and order.delivered_quantity < order.quantity),
+        )
+        causal_payload = None
+        if not subsistence_causes and deltas:
+            # The first material subsistence reading can precede every owner
+            # receipt in a generated world. Preserve its actual baseline as a
+            # root premise rather than leaving an unexplained health/shortage
+            # transition with no cause.
+            causal_payload = {"root_premise": {
+                "kind": "world_generation",
+                "domain": "initial_subsistence",
+                "source_refs": [
+                    {"kind": "settlement", "id": need.id},
+                    {"kind": "settlement_needs", "id": need.id},
+                    {"kind": "stock", "id": stock.id},
+                    {"kind": "market", "id": need.id},
+                    *({"kind": "population_group", "id": group.id} for group in groups),
+                ],
+                "observed_day": world.clock.absolute_day,
+            }}
         event = _apply_stock(world, stock, stock.goods, "subsistence_resolved",
                              f"{settlement.name}: {domestic + paid}/{required} rações atendidas; {domestic} domésticas, {paid} compradas; "
                              f"déficit de {missing}.",
-                             extra_deltas=deltas, cause_ids=_causes(need.last_event_id, stock.last_event_ids.get("food"),
-                                  market.last_event_id,
-                                  *domestic_receipts, *receipts,
-                                  *interrupted_route_causes,
-                                  *(economy.accounts[f"household:{group_id}"].last_event_id
-                                    for group_id in required_by_group
-                                    if f"household:{group_id}" in economy.accounts),
-                                  *(group.last_event_id for group in groups),
-                                 *(f.last_event_id for f in economy.facilities.values() if f.stock_id == stock.id
-                                   and "food" in economy.recipes[f.recipe_id].outputs),
-                                 *(o.last_event_id for o in economy.freight_orders.values() if o.destination_id == stock.id
-                                   and o.resource_id == "food" and o.delivered_quantity < o.quantity)))
+                             extra_deltas=deltas, cause_ids=subsistence_causes,
+                             causal_payload=causal_payload)
         # The scalar deltas preserve the canonical state transition.  This
         # structured reading makes the affordability bottleneck explainable
         # without parsing prose or exposing household balances to decision
         # contexts that do not already know them.
-        event = event.model_copy(update={"causal_payload": {
-            "subsistence": {
+        payload = dict(event.causal_payload or {})
+        payload["subsistence"] = {
                 "settlement_id": need.id,
                 "required": required,
                 "public_required": public_required,
@@ -311,7 +365,7 @@ def consume_monthly(world) -> None:
                                           if amount > 0},
                 "unmet_by_group": dict(sorted(unmet_by_group.items())),
             }
-        }})
+        event = event.model_copy(update={"causal_payload": payload})
         world.events[-1] = event
         economy.needs[need.id] = updated.model_copy(update={"last_event_id": event.id})
 
@@ -490,7 +544,8 @@ def transfer_money(world, source_id: str, target_id: str, amount: int, *, decisi
     expected = decision_intent or {"action": "pay", "source_id": source_id,
                                    "target_id": target_id, "amount": amount,
                                    "actor_ref": source.owner_ref.to_dict()}
-    if (event is None or event.fact_kind != FactKind.DECISION or intent is None
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin != CausalOrigin.ACTOR_DECISION or intent is None
             or intent != expected
             or decision_event_id in economy.payments):
         raise ValueError("payment needs a matching unexecuted decision")

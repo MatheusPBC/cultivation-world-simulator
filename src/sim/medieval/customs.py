@@ -10,6 +10,7 @@ from copy import deepcopy
 
 from src.classes.economy.customs import CargoManifest, CustomsCheckpoint
 from src.classes.economy.models import MoneyAccount, Payroll
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.models import CustomsNotice
@@ -176,12 +177,14 @@ def open_customs_checkpoint(world, option_id, *, decision_event_id):
                   else tuple(option for site in world.map.infrastructure_sites.values()
                               for option in customs_open_options(world, site.id, actor)))
     option = next((item for item in candidates if item.id == option_id == selected_id), None)
-    if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
+    if (decision is None or decision.day != world.clock.absolute_day
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs opening option is stale")
     authorization = record_event(
         world, "customs_open_authorized", "O owner autorizou a abertura do posto escolhido.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
         decision={"action": "open_customs_checkpoint", "actor_ref": option.actor_ref.to_dict(),
                   "option_id": option.id, "site_id": option.site_id, "account_id": option.account_id,
                   "staff_group_id": option.staff_group_id, "staff_count": option.staff_count,
@@ -512,7 +515,9 @@ def _decision_option(world, option_id, decision_event_id, action):
         actor = None
     option = next((item for item in customs_cargo_options(world, actor)
                    if item.id == option_id and item.action == action), None)
-    if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
+    if (decision is None or decision.day != world.clock.absolute_day
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs cargo option is stale")
     # The actor-facing turn contains only the selected affordance ID.  Preserve
@@ -520,7 +525,7 @@ def _decision_option(world, option_id, decision_event_id, action):
     # validation never needs to treat provider input as material truth.
     authorization = record_event(
         world, "customs_action_authorized", "O proprietário autorizou a resolução alfandegária escolhida.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
         decision={"action": action, "actor_ref": actor.to_dict(),
                   "notice_id": option.notice_id, "checkpoint_id": option.checkpoint_id,
                   "parcel_id": option.parcel_id, "order_id": option.order_id,
@@ -623,7 +628,8 @@ def seize_contraband_cargo(world, option_id, *, decision_event_id):
         actor = None
     option = next((item for item in customs_seizure_options(candidate, actor) if item.id == option_id), None)
     if (decision is None or decision.day != candidate.clock.absolute_day
-            or decision.fact_kind != FactKind.DECISION or option is None
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION or option is None
             or decision.decision != option.decision()):
         raise ValueError("customs seizure option is stale")
     require_authority(candidate, actor, "supply")
@@ -793,12 +799,14 @@ def pay_customs_fee(world, option_id, *, decision_event_id):
     except (KeyError, TypeError, ValueError):
         actor = None
     option = next((item for item in customs_payment_options(world, actor) if item.id == option_id), None)
-    if (decision is None or decision.day != world.clock.absolute_day or decision.fact_kind != FactKind.DECISION
+    if (decision is None or decision.day != world.clock.absolute_day
+            or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
             or option is None or decision.decision != option.decision()):
         raise ValueError("customs payment option is stale")
     authorization = record_event(
         world, "customs_payment_authorized", "O proprietário autorizou o pagamento alfandegário escolhido.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
         decision={"action": "pay_customs_fee", "actor_ref": actor.to_dict(),
                   "notice_id": option.notice_id, "parcel_id": option.parcel_id,
                   "checkpoint_id": option.checkpoint_id, "account_id": option.account_id,

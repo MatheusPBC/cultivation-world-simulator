@@ -57,11 +57,11 @@ async def test_public_lifecycle_creates_medieval_world_advances_a_year_and_resum
     before = await query(client, "world")
     assert before["day"] == 360
     assert before["config"]["seed"] == 73
-    # Sustained deprivation is a canonical material consequence.  The public
-    # lifecycle must preserve the aggregate population exposed by the same
-    # snapshot, but it is not allowed to promise the initial count after a
-    # year of unpaid food shortfall.
-    assert 0 < before["population"] <= 10900
+    # Births and deprivation can coexist. The public aggregate must match the
+    # canonical groups; it cannot assume population only falls during a year.
+    society = await query(client, "society")
+    assert before["population"] > 0
+    assert before["population"] == sum(group["count"] for group in society["population_groups"])
     economics = await query(client, "economy")
     await command(client, "save", {"save_id": "um-ano"})
     await command(client, "step")
@@ -115,6 +115,17 @@ async def test_public_month_exposes_paid_food_and_its_two_decisions(client):
                    for d in e["deltas"] if d["owner_kind"] == "stock" and d["aspect"] == "food")
     missing = sum(s["missing_food"] for s in society["settlements"])
     assert consumed == initial_population - domestic - missing
+    needs = {item["id"]: item for item in economy["needs"]}
+    stocks = {item["id"]: item for item in economy["stocks"]}
+    markets = {item["id"]: item for item in economy["markets"]}
+    for settlement in society["settlements"]:
+        need = needs[settlement["id"]]
+        assert settlement["public_food_stock"] == stocks[need["stock_id"]]["goods"].get("food", 0)
+        assert settlement["food_price"] == markets[settlement["id"]]["prices"]["food"]
+        assert settlement["estimated_unaffordable_public_rations"] == sum(
+            settlement["estimated_unaffordable_public_rations_by_occupation"].values())
+        assert settlement["food_access_evidence_event_ids"] == sorted(
+            set(settlement["food_access_evidence_event_ids"]))
     detail = await query(client, f"causal/{purchases[0]['id']}")
     assert {e["decision"]["action"] for e in detail["causes"] if e["decision"]} >= {"buy_rations", "sell_rations"}
     assert any(e["event_type"] == "subsistence_resolved" for e in detail["effects"])
@@ -187,12 +198,18 @@ async def test_dossier_api_serializes_state_delta_from_known_material_event(clie
 
     assert response.status_code == 200, response.text
     payload = response.json()["data"]
+    assert payload["next_after"] is None or isinstance(payload["next_after"], str)
+    assert isinstance(payload["has_more"], bool)
     entry = next(item for item in payload["entries"] if item["event_id"] == event.id)
     assert entry["payload"]["deltas"] == [{
         "id": f"{event.id}:delta:0", "event_id": event.id,
         "owner_kind": "region", "owner_id": "pedraclara", "aspect": "population",
         "before": "10", "after": "9", "magnitude": -1,
     }]
+    page = await client.get("/api/v2/query/dossier/polity/auren?limit=1")
+    assert page.status_code == 200
+    assert len(page.json()["data"]["entries"]) <= 1
+    assert (await client.get("/api/v2/query/dossier/polity/auren?limit=101")).status_code == 422
 
 
 async def test_pause_waits_for_the_active_step_before_acknowledging(client, app, monkeypatch):
@@ -236,6 +253,7 @@ async def test_failed_step_preserves_published_world_and_pauses(client, app, mon
 
 async def test_provider_decision_failure_pauses_without_publishing_candidate(client, app, monkeypatch):
     from src.sim.medieval.ai_decider import ProviderDecisionRequired
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
     await command(client, "create", {"ai_enabled": True, "ai_calls_per_step": 1})
     before = await query(client, "world")
 
@@ -251,10 +269,59 @@ async def test_provider_decision_failure_pauses_without_publishing_candidate(cli
     assert status["paused"] and status["last_error"]["code"] == "AI_DECISION_REQUIRED"
 
 
+async def test_ai_decisions_require_provider_and_persist_when_enabled(client, app, monkeypatch):
+    await command(client, "create")
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: False)
+    unavailable = await client.post("/api/v2/command/ai", json={"enabled": True, "ai_calls_per_step": 24})
+    assert unavailable.status_code == 409
+    assert unavailable.json()["error"]["code"] == "AI_PROVIDER_UNAVAILABLE"
+    assert not (await query(client, "world"))["config"]["ai_enabled"]
+
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+    enabled = await command(client, "ai", {"enabled": True, "ai_calls_per_step": 24})
+    assert enabled["paused"]
+    assert (await query(client, "world"))["config"]["ai_enabled"]
+    assert (await query(client, "world"))["config"]["ai_calls_per_step"] == 24
+    await command(client, "save", {"save_id": "ai-enabled"})
+    await command(client, "ai", {"enabled": False, "ai_calls_per_step": 24})
+    assert not (await query(client, "world"))["config"]["ai_enabled"]
+    await command(client, "load", {"save_id": "ai-enabled"})
+    assert (await query(client, "world"))["config"]["ai_enabled"]
+
+
+async def test_create_rejects_ai_enabled_without_provider(client, monkeypatch):
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: False)
+    response = await client.post("/api/v2/command/create", json={"ai_enabled": True})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "AI_PROVIDER_UNAVAILABLE"
+    assert not (await query(client, "status"))["ready"]
+
+
+async def test_ai_setting_requires_paused_world(client, monkeypatch):
+    await command(client, "create")
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+    await command(client, "resume")
+    response = await client.post("/api/v2/command/ai", json={"enabled": True, "ai_calls_per_step": 24})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PAUSE_REQUIRED"
+    assert not (await query(client, "world"))["config"]["ai_enabled"]
+
+
+async def test_resume_refuses_ai_world_when_provider_disappears(client, monkeypatch):
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: True)
+    await command(client, "create", {"ai_enabled": True})
+    assert (await query(client, "world"))["config"]["ai_enabled"]
+    monkeypatch.setattr("src.sim.medieval.ai_decider.provider_available", lambda: False)
+    response = await client.post("/api/v2/command/resume", json={})
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "AI_PROVIDER_UNAVAILABLE"
+    assert (await query(client, "status"))["paused"]
+
+
 async def test_observer_api_has_no_material_mutation_or_xianxia_routes(client):
     schema = (await client.get("/openapi.json")).json()
     commands = {path.rsplit("/", 1)[-1] for path in schema["paths"] if "/command/" in path}
-    assert commands == {"create", "step", "pause", "resume", "speed", "save", "load"}
+    assert commands == {"create", "step", "pause", "resume", "ai", "speed", "save", "load"}
     assert not any("/api/v1/" in p for p in schema["paths"])
     response = await client.post("/api/v2/command/create", json={}, headers={"Origin": "https://untrusted.example"})
     assert response.status_code == 403

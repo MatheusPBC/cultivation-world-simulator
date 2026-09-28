@@ -119,7 +119,9 @@ it('reads the aid trail, remembered facts and the directional institutional read
     { id: 'memory:polity:auren:event:20', institution_ref: requester, event_id: 'event:20', recorded_day: 121,
       last_reinforced_day: 130, effective_salience: 1000 },
     { id: 'memory:polity:auren:event:30', institution_ref: requester, event_id: 'event:30', recorded_day: 130,
-      last_reinforced_day: 130, effective_salience: 1000 }]
+      last_reinforced_day: 130, effective_salience: 1000 },
+    { id: 'memory:polity:auren:event:32', institution_ref: requester, event_id: 'event:32', recorded_day: 131,
+      last_reinforced_day: 131, effective_salience: 1000, kind: 'campaign_withdrawal_remediated' }]
   data.diplomacy.aid_readings = [{ observer_ref: requester, subject_ref: provider, value: -2,
     evidence_event_ids: ['event:20', 'event:30'] }]
   store.snapshot = data
@@ -144,6 +146,7 @@ it('reads the aid trail, remembered facts and the directional institutional read
   expect(memory.text()).toContain('Peso efetivo (por mil)')
   await memory.findAll('button').find(b => b.text() === 'Ver o fato lembrado')!.trigger('click')
   expect(store.focusEventId).toBe('event:20')
+  expect(panel.get('[data-memory="memory:polity:auren:event:32"]').text()).toContain('Retirada de campanha reparada')
 
   const reading = panel.get('[data-reading="auren:valedouro"]')
   expect(reading.text()).toContain('-2')

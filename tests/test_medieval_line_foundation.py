@@ -12,6 +12,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
@@ -67,7 +68,9 @@ def only_option(world, owner):
 def authorize(world, option):
     from src.sim.medieval.expansion import _foundation_terms
     return record_event(world, "line_foundation_authorized", "Fundar a linha.",
-                        fact_kind=FactKind.DECISION, decision=_foundation_terms(option))
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=_foundation_terms(option))
 
 
 def build(world, option, day_limit=400):

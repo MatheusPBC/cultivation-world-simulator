@@ -1,8 +1,8 @@
 """Run one bounded provider-backed medieval campaign response chain.
 
 This is an operational probe, not a second campaign runtime.  The provider
-can select an existing adoption affordance and, on the next scheduled turn,
-an existing material force affordance.  ``NO_ACTION`` is preserved as a
+can select an existing adoption affordance, a political authorization, an
+existing material force affordance, and a field-command appointment. ``NO_ACTION`` is preserved as a
 decline; no deterministic choice is substituted.
 """
 
@@ -19,7 +19,6 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.classes.causal_origin import CausalOrigin
-from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
 from src.sim.medieval.events import validate_history
@@ -55,15 +54,15 @@ def _basic_audit(world):
 
 
 async def run(seed: int = 73, output: Path = DEFAULT_OUTPUT) -> dict:
-    """Execute at most two real-provider calls and persist the resulting chain."""
+    """Execute at most four provider calls and persist the resulting chain."""
     if not ai_decider.provider_available():
         raise RuntimeError("real provider is not configured or is disabled in this runtime")
 
     world, _, _ = _occupied_campaign_world(seed)
     world.config = world.config.model_copy(update={
         "ai_enabled": True,
-        "ai_calls_per_step": 2,
-        "ai_max_calls": 2,
+        "ai_calls_per_step": 4,
+        "ai_max_calls": 4,
     })
 
     before_receipts = len([event for event in world.events
@@ -78,7 +77,8 @@ async def run(seed: int = 73, output: Path = DEFAULT_OUTPUT) -> dict:
     material_changed = False
     advanced_day = False
     material_receipt = None
-    if plan is not None and plan.stage == "adopted":
+    while (plan is not None and plan.stage == "adopted"
+           and ai_decider.spent_calls(world) < 4):
         due = _tick(world)
         advanced_day = True
         before_receipts = len([event for event in world.events
@@ -87,6 +87,9 @@ async def run(seed: int = 73, output: Path = DEFAULT_OUTPUT) -> dict:
         receipts = [event for event in world.events
                     if event.event_type in ai_decider.RECEIPT_EVENTS]
         material_receipt = receipts[before_receipts:][-1] if len(receipts) > before_receipts else None
+        plan = world.strategy.plans.get(plan.id)
+        if material_receipt is not None and material_receipt.event_type == ai_decider.DECLINED_EVENT:
+            break
 
     audit = _basic_audit(world)
     save_world(world, output)

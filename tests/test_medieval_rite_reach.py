@@ -75,7 +75,7 @@ def test_serpent_countermeasure_is_an_authored_hazard_specific_ward():
 def start(world, officiant_id, sponsor, blueprint_id):
     option = next(item for item in rite_offer_options(world, officiant_id)
                   if item.sponsor_ref == sponsor and item.blueprint_id == blueprint_id)
-    offer = record_rite_offer(world, officiant_id, option.id)
+    offer = record_rite_offer(world, officiant_id, option.id, decision_source={"kind": "api"})
     sponsored = next(item for item in rite_sponsor_options(world, sponsor)
                      if item.offer_event_id == offer.id)
     return sponsor_rite(world, sponsor, sponsored.id, decide(world, sponsored).id)

@@ -66,6 +66,7 @@ def civic_amnesty_options(world, actor):
 def _decision(world, decision_event_id):
     decision = _event(world, decision_event_id)
     if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day
             or decision.decision is None
             or decision.decision.get("action") != AMNESTY_ACTION

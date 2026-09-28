@@ -48,14 +48,25 @@ def prepared_world():
 
 def decision(world, option, event_type):
     event = record_event(world, event_type, "Decisão institucional.", fact_kind=FactKind.DECISION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}},
                          decision=option.decision())
     return event
 
 
 def provider_decision(world, option, event_type):
+    receipt = record_event(
+        world, "ai_decision_interpreted", "O provider selecionou uma opção existente.",
+        causal_origin=CausalOrigin.LLM_INTERPRETATION,
+        causal_payload={"selection": {"actor_ref": option.actor_ref.to_dict(),
+                                       "selected_affordance_id": option.id}},
+    )
     return record_event(world, event_type, "Decisão institucional do provedor.",
                         fact_kind=FactKind.DECISION,
                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "provider",
+                                                            "receipt_event_id": receipt.id}},
+                        cause_ids=(receipt.id,),
                         decision=option.decision())
 
 
@@ -81,6 +92,12 @@ def test_aid_chain_hides_terms_until_provider_and_fulfills_real_freight(tmp_path
     assert not any(hasattr(request_option, field) for field in ("source_stock_id", "quantity", "route_ids"))
     request_decision = decision(world, request_option, "aid request")
     request = request_institutional_aid(world, REQUESTER, request_option.id, request_decision.id)
+    assert request.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert request.causal_payload == {
+        "decision_event_id": request_decision.id,
+        "actor_ref": REQUESTER.to_dict(),
+        "selected_affordance_id": request_option.id,
+    }
     refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
     provider_notices = world.knowledge.institutional_aid_for_actor(PROVIDER)
     assert len(provider_notices) == 1
@@ -100,6 +117,13 @@ def test_aid_chain_hides_terms_until_provider_and_fulfills_real_freight(tmp_path
     accounts_before = {key: account.balance for key, account in world.economy.accounts.items()}
     freight_count = len(world.economy.freight_orders)
     proposal = respond_institutional_aid(world, PROVIDER, response_option.id, response_decision.id)
+    accepted = next(event for event in world.events if event.event_type == "institutional_aid_accepted")
+    assert accepted.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert accepted.causal_payload == {
+        "decision_event_id": response_decision.id,
+        "actor_ref": PROVIDER.to_dict(),
+        "selected_affordance_id": response_option.id,
+    }
     requester_notices = world.knowledge.institutional_aid_for_actor(REQUESTER)
     assert len(requester_notices) == 1
     assert requester_notices[0].kind == "response"
@@ -122,9 +146,14 @@ def test_aid_chain_hides_terms_until_provider_and_fulfills_real_freight(tmp_path
     fulfillment = next(e for e in world.events if e.event_type == "institutional_aid_fulfilled")
     assert order.last_event_id in {link.cause_event_id for link in fulfillment.causal_links}
     opened = next(event for event in world.events if event.id == order.last_event_id)
-    assert opened.causal_origin is CausalOrigin.DETERMINISTIC
-    assert fulfillment.causal_origin is CausalOrigin.DETERMINISTIC
-    assert opened.causal_payload is fulfillment.causal_payload is None
+    expected_authorship = {
+        "decision_event_id": fulfill_decision.id,
+        "actor_ref": fulfill_option.actor_ref.to_dict(),
+        "selected_affordance_id": fulfill_option.id,
+    }
+    assert opened.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert fulfillment.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert opened.causal_payload == fulfillment.causal_payload == expected_authorship
     save_world(world, tmp_path / "aid.mws")
     assert world_snapshot(load_world(tmp_path / "aid.mws")) == world_snapshot(world)
 
@@ -177,6 +206,19 @@ def test_stale_or_wrong_aid_decisions_do_not_mutate_world():
     before = world_snapshot(world)
     with pytest.raises(ValueError, match="current|stale|option"):
         request_institutional_aid(world, REQUESTER, option.id, stale.id)
+    assert world_snapshot(world) == before
+
+
+def test_exact_copied_affordance_without_actor_decision_cannot_request_aid():
+    world = prepared_world()
+    option = aid_request_options(world, REQUESTER)[0]
+    copied = record_event(world, "copied_aid_selection", "Payload copiado sem decisão do ator.",
+                          fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current actor decision"):
+        request_institutional_aid(world, REQUESTER, option.id, copied.id)
+
     assert world_snapshot(world) == before
 
 
@@ -239,6 +281,12 @@ def test_aid_rejection_notifies_only_the_requester():
     response = respond_institutional_aid(world, PROVIDER, reject_option.id, reject_decision.id)
 
     assert response.event_type == "institutional_aid_rejected"
+    assert response.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert response.causal_payload == {
+        "decision_event_id": reject_decision.id,
+        "actor_ref": PROVIDER.to_dict(),
+        "selected_affordance_id": reject_option.id,
+    }
     requester_notices = world.knowledge.institutional_aid_for_actor(REQUESTER)
     assert len(requester_notices) == 1
     assert requester_notices[0].request_event_id == request.id
@@ -270,6 +318,31 @@ def test_aid_validation_uses_current_request_event_provenance():
     assert decision_event.id not in {link.cause_event_id for link in world.events[index].causal_links}
     with pytest.raises(ValueError, match="institutional aid proposal lacks its request provenance"):
         world.relations.validate(world)
+
+
+@pytest.mark.parametrize("stage", ("request", "response"))
+def test_aid_persisted_notices_require_actor_authored_transitions(stage):
+    world = prepared_world()
+    option = next(item for item in aid_request_options(world, REQUESTER)
+                  if item.provider_ref == PROVIDER)
+    request = request_institutional_aid(world, REQUESTER, option.id,
+                                        decision(world, option, "aid request").id)
+    event_id = request.id
+    if stage == "response":
+        refresh_route_reports(world, route_ids=("river-pedraclara-portovelho",))
+        response = next(item for item in aid_response_options(world, PROVIDER)
+                        if item.kind == "accept")
+        respond_institutional_aid(world, PROVIDER, response.id,
+                                  decision(world, response, "aid response").id)
+        event_id = next(event.id for event in world.events
+                        if event.event_type == "institutional_aid_accepted")
+
+    index = next(i for i, event in enumerate(world.events) if event.id == event_id)
+    world.events[index] = world.events[index].model_copy(
+        update={"causal_origin": CausalOrigin.DETERMINISTIC})
+
+    with pytest.raises(ValueError, match="institutional aid"):
+        world.knowledge.validate(world)
 
 
 @pytest.mark.parametrize("response_kind", ("accept", "reject"))

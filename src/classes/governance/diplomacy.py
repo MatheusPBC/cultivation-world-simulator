@@ -550,12 +550,14 @@ class RelationsState(RegistrySerialization):
                 clause = p.clauses[obligation.clause_index]
                 material_ok = (material is not None and (
                     (clause.kind == 'resource_transfer' and material.event_type == 'freight_opened')
-                    or (clause.kind == 'payment' and material.event_type == 'payment_completed')))
+                    or (clause.kind == 'payment' and material.event_type == 'payment_completed')
+                    or (clause.kind == 'campaign_withdrawal'
+                        and material.event_type == 'detachment_withdrawal_started')))
                 if (breach is None or breach.event_type != 'commitment_breached'
                         or not material_ok
                         or final is None or final.event_type not in {
                             'institutional_aid_remediated', 'resource_transfer_remediated',
-                            'payment_obligation_remediated'}
+                            'payment_obligation_remediated', 'campaign_withdrawal_remediated'}
                         or obligation.breach_event_id not in {link.cause_event_id for link in final.causal_links}
                         or obligation.remediation_material_event_id not in {link.cause_event_id for link in final.causal_links}
                         or not any(d.owner_kind == 'obligation' and d.owner_id == obligation.id
@@ -653,7 +655,32 @@ class RelationsState(RegistrySerialization):
                                         for delta in material.deltas)):
                         raise ValueError('remediation requires the negotiated payment receipt')
                 elif clause.kind != 'resource_transfer':
-                    raise ValueError('only payment or resource transfers can be remediated')
+                    if clause.kind != 'campaign_withdrawal':
+                        raise ValueError('only payment, resource transfers or campaign withdrawals can be remediated')
+                    decisions = [event for event in events.values()
+                                 if event.fact_kind.name == 'DECISION' and event.decision
+                                 and event.decision.get('action') == 'remediate_campaign_withdrawal'
+                                 and event.decision.get('actor_ref') == clause.debtor_ref.to_dict()
+                                 and event.id in {link.cause_event_id for link in material.causal_links}]
+                    decision = decisions[0] if len(decisions) == 1 else None
+                    final_payload = final.causal_payload or {}
+                    decision_payload = decision.decision if decision is not None else {}
+                    if (decision is None
+                            or not any(delta.owner_kind == 'detachment' and delta.owner_id == clause.detachment_id
+                                       and delta.aspect == 'stage' and delta.before == 'present'
+                                       and delta.after == 'marching' for delta in material.deltas)
+                            or material.causal_payload is None
+                            or material.causal_payload.get('selected_affordance_id')
+                               != decision_payload.get('selected_affordance_id')
+                            or final_payload.get('decision_event_id') != decision.id
+                            or final_payload.get('actor_ref') != clause.debtor_ref.to_dict()
+                            or final_payload.get('selected_affordance_id')
+                               != decision_payload.get('selected_affordance_id')
+                            or decision.id not in {link.cause_event_id for link in final.causal_links}
+                            or final_payload.get('obligation_id') != obligation.id
+                            or final_payload.get('campaign_id') != clause.campaign_id
+                            or final_payload.get('detachment_id') != clause.detachment_id):
+                        raise ValueError('campaign remediation requires the debtor\'s selected material withdrawal')
                 else:
                     decisions = [event for event in events.values()
                              if event.fact_kind.name == 'DECISION'

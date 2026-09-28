@@ -4,6 +4,7 @@ import pytest
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.systems.time import WorldClock
 from src.sim.medieval.persistence import save_world, load_world, world_snapshot
 
@@ -13,6 +14,7 @@ def start(world):
     facility = world.economy.facilities['works:minas-de-ferroalto']
     owner = world.economy.stocks[facility.stock_id].owner_ref
     event = record_event(world, 'expansion_decided', 'Ampliar serraria.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={'action': 'expand', 'actor_ref': owner.to_dict(),
                   'facility_id': facility.id, 'blueprint_id': 'workshop-extension'})
     return start_expansion(world, facility.id, 'workshop-extension', decision_event_id=event.id)
@@ -68,6 +70,30 @@ def test_missing_materials_block_without_spending_or_free_progress():
     assert world.economy.facilities[project.facility_id].max_batches == 60
 
 
+def test_monthly_progress_rolls_back_world_and_shared_labor_when_later_owner_fails(monkeypatch):
+    import src.sim.medieval.expansion as expansion
+
+    world = create_medieval_world(73)
+    project = start(world)
+    world.clock = WorldClock(30)
+    available = {group.id: group.count for group in world.society.population.values()}
+    before = world_snapshot(world)
+    available_before = dict(available)
+    settle_work = expansion.settle_work
+
+    def fail_after_payroll(*args, **kwargs):
+        settle_work(*args, **kwargs)
+        raise RuntimeError("injected failure after project materials and payroll")
+
+    monkeypatch.setattr(expansion, "settle_work", fail_after_payroll)
+    with pytest.raises(RuntimeError, match="after project materials and payroll"):
+        expansion.progress_expansions(world, available)
+
+    assert world_snapshot(world) == before
+    assert available == available_before
+    assert world.economy.expansions[project.id].completed_units == 0
+
+
 def test_storage_pressure_exposes_and_completes_granary_expansion():
     from src.sim.medieval.economy import produce_monthly
     from src.sim.medieval.expansion import expansion_options, start_expansion, progress_expansions
@@ -84,7 +110,9 @@ def test_storage_pressure_exposes_and_completes_granary_expansion():
     option = next(item for item in expansion_options(world, stock.owner_ref)
                   if item.facility_id == facility.id and item.blueprint_id == 'granary-extension')
     decision = record_event(world, 'expansion_decided', 'Ampliar o armazém após pressão material de armazenamento.',
-        fact_kind=FactKind.DECISION, decision={'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision={'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
                                                'facility_id': facility.id, 'blueprint_id': option.blueprint_id},
         cause_ids=(world.economy.facilities[facility.id].last_event_id,))
     project = start_expansion(world, facility.id, option.blueprint_id, decision_event_id=decision.id)
@@ -129,11 +157,72 @@ def test_only_owner_can_authorize_and_one_active_project():
     with pytest.raises(ValueError):
         start_expansion(world, project.facility_id, project.blueprint_id, decision_event_id=project.decision_event_id)
     decision = record_event(world, 'expansion_decided', 'Sem autoridade.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION, causal_payload={"decision_source": {"kind": "api"}},
         decision={'action': 'expand', 'actor_ref': {'kind': 'polity', 'id': 'auren'},
                   'facility_id': 'works:minas-de-ferroalto', 'blueprint_id': 'workshop-extension'})
     before = world_snapshot(world)
     with pytest.raises(ValueError):
         start_expansion(world, 'works:minas-de-ferroalto', 'workshop-extension', decision_event_id=decision.id)
+    assert world_snapshot(world) == before
+
+
+def test_expansion_owner_rolls_back_if_project_creation_fails(monkeypatch):
+    from src.sim.medieval import expansion
+
+    world = create_medieval_world(73)
+    facility = world.economy.facilities['works:minas-de-ferroalto']
+    owner = world.economy.stocks[facility.stock_id].owner_ref
+    decision = record_event(
+        world, 'expansion_decided', 'Ampliar serraria.', fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision={'action': 'expand', 'actor_ref': owner.to_dict(),
+                  'facility_id': facility.id, 'blueprint_id': 'workshop-extension'},
+    )
+    before = world_snapshot(world)
+    create_project = expansion._start_expansion_in_place
+
+    def fail_after_project(candidate, *args, **kwargs):
+        create_project(candidate, *args, **kwargs)
+        raise RuntimeError('injected failure after expansion project creation')
+
+    monkeypatch.setattr(expansion, '_start_expansion_in_place', fail_after_project)
+    with pytest.raises(RuntimeError, match='injected failure'):
+        expansion.start_expansion(world, facility.id, 'workshop-extension',
+                                  decision_event_id=decision.id)
+    assert world_snapshot(world) == before
+
+
+def test_expansion_menu_rolls_back_authorization_and_project_together(monkeypatch):
+    from src.sim.medieval import expansion
+    from src.sim.medieval.economy import produce_monthly
+
+    world = create_medieval_world(73)
+    world.clock = WorldClock(30)
+    facility = world.economy.facilities['works:campos-de-brumafria']
+    stock = world.economy.stocks[facility.stock_id]
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={'capacity': world.economy.used_capacity(stock) + 50})
+    produce_monthly(world)
+    owner = world.economy.stocks[facility.stock_id].owner_ref
+    option = next(item for item in expansion.expansion_options(world, owner)
+                  if item.facility_id == facility.id and item.blueprint_id == 'granary-extension')
+    decision = record_event(
+        world, 'expansion_decided', 'O proprietário escolheu ampliar a serraria.',
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision(),
+    )
+    before = world_snapshot(world)
+    create_project = expansion._start_expansion_in_place
+
+    def fail_after_project(candidate, *args, **kwargs):
+        create_project(candidate, *args, **kwargs)
+        raise RuntimeError('injected failure after expansion project creation')
+
+    monkeypatch.setattr(expansion, '_start_expansion_in_place', fail_after_project)
+    adapter = expansion.expansion_adapters()[0]
+    with pytest.raises(RuntimeError, match='injected failure'):
+        adapter.execute_fn(world, owner, option.id, decision.id)
     assert world_snapshot(world) == before
 
 
@@ -168,7 +257,7 @@ def test_project_material_demand_is_remaining_not_monthly_multiplied():
     from src.sim.medieval.demand import reserve_quantity, objective_target
     from src.sim.medieval.expansion import review_expansions
     world = create_medieval_world(73)
-    project = start(world)
+    start(world)
     review_expansions(world)
     tools_goal = next(o for o in world.strategy.objectives.values() if o.stock_id == 'stock:ferroalto' and o.resource_id == 'tools')
     assert objective_target(world, tools_goal) == 10

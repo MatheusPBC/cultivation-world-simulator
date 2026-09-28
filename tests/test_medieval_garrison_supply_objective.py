@@ -12,12 +12,10 @@ import json
 
 import pytest
 
-from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
 from src.sim.medieval.demand import garrison_demand, reserve_quantity
-from src.sim.medieval.events import record_event
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.strategy_response import (execute_garrison_supply, garrison_supply_adapters,
@@ -117,6 +115,33 @@ def test_abandoning_returns_the_priority_and_leaves_the_duty_alone():
     assert garrison_demand(world, stock_id, "food") == 0
     assert world.society.garrisons[garrison.id].stage == "active", "o dever segue por conta própria"
     world.strategy.validate(world)
+
+
+@pytest.mark.parametrize("mismatch", ["action", "actor", "affordance", "origin"])
+def test_garrison_objective_owner_rejects_a_nonmatching_decision(mismatch):
+    from src.classes.causal_origin import CausalOrigin
+
+    world, _garrison = garrisoned_world()
+    option = only_option(world)
+    decision = _decision(world, option)
+    if mismatch == "action":
+        decision_payload = {**decision.decision, "action": "other_action"}
+    elif mismatch == "actor":
+        decision_payload = {**decision.decision,
+                            "actor_ref": EntityRef("polity", "escarlia").to_dict()}
+    elif mismatch == "affordance":
+        decision_payload = {**decision.decision, "selected_affordance_id": "invented"}
+    else:
+        decision_payload = decision.decision
+    if mismatch == "origin":
+        world.events[-1] = decision.model_copy(update={"causal_origin": CausalOrigin.DETERMINISTIC})
+    else:
+        world.events[-1] = decision.model_copy(update={"decision": decision_payload})
+
+    before = world_snapshot(world)
+    with pytest.raises(ValueError, match="decision"):
+        execute_garrison_supply(world, OWNER, option.id, decision.id)
+    assert world_snapshot(world) == before
 
 
 @pytest.mark.parametrize("missing", ["garrison", "column", "occupation", "authority"])

@@ -24,3 +24,5 @@ input,select{border:1px solid var(--line);background:#111f1f;color:var(--text);b
 .detachment-row span:first-child { display:grid; min-width:0; }
 .detachment-row small { color:var(--muted); font-size:.68rem; overflow-wrap:anywhere; }
 .detachment-row > span:last-child { color:var(--gold); white-space:nowrap; font-size:.72rem; }
+
+@media(max-width:1350px){.timebar{flex-wrap:wrap}.ai-unavailable{flex:1 0 100%;text-align:right}}

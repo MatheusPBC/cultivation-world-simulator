@@ -26,6 +26,18 @@ from src.utils.llm.runtime_mode import is_test_mode_enabled, is_world_test_mode
 DEFAULT_ACTION_URGENCY_THRESHOLD = 0.65
 
 
+class DomainDecisionFailed(RuntimeError):
+    """A required collective decision could not be obtained from its provider."""
+
+    def __init__(self, domain: str, actor_ref: Any, cause: Exception):
+        self.domain = domain
+        self.actor_ref = actor_ref
+        super().__init__(
+            f"Required decision failed for {domain} actor "
+            f"{actor_ref.kind}:{actor_ref.id}: {cause}"
+        )
+
+
 def decision_schema(affordances: Sequence[DomainAffordance]) -> dict[str, Any]:
     ids = [item.id for item in affordances]
     return {
@@ -248,12 +260,11 @@ async def interpret_domain_affordances(
                 if inspect.isawaitable(raw):
                     raw = await raw
                 decision = _parse(raw, options)
-            except (LLMError, ParseError, ProviderCallError):
-                source = "rule"
-                decision = DomainDecision(
-                    DomainDecisionKind.MAINTAIN,
-                    "The domain provider was unavailable, so no action was selected.",
-                )
+            except (LLMError, ParseError, ProviderCallError) as exc:
+                # A transport/provider failure is not an actor's decision.
+                # Propagate so the monthly transaction rolls back instead of
+                # recording a synthetic maintain/refusal receipt.
+                raise DomainDecisionFailed(domain, actor_ref, exc) from exc
             except (ValueError, TypeError, KeyError, json.JSONDecodeError):
                 # Invalid structured output is an explicit blocked decision.
                 # Selecting another option here would let malformed LLM output
@@ -277,6 +288,7 @@ async def interpret_domain_affordances(
 
 __all__ = [
     "DEFAULT_ACTION_URGENCY_THRESHOLD",
+    "DomainDecisionFailed",
     "conservative_decision",
     "decision_schema",
     "interpret_domain_affordances",

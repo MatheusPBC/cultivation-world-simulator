@@ -19,7 +19,11 @@ from src.classes.society.models import SocietyValue
 from .economy import _causes, _delta
 from .events import record_event
 from .labor import settle_work
-from .actor_dossier import _own_production_readings
+from .actor_dossier import (
+    _latest_food_affordability,
+    _own_local_livelihood_readings,
+    _own_production_readings,
+)
 
 
 ACTION = "create_permanent_employment"
@@ -75,7 +79,11 @@ def _site_supports_occupation(world, site, occupation):
     facilities = tuple(facility for facility in world.economy.facilities.values()
                         if facility.site_id == site.id)
     if not facilities:
-        return True
+        # A standing payroll reserves workers and transfers real household
+        # income.  In this vertical that labor is only represented when an
+        # authored production line at the site consumes the occupation; an
+        # empty road/post/landmark is not itself a modeled job.
+        return False
     return occupation in {world.economy.recipes[facility.recipe_id].occupation
                           for facility in facilities}
 
@@ -123,13 +131,14 @@ def _food_labor_pressure(world, settlement_id):
     need = world.economy.needs.get(settlement_id)
     if need is None:
         return False
+    events = world.event_index()
     for facility in world.economy.facilities.values():
         stock = world.economy.stocks.get(facility.stock_id)
         recipe = world.economy.recipes.get(facility.recipe_id)
         if (stock is None or recipe is None or stock.location_id != settlement_id
                 or recipe.occupation != "farmer" or "food" not in recipe.outputs):
             continue
-        event = next((item for item in reversed(world.events) if item.id == facility.last_event_id), None)
+        event = events.get(facility.last_event_id)
         if event is None or event.day != world.clock.absolute_day:
             continue
         if any(delta.owner_kind == "production" and delta.owner_id == facility.id
@@ -149,11 +158,17 @@ def _standing_monthly_cost(world, account_id):
     forecasts revenue or creates credit; a later dated decision can observe a
     genuinely replenished balance and re-open the option.
     """
-    return sum(
-        contract.staffing_target * contract.wage_per_worker
-        for contract in world.economy.employment_contracts.values()
-        if contract.account_id == account_id
-    )
+    return sum(contract.staffing_target * contract.wage_per_worker
+               for contract in _standing_contracts(world, account_id))
+
+
+def _standing_contracts(world, account_id):
+    """Current obligations on one shared employer account, in stable order."""
+    return tuple(sorted(
+        (contract for contract in world.economy.employment_contracts.values()
+         if contract.account_id == account_id),
+        key=lambda contract: contract.id,
+    ))
 
 
 def permanent_employment_options(world, employer):
@@ -213,13 +228,18 @@ def permanent_employment_options(world, employer):
     return tuple(options)
 
 
-def record_permanent_employment_decision(world, employer, option_id):
+def record_permanent_employment_decision(world, employer, option_id, *, decision_source):
     option = next((item for item in permanent_employment_options(world, employer) if item.id == option_id), None)
     if option is None:
         raise ValueError("permanent employment option is stale or unknown")
+    if (not isinstance(decision_source, dict)
+            or not isinstance(decision_source.get("kind"), str) or not decision_source["kind"]):
+        raise ValueError("permanent employment decision requires an explicit source")
     return record_event(world, "permanent_employment_decided",
                         "A instituição decidiu estabelecer um vínculo de trabalho local.",
-                        fact_kind=FactKind.DECISION, decision=option.decision(),
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
                         cause_ids=_causes(*_event_provenance(world, option)))
 
 
@@ -230,13 +250,31 @@ def _event_provenance(world, option):
     return (group.last_event_id, *(stock.last_event_ids.values()), account.last_event_id)
 
 
+def _employment_evidence_event_ids(world, option):
+    """Attach the actor-visible local pressure used to compare this offer."""
+    causes = list(_event_provenance(world, option))
+    report = world.knowledge.settlement_report(option.employer_ref, option.settlement_id)
+    if report is not None:
+        causes.append(report.event_id)
+        causes.append(_latest_food_affordability(world, report)["affordability_event_id"])
+    causes.extend(
+        event_id
+        for reading in _own_local_livelihood_readings(world, option.employer_ref)
+        if reading["settlement_id"] == option.settlement_id
+        for event_id in reading["source_event_ids"]
+    )
+    return _causes(*causes)
+
+
 def _current_option(world, decision):
     payload = decision.decision if decision is not None else None
     try:
         employer = EntityRef.from_dict(payload.get("actor_ref")) if isinstance(payload, dict) else None
     except (KeyError, TypeError, ValueError):
         employer = None
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != world.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
+            or decision.day != world.clock.absolute_day
             or not isinstance(payload, dict) or set(payload) != {"action", "actor_ref", "selected_affordance_id"}
             or payload.get("action") != ACTION):
         return None
@@ -308,7 +346,13 @@ def _payroll_pressure(world, account_id, employer):
 
 
 def employment_staffing_options(world, employer):
-    """Offer a lower or restored staffing target only after own paid production stalled."""
+    """Offer a staffing revision only after a current, sourced payroll failure.
+
+    Pressure can be a production facility that could not fund its own payroll,
+    or this employer's standing contract failing to pay even one worker. The
+    latter exposes only suspension: a smaller positive target cannot be paid
+    until the account can cover at least one wage.
+    """
     if (not isinstance(employer, EntityRef)
             or any(not can_actor_act_for(world, employer, employer, scope)
                    for scope in ("supply", "trade"))):
@@ -319,17 +363,28 @@ def employment_staffing_options(world, employer):
             continue
         pressure = _payroll_pressure(world, contract.account_id, employer)
         if pressure is None:
+            event = world.event_index().get(contract.last_event_id)
+            account = world.economy.accounts.get(contract.account_id)
+            if (contract.last_outcome == "unpaid_funds"
+                    and contract.last_reviewed_day == world.clock.absolute_day
+                    and event is not None and event.event_type == "permanent_employment_unpaid"
+                    and event.day == world.clock.absolute_day
+                    and account is not None and account.balance < contract.wage_per_worker):
+                pressure = event
+        if pressure is None:
             continue
-        for target in sorted({max(1, contract.workforce_limit // 4),
-                              max(1, contract.workforce_limit // 2), contract.workforce_limit}):
-            if target == contract.staffing_target:
-                continue
-            options.append(EmploymentStaffingOption(
-                id=(f"employment-staffing:{contract.id}:{target}:{world.clock.absolute_day}:"
-                    f"{contract.last_event_id}:{pressure.id}"), employer_ref=employer,
-                contract_id=contract.id, target=target,
-                current_target=contract.staffing_target,
-                workforce_limit=contract.workforce_limit, pressure_event_id=pressure.id))
+        if pressure.event_type != "permanent_employment_unpaid":
+            current_target = contract.staffing_target
+            for target in sorted({max(1, current_target // 4),
+                                  max(1, current_target // 2)}):
+                if target >= current_target:
+                    continue
+                options.append(EmploymentStaffingOption(
+                    id=(f"employment-staffing:{contract.id}:{target}:{world.clock.absolute_day}:"
+                        f"{contract.last_event_id}:{pressure.id}"), employer_ref=employer,
+                    contract_id=contract.id, target=target,
+                    current_target=contract.staffing_target,
+                    workforce_limit=contract.workforce_limit, pressure_event_id=pressure.id))
         if contract.staffing_target > 0:
             target = 0
             options.append(EmploymentStaffingOption(
@@ -342,22 +397,41 @@ def employment_staffing_options(world, employer):
 
 def _staffing_causes(world, option):
     contract = world.economy.employment_contracts[option.contract_id]
+    account_contracts = _standing_contracts(world, contract.account_id)
+    livelihood = next((
+        reading
+        for reading in _own_local_livelihood_readings(world, option.employer_ref)
+        if reading["settlement_id"] == contract.settlement_id
+    ), None)
+    local_sources = tuple(
+        event_id
+        for event_id in (livelihood["source_event_ids"] if livelihood is not None else ())
+    )
+    report = _current_local_staffing_report(world, option.employer_ref, contract.settlement_id)
+    affordability_source = (_latest_food_affordability(world, report)["affordability_event_id"]
+                            if report is not None else None)
     return _causes(contract.last_event_id,
                    world.economy.accounts[contract.account_id].last_event_id,
-                   option.pressure_event_id)
+                   *(item.last_event_id for item in account_contracts),
+                   option.pressure_event_id, *local_sources, affordability_source)
 
 
-def record_employment_staffing_decision(world, employer, option_id):
+def record_employment_staffing_decision(world, employer, option_id, *, decision_source):
     option = next((item for item in employment_staffing_options(world, employer)
                    if item.id == option_id), None)
     if option is None:
         raise ValueError("employment staffing option is stale or unknown")
+    if (not isinstance(decision_source, dict)
+            or not isinstance(decision_source.get("kind"), str) or not decision_source["kind"]):
+        raise ValueError("employment staffing decision requires an explicit source")
     return record_event(world, "employment_staffing_decided",
                         ("O empregador decidiu suspender o vínculo no próximo ciclo."
                          if option.target == 0 else
                          "O empregador escolheu um novo alvo de contratação dentro do vínculo vigente."),
                         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-                        decision=option.decision(), cause_ids=_staffing_causes(world, option))
+                        decision=option.decision(),
+                        causal_payload={"decision_source": decision_source},
+                        cause_ids=_staffing_causes(world, option))
 
 
 def set_employment_staffing(world, employer, option_id, *, decision_event_id):
@@ -366,9 +440,13 @@ def set_employment_staffing(world, employer, option_id, *, decision_event_id):
     option = next((item for item in employment_staffing_options(candidate, employer)
                    if item.id == option_id), None)
     decision = candidate.event_index().get(decision_event_id)
+    decision_causes = ({link.cause_event_id for link in decision.causal_links}
+                       if decision is not None else set())
+    required_causes = set(_staffing_causes(candidate, option)) if option is not None else set()
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.day != candidate.clock.absolute_day or decision.decision != option.decision()
-            or option.pressure_event_id not in {link.cause_event_id for link in decision.causal_links}):
+            or not required_causes.issubset(decision_causes)):
         raise ValueError("employment staffing option is stale or has no matching sourced decision")
     require_authority(candidate, employer, "supply")
     require_authority(candidate, employer, "trade")
@@ -505,16 +583,22 @@ def _situation(world, actor, options):
         for report in world.knowledge.settlements_for_actor(actor)
         if report.publisher_ref == actor
     }
+    livelihood = {
+        reading["settlement_id"]: reading
+        for reading in _own_local_livelihood_readings(world, actor)
+    }
     return {
         "you_are": actor.to_dict(),
         "today": world.clock.absolute_day,
         "employment_effect": ("Este vínculo paga trabalho local e reserva pessoas antes da produção mensal; "
                               "não opera instalações nem cria alimentos por si só."),
         "own_production_readings": _own_production_readings(world, actor),
+        "own_local_livelihood_readings": list(livelihood.values()),
         "settlement_reports": [
             {"settlement_id": report.settlement_id, "missing_food": report.missing_food,
              "health": report.health, "unrest": report.unrest,
-             "observed_day": report.observed_day, "event_id": report.event_id}
+             "observed_day": report.observed_day, "event_id": report.event_id,
+             **_latest_food_affordability(world, report)}
             for report in sorted(reports.values(), key=lambda item: item.settlement_id)
         ],
         "employment_options": [
@@ -524,6 +608,8 @@ def _situation(world, actor, options):
              "workforce_limit": option.workforce_limit,
              "wage_per_worker": option.wage_per_worker,
              "pressure": ({"missing_food": reports[option.settlement_id].missing_food,
+                           "unaffordable_food": _latest_food_affordability(
+                               world, reports[option.settlement_id])["unaffordable_food"],
                            "health": reports[option.settlement_id].health,
                            "unrest": reports[option.settlement_id].unrest}
                           if option.settlement_id in reports else None)}
@@ -545,7 +631,7 @@ def permanent_employment_adapters():
         # A stock, cohort and treasury can share the same latest receipt.  The
         # event ledger requires causal links to be unique, so normalize the
         # owner evidence exactly as the direct decision path does.
-        causes_fn=lambda world, option: _causes(*_event_provenance(world, option)), execute_fn=execute,
+        causes_fn=_employment_evidence_event_ids, execute_fn=execute,
         situation_fn=_situation,
     ),)
 
@@ -557,9 +643,9 @@ def employment_staffing_adapters():
         name="employment_staffing", family="employment_staffing",
         options_fn=employment_staffing_options,
         label_fn=lambda option: (
-            (f"Suspender o vínculo {option.contract_id} no próximo ciclo; liberar até "
-             f"{option.workforce_limit} pessoas e a verba correspondente, sem garantir que "
-             "outra atividade as empregue ou produza")
+            (f"Suspender o vínculo {option.contract_id} no próximo ciclo e retirar até "
+             f"{option.workforce_limit} pessoas do alvo de folha; isso não cria renda "
+             "nem as aloca a outra atividade")
             if option.target == 0 else
             (f"Ajustar trabalho remunerado do vínculo {option.contract_id} para até "
              f"{option.target}/{option.workforce_limit} pessoas no próximo ciclo; "
@@ -567,14 +653,120 @@ def employment_staffing_adapters():
         causes_fn=_staffing_causes,
         execute_fn=lambda world, actor, option_id, decision_event_id:
             set_employment_staffing(world, actor, option_id, decision_event_id=decision_event_id),
-        situation_fn=lambda world, actor, options: {
-            "you_are": actor.to_dict(), "today": world.clock.absolute_day,
-            "own_production_readings": _own_production_readings(world, actor),
-            "staffing_options": [
-                _staffing_context(world, option)
-                for option in options],
-        },
+        situation_fn=_staffing_situation,
     ),)
+
+
+def _staffing_situation(world, actor, options):
+    """Expose only current local livelihood facts relevant to these payrolls."""
+    settlement_ids = {
+        world.economy.employment_contracts[option.contract_id].settlement_id
+        for option in options
+    }
+    livelihood = [reading for reading in _own_local_livelihood_readings(world, actor)
+                  if reading["settlement_id"] in settlement_ids]
+    events = world.event_index()
+    reports = []
+    for settlement_id in sorted({item["settlement_id"] for item in livelihood}):
+        report = _current_local_staffing_report(world, actor, settlement_id, events=events)
+        if report is None:
+            continue
+        reports.append({
+            "settlement_id": report.settlement_id,
+            "missing_food": report.missing_food,
+            "health": report.health,
+            "unrest": report.unrest,
+            "observed_day": report.observed_day,
+            "event_id": report.event_id,
+            **_latest_food_affordability(world, report),
+        })
+    # A contract's wage, balance, and current payroll are shared by every
+    # engine-enumerated target. Keep that evidence once per contract instead
+    # of repeating it in each option; the prompt's separate choices still
+    # carry every canonical selection token and label.
+    contracts = {}
+    targets = []
+    target_fields = ("proposed_target", "proposed_contract_payroll",
+                     "account_payroll_after_selected_change")
+    for option in options:
+        context = _staffing_context(world, option)
+        contracts.setdefault(option.contract_id, {
+            key: value for key, value in context.items()
+            if key not in target_fields and key != "id"
+        })
+        targets.append({"contract_id": option.contract_id, **{
+            key: context[key] for key in target_fields
+        }})
+    return {
+        "you_are": actor.to_dict(),
+        "today": world.clock.absolute_day,
+        "own_production_readings": _own_production_readings(world, actor),
+        "own_local_livelihood_readings": livelihood,
+        "settlement_reports": reports,
+        "payroll_limited_production": _staffing_production_context(world, actor, options),
+        "staffing_contracts": [contracts[key] for key in sorted(contracts)],
+        "staffing_options": targets,
+    }
+
+
+def _current_local_staffing_report(world, actor, settlement_id, *, events=None):
+    """Return only the employer's own validated same-day local observation."""
+    report = world.knowledge.settlement_report(actor, settlement_id)
+    if (report is None or report.recipient_ref != actor or report.publisher_ref != actor
+            or report.channel != "local_settlement_report"
+            or report.observed_day != world.clock.absolute_day):
+        return None
+    try:
+        world.knowledge._validate_settlement_report(world, events or world.event_index(), report)
+    except ValueError:
+        return None
+    return report
+
+
+def _staffing_production_context(world, employer, options):
+    """Show the actual authored lines behind the current payroll pressure.
+
+    This is descriptive evidence, not a forecast of what reducing a contract
+    would produce next cycle. Only current production receipts referenced by
+    this employer's staffing affordances are included.
+    """
+    contracts = {
+        option.pressure_event_id: world.economy.employment_contracts[option.contract_id]
+        for option in options
+        if option.employer_ref == employer
+    }
+    events = world.event_index()
+    readings = []
+    for event_id, contract in sorted(contracts.items()):
+        event = events.get(event_id)
+        production = event.causal_payload.get("production", {}) if event is not None else {}
+        facility = world.economy.facilities.get(production.get("facility_id"))
+        if (event is None or event.event_type not in {"production_limited", "production_completed"}
+                or event.day != world.clock.absolute_day or facility is None
+                or facility.last_event_id != event.id
+                or facility.payroll_account_id != contract.account_id):
+            continue
+        stock = world.economy.stocks.get(facility.stock_id)
+        recipe = world.economy.recipes.get(facility.recipe_id)
+        if (stock is None or stock.owner_ref != employer
+                or stock.location_id != production.get("settlement_id")
+                or recipe is None or recipe.id != production.get("recipe_id")):
+            continue
+        readings.append({
+            "event_id": event.id,
+            "observed_day": event.day,
+            "facility_id": facility.id,
+            "site_id": facility.site_id,
+            "settlement_id": stock.location_id,
+            "recipe_id": recipe.id,
+            "occupation": recipe.occupation,
+            "inputs_per_batch": dict(sorted(recipe.inputs.items())),
+            "outputs_per_batch": dict(sorted(recipe.outputs.items())),
+            "batches": production.get("batches"),
+            "capacity": production.get("capacity"),
+            "limitations": list(production.get("limitations", ())),
+        })
+    return readings
 
 
 def _staffing_context(world, option):
@@ -586,6 +778,16 @@ def _staffing_context(world, option):
     """
     contract = world.economy.employment_contracts[option.contract_id]
     account = world.economy.accounts[contract.account_id]
+    pressure = world.event_index().get(option.pressure_event_id)
+    account_contracts = _standing_contracts(world, contract.account_id)
+    current_account_payroll = sum(
+        item.staffing_target * item.wage_per_worker for item in account_contracts
+    )
+    proposed_account_payroll = (
+        current_account_payroll
+        - contract.staffing_target * contract.wage_per_worker
+        + option.target * contract.wage_per_worker
+    )
     return {
         "id": option.id,
         "contract_id": contract.id,
@@ -597,10 +799,14 @@ def _staffing_context(world, option):
         "wage_per_worker": contract.wage_per_worker,
         "current_contract_payroll": option.current_target * contract.wage_per_worker,
         "proposed_contract_payroll": option.target * contract.wage_per_worker,
+        "account_current_standing_contract_payroll": current_account_payroll,
+        "account_payroll_after_selected_change": proposed_account_payroll,
+        "account_standing_contract_count": sum(item.staffing_target > 0 for item in account_contracts),
         "employer_account_balance": account.balance,
         "account_balance_event_id": account.last_event_id,
         "pressure_event_id": option.pressure_event_id,
-        "payroll_scope": "vínculo local apenas; não inclui folha total das instalações",
+        "pressure_event_type": pressure.event_type if pressure is not None else None,
+        "payroll_scope": "compromissos dos vínculos permanentes nesta conta; exclui folha das instalações",
     }
 
 
@@ -636,7 +842,11 @@ def review_permanent_employment_fallback(world, *, excluded_actors=()):
         if not pressured:
             continue
         _, option = max(pressured, key=lambda item: (item[0], tuple(reversed(item[1].id))))
-        decision = record_permanent_employment_decision(world, employer, option.id)
+        decision = record_permanent_employment_decision(
+            world, employer, option.id,
+            decision_source={"kind": "fallback", "policy": "routine-rules",
+                             "rule": "permanent_employment"},
+        )
         created.append(create_permanent_employment(world, option.id, decision_event_id=decision.id))
     return tuple(created)
 

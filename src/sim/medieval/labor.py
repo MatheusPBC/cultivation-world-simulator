@@ -3,6 +3,7 @@
 import hashlib
 
 from src.classes.economy.models import MoneyAccount, Payroll
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.mechanical_language import EntityRef
@@ -75,7 +76,9 @@ def set_income_tax(world, polity_id, income_rate, *, decision_event_id):
     decision = next((e for e in world.events if e.id == decision_event_id), None)
     expected = {"action": "set_income_tax", "actor_ref": actor.to_dict(),
                 "polity_id": polity_id, "income_rate": income_rate}
-    if decision is None or decision.fact_kind != FactKind.DECISION or decision.decision != expected:
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
+            or decision.decision != expected):
         raise ValueError("tax change requires a matching decision")
     if any(e.event_type == "income_tax_changed" and any(link.cause_event_id == decision_event_id
            for link in e.causal_links) for e in world.events):

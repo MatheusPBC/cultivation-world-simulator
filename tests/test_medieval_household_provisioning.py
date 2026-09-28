@@ -2,18 +2,21 @@
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.economy.models import Stock
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
 from src.sim.medieval.household_provisioning import (buy_household_provisions, household_provision_adapters,
+                                                     execute_household_provision_purchase,
+                                                     execute_household_provision_sale,
                                                      household_provision_options, household_provision_sale_options,
                                                      household_stock_id, review_household_provisions)
 from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval import ai_decider
 from src.sim.medieval.intelligence import refresh_reports
-from src.sim.medieval.persistence import load_world, save_world
+from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.migration_policy import review_migration
 
 
@@ -35,14 +38,19 @@ def prepared_offer(pressure=100):
     return world, group, offer, seller
 
 
-def decisions(world, group, offer, seller, quantity=2):
+def decisions(world, group, offer, seller, quantity=2, *, unauthored_party=None):
     terms = {"group_id": group.id, "stock_id": offer.stock_id, "quantity": quantity,
              "unit_price": offer.unit_price, "seller_account_id": seller.id, "offer_id": offer.id}
+    source = {"decision_source": {"kind": "api"}}
+    buyer_origin = CausalOrigin.DETERMINISTIC if unauthored_party == "buyer" else CausalOrigin.ACTOR_DECISION
+    seller_origin = CausalOrigin.DETERMINISTIC if unauthored_party == "seller" else CausalOrigin.ACTOR_DECISION
     buy = record_event(world, "household_provisions_purchase_decided", "Comprar provisões.",
-                       fact_kind=FactKind.DECISION,
+                       fact_kind=FactKind.DECISION, causal_origin=buyer_origin,
+                       causal_payload=source if buyer_origin is CausalOrigin.ACTOR_DECISION else None,
                        decision={"action": "buy_household_provisions", "actor_ref": EntityRef("population_group", group.id).to_dict(), **terms})
     sell = record_event(world, "household_provisions_sale_decided", "Vender provisões.",
-                        fact_kind=FactKind.DECISION,
+                        fact_kind=FactKind.DECISION, causal_origin=seller_origin,
+                        causal_payload=source if seller_origin is CausalOrigin.ACTOR_DECISION else None,
                         decision={"action": "sell_household_provisions", "actor_ref": seller.owner_ref.to_dict(), **terms})
     return buy.id, sell.id
 
@@ -68,6 +76,59 @@ def test_public_offer_buys_real_food_into_a_bounded_household_pantry_without_con
     assert any(delta.owner_id == pantry_id and delta.aspect == "capacity" for delta in receipt.deltas)
 
 
+def test_purchase_receipt_failure_rolls_back_stock_money_and_household_pantry(monkeypatch):
+    import src.sim.medieval.household_provisioning as provisioning
+
+    world, group, offer, seller = prepared_offer()
+    buyer_decision, seller_decision = decisions(world, group, offer, seller)
+    before = world_snapshot(world)
+    record = provisioning.record_event
+
+    def fail_after_purchase_receipt(target, event_type, *args, **kwargs):
+        event = record(target, event_type, *args, **kwargs)
+        if event_type == "household_provisions_purchased":
+            raise RuntimeError("injected failure after household purchase receipt")
+        return event
+
+    monkeypatch.setattr(provisioning, "record_event", fail_after_purchase_receipt)
+    with pytest.raises(RuntimeError, match="after household purchase receipt"):
+        buy_household_provisions(world, group_id=group.id, offer_id=offer.id, quantity=2,
+                                 buyer_decision_id=buyer_decision, seller_decision_id=seller_decision)
+    assert world_snapshot(world) == before
+
+
+def test_seller_acceptance_rolls_back_both_owner_receipts_if_transfer_fails(monkeypatch):
+    import src.sim.medieval.household_provisioning as provisioning
+
+    world, group, _, seller = prepared_offer()
+    buyer = EntityRef("population_group", group.id)
+    purchase_option = household_provision_options(world, buyer)[0]
+    buyer_decision = record_event(world, "buyer_selection", "A coorte seleciona a oferta.",
+                                  fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                  causal_payload={"decision_source": {"kind": "api"}},
+                                  decision=purchase_option.decision())
+    execute_household_provision_purchase(world, buyer, purchase_option.id, buyer_decision.id)
+    sale_option = next(item for item in household_provision_sale_options(world, seller.owner_ref)
+                       if item.response == "accept")
+    seller_decision = record_event(world, "seller_selection", "O vendedor aceita a oferta.",
+                                   fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                   causal_payload={"decision_source": {"kind": "api"}},
+                                   decision=sale_option.decision())
+    before = world_snapshot(world)
+    record = provisioning.record_event
+
+    def fail_after_purchase_receipt(target, event_type, *args, **kwargs):
+        event = record(target, event_type, *args, **kwargs)
+        if event_type == "household_provisions_purchased":
+            raise RuntimeError("injected failure after household purchase receipt")
+        return event
+
+    monkeypatch.setattr(provisioning, "record_event", fail_after_purchase_receipt)
+    with pytest.raises(RuntimeError, match="after household purchase receipt"):
+        execute_household_provision_sale(world, seller.owner_ref, sale_option.id, seller_decision.id)
+    assert world_snapshot(world) == before
+
+
 @pytest.mark.parametrize("invalid", ["stale", "authority", "replay"])
 def test_executor_revalidates_current_bilateral_terms_before_any_effect(invalid):
     world, group, offer, seller = prepared_offer()
@@ -85,10 +146,68 @@ def test_executor_revalidates_current_bilateral_terms_before_any_effect(invalid)
     assert (dict(world.economy.stocks[offer.stock_id].goods), world.economy.accounts[f"household:{group.id}"].balance) == before
 
 
-def test_review_uses_pressure_and_public_offer_but_keeps_quiet_or_unfunded_households_idle():
+@pytest.mark.parametrize("unauthored_party", ["buyer", "seller"])
+def test_bilateral_purchase_rejects_matching_payload_without_actor_authorship(unauthored_party):
+    world, group, offer, seller = prepared_offer()
+    buy, sell = decisions(world, group, offer, seller, unauthored_party=unauthored_party)
+    before = (dict(world_snapshot(world)), list(world.events))
+
+    with pytest.raises(ValueError, match="bilateral decisions"):
+        buy_household_provisions(world, group_id=group.id, offer_id=offer.id, quantity=2,
+                                 buyer_decision_id=buy, seller_decision_id=sell)
+
+    assert (world_snapshot(world), world.events) == before
+
+
+@pytest.mark.parametrize("party", ["buyer", "seller"])
+def test_provider_adapters_reject_deterministic_affordance_copy_without_mutation(party):
+    world, group, _, seller = prepared_offer()
+    buyer = EntityRef("population_group", group.id)
+    if party == "buyer":
+        option = household_provision_options(world, buyer)[0]
+        decision = record_event(world, "copied_household_purchase", "Cópia determinística da opção.",
+                                fact_kind=FactKind.DECISION, decision=option.decision())
+    else:
+        purchase_option = household_provision_options(world, buyer)[0]
+        buyer_decision = record_event(world, "buyer_selection", "Compra escolhida.",
+                                      fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                      causal_payload={"decision_source": {"kind": "api"}},
+                                      decision=purchase_option.decision())
+        execute_household_provision_purchase(world, buyer, purchase_option.id, buyer_decision.id)
+        option = next(item for item in household_provision_sale_options(world, seller.owner_ref)
+                      if item.response == "accept")
+        decision = record_event(world, "copied_household_sale", "Cópia determinística da aceitação.",
+                                fact_kind=FactKind.DECISION, decision=option.decision())
+    before = (world_snapshot(world), list(world.events))
+
+    with pytest.raises(ValueError, match="stale or unknown"):
+        if party == "buyer":
+            execute_household_provision_purchase(world, buyer, option.id, decision.id)
+        else:
+            execute_household_provision_sale(world, seller.owner_ref, option.id, decision.id)
+
+    assert (world_snapshot(world), world.events) == before
+
+
+def test_review_marks_offline_decisions_and_persists_their_source(tmp_path):
     world, group, _, _ = prepared_offer()
     review_household_provisions(world)
     assert world.economy.stocks[household_stock_id(group.id)].goods["food"] > 0
+    decisions = [event for event in world.events
+                 if event.event_type in {"household_provisions_purchase_decided",
+                                         "household_provisions_sale_decided",
+                                         "household_provisions_sale_declined"}]
+    assert decisions
+    assert all(event.causal_origin.value == "actor_decision" for event in decisions)
+    assert all(event.causal_payload["decision_source"]["kind"] == "fallback" for event in decisions)
+    assert all(event.causal_payload["decision_source"]["policy"] == "routine-rules" for event in decisions)
+    path = tmp_path / "offline-provisions.mws"
+    save_world(world, path)
+    resumed = load_world(path)
+    resumed_decisions = [event for event in resumed.events if event.id in {item.id for item in decisions}]
+    assert [event.causal_payload["decision_source"] for event in resumed_decisions] == [
+        event.causal_payload["decision_source"] for event in decisions
+    ]
 
     quiet, quiet_group, _, _ = prepared_offer(pressure=0)
     review_household_provisions(quiet)

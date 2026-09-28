@@ -5,6 +5,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.dated import resolve_dated
@@ -21,7 +22,9 @@ BLUEPRINT = "rite-of-restoration"
 
 def decide(world, option):
     return record_event(world, "rite_decided", "Decisão institucional sobre o rito.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision())
 
 
 def ailing_world(health=700):
@@ -47,7 +50,7 @@ def totals(world):
 
 def started(world, healer):
     offer_option = next(item for item in rite_offer_options(world, healer.id) if item.sponsor_ref == SPONSOR)
-    offer = record_rite_offer(world, healer.id, offer_option.id)
+    offer = record_rite_offer(world, healer.id, offer_option.id, decision_source={"kind": "api"})
     sponsor_option = next(item for item in rite_sponsor_options(world, SPONSOR) if item.offer_event_id == offer.id)
     return offer, sponsor_rite(world, SPONSOR, sponsor_option.id, decide(world, sponsor_option).id)
 
@@ -76,6 +79,7 @@ def test_a_paid_rite_relieves_local_health_and_is_visible_while_it_runs(tmp_path
     assert BLUEPRINT not in report.observation() and rite.stock_id not in report.observation()
     assert str(blueprint.min_skill) not in report.observation()
 
+
     tick_to(world, rite.due_day)
 
     done = world.research.rites[rite.id]
@@ -96,6 +100,21 @@ def test_a_paid_rite_relieves_local_health_and_is_visible_while_it_runs(tmp_path
     path = tmp_path / "rite.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_rite_owner_rejects_deterministic_exact_sponsorship_choice():
+    world, healer = ailing_world()
+    offer_option = next(item for item in rite_offer_options(world, healer.id) if item.sponsor_ref == SPONSOR)
+    offer = record_rite_offer(world, healer.id, offer_option.id, decision_source={"kind": "api"})
+    option = next(item for item in rite_sponsor_options(world, SPONSOR) if item.offer_event_id == offer.id)
+    decision = record_event(world, "rite_decided", "Intenção determinística com payload exato.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current actor decision"):
+        sponsor_rite(world, SPONSOR, option.id, decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(tmp_path):
@@ -142,13 +161,24 @@ def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(
     position_option = next(item for item in force_position_options(world, outsider)
                            if item.detachment_id == "detachment:outsider")
     position_decision = record_event(world, "force_position_decided", "Preparar posição local.",
-                                     fact_kind=FactKind.DECISION, decision=position_option.decision())
+                                     fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                     causal_payload={"decision_source": {"kind": "api"}},
+                                     decision=position_option.decision())
     position = prepare_force_position(world, outsider, position_option.id, position_decision.id)
     tick_to(world, position.ready_day)
     denial = next(item for item in assembly_denial_options(world, outsider)
                   if item.detachment_id == "detachment:outsider" and item.kind == "deny")
     denial_decision = record_event(world, "assembly_denial_decided", "Negar assembleia observada.",
-                                   fact_kind=FactKind.DECISION, decision=denial.decision())
+                                   fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                   causal_payload={"decision_source": {"kind": "api"}},
+                                   decision=denial.decision())
+    deterministic_denial = record_event(world, "assembly_denial_decided",
+                                        "Payload de negação sem escolha do ator.",
+                                        fact_kind=FactKind.DECISION, decision=denial.decision())
+    before_denial = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        execute_assembly_denial_option(world, outsider, denial.id, deterministic_denial.id)
+    assert world_snapshot(world) == before_denial
     with pytest.raises(ValueError, match="stale|unknown"):
         execute_assembly_denial_option(world, outsider, denial.id + ":forged", denial_decision.id)
     assert rite.site_id not in world.society.assembly_denials
@@ -194,7 +224,9 @@ def test_local_observation_and_assembly_denial_interrupt_on_the_next_dated_tick(
     disband = next(item for item in force_options(world, outsider)
                    if item.detachment_id == "detachment:outsider" and item.kind == "disband")
     disband_decision = record_event(world, "detachment_decided", "Dissolver coluna local.",
-                                    fact_kind=FactKind.DECISION, decision=disband.decision())
+                                    fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                    causal_payload={"decision_source": {"kind": "api"}},
+                                    decision=disband.decision())
     execute_force_option(world, outsider, disband.id, disband_decision.id, DISBAND_ACTION)
     assert rite.site_id not in world.society.assembly_denials
     assert any(item.event_type == "assembly_denial_lifted" for item in world.events)
@@ -224,7 +256,9 @@ async def test_religious_assembly_denial_is_a_monthly_institutional_choice(monke
     position_option = next(item for item in force_position_options(world, outsider)
                            if item.detachment_id == "detachment:monthly-denial")
     position_decision = record_event(world, "force_position_decided", "Preparar posição local.",
-                                     fact_kind=FactKind.DECISION, decision=position_option.decision())
+                                     fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                                     causal_payload={"decision_source": {"kind": "api"}},
+                                     decision=position_option.decision())
     position = prepare_force_position(world, outsider, position_option.id, position_decision.id)
     tick_to(world, position.ready_day)
 

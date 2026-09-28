@@ -68,7 +68,7 @@ class MilitaryRecruitmentOption(SocietyValue):
 
 
 def _event(world, event_id):
-    return next((event for event in world.events if event.id == event_id), None)
+    return world.event_index().get(event_id)
 
 
 def labor_shortfall(event, owner_kind, work_id):
@@ -438,6 +438,7 @@ def authorize_military_recruitment(world, actor, option_id, decision_event_id):
                    if item.id == option_id), None)
     decision = _event(world, decision_event_id)
     if (option is None or decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
             or decision.day != world.clock.absolute_day or decision.decision != option.decision()):
         raise ValueError("military recruitment option is stale or was not selected")
     require_authority(world, actor, "military")
@@ -576,7 +577,9 @@ def workforce_adapters():
 def accept_workforce_transition(world, option_id, *, decision_event_id):
     """Validate an acceptance, pay the dated stipend, and reserve Society time."""
     decision = _event(world, decision_event_id)
-    if (decision is None or decision.fact_kind != FactKind.DECISION or decision.day != world.clock.absolute_day
+    if (decision is None or decision.fact_kind != FactKind.DECISION
+            or decision.causal_origin != CausalOrigin.ACTOR_DECISION
+            or decision.day != world.clock.absolute_day
             or not isinstance(decision.decision, dict) or decision.decision.get("action") != "accept_workforce_offer"):
         raise ValueError("workforce transition requires a current acceptance decision")
     group_ref = decision.decision.get("actor_ref")
@@ -701,8 +704,10 @@ def review_workforce_transition_fallback(world, *, excluded_actors=()):
         decision = record_event(
             world, "workforce_transition_decided",
             "O grupo escolheu uma oferta de transição ocupacional enumerada.",
-            fact_kind=FactKind.DECISION,
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
             decision=option.decision(),
+            causal_payload={"decision_source": {"kind": "fallback", "policy": "routine-rules",
+                                                "rule": "workforce_transition"}},
             cause_ids=(world.knowledge.workforce_offer_notices[option.notice_id].event_id,),
         )
         started.append(accept_workforce_transition(world, option.id, decision_event_id=decision.id))

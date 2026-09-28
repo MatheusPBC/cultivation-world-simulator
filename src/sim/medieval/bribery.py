@@ -7,6 +7,7 @@ can grant a scope or office; accepting this proposal does neither.
 from dataclasses import dataclass
 from hashlib import sha256
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for, require_authority
 from src.classes.governance.diplomacy import (PaymentClause, bribery_offer_intent,
@@ -16,7 +17,6 @@ from src.classes.society.models import Identity
 
 from .commitments import fulfill_obligation
 from .diplomacy import offer_proposal, respond_proposal
-from .events import record_event
 from .institutional_decision_turn import DiscretionaryAdapter
 
 
@@ -164,7 +164,9 @@ def bribery_payment_options(world, actor):
 
 def _decision(world, decision_event_id, expected):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision != expected):
         raise ValueError("bribery requires its exact current decision")
     return event
@@ -203,16 +205,9 @@ def execute_bribery_payment(world, actor, option_id, decision_event_id):
     option = next((item for item in bribery_payment_options(world, actor) if item.id == option_id), None)
     if option is None:
         raise ValueError("bribery payment is stale or unknown")
-    _decision(world, decision_event_id, option.decision())
-    authorization_intent = {"action": "pay", "actor_ref": actor.to_dict(),
-                            "source_id": option.source_account_id, "target_id": option.target_account_id,
-                            "amount": option.amount}
-    authorization = record_event(world, "bribery_payment_authorized",
-                                 "O owner autorizou o pagamento de suborno escolhido.",
-                                 fact_kind=FactKind.DECISION, decision=authorization_intent,
-                                 cause_ids=(decision_event_id,))
-    fulfill_obligation(world, option.obligation_id, decision_event_id=authorization.id,
-                       decision_intent=authorization_intent)
+    decision = _decision(world, decision_event_id, option.decision())
+    fulfill_obligation(world, option.obligation_id, decision_event_id=decision.id,
+                       decision_intent=option.decision())
     return world.relations.obligations[option.obligation_id]
 
 
@@ -233,15 +228,15 @@ def _situation(world, _actor, options):
 def bribery_adapters():
     return (
         DiscretionaryAdapter(
-            name="bribery_offer", family="diplomacy", options_fn=bribery_offer_options,
+            name="bribery_offer", family="bribery", options_fn=bribery_offer_options,
             label_fn=lambda option: f"Oferecer {option.amount} unidades monetárias à contraparte.",
             causes_fn=_causes, execute_fn=execute_bribery_offer, situation_fn=_situation),
         DiscretionaryAdapter(
-            name="bribery_response", family="diplomacy", options_fn=bribery_response_options,
+            name="bribery_response", family="bribery", options_fn=bribery_response_options,
             label_fn=lambda option: f"{('Aceitar' if option.response == 'accept' else 'Recusar')} a oferta material.",
             causes_fn=_causes, execute_fn=execute_bribery_response, situation_fn=_situation),
         DiscretionaryAdapter(
-            name="bribery_payment", family="diplomacy", options_fn=bribery_payment_options,
+            name="bribery_payment", family="bribery", options_fn=bribery_payment_options,
             label_fn=lambda _option: "Cumprir o pagamento material aceito.",
             causes_fn=_causes, execute_fn=execute_bribery_payment, situation_fn=_situation),
     )

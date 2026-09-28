@@ -14,6 +14,7 @@ from contextlib import redirect_stdout
 import json
 from pathlib import Path
 import sys
+from time import perf_counter
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -24,6 +25,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Keep the allowance explicit and generous here; budget/latency behavior is
 # exercised by the separate provider probe and decision-turn tests.
 FIXTURE_AI_CALLS_PER_STEP = 256
+V1_BUDGET = {
+    "run_s": 3600,
+    "peak_rss_bytes": 4 * 1024**3,
+    "save_bytes": 512 * 1024**2,
+    "save_s": 60,
+    "load_s": 60,
+    "monthly_p95_s": 35,
+    "why_p95_s": 2,
+}
 
 
 async def _run_smoke(*args, **kwargs):
@@ -49,8 +59,62 @@ def _checkpoint_audits(result: dict) -> list[dict]:
     return [_audit(Path(item["path"])) for item in result["checkpoints"]]
 
 
+def _why_latency(save: Path) -> dict:
+    """Measure 20 distributed canonical causal queries on the final save."""
+    with redirect_stdout(sys.stderr):
+        from src.sim.medieval.persistence import load_world
+        from src.server.medieval.queries import causal_view
+        world = load_world(save)
+    linked = [event.id for event in world.events if event.causal_links]
+    if len(linked) < 20:
+        raise ValueError("final V1 gate needs at least 20 causally linked events")
+    samples = []
+    for index in range(20):
+        event_id = linked[index * (len(linked) - 1) // 19]
+        started = perf_counter()
+        view = causal_view(world, event_id, after=0, limit=100)
+        samples.append(perf_counter() - started)
+        expected_causes = {link.cause_event_id for link in view.event.causal_links}
+        if (view.event.id != event_id
+                or {cause.id for cause in view.causes} != expected_causes
+                or not expected_causes
+                or any(not any(link.cause_event_id == event_id for link in effect.causal_links)
+                       for effect in view.effects)):
+            raise ValueError("why() returned an unnavigable causal link")
+    return {"queries": len(samples), "p95_s": round(sorted(samples)[18], 4),
+            "links_verified": True}
+
+
+def _v1_budget_result(result: dict, why: dict) -> dict:
+    """Apply the frozen pre-gate limits, never a post-hoc adjusted budget."""
+    observed = {
+        "run_s": result["elapsed_s"],
+        "peak_rss_bytes": result["memory_high_water_bytes"],
+        "save_bytes": result["save_bytes"],
+        "save_s": result["save_elapsed_s"],
+        "load_s": result["load_elapsed_s"],
+        "monthly_p95_s": result["monthly_p95_seconds"],
+        "why_p95_s": why["p95_s"],
+    }
+    checks = {name: observed[name] is not None and observed[name] <= limit
+              for name, limit in V1_BUDGET.items()}
+    checks["monthly_samples"] = len(result["monthly_advance_seconds"]) == 120
+    checks["why_samples"] = why["queries"] == 20
+    checks["why_links"] = why["links_verified"] is True
+    return {"limits": dict(V1_BUDGET), "observed": observed, "checks": checks,
+            "ok": all(checks.values())}
+
+
 async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, pressured: bool,
-                   economic: bool = False, checkpoint_days: int | None = None) -> dict:
+                   economic: bool = False, checkpoint_days: int | None = None,
+                   final_v1: bool = False) -> dict:
+    if final_v1 and (days != 3600 or len(seeds) != 3 or len(set(seeds)) != 3
+                     or pressured or economic or checkpoint_days is None
+                     or checkpoint_days <= 0
+                     or checkpoint_days > 360 or 3600 % checkpoint_days):
+        raise ValueError("final V1 gate requires three natural seeds, 3600 days and annual-or-finer checkpoints")
+    if final_v1 and any((output_dir / f"natural-{seed}.mws").exists() for seed in seeds):
+        raise ValueError("final V1 gate refuses to overwrite an existing natural save")
     output_dir.mkdir(parents=True, exist_ok=True)
     natural = []
     for seed in seeds:
@@ -58,7 +122,9 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
         result = await _run_smoke(seed, days, save, checkpoint_days=checkpoint_days)
         checkpoint_audits = _checkpoint_audits(result)
         natural.append({"result": result, "audit": _audit(save),
-                        "checkpoint_audits": checkpoint_audits})
+                        "checkpoint_audits": checkpoint_audits,
+                        "budget": (_v1_budget_result(result, _why_latency(save))
+                                   if final_v1 else None)})
 
     pressured_run = None
     if pressured:
@@ -85,7 +151,6 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
                 checkpoint_days=checkpoint_days)
             comparison[profile] = {"result": result, "audit": _audit(save),
                                    "checkpoint_audits": _checkpoint_audits(result)}
-        quiet = comparison["desatento"]
         relief = comparison["alivio"]
         market = comparison["mercado"]
         mobility = comparison["mobilidade"]
@@ -122,7 +187,8 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
                               for checkpoint in item["result"]["checkpoints"])
                       and item["result"]["save_load_equivalent"]
                       and item["result"]["money_conserved"]
-                      and item["result"]["all_resources_accounted"] for item in natural)
+                      and item["result"]["all_resources_accounted"]
+                      and (not final_v1 or item["budget"]["ok"]) for item in natural)
     pressured_ok = (not pressured or (
         pressured_run["audit"]["ok"]
         and all(audit["ok"] for audit in pressured_run["checkpoint_audits"])
@@ -139,6 +205,7 @@ async def run_gate(seeds: tuple[int, ...], days: int, output_dir: Path, *, press
         "natural": natural,
         "pressured": pressured_run,
         "economic": economic_run,
+        "final_v1": final_v1,
         "natural_ok": natural_ok,
         "pressured_ok": pressured_ok,
         "ok": natural_ok and pressured_ok and (economic_run is None or economic_run["ok"]),
@@ -158,6 +225,8 @@ def main() -> int:
                         help="compare the same pressured seed with NO_ACTION and explicit relief policies")
     parser.add_argument("--checkpoint-days", type=int, default=None,
                         help="write and audit a distinct save at each positive multiple-of-30-day interval")
+    parser.add_argument("--final-v1", action="store_true",
+                        help="enforce the frozen 10-year V1 budgets on three natural seeds")
     args = parser.parse_args()
     try:
         seeds = tuple(int(item.strip()) for item in args.seeds.split(",") if item.strip())
@@ -167,9 +236,15 @@ def main() -> int:
         parser.error("seeds must be non-empty and days must be a positive multiple of 30")
     if args.checkpoint_days is not None and (args.checkpoint_days <= 0 or args.checkpoint_days % 30):
         parser.error("checkpoint-days must be a positive multiple of 30")
+    if args.final_v1 and (args.days != 3600 or len(seeds) != 3 or len(set(seeds)) != 3
+                          or args.pressured or args.economic or args.checkpoint_days is None
+                          or args.checkpoint_days <= 0
+                          or args.checkpoint_days > 360 or 3600 % args.checkpoint_days):
+        parser.error("--final-v1 requires three natural seeds, --days 3600 and annual-or-finer checkpoints")
     report = asyncio.run(run_gate(seeds, args.days, args.output_dir,
                                   pressured=args.pressured, economic=args.economic,
-                                  checkpoint_days=args.checkpoint_days))
+                                  checkpoint_days=args.checkpoint_days,
+                                  final_v1=args.final_v1))
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if report["ok"] else 1
 

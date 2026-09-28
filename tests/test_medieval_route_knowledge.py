@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.knowledge import route_report_id
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -108,6 +109,8 @@ async def test_route_report_exposes_only_aggregate_daily_traffic(tmp_path):
     source, destination = "stock:campomanso", "stock:pedraclara"
     decision = record_event(
         world, "freight_decided", "Remessa autorizada.", fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "freight", "source_id": source, "destination_id": destination,
                   "resource_id": "food", "quantity": 100, "route_ids": [ROUTE],
                   "actor_ref": world.economy.stocks[source].owner_ref.to_dict()},
@@ -163,6 +166,9 @@ def test_bulletin_reaches_the_observed_place_but_not_a_disconnected_holder():
     decision = next(e for e in world.events for link in delivery.causal_links if e.id == link.cause_event_id
                     and e.event_type == "route_report_published")
     assert decision.decision["action"] == "publish_route_report"
+    assert decision.causal_origin == CausalOrigin.DETERMINISTIC
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "owner", "owner": "knowledge", "rule": "monthly_route_bulletin"}
     assert local.to_dict() in decision.decision["recipients"]
     assert world.knowledge.route_report(remote, route_id) is None
 

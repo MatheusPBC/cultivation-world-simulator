@@ -3,6 +3,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -33,7 +34,9 @@ TARGET = "ferroalto"
 
 def decide(world, option):
     return record_event(world, "administration_concession_decided", "Decisão canônica sobre concessão administrativa.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def tick(world):
@@ -102,6 +105,20 @@ def accepted_concession(world):
     response = next(item for item in administration_concession_response_options(world, DEFENDER)
                     if item.proposal_id == proposal.id and item.response == "accept")
     return respond_administration_concession(world, DEFENDER, response.id, decide(world, response).id)
+
+
+def postwar_concession_world():
+    world, own_id = concession_world()
+    garrison = next(item for item in garrison_options(world, ATTACKER) if item.kind == "garrison")
+    establish_garrison(world, ATTACKER, garrison.id, decide(world, garrison).id)
+    refresh_settlement_reports(world)
+    control = next(item for item in territorial_control_options(world, ATTACKER)
+                   if item.kind == "establish")
+    establish_territorial_control(world, ATTACKER, control.id, decide(world, control).id)
+    refresh_settlement_reports(world)
+    offer = next(item for item in administration_concession_offer_options(world, ATTACKER)
+                 if item.kind == "postwar")
+    return world, own_id, offer
 
 
 def test_acceptance_binds_administration_and_withdrawal_without_transferring():
@@ -183,6 +200,41 @@ def test_breached_postwar_transfer_opens_a_new_remediation_proposal():
     assert world.society.settlements[TARGET].administrator_id == ATTACKER.id
 
 
+def test_postwar_response_stales_if_current_administrator_changed():
+    world, _, offer = postwar_concession_world()
+    proposal = offer_administration_concession(world, ATTACKER, offer.id, decide(world, offer).id)
+    stale_response = next(item for item in administration_concession_response_options(world, DEFENDER)
+                          if item.proposal_id == proposal.id and item.response == "accept")
+
+    # A separate valid administration transfer changes the target while the
+    # old offer is still pending; its former administrator can no longer accept.
+    world.society.transfer_administration(TARGET, DEFENDER.id, "valedouro")
+    stale_decision = decide(world, stale_response)
+    before = (len(world.events), world.relations.proposals[proposal.id].status,
+              world.society.settlements[TARGET].administrator_id)
+    assert not [item for item in administration_concession_response_options(world, DEFENDER)
+                if item.proposal_id == proposal.id]
+    with pytest.raises(ValueError, match="stale or unknown"):
+        respond_administration_concession(world, DEFENDER, stale_response.id,
+                                          stale_decision.id)
+    assert (len(world.events), world.relations.proposals[proposal.id].status,
+            world.society.settlements[TARGET].administrator_id) == before
+
+
+def test_postwar_offer_id_binds_the_administrator_that_was_enumerated():
+    world, _, stale_offer = postwar_concession_world()
+    decision = decide(world, stale_offer)
+    world.society.transfer_administration(TARGET, DEFENDER.id, "valedouro")
+
+    current_ids = {item.id for item in administration_concession_offer_options(world, ATTACKER)
+                   if item.settlement_id == TARGET}
+    assert stale_offer.id not in current_ids
+    before = (len(world.relations.proposals), len(world.relations.obligations))
+    with pytest.raises(ValueError, match="stale or unknown"):
+        offer_administration_concession(world, ATTACKER, stale_offer.id, decision.id)
+    assert (len(world.relations.proposals), len(world.relations.obligations)) == before
+
+
 def test_concession_offer_is_available_in_the_composed_campaign_menu():
     world, _ = concession_world()
     options = concurrent_civil_options(world, ATTACKER)
@@ -200,7 +252,8 @@ def test_current_administrator_fulfills_only_administration_and_persists(tmp_pat
     settlement_before = world.society.settlements[TARGET]
 
     option = administration_transfer_fulfillment_options(world, DEFENDER)[0]
-    obligation = fulfill_administration_transfer(world, DEFENDER, option.id, decide(world, option).id)
+    decision = decide(world, option)
+    obligation = fulfill_administration_transfer(world, DEFENDER, option.id, decision.id)
 
     settlement_after = world.society.settlements[TARGET]
     assert obligation.status == "fulfilled"
@@ -215,6 +268,14 @@ def test_current_administrator_fulfills_only_administration_and_persists(tmp_pat
     assert world.society.detachments[own_id].stage == "present"
     assert world.relations.obligations[f"{proposal.id}:term:1"].status == "active"
     assert any(event.event_type == "settlement_administration_transferred" for event in world.events)
+    transfer_receipt = next(event for event in reversed(world.events)
+                            if event.event_type == "settlement_administration_transferred")
+    assert transfer_receipt.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert transfer_receipt.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": DEFENDER.to_dict(),
+        "selected_affordance_id": option.id,
+    }
     path = tmp_path / "administration-concession.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)

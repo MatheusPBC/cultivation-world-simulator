@@ -4,17 +4,17 @@ import json
 
 import pytest
 
-from src.classes.economy.maintenance import repair_intent
 from src.classes.economy.models import Stock
 from src.classes.environment.infrastructure import InfrastructureSite
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
 from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
-from src.sim.medieval.infrastructure import damage_site, progress_repairs, start_repair
+from src.sim.medieval.infrastructure import damage_site, progress_repairs, review_maintenance
 from src.sim.medieval.institutional_decision_turn import DECLINED_DECISION_EVENT_TYPE
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.research import learn_technology
@@ -35,7 +35,9 @@ LOCAL_STOCK = "stock:auren-ferroalto"
 
 def decide(world, option, event_type="technique_copy_decided"):
     return record_event(world, event_type, "Escolha de uma affordance técnica canônica.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
+                        decision=option.decision())
 
 
 def access_world(*, progress=True):
@@ -73,12 +75,8 @@ def access_world(*, progress=True):
                           deltas=(_delta("site", SITE, "integrity", site.integrity, 0.8),))
     damage_site(world, SITE, event_id=damage.id)
     refresh_site_reports(world, site_ids=(SITE,))
-    blueprint = next(item for item in world.economy.repair_blueprints.values() if item.site_kind == "mine")
-    repair_decision = record_event(
-        world, "repair_decided", "Autorizar reparo estrangeiro já contratado.", fact_kind=FactKind.DECISION,
-        decision=repair_intent(COPIER, SITE, blueprint.id, LOCAL_STOCK, "treasury:auren"),
-    )
-    repair = start_repair(world, SITE, blueprint.id, decision_event_id=repair_decision.id)
+    review_maintenance(world)
+    repair = next(project for project in world.economy.repairs.values() if project.site_id == SITE)
     if not progress:
         return world, sighting, repair
     world.clock = WorldClock(30)
@@ -180,6 +178,13 @@ async def test_missing_evidence_access_prerequisite_or_authority_and_no_action_d
     # canonical owners alone.
     world, _, _ = access_world()
     option, = technique_copy_options(world, COPIER)
+    unauthored = record_event(world, "technique_copy_interpreted", "Payload sem escolha do ator.",
+                              fact_kind=FactKind.DECISION, decision=option.decision())
+    before_unauthored = world_snapshot(world)
+    with pytest.raises(ValueError, match="current actor decision"):
+        open_technique_copy(world, COPIER, option.id, unauthored.id)
+    assert world_snapshot(world) == before_unauthored
+
     decision = decide(world, option)
     before = world_snapshot(world)
     with pytest.raises(ValueError, match="stale or unknown"):

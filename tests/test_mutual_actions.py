@@ -22,6 +22,7 @@ from src.classes.mutual_action.confess import Confess
 from src.classes.mutual_action.swear_brotherhood import SwearBrotherhood
 from src.classes.mutual_action.occupy import Occupy
 from src.classes.action_runtime import ActionStatus
+from src.classes.event import Event
 from src.classes.relation.relation import Relation
 from src.server.runtime.session import DEFAULT_GAME_STATE
 from src.server.runtime.session import GameSessionRuntime
@@ -320,6 +321,11 @@ class TestSpar:
         """
         action = Spar(dummy_avatar, dummy_avatar.world)
         action._last_result = (dummy_avatar, target_avatar, 15.0, 5.0)
+        action._last_result_event = Event(
+            dummy_avatar.world.month_stamp,
+            "The avatars completed a sparring match.",
+            related_avatars=[dummy_avatar.id, target_avatar.id],
+        )
         
         with patch("src.classes.story_event_service.StoryEventService.should_trigger", return_value=True), \
              patch("src.classes.story_event_service.StoryTeller.tell_story", new_callable=AsyncMock) as mock_story:
@@ -329,9 +335,9 @@ class TestSpar:
             result = action.finish(target_avatar=target_avatar)
             events = await result  # The wrapper returns coroutine
             
-            assert len(events) == 1
-            assert events[0].is_story is True
-            assert "great sparring match" in events[0].content
+            story_events = [event for event in events if event.is_story]
+            assert len(story_events) == 1
+            assert "great sparring match" in story_events[0].content
 
     @pytest.mark.asyncio
     async def test_spar_finish_without_result(self, dummy_avatar, target_avatar):

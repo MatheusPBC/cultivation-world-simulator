@@ -5,6 +5,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval import ai_decider
@@ -26,7 +27,7 @@ from src.sim.medieval.institutional_aid_policy import review_institutional_aid_w
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.procurement import (MARKET_PURCHASE_ACTION, SUPPLY_OBJECTIVE_ACTION,
                                           execute_supply_objective_option, market_purchase_options,
-                                          review_supply)
+                                          review_supply, supply_objective_options)
 from src.sim.medieval.institutional_aid import (
     REQUEST_ACTION,
     aid_fulfillment_options,
@@ -51,6 +52,8 @@ def civil_pressure_world():
     report); only after fresh reports arrive does a preview succeed. Nothing
     here force-sets a plan or fabricates a contradiction."""
     world = prepared_world()
+    refresh_reports(world)
+    world.clock = world.clock.advance(1)
     review_supply(world)
     plan = world.strategy.plans[f"plan:{OBJECTIVE_ID}"]
     assert plan.stage == "blocked"
@@ -122,6 +125,12 @@ async def test_no_action_materializes_no_supply_or_aid(monkeypatch):
     assert {k: v for k, v in before.items() if k != "event_count"} == \
         {k: v for k, v in after.items() if k != "event_count"}
     assert after["event_count"] > before["event_count"], "only a zero-delta receipt was added"
+    decision = next(event for event in world.events
+                    if event.event_type == "institutional_decision_turn_declined")
+    source = decision.causal_payload["decision_source"]
+    assert source["kind"] == "provider"
+    assert source["receipt_event_id"] in {link.cause_event_id for link in decision.causal_links}
+    assert world.event_index()[source["receipt_event_id"]].event_type == "ai_decision_declined"
 
 
 async def test_supply_context_is_public_and_shared_without_private_handles(monkeypatch):
@@ -182,8 +191,6 @@ async def test_expansion_is_a_revalidated_civil_affordance(monkeypatch):
     stock = world.economy.stocks[facility.stock_id]
     world.economy.facilities[facility.id] = facility.model_copy(update={"last_batches": facility.max_batches})
     world.economy.stocks[stock.id] = stock.model_copy(update={"goods": {**stock.goods, "tools": 0}})
-    from src.sim.medieval.expansion import expansion_options
-    option = expansion_options(world, stock.owner_ref)[0]
 
     async def call_llm_json(prompt, *args, **kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
@@ -215,19 +222,26 @@ async def test_research_sponsorship_is_a_civil_affordance(monkeypatch):
     async def call_llm_json(prompt, *args, **kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
         selected = next((item["id"] for item in payload["choices"]
-                         if item["label"].startswith("Financiar pesquisa de metallurgy")),
+                         if item["label"].startswith(f"Propor pesquisa de {option.technology_name}")),
                         ai_decider.NO_ACTION)
         return {"selected_id": selected}
 
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", call_llm_json)
-    await review_concurrent_civil_decision_with_provider(world)
+    from src.sim.medieval.concurrent_civil_decision import CIVIL_ADAPTERS
+    from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
+    await review_institutional_decision_turn(world, actor, CIVIL_ADAPTERS)
 
-    projects = [project for project in world.research.projects.values()
-                if project.technology_id == "metallurgy"]
-    assert len(projects) == 1
-    assert projects[0].owner_ref == actor
-    assert projects[0].researcher_id == option.researcher_id
+    assert not world.research.projects, "sponsorship is only an offer until the researcher responds"
+    authorization = next(event for event in world.events if event.event_type == "research_authorized")
+    assert authorization.decision["technology_id"] == "metallurgy"
+    assert authorization.decision["researcher_id"] == option.researcher_id
+    from src.sim.medieval.research import researcher_work_options
+    assert any(item.technology_id == "metallurgy"
+               for item in researcher_work_options(world, option.researcher_id))
+    assert world.agenda.get(
+        f"character-rite-offer-review:{option.researcher_id}:"
+        f"{authorization.causal_links[0].cause_event_id}") is not None
     decision = next(e for e in reversed(world.events)
                     if e.event_type == "institutional_decision_turn_decided")
     assert set(decision.decision) == {"action", "actor_ref", "selected_affordance_id"}
@@ -296,6 +310,35 @@ def test_a_genuinely_expired_option_id_is_rejected_without_any_delta():
         {k: v for k, v in after.items() if k != "event_count"}
 
 
+def test_deterministic_choice_cannot_execute_a_current_supply_affordance():
+    world = civil_pressure_world()
+    option = supply_objective_options(world, REQUESTER)[0]
+    decision = record_event(world, "supply_objective_decided", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="stale or unknown"):
+        execute_supply_objective_option(world, REQUESTER, option.id, decision.id)
+
+    assert world_snapshot(world) == before
+
+
+def test_pending_supply_orders_do_not_keep_a_non_material_supply_choice_available():
+    world = civil_pressure_world()
+    option = supply_objective_options(world, REQUESTER)[0]
+    decision = record_event(
+        world, "supply_objective_decided", "Ator escolheu revisar o abastecimento.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=option.decision(),
+    )
+
+    execute_supply_objective_option(world, REQUESTER, option.id, decision.id)
+
+    assert world.strategy.plans[f"plan:{OBJECTIVE_ID}"].order_ids
+    assert not supply_objective_options(world, REQUESTER)
+
+
 async def test_choosing_supply_uses_the_existing_procurement_executor(monkeypatch):
     world = civil_pressure_world()
     options = concurrent_civil_options(world, REQUESTER)
@@ -327,7 +370,9 @@ async def test_existing_aid_fulfillment_is_in_the_same_monthly_menu(monkeypatch)
                           if item.provider_ref == provider_ref)
     request_decision = record_event(
         world, "aid_request_decided", "Pedido de ajuda escolhido.",
-        fact_kind=FactKind.DECISION, decision=request_option.decision())
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=request_option.decision())
     request = request_institutional_aid(world, REQUESTER, request_option.id, request_decision.id)
 
     world.clock = world.clock.advance(1)
@@ -336,7 +381,9 @@ async def test_existing_aid_fulfillment_is_in_the_same_monthly_menu(monkeypatch)
                            if item.request_event_id == request.id and item.kind == "accept")
     response_decision = record_event(
         world, "aid_response_decided", "Aceite de ajuda escolhido.",
-        fact_kind=FactKind.DECISION, decision=response_option.decision())
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=response_option.decision())
     proposal = respond_institutional_aid(world, provider_ref, response_option.id, response_decision.id)
 
     fulfillment = next(item for item in aid_fulfillment_options(world, provider_ref)
@@ -361,6 +408,18 @@ async def test_existing_aid_fulfillment_is_in_the_same_monthly_menu(monkeypatch)
 
     assert world.relations.obligations[fulfillment.obligation_id].status == "fulfilled"
     assert calls, "the composed boundary should consult the provider"
+    payloads = [json.loads(prompt[prompt.index("{"):]) for prompt in calls]
+    provider_prompt = next(item for item in payloads if item["you_are"] == provider_ref.to_dict())
+    obligation_context = provider_prompt["situation"]["institutional_aid"]["your_accepted_obligations"]
+    assert obligation_context == [{
+        "affordance_id": fulfillment.id,
+        "obligation_id": fulfillment.obligation_id,
+        "creditor_ref": REQUESTER.to_dict(),
+        "resource_id": "food",
+        "quantity": fulfillment.quantity,
+        "due_day": proposal.clauses[0].due_day,
+        "days_until_due": proposal.clauses[0].due_day - world.clock.absolute_day,
+    }]
     assert len([event for event in world.events if event.event_type == "institutional_aid_fulfilled"]) == 1
 
 
@@ -494,10 +553,12 @@ async def test_no_action_creates_no_repair_project(monkeypatch):
 
 async def test_choosing_repair_uses_start_repair_and_leaves_integrity_unchanged(monkeypatch):
     world = repair_pressure_world()
+    refresh_route_reports(world)
     options = concurrent_civil_options(world, MAINTAINER)
     repair_option = next(o for o in options if o.decision()["action"] == REPAIR_AUTHORIZATION_ACTION)
     integrity_before = world.map.infrastructure_sites[SITE].integrity
-    provider(monkeypatch, repair_option.id, [])
+    prompts = []
+    provider(monkeypatch, repair_option.id, prompts)
     claimed, sites, excluded = await review_concurrent_civil_decision_with_provider(world)
     assert sites == {SITE}
     assert len(world.economy.repairs) == 1
@@ -508,8 +569,41 @@ async def test_choosing_repair_uses_start_repair_and_leaves_integrity_unchanged(
     decision = next(e for e in world.events if e.event_type == "institutional_decision_turn_decided")
     assert decision.decision == repair_option.decision()
     assert set(decision.decision) == {"action", "actor_ref", "selected_affordance_id"}
+    assert decision.causal_payload["decision_source"]["kind"] == "provider"
     assert decision.causal_links, "the decision carries canonical evidence, not private state"
     assert decision.causal_origin.value == "actor_decision"
+    authorization = next(event for event in world.events if event.id == project.decision_event_id)
+    assert authorization.causal_payload["decision_source"]["kind"] == "provider"
+    assert authorization.causal_origin.value == "deterministic"
+    assert decision.id in {link.cause_event_id for link in authorization.causal_links}
+    payload = json.loads(prompts[0].rsplit("\n", 1)[1])
+    opportunity = payload["situation"]["infrastructure_maintenance"]["opportunities"][0]
+    site = world.map.infrastructure_sites[SITE]
+    report = world.knowledge.site_report(MAINTAINER, SITE)
+    blueprint = next(item for item in world.economy.repair_blueprints.values()
+                     if item.site_kind == site.kind)
+    stock = next(item for item in world.economy.stocks.values()
+                 if item.owner_ref == MAINTAINER
+                 and world.society.settlements[item.location_id].region_id in site.region_ids)
+    account = next(item for item in world.economy.accounts.values() if item.owner_ref == MAINTAINER)
+    assert opportunity["affordance_id"] == repair_option.id
+    assert opportunity["site"]["report_event_id"] == report.event_id
+    assert opportunity["site"]["integrity"] == report.integrity
+    assert opportunity["standard_batch"]["materials"] == blueprint.inputs
+    assert opportunity["own_local_holdings"] == {
+        "materials": {resource_id: stock.goods.get(resource_id, 0)
+                      for resource_id in sorted(blueprint.inputs)},
+        "treasury_balance": account.balance,
+    }
+    assert len(opportunity["known_route_readings"]) == len(site.route_ids)
+    for route_reading in opportunity["known_route_readings"]:
+        route = world.knowledge.route_report(MAINTAINER, route_reading["route_id"])
+        assert route is not None
+        assert route_reading["event_id"] == route.event_id
+        assert route_reading["observed_day"] == route.observed_day
+        assert route_reading["operational_capacity"] == route.operational_capacity
+    assert "stock_id" not in str(opportunity) and "account_id" not in str(opportunity)
+    assert "stock:" not in prompts[0] and "treasury:" not in prompts[0]
 
 
 def test_a_genuinely_stale_repair_option_is_rejected_without_any_delta():

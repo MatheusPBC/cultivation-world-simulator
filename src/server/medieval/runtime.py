@@ -83,9 +83,17 @@ class MedievalRuntime:
             self._require_paused()
             if self.world is not None and not request.replace:
                 raise RuntimeProblem("WORLD_EXISTS", "Já existe um mundo. Confirme a substituição para criar outro.")
+            if request.ai_enabled:
+                from src.sim.medieval.ai_decider import provider_available
+                if not provider_available():
+                    raise RuntimeProblem("AI_PROVIDER_UNAVAILABLE", "Configure um provedor de IA antes de criar um mundo com decisões por IA.")
             try:
                 candidate = create_medieval_world(request.seed, character_count=request.character_count,
                                                    bootstrap_household_income=True)
+                # The constructor supplies safe defaults for non-API callers;
+                # the validated request is the complete configuration of this run.
+                candidate.config = type(candidate.config).model_validate(
+                    request.model_dump(exclude={"replace"}))
                 self._activate(candidate)
             except Exception as exc:
                 raise self._fail("CREATE_FAILED", "Não foi possível criar e salvar o mundo.", exc) from exc
@@ -123,8 +131,35 @@ class MedievalRuntime:
 
     async def resume(self):
         async with self._lock:
-            self.require_world()
+            world = self.require_world()
+            if world.config.ai_enabled:
+                from src.sim.medieval.ai_decider import provider_available
+                if not provider_available():
+                    raise RuntimeProblem("AI_PROVIDER_UNAVAILABLE", "O mundo está configurado para decisões por IA, mas o provedor não está disponível.")
             self.paused, self.last_error = False, None
+            self.revision += 1
+            self._changed.set()
+            return self._response(self.status())
+
+    async def set_ai_enabled(self, request):
+        async with self._lock:
+            self._require_paused()
+            world = self.require_world()
+            if request.enabled:
+                from src.sim.medieval.ai_decider import provider_available
+                if not provider_available():
+                    raise RuntimeProblem("AI_PROVIDER_UNAVAILABLE", "Configure um provedor de IA antes de habilitar decisões por IA.")
+            previous = world.config
+            world.config = previous.model_copy(update={
+                "ai_enabled": request.enabled,
+                "ai_calls_per_step": request.ai_calls_per_step,
+            })
+            try:
+                persistence.save_world(world, self.save_path(self._auto_id))
+            except Exception as exc:
+                world.config = previous
+                raise self._fail("CONFIG_SAVE_FAILED", "Não foi possível salvar a configuração do mundo.", exc) from exc
+            self.last_error = None
             self.revision += 1
             self._changed.set()
             return self._response(self.status())

@@ -1,5 +1,6 @@
 """Conservative monthly investment policy over an institution's own operations."""
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.models import Objective
@@ -61,8 +62,11 @@ def review_investment(world):
             if account.balance < material_budget + wage_budget + operating_buffer:
                 continue
             decision = record_event(world, 'expansion_decided', f'{site.name}: investir em capacidade utilizada.',
-                fact_kind=FactKind.DECISION, decision={'action': 'expand', 'actor_ref': owner.to_dict(),
+                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                decision={'action': 'expand', 'actor_ref': owner.to_dict(),
                     'facility_id': facility.id, 'blueprint_id': blueprint.id},
+                causal_payload={'decision_source': {'kind': 'fallback', 'policy': 'routine-rules',
+                                                    'rule': 'investment'}},
                 cause_ids=_causes(facility.last_event_id, account.last_event_id, *(stock.last_event_ids.get(r) for r in recipe.outputs)))
             start_expansion(world, facility.id, blueprint.id, decision_event_id=decision.id)
             break

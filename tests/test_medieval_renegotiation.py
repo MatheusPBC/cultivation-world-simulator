@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.sim.medieval.commitments import resolve_diplomacy
 from src.sim.medieval.diplomacy_policy import (
@@ -45,7 +46,9 @@ def test_creditor_can_offer_one_fresh_payment_term_after_known_breach(tmp_path):
     assert _renegotiation_options(world, BUYER) == ()
 
     decision = record_event(world, "renegotiation_decided", "Propor novo prazo após a quebra conhecida.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision(),
                             cause_ids=(option.breach_event_id,))
     assert _execute_renegotiation(world, option, decision.id)
 
@@ -67,11 +70,15 @@ def test_renegotiation_affordance_is_single_use_and_stale_decision_is_rejected()
     world, _, _ = breached_payment_world()
     option = _renegotiation_options(world, SELLER)[0]
     stale = record_event(world, "renegotiation_decided", "Escolha forjada.", fact_kind=FactKind.DECISION,
+                         causal_origin=CausalOrigin.ACTOR_DECISION,
+                         causal_payload={"decision_source": {"kind": "api"}},
                          decision={**option.decision(), "selected_affordance_id": "forged"})
-    with pytest.raises(ValueError, match="exact current decision"):
+    with pytest.raises(ValueError, match="exact current actor decision"):
         _execute_renegotiation(world, option, stale.id)
     assert len(world.relations.proposals) == 1
     decision = record_event(world, "renegotiation_decided", "Propor novo prazo.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision=option.decision())
     assert _execute_renegotiation(world, option, decision.id)
     assert _renegotiation_options(world, SELLER) == ()
@@ -83,7 +90,9 @@ def test_debtor_can_materially_repair_a_known_payment_breach_without_erasing_his
     source_before = world.economy.accounts[option.source_account_id].balance
     target_before = world.economy.accounts[option.target_account_id].balance
     decision = record_event(world, "institutional_decision_turn_decided", "Reparar pagamento descumprido.",
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision(),
                             cause_ids=option.causes())
     assert _execute_payment_remediation(world, option, decision.id)
     obligation = world.relations.obligations[obligation_id]
@@ -121,7 +130,9 @@ def test_teacher_can_remediate_a_paid_but_breached_teaching_term(tmp_path):
     option = next(item for item in _renegotiation_options(world, SELLER)
                   if item.obligation_id == teaching_id)
     decision = record_event(world, 'teaching-remediation-decided', 'Propor novo ensino após breach.',
-                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision(),
                             cause_ids=(option.breach_event_id,))
     assert _execute_renegotiation(world, option, decision.id)
     successor = next(item for item in world.relations.proposals.values()
@@ -131,19 +142,28 @@ def test_teacher_can_remediate_a_paid_but_breached_teaching_term(tmp_path):
     response = next(item for item in _proposal_response_options(world, BUYER)
                     if item.proposal_id == successor.id and item.response == 'accept')
     response_decision = record_event(world, 'teaching-remediation-response', 'Aceitar novo ensino.',
-                                     fact_kind=FactKind.DECISION, decision=response.decision())
+                                     fact_kind=FactKind.DECISION,
+                                     causal_origin=CausalOrigin.ACTOR_DECISION,
+                                     causal_payload={"decision_source": {"kind": "api"}},
+                                     decision=response.decision())
     assert _execute_response(world, response, response_decision.id)
     world.clock = world.clock.advance(1)
 
     teacher = next(item for item in _teaching_options(world, SELLER)
                    if item.proposal_id == successor.id)
     teacher_decision = record_event(world, 'teaching-remediation-consent', 'Autorizar o novo ensino.',
-                                    fact_kind=FactKind.DECISION, decision=teacher.decision())
+                                    fact_kind=FactKind.DECISION,
+                                    causal_origin=CausalOrigin.ACTOR_DECISION,
+                                    causal_payload={"decision_source": {"kind": "api"}},
+                                    decision=teacher.decision())
     assert _execute_teaching(world, teacher, teacher_decision.id)
     learner = next(item for item in _learning_options(world, BUYER)
                    if item.proposal_id == successor.id)
     learner_decision = record_event(world, 'teaching-remediation-acceptance', 'Aceitar o novo ensino.',
-                                    fact_kind=FactKind.DECISION, decision=learner.decision())
+                                    fact_kind=FactKind.DECISION,
+                                    causal_origin=CausalOrigin.ACTOR_DECISION,
+                                    causal_payload={"decision_source": {"kind": "api"}},
+                                    decision=learner.decision())
     assert _execute_learning(world, learner, learner_decision.id)
 
     assert world.relations.obligations[teaching_id].status == 'breached'

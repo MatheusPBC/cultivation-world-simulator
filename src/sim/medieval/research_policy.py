@@ -1,13 +1,16 @@
 """Monthly institutional research and application, using only owned operations."""
 from copy import deepcopy
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.models import Objective
 from src.classes.society.models import SocietyValue
+from src.systems.calendar_agenda import ScheduledSituation
 from .economy import _causes
 from .events import record_event
-from .research import start_research, research_blocker
+from .research import (has_open_research_authorization, research_blocker,
+                       start_research)
 
 
 class ResearchOption(SocietyValue):
@@ -19,6 +22,8 @@ class ResearchOption(SocietyValue):
     stock_id: str
     account_id: str
     researcher_id: str
+    technology_name: str
+    researcher_name: str
     site_event_id: str | None = None
     account_event_id: str | None = None
     stock_event_ids: tuple[str, ...] = ()
@@ -39,6 +44,8 @@ def research_options(world, actor):
             continue
         if any(project.owner_ref == actor and project.stage not in {"completed", "superseded"}
                for project in world.research.projects.values()):
+            continue
+        if has_open_research_authorization(world, actor):
             continue
         accounts = sorted((account for account in economy.accounts.values()
                            if account.owner_ref == actor), key=lambda item: item.id)
@@ -74,7 +81,8 @@ def research_options(world, actor):
                     options.append(ResearchOption(
                         id=option_id, actor_ref=actor, technology_id=technology.id,
                         site_id=site.id, stock_id=stock.id, account_id=account.id,
-                        researcher_id=lead.id, site_event_id=site.last_event_id,
+                        researcher_id=lead.id, technology_name=technology.name,
+                        researcher_name=lead.name, site_event_id=site.last_event_id,
                         account_event_id=account.last_event_id,
                         stock_event_ids=tuple(sorted(stock.last_event_ids.values()))))
     return tuple(options)
@@ -100,15 +108,16 @@ def execute_research_option(world, actor, option_id, decision_event_id):
     source = next((event for event in candidate.events if event.id == decision_event_id), None)
     if (source is None or source.day != candidate.clock.absolute_day
             or source.fact_kind != FactKind.DECISION
+            or source.causal_origin != CausalOrigin.ACTOR_DECISION
             or source.decision != option.decision()
             or source.decision.get("actor_ref") != actor.to_dict()):
         raise ValueError("research requires the current actor decision for the selected affordance")
     # The menu decision carries only the affordance ID.  The owner recomposes
     # private terms into a separate dated authorization receipt before
     # start_research validates and persists the project.
-    sponsor = record_event(
-        candidate, "research_authorized", "A instituição autorizou a pesquisa escolhida.",
-        fact_kind=FactKind.DECISION,
+    record_event(
+        candidate, "research_authorized", "A instituição propôs financiar a pesquisa; o pesquisador ainda precisa responder.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.DETERMINISTIC,
         decision={
             "action": "research", "actor_ref": actor.to_dict(),
             "technology_id": option.technology_id, "site_id": option.site_id,
@@ -116,18 +125,9 @@ def execute_research_option(world, actor, option_id, decision_event_id):
             "researcher_id": option.researcher_id,
         },
         cause_ids=(decision_event_id,))
-    accepted = record_event(
-        candidate, "research_accepted", "O pesquisador aceita participar da pesquisa.",
-        fact_kind=FactKind.DECISION,
-        decision={"action": "research_work", "actor_ref": EntityRef("character", option.researcher_id).to_dict(),
-                  "technology_id": option.technology_id, "site_id": option.site_id,
-                  "stock_id": option.stock_id, "account_id": option.account_id,
-                  "researcher_id": option.researcher_id},
-        cause_ids=(sponsor.id,))
-    start_research(
-        candidate, option.technology_id, option.site_id, option.stock_id, option.account_id,
-        option.researcher_id, sponsor_decision_id=sponsor.id,
-        researcher_decision_id=accepted.id)
+    candidate.agenda.schedule(ScheduledSituation(
+        id=f"character-rite-offer-review:{option.researcher_id}:{decision_event_id}",
+        kind="character_rite_offer_review", due_day=candidate.clock.absolute_day + 1))
     world.__dict__.update(candidate.__dict__)
 
 
@@ -135,7 +135,8 @@ def research_adapters():
     from .institutional_decision_turn import DiscretionaryAdapter
     return (DiscretionaryAdapter(
         name="research", family="production", options_fn=research_options,
-        label_fn=lambda option: f"Financiar pesquisa de {option.technology_id} com {option.researcher_id}.",
+        label_fn=lambda option: (
+            f"Propor pesquisa de {option.technology_name} com {option.researcher_name}."),
         causes_fn=_research_causes, execute_fn=execute_research_option),)
 
 
@@ -187,11 +188,17 @@ def _propose_research(world):
                 continue
             terms = dict(technology_id=tech.id, site_id=site.id, stock_id=stock.id, account_id=account.id, researcher_id=lead.id)
             offer = record_event(world, 'research_decided', f'Financiar {tech.name} com trabalho especializado.',
-                fact_kind=FactKind.DECISION, decision={**terms, 'action': 'research', 'actor_ref': owner.to_dict()},
+                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                decision={**terms, 'action': 'research', 'actor_ref': owner.to_dict()},
+                causal_payload={'decision_source': {'kind': 'fallback', 'policy': 'routine-rules',
+                                                    'rule': 'research_sponsorship'}},
                 cause_ids=_causes(account.last_event_id, site.last_event_id))
             # The deterministic researcher policy accepts qualified, local, paid work consistent with curiosity.
             accepted = record_event(world, 'research_accepted', f'{lead.name} aceita participar da pesquisa.',
-                fact_kind=FactKind.DECISION, decision={**terms, 'action': 'research_work', 'actor_ref': EntityRef('character', lead.id).to_dict()},
+                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                decision={**terms, 'action': 'research_work', 'actor_ref': EntityRef('character', lead.id).to_dict()},
+                causal_payload={'decision_source': {'kind': 'fallback', 'policy': 'routine-rules',
+                                                    'rule': 'researcher_acceptance'}},
                 cause_ids=(offer.id,))
             start_research(world, **terms, sponsor_decision_id=offer.id, researcher_decision_id=accepted.id)
             break
@@ -206,8 +213,12 @@ def _apply_known_techniques(world):
         return
     from .expansion import start_expansion
     from .industrial_lines import line_exists_or_planned
-    economy = world.economy
-    for facility in sorted(economy.facilities.values(), key=lambda f: f.id):
+    # start_expansion commits a transaction copy and replaces world.economy.
+    # Re-read it for each anchor so another facility on the same site cannot
+    # plan the same production line from a stale pre-commit economy.
+    for facility_id in sorted(world.economy.facilities):
+        economy = world.economy
+        facility = economy.facilities[facility_id]
         if any(p.facility_id == facility.id and p.stage != 'completed' for p in economy.expansions.values()):
             continue
         stock = economy.stocks[facility.stock_id]
@@ -234,7 +245,11 @@ def _apply_known_techniques(world):
             if account.balance < cost:
                 continue
             decision = record_event(world, 'adaptation_decided', f'Aplicar conhecimento em {blueprint.name}.',
-                fact_kind=FactKind.DECISION, decision={'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
-                    'facility_id': facility.id, 'blueprint_id': blueprint.id}, cause_ids=_causes(facility.last_event_id, account.last_event_id))
+                fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                decision={'action': 'expand', 'actor_ref': stock.owner_ref.to_dict(),
+                    'facility_id': facility.id, 'blueprint_id': blueprint.id},
+                causal_payload={'decision_source': {'kind': 'fallback', 'policy': 'routine-rules',
+                                                    'rule': 'technology_application'}},
+                cause_ids=_causes(facility.last_event_id, account.last_event_id))
             start_expansion(world, facility.id, blueprint.id, decision_event_id=decision.id)
             break

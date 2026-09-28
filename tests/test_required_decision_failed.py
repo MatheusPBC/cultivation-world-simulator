@@ -30,6 +30,9 @@ from src.sim.simulator_engine.phases.actions import (
     RequiredDecisionFailed,
     phase_decide_actions,
 )
+from src.classes.mechanical_language import EntityRef
+from src.systems.domain_decision_interpreter import DomainDecisionFailed
+from src.systems.single_choice import SingleChoiceDecisionFailed
 from src.utils.llm.exceptions import LLMError, ProviderCallError, ProviderFailureKind
 from src.utils.llm.runtime_mode import llm_test_mode_scope
 
@@ -230,3 +233,49 @@ async def test_run_once_does_not_pause_on_unrelated_exception():
 
     assert runtime.is_effectively_paused() is False
     assert runtime.get_pause_reason() == ""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_kind", ["domain", "single-choice"])
+async def test_run_once_pauses_on_collective_decision_failure(failure_kind):
+    state = dict(DEFAULT_GAME_STATE)
+    state["init_status"] = "ready"
+    runtime = GameSessionRuntime(state)
+    runtime.set_paused(False)
+
+    async def _raise_step():
+        if failure_kind == "domain":
+            raise DomainDecisionFailed(
+                "institutional-aid",
+                EntityRef("institution", "city-1"),
+                LLMError("provider unavailable"),
+            )
+        raise SingleChoiceDecisionFailed(
+            SimpleNamespace(
+                task_name="single_choice",
+                avatar=SimpleNamespace(id="avatar-1"),
+            ),
+            "provider unavailable",
+        )
+
+    sim = SimpleNamespace(step=_raise_step)
+    world = SimpleNamespace(run_config_snapshot={})
+    runtime.set_world_and_sim(world, sim)
+    runner = GameLoopRunner(
+        game_instance={},
+        runtime=runtime,
+        manager=SimpleNamespace(broadcast=AsyncMock()),
+        tick_payload_builder=TickPayloadBuilder(
+            build_avatar_updates=lambda: [],
+            build_tick_state=lambda avatar_updates, events, world: {},
+        ),
+        should_trigger_auto_save=lambda world: (False, 0, 0),
+        trigger_auto_save=lambda world, sim: None,
+        build_auto_save_toast=lambda: {},
+        get_logger=lambda: SimpleNamespace(logger=SimpleNamespace(error=lambda *a, **k: None)),
+    )
+
+    await runner.run_once()
+
+    assert runtime.is_effectively_paused() is True
+    assert runtime.get_pause_reason() == "required_decision_failed"

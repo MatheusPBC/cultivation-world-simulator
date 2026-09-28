@@ -23,11 +23,13 @@ def _latest_food_affordability(world, report):
     """Project only affordability known at the report's actual observation.
 
     ``consume_monthly`` records household purchasing limits in the structured
-    subsistence payload.  The provider gets only aggregate quantities and the
-    source event; balances, cohort IDs and prose never become actor context.
+    subsistence payload. The provider gets aggregate quantities, source event
+    and its age relative to the settlement observation; balances, cohort IDs
+    and prose never become actor context.
     """
     unknown = {"unaffordable_food": 0, "unaffordable_group_count": 0,
-               "affordability_event_id": None}
+               "affordability_event_id": None, "affordability_observed_day": None,
+               "affordability_age_days": None}
     if report is None:
         return unknown
     events = world.event_index()
@@ -50,13 +52,46 @@ def _latest_food_affordability(world, report):
         unaffordable = reading.get("unaffordable_by_group", {})
         if not isinstance(unaffordable, dict):
             return {"unaffordable_food": 0, "unaffordable_group_count": 0,
-                    "affordability_event_id": event.id}
+                    "affordability_event_id": event.id,
+                    "affordability_observed_day": event.day,
+                    "affordability_age_days": max(0, report.observed_day - event.day)}
         amounts = tuple(max(0, int(value)) for value in unaffordable.values()
                         if isinstance(value, int) and not isinstance(value, bool))
         return {"unaffordable_food": sum(amounts),
                 "unaffordable_group_count": len(amounts),
-                "affordability_event_id": event.id}
+                "affordability_event_id": event.id,
+                "affordability_observed_day": event.day,
+                "affordability_age_days": max(0, report.observed_day - event.day)}
     return unknown
+
+
+def recent_creature_attacks_for_report(world, report):
+    """Local observer's recent creature impacts, sourced through that report."""
+    events = world.event_index()
+    observed = events.get(report.event_id)
+    if observed is not None and observed.event_type == "settlement_report_received":
+        observed = next((events.get(link.cause_event_id) for link in observed.causal_links
+                         if events.get(link.cause_event_id) is not None
+                         and events[link.cause_event_id].event_type == "settlement_observed"), None)
+    incidents = []
+    if (observed is not None and observed.event_type == "settlement_observed"
+            and report.observed_day - 30 <= observed.day <= report.observed_day):
+        for link in observed.causal_links:
+            event = events.get(link.cause_event_id)
+            if (event is None or event.event_type != "creature_attacked_population"
+                    or event.day > report.observed_day or event.day < report.observed_day - 30
+                    or event.causal_payload.get("target_settlement_id") != report.settlement_id):
+                continue
+            impact = event.causal_payload.get("hazard_impact", {})
+            loss = next((int(delta.before) - int(delta.after)
+                         for delta in event.deltas
+                         if delta.owner_kind == "population_group" and delta.aspect == "count"
+                         and int(delta.before) >= int(delta.after)), 0)
+            if loss > 0:
+                incidents.append({"event_id": event.id, "day": event.day,
+                                  "hazard_kind": impact.get("hazard_kind"),
+                                  "affected_count": loss})
+    return sorted(incidents, key=lambda item: item["event_id"])
 
 
 def _known_settlement_reports(world, actor):
@@ -64,6 +99,9 @@ def _known_settlement_reports(world, actor):
     for report in world.knowledge.settlements_for_actor(actor):
         reports.append({"settlement_id": report.settlement_id, "missing_food": report.missing_food,
                         "observed_day": report.observed_day, "event_id": report.event_id,
+                        "field_engagements": [item.model_dump(mode="json")
+                                              for item in report.field_engagements],
+                        "recent_creature_attacks": recent_creature_attacks_for_report(world, report),
                         **_latest_food_affordability(world, report)})
     return tuple(reports)
 
@@ -135,12 +173,13 @@ def _own_production_readings(world, actor):
 
 
 def _own_local_livelihood_readings(world, actor):
-    """Show an administrator its current census beside its own paid production.
+    """Show an administrator its census beside its own paid local work.
 
-    A local settlement observation grounds the resident counts.  Only payrolls
-    from the actor's own facilities are included; other employers' accounts,
-    wages and group identities are neither read nor guessed.  If the census
-    predates a population change, the reading waits for another observation.
+    Facility and standing-employment payrolls stay separate because they have
+    different owners and compete through different contracts. Other employers'
+    accounts, wages and group identities are neither read nor guessed. If the
+    census predates a population change, the reading waits for another
+    observation.
     """
     if actor.kind != "polity":
         return ()
@@ -172,6 +211,7 @@ def _own_local_livelihood_readings(world, actor):
         for group in groups.values():
             residents[group.occupation] += group.count
         paid = defaultdict(int)
+        standing_paid = defaultdict(int)
         payroll_sources = []
         for facility in world.economy.facilities.values():
             stock = world.economy.stocks.get(facility.stock_id)
@@ -187,11 +227,25 @@ def _own_local_livelihood_readings(world, actor):
                 if group is not None:
                     paid[group.occupation] += count
             payroll_sources.append(source.id)
+        for contract in world.economy.employment_contracts.values():
+            if (contract.employer_ref != actor or contract.settlement_id != settlement.id):
+                continue
+            payroll = world.economy.payrolls.get(contract.id)
+            source = events.get(payroll.last_event_id) if payroll is not None else None
+            if (payroll is None or payroll.day != day or source is None
+                    or source.sequence > observed.sequence):
+                continue
+            group = groups.get(contract.cohort_id)
+            if group is None or group.occupation != contract.occupation:
+                continue
+            standing_paid[contract.occupation] += payroll.workers_by_group.get(group.id, 0)
+            payroll_sources.append(source.id)
         readings.append({
             "settlement_id": settlement.id,
             "observed_day": report.observed_day,
             "residents_by_occupation": dict(sorted(residents.items())),
             "own_production_paid_workers_by_occupation": dict(sorted(paid.items())),
+            "own_standing_employment_paid_workers_by_occupation": dict(sorted(standing_paid.items())),
             "source_event_ids": tuple(sorted({report.event_id, *payroll_sources})),
         })
     return tuple(readings)

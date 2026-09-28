@@ -9,7 +9,37 @@ stock e relatórios fiscais datados. O fallback `routine-rules` não é IA real:
 polity executa no máximo uma ação por revisão, na prioridade `respond`, `fulfill`,
 `remediate`, `request`. Request usa apenas plano alimentar bloqueado, shortfall
 atual e uma cadeia/settlement aberto; as demais ações usam opções atuais válidas.
+Decisões automáticas de distribuição local também identificam no receipt
+`decision_source.kind=fallback`, `policy=routine-rules` e a regra aplicada; não
+são apresentadas como escolha de provider.
 A agenda permite request em N, reply em N+1 e fulfillment em N+2.
+
+O mesmo marcador identifica os caminhos offline de contratação permanente,
+transição ocupacional e provisões domésticas. Em provisões, `routine-rules`
+seleciona tanto a intenção da coorte quanto a resposta do vendedor; isso não é
+uma decisão bilateral independente de provider. Com IA habilitada, buyer e
+seller recebem decisões próprias. Como pedidos de organizações podem ocorrer
+depois do turno mensal das polities, vendedores com pedidos criados naquele
+boundary recebem uma consulta de resposta separada, limitada aos pedidos atuais;
+isso não escolhe pelo vendedor nem movimenta material até o aceite. A affordance
+de venda apresenta comprador, recurso, quantidade, preço e assentamentos. Falha
+técnica não cai no fallback.
+
+As decisões offline de objetivo de abastecimento/frete, resposta determinística
+do vendedor, tarifa de exportação e suspensão/retomada do serviço de site também
+identificam `routine-rules`. Essa lista descreve os caminhos atualmente
+revisados, não certifica autoria de todos os turnos offline do mundo.
+
+As políticas offline de migração e diplomacia também marcam suas decisões como
+`routine-rules`. Na diplomacia, criação de oferta, resposta, contraproposta,
+cumprimento e divulgação factual da oferta compartilham essa autoria no modo
+offline; no turno composto, a escolha do provider fica ligada ao receipt de
+interpretação, sem se transformar na causa material direta.
+
+Na manutenção, a autorização registra a fonte de quem escolheu a affordance
+(`routine-rules` ou `provider`). Os lotes seguintes usam `owner/economy`, pois
+são execução do projeto já autorizado sob condições materiais vigentes, não
+uma nova decisão atribuída ao mantenedor.
 
 Primeira política institucional executável das etapas2/3. Não equivale a toda a
 estratégia/diplomacia do plano nem à integração de LLM.
@@ -63,8 +93,10 @@ modo, recursos permitidos) permanece pública e estática ali; só capacidade
 operacional e duração de viagem são conhecidas por relatório. Uma instituição
 com povoado em um dos extremos da rota e mandato `supply` vigente observa sua
 própria passagem; essa autoobservação não exige estrada aberta, pois o ator já
-administra o extremo. A publicação mensal é uma decisão `publish_route_report`
-que entrega um recibo (`route_bulletin`) por destinatário, propagado pela rede
+administra o extremo. A publicação mensal é atualmente uma política automática
+do owner de conhecimento, registrada como intenção determinística
+`publish_route_report` (não como escolha consultada ao ator/provider), e entrega
+um recibo (`route_bulletin`) por destinatário, propagado pela rede
 física alcançável apenas a partir dos extremos administrados pelo publicador
 na própria rota observada (via `supply_path`), nunca a partir de outros
 povoados desconectados que o publicador também administre; um destinatário
@@ -76,17 +108,37 @@ inferido do mapa. O painel de inspeção de rota compara o valor datado com a
 capacidade canônica atual lado a lado; o observador onisciente nunca ensina
 esse conhecimento a um ator que não o recebeu.
 
+Um comandante formalmente ligado a uma coluna também pode obter observação
+pessoal de campo, mas somente depois de a coluna marchar ou ficar detida. A
+observação cobre as rotas que tocam a junção física atual derivada do prefixo
+percorrido; ela não revela o restante da rede, não é publicada como boletim e
+não é copiada para a instituição ou para o QG. O receipt `field_route_observation`
+aponta para o movimento/detenção e para a nomeação causal do comandante. Uma
+detenção por rota fechada agenda a revisão independente do comandante; ele pode
+manter, escolher um desvio conhecido ou retrair pelo trecho já percorrido até
+seu assentamento de partida. O owner recompõe as opções e revalida comando,
+ordem política, relatórios pessoais atuais e rotas físicas antes de executar.
+
 `SiteReport` é diferente de um boletim: só o mantenedor com presença local na
 instalação conhece sua integridade/operabilidade. Esse conhecimento permanece
 privado em `KnowledgeState` e não é transmitido automaticamente a outros atores.
+Quando o proprietário ou mantenedor possui um `SiteReport` administrativo
+próprio, atual e do mesmo dia, ele pode observar apenas as rotas que listam
+explicitamente aquela instalação como dependência. O receipt
+`field_infrastructure_route_observation` cita o receipt do site e as causas
+físicas da rota; não é publicado nem copiado para a instituição, QG ou terceiros.
+Assim, conhecer o dano não dá conhecimento remoto de toda a rede.
 
 ### Conhecimento fiscal e escolha de rota
 
 `FiscalRouteReport` é um recibo datado, não uma leitura privada de caixa. O
-operador do posto civil ativo observa seu próprio checkpoint; a publicação exige
-a decisão `publish_fiscal_route_report` e entrega um recibo
+operador do posto civil ativo observa seu próprio checkpoint; a publicação é
+atualmente uma política automática determinística do owner de conhecimento,
+registrada como intenção `publish_fiscal_route_report` (não uma escolha
+consultada ao ator/provider), e entrega um recibo
 `fiscal_route_bulletin` por destinatário alcançável pela rede física. A cadeia é
-`checkpoint ativo → observação do operador → decisão de publicação → boletim`.
+`checkpoint ativo → observação do operador → política determinística de
+publicação → boletim`.
 
 Ao abrir uma nova remessa, `fiscal_route_options` enumera as rotas fisicamente
 conhecidas e seus relatórios fiscais atuais. Uma rota legal sem checkpoint é uma

@@ -1,5 +1,6 @@
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
@@ -24,7 +25,8 @@ def ship(world, amount=100, *, source=SOURCE, destination=DEST, routes=(ROAD,)):
               "resource_id": "food", "quantity": amount, "route_ids": list(routes),
               "actor_ref": world.economy.stocks[source].owner_ref.to_dict()}
     choice = record_event(world, "freight_decided", "Remessa autorizada.",
-                          fact_kind=FactKind.DECISION, decision=intent)
+                          fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                          decision=intent, causal_payload={"decision_source": {"kind": "api"}})
     return queue_freight(world, source, destination, "food", amount, routes, decision_event_id=choice.id)
 
 
@@ -186,12 +188,29 @@ def test_stale_freight_decision_is_rejected_and_leaves_no_new_state():
               "resource_id": "food", "quantity": 100, "route_ids": list((ROAD,)),
               "actor_ref": world.economy.stocks[SOURCE].owner_ref.to_dict()}
     choice = record_event(world, "freight_decided", "Remessa autorizada.",
-                          fact_kind=FactKind.DECISION, decision=intent)
+                          fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                          decision=intent, causal_payload={"decision_source": {"kind": "api"}})
     world.clock = WorldClock(1)
     before = world_snapshot(world)
     from src.sim.medieval.logistics import queue_freight
     with pytest.raises(ValueError, match="stale"):
         queue_freight(world, SOURCE, DEST, "food", 100, (ROAD,), decision_event_id=choice.id)
+    assert world_snapshot(world) == before
+
+
+def test_deterministic_intent_cannot_authorize_material_freight():
+    world = cargo_world()
+    intent = {"action": "freight", "source_id": SOURCE, "destination_id": DEST,
+              "resource_id": "food", "quantity": 100, "route_ids": [ROAD],
+              "actor_ref": world.economy.stocks[SOURCE].owner_ref.to_dict()}
+    choice = record_event(world, "freight_decided", "Intenção determinística de teste.",
+                          fact_kind=FactKind.DECISION, decision=intent)
+    before = world_snapshot(world)
+
+    from src.sim.medieval.logistics import queue_freight
+    with pytest.raises(ValueError, match="matching decision"):
+        queue_freight(world, SOURCE, DEST, "food", 100, (ROAD,), decision_event_id=choice.id)
+
     assert world_snapshot(world) == before
 
 

@@ -32,7 +32,7 @@ causas que o ator não conhece nem cria um segundo dono de conhecimento.
 | Desordem civil | Petição, paralisação de um ciclo, greve organizada local limitada, recusa que aumenta unrest, tumulto material limitado, endosso de residente e resposta independente do governo. | Greve geral, violência coletiva distinta, movimento organizado, rebelião e revolução ainda ausentes; as fatias de greve/tumulto não criam escalada automática. |
 | Onda 11 | Condicionada à evidência das simulações. | Intriga, conspiração e ameaças míticas não iniciadas. |
 
-## Problemas observados no último mundo — não corrigidos neste pacote
+## Problemas observados no mundo histórico — status atual abaixo
 
 Inspeção histórica de 09/09/2026: ano 101, mês 10, 13 Avatares, mundo pausado. Oito estavam respirando qi. Nos últimos 12 meses consultados: 61 eventos, 56 rotineiros, quatro importantes e uma Story. A amostra não é prova de inatividade de todos os sistemas.
 
@@ -40,11 +40,24 @@ Inspeção histórica de 09/09/2026: ano 101, mês 10, 13 Avatares, mundo pausad
 
 A decisão anual da seita 12 registrou `maintain` porque o provider estava indisponível; resumo e crônica apresentaram consolidação como preferência estratégica. O motivo técnico exato ainda não foi determinado: o fallback pode cobrir erro de provider ou parsing.
 
+**Atualização 24/09/2026:** o código atual foi auditado e a causa foi localizada
+no boundary compartilhado de decisões coletivas. Falhas de provider/parsing
+eram convertidas em `maintain` (`source=rule`), com potencial de produzir
+recusa institucional ou resumo de intenção. O intérprete agora propaga
+`DomainDecisionFailed` sem receipt; a transação mensal reverte e o loop pausa.
+53 testes focados passaram, inclusive rollback quando uma decisão coletiva
+posterior falha após uma ação material; o boundary de `single_choice` também
+falha fechado fora de test mode e não aceita automaticamente equipamento após
+falha do provider. Isso corrige o caminho atual, mas não reescreve o evento
+histórico nem prova qual falha ocorreu naquela execução.
+
 - Decisão: `af11cf64-0de9-4993-962b-91e5b4a0b4fb`.
 - Resumo: `c8dc023c-f532-4cf4-8ed8-7719f62103bc`.
-- Inspecionar `domain_decision_interpreter.py`, `sect_decider.py`, projeções e templates.
-- Aceite proposto: distinguir escolha consciente, ausência de affordance e falha técnica, sem inventar motivação; preservar ausência de mutação em falhas.
-- O endpoint causal mostrou `decision: null` enquanto outra projeção tinha motivo: investigar contrato, não assumir perda no storage.
+- Boundary de `domain_decision_interpreter.py` e pausa do loop: corrigidos no
+  checkout atual e cobertos por testes focados.
+- A discrepância histórica entre endpoint causal (`decision: null`) e outra
+  projeção com motivo permanece uma questão de contrato/projeção a investigar;
+  não deve ser confundida com mutação no storage nem com o bug acima.
 
 ### P0 — Crônica confunde mês absoluto e ano
 

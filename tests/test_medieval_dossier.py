@@ -43,7 +43,6 @@ def test_dossier_rejects_unknown_actor():
 def test_dossier_exposes_only_known_causal_links():
     world = create_medieval_world(73)
     actor = EntityRef("polity", "auren")
-    foreign = EntityRef("polity", "valedouro")
     own = record_event(world, "own_decision", "Auren decidiu.", fact_kind=FactKind.DECISION,
                        decision={"action": "observe", "actor_ref": actor.to_dict()})
     hidden = record_event(world, "foreign_fact", "Fato estrangeiro.", fact_kind=FactKind.OCCURRENCE)
@@ -81,3 +80,37 @@ def test_dossier_reports_known_multi_hop_depth_without_leaking_unknown_causes():
     entry = next(item for item in dossier.entries if item.id == f"fact:{third.id}")
     assert entry.causal_depth == 2
     assert entry.cause_event_ids == [second.id]
+
+
+def test_dossier_pages_known_history_without_losing_or_leaking_entries():
+    world = create_medieval_world(73)
+    actor = EntityRef("polity", "auren")
+    events = [record_event(
+        world, f"known_decision_{index}", f"Decisão conhecida {index}.",
+        fact_kind=FactKind.DECISION,
+        decision={"action": "observe", "actor_ref": actor.to_dict()},
+    ) for index in range(3)]
+    foreign = record_event(world, "foreign_fact", "Fato de outra instituição.", fact_kind=FactKind.OCCURRENCE)
+
+    full = actor_dossier(world, actor.kind, actor.id, limit=100)
+    first = actor_dossier(world, actor.kind, actor.id, limit=2)
+    new = record_event(
+        world, "newer_decision", "Uma decisão posterior.", fact_kind=FactKind.DECISION,
+        decision={"action": "observe", "actor_ref": actor.to_dict()},
+    )
+    pages = list(first.entries)
+    next_after = first.next_after
+    while next_after:
+        page = actor_dossier(world, actor.kind, actor.id, after=next_after, limit=2)
+        pages.extend(page.entries)
+        next_after = page.next_after
+    visible_ids = {item.event_id for item in pages if item.category == "known_fact"}
+
+    assert len(first.entries) == 2
+    assert first.has_more is True and first.next_after
+    assert pages == full.entries
+    assert visible_ids == {event.id for event in events}
+    assert all(item.event_id != new.id for item in pages)
+    assert all(item.event_id != foreign.id for item in pages)
+    with pytest.raises(RuntimeProblem, match="Cursor de dossiê inválido"):
+        actor_dossier(world, actor.kind, actor.id, after="invalid")

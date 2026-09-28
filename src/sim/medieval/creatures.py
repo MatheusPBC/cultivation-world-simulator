@@ -169,7 +169,7 @@ def apply_monthly_creature_ecology(world):
         # Keep the engine reading alongside the scalar delta.  The causal
         # links show *which* facts led here; this payload explains the
         # recomputed measurement without asking a narrative layer to infer it.
-        event = event.model_copy(update={"causal_payload": {
+        causal_payload = {
             "ecology": {
                 "species": creature.species,
                 "closed_route_ids": [route.id for route in closed_routes if not route.enabled],
@@ -178,7 +178,15 @@ def apply_monthly_creature_ecology(world):
                 "base_decay": definition.monthly_condition_decay,
                 "total_decay": decay,
             }
-        }})
+        }
+        if not event.causal_links:
+            causal_payload["root_premise"] = {
+                "kind": "world_generation",
+                "domain": "creature_habitat",
+                "source_refs": [{"kind": "creature", "id": creature.id}],
+                "observed_day": world.clock.absolute_day,
+            }
+        event = event.model_copy(update={"causal_payload": causal_payload})
         world.events[-1] = event
         updated = _remember(creature.model_copy(update={"condition": after, "last_event_id": event.id}), event.id)
         world.creatures.creatures[creature.id] = updated
@@ -199,7 +207,9 @@ def _event(world, event_id):
 
 def _decision(world, decision_event_id, action):
     event = _event(world, decision_event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.day != world.clock.absolute_day
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
+            or event.day != world.clock.absolute_day
             or event.decision is None or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
         raise ValueError("creature action requires a current decision")
@@ -234,6 +244,22 @@ def perceive_cargo(world, route_id, cargo_event_id):
     return tuple(perceived)
 
 
+def _route_perception_event(world, creature, route_id):
+    """Return the latest remembered perception of cargo on this exact route."""
+    events = world.event_index()
+    for event_id in reversed(creature.memory_event_ids):
+        perception = events.get(event_id)
+        if perception is None or perception.event_type != "creature_perceived_cargo":
+            continue
+        for link in perception.causal_links:
+            departure = events.get(link.cause_event_id)
+            if (departure is not None and departure.event_type == "cargo_departed"
+                    and any(delta.owner_kind == "route_flow" and delta.owner_id == route_id
+                            for delta in departure.deltas)):
+                return perception
+    return None
+
+
 def creature_options(world, creature_id):
     """Compose one concrete turn from the creature's own physical affordances."""
     creature = world.creatures.creatures.get(creature_id)
@@ -245,7 +271,8 @@ def creature_options(world, creature_id):
     hungry = creature.condition < creature.hunger_threshold
     open_demands = world.creatures.open_demands(creature.id)
     for route_id in creature.route_ids:
-        if hungry and not open_demands and creature.restricted_route_id is None:
+        if (hungry and not open_demands and creature.restricted_route_id is None
+                and _route_perception_event(world, creature, route_id) is not None):
             options.append(CreatureOption(f"{base}:request:{route_id}", creature.id, "request",
                                           route_id=route_id, food=creature.tribute_food))
         expired = [item for item in world.creatures.demands.values()
@@ -258,7 +285,7 @@ def creature_options(world, creature_id):
         target = _damage_target(world, creature, expired_demands=tuple(
             item for item in world.creatures.demands.values()
             if item.creature_id == creature.id and item.stage == "open"
-            and item.due_day < world.clock.absolute_day))
+            and item.due_day <= world.clock.absolute_day))
         if target is not None:
             demand, site = target
             options.append(CreatureOption(
@@ -268,7 +295,7 @@ def creature_options(world, creature_id):
         target = _population_target(world, creature, expired_demands=tuple(
             item for item in world.creatures.demands.values()
             if item.creature_id == creature.id and item.stage == "open"
-            and item.due_day < world.clock.absolute_day))
+            and item.due_day <= world.clock.absolute_day))
         if target is not None:
             demand, group, count = target
             options.append(CreatureOption(
@@ -388,7 +415,7 @@ def _damage_site(world, creature, option, decision):
     """Apply the fixed creature effect to one currently valid Map site."""
     expired = tuple(item for item in world.creatures.demands.values()
                     if item.creature_id == creature.id and item.stage == "open"
-                    and item.due_day < world.clock.absolute_day)
+                    and item.due_day <= world.clock.absolute_day)
     target = _damage_target(world, creature, expired_demands=expired)
     if target is None or target[0].id != option.demand_id or target[1].id != option.site_id:
         raise ValueError("creature site damage is no longer possible")
@@ -452,7 +479,7 @@ def _damage_site(world, creature, option, decision):
 def _attack_population(world, creature, option, decision):
     expired = tuple(item for item in world.creatures.demands.values()
                     if item.creature_id == creature.id and item.stage == "open"
-                    and item.due_day < world.clock.absolute_day)
+                    and item.due_day <= world.clock.absolute_day)
     target = _population_target(world, creature, expired_demands=expired)
     if (target is None or target[0].id != option.demand_id
             or target[1].id != option.population_group_id
@@ -588,6 +615,9 @@ def clear_resolved_damage(world):
 
 
 def _demand(world, creature, option, decision):
+    perception = _route_perception_event(world, creature, option.route_id)
+    if perception is None:
+        raise ValueError("creature has not perceived cargo on this route")
     demand_id = f"creature_demand:{decision.id}"
     day = world.clock.absolute_day
     recipients = _endpoint_administrations(world, option.route_id)
@@ -597,7 +627,7 @@ def _demand(world, creature, option, decision):
                          deltas=(_delta("creature_demand", demand_id, "stage", None, "open"),),
                          cause_ids=_causes(decision.id, creature.last_event_id, creature.last_event_id))
     demand = CreatureDemand(id=demand_id, creature_id=creature.id, route_id=option.route_id, food=option.food,
-                            opened_day=day, due_day=day + DEMAND_DAYS, perception_event_id=creature.last_event_id,
+                            opened_day=day, due_day=day + DEMAND_DAYS, perception_event_id=perception.id,
                             decision_event_id=decision.id, last_event_id=event.id)
     world.creatures.demands[demand.id] = demand
     world.creatures.creatures[creature.id] = _remember(

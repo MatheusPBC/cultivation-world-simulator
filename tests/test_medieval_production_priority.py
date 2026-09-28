@@ -69,13 +69,28 @@ def test_executor_recomposes_and_rejects_stale_id(monkeypatch):
     world, _ = _world()
     option = production_priority_options(world, OWNER)[0]
     event = SimpleNamespace(id="decision:1", day=world.clock.absolute_day,
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            decision=option.decision())
     world.events.append(event)
     draft = execute_production_priority(world, OWNER, option.id, event.id)
     assert draft.facility_id == option.facility_id
     assert draft.effective_day == 60
     with pytest.raises(ValueError, match="stale"):
         execute_production_priority(world, OWNER, "forged", event.id)
+
+
+def test_executor_rejects_copied_decision_without_actor_authorship():
+    world, _ = _world()
+    option = production_priority_options(world, OWNER)[0]
+    event = SimpleNamespace(id="decision:copied", day=world.clock.absolute_day,
+                            fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.DETERMINISTIC,
+                            decision=option.decision())
+    world.events.append(event)
+
+    with pytest.raises(ValueError, match="exact current actor decision"):
+        execute_production_priority(world, OWNER, option.id, event.id)
 
 
 def test_selected_priority_survives_save_and_orders_only_the_next_boundary(tmp_path):
@@ -90,6 +105,7 @@ def test_selected_priority_survives_save_and_orders_only_the_next_boundary(tmp_p
     decision = record_event(
         world, "institutional_decision_turn_decided", "Escolha de produção.",
         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision=option.decision(),
     )
     priority = set_production_priority(world, OWNER, option.id, decision_event_id=decision.id)
@@ -118,3 +134,123 @@ def test_priority_is_registered_in_the_single_monthly_institutional_menu():
     world = create_medieval_world(73)
     assert any(adapter.name == "production_priority" for adapter in monthly_adapters())
     assert OWNER in monthly_actors(world)
+
+
+def test_priority_menu_explains_local_tradeoffs_with_owned_evidence():
+    from src.sim.medieval.intelligence import refresh_reports
+    from src.sim.medieval.production_priority import production_priority_adapters
+
+    world = create_medieval_world(73)
+    refresh_reports(world)
+    options = production_priority_options(world, OWNER)
+    assert len(options) >= 2
+    adapter = production_priority_adapters()[0]
+    from src.sim.medieval.institutional_decision_turn import _composed_situation
+    composed = _composed_situation(
+        world, OWNER, {option.id: (adapter, option) for option in options}
+    )
+    situation = composed["production_priority"]
+
+    report = world.knowledge.settlement_report(OWNER, options[0].settlement_id)
+    assert report is not None
+    assert report.channel == "local_settlement_report"
+    causes = set(adapter.causes_fn(world, options[0]))
+    assert report.event_id in causes
+    cohort_sources = {
+        group.last_event_id for group in world.society.population.values()
+        if group.settlement_id == options[0].settlement_id
+        and group.occupation == options[0].occupation and group.last_event_id
+    }
+    assert cohort_sources <= causes
+    assert report.observed_day <= world.clock.absolute_day
+
+    conflict = next(item for item in situation["payroll_competition"]
+                    if item["settlement_id"] == options[0].settlement_id)
+    assert conflict["settlement_name"] == world.society.settlements[options[0].settlement_id].name
+    assert conflict["settlement_report"]["event_id"] == report.event_id
+    expected_workers = sum(
+        world.society.available_count(group.id) for group in world.society.population.values()
+        if group.settlement_id == options[0].settlement_id
+        and group.occupation == options[0].occupation
+    )
+    assert conflict["society_available_workers"] == expected_workers
+    assert conflict["payroll_balance"] == world.economy.accounts[
+        options[0].payroll_account_id
+    ].balance
+    assert all(line["outputs_per_batch"] and line["inputs_per_batch"] is not None
+               for line in conflict["lines"])
+    assert all("resource_name" in row for line in conflict["lines"]
+               for row in line["outputs_per_batch"] + line["inputs_per_batch"])
+    assert all("unit" in row for line in conflict["lines"]
+               for row in line["outputs_per_batch"] + line["inputs_per_batch"])
+    assert all("available" in row and "source_event_id" in row
+               for line in conflict["lines"] for row in line["inputs_per_batch"])
+    rendered = repr(situation)
+    assert "stock:" not in rendered and "treasury:" not in rendered
+    label = adapter.label_fn(options[0])
+    assert options[0].facility_name in label
+    assert options[0].settlement_name in label
+
+
+def test_menu_labels_applied_priority_as_history_and_names_next_boundary():
+    from src.systems.time import WorldClock
+    from src.sim.medieval.intelligence import refresh_reports
+    from src.sim.medieval.institutional_decision_turn import _composed_situation
+    from src.sim.medieval.production_priority import (
+        production_priority_adapters, set_production_priority,
+    )
+
+    world = create_medieval_world(73)
+    world.clock = WorldClock(30)
+    refresh_reports(world)
+    option = next(item for item in production_priority_options(world, OWNER)
+                  if item.facility_id == "works:campos-de-salgueiro")
+    decision = record_event(
+        world, "institutional_decision_turn_decided", "Prioridade escolhida.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=option.decision(),
+    )
+    priority = set_production_priority(world, OWNER, option.id, decision_event_id=decision.id)
+
+    world.clock = WorldClock(60)
+    produce_monthly(world)
+    options = production_priority_options(world, OWNER)
+    adapter = production_priority_adapters()[0]
+    situation = _composed_situation(
+        world, OWNER, {item.id: (adapter, item) for item in options}
+    )["production_priority"]
+    conflict = next(item for item in situation["payroll_competition"]
+                    if item["settlement_id"] == priority.settlement_id)
+
+    assert conflict["next_effective_day"] == 90
+    current_cycle_workers = sum(
+        payroll.workers_by_group.get(group.id, 0)
+        for payroll in world.economy.payrolls.values()
+        if payroll.day == world.clock.absolute_day
+        for group in world.society.population.values()
+        if group.settlement_id == priority.settlement_id
+        and group.occupation == priority.occupation
+    )
+    assert current_cycle_workers > 0
+    expected_next_cycle_workers = sum(
+        world.society.available_count(group.id) for group in world.society.population.values()
+        if group.settlement_id == priority.settlement_id
+        and group.occupation == priority.occupation
+    )
+    assert conflict["society_available_workers"] == expected_next_cycle_workers
+    from src.sim.medieval.economy import monthly_workforce
+    current_workforce = monthly_workforce(world)
+    remaining_current_cycle = sum(
+        current_workforce[group.id] for group in world.society.population.values()
+        if group.settlement_id == priority.settlement_id
+        and group.occupation == priority.occupation
+    )
+    assert expected_next_cycle_workers > remaining_current_cycle
+    assert conflict["last_applied_priority"] == {
+        "facility_id": priority.facility_id,
+        "facility_name": "Campos de Salgueiro",
+        "effective_day": 60,
+        "event_id": priority.last_event_id,
+    }
+    assert conflict["scheduled_priority"] is None

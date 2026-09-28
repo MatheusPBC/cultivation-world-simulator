@@ -5,6 +5,7 @@ import json
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment
 from src.run.medieval_world import create_medieval_world
@@ -28,7 +29,9 @@ TARGET = "salgueiro"
 
 def decide(world, option):
     return record_event(world, "force_contact_decided", "Decisão diante de presença armada.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}})
 
 
 def contact_world():
@@ -146,6 +149,14 @@ async def test_contact_noaction_or_invalid_authority_cannot_mutate_and_lapse_res
     # tick; the provider's NO_ACTION itself adds only a zero-delta receipt.
     new_events = world.events[before["event_count"]:]
     assert any(event.event_type == ai_decider.DECLINED_EVENT and not event.deltas for event in new_events)
+    decision = next(event for event in new_events if event.event_type == "force_standoff_decided")
+    assert decision.fact_kind is FactKind.DECISION
+    assert decision.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert decision.decision["selected_affordance_id"] == ai_decider.NO_ACTION
+    assert decision.causal_payload["decision_source"]["kind"] == "provider"
+    assert decision.causal_payload["decision_source"]["receipt_event_id"] in {
+        link.cause_event_id for link in decision.causal_links
+    }
     assert not any(event.event_type == "detachment_stood_down" for event in world.events)
 
     option = standoff_options(world, OWNER)[0]

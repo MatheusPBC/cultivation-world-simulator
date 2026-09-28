@@ -26,8 +26,11 @@ def resolve_dated(world, situations):
                           "force", "force_preparation", "force_training", "rite", "rite_interruption", "creature_review", "recourse_review",
                           "character_rite_offer_review", "character_rite_sponsor_review", "character_travel_review",
                           "force_contact_review", "detachment_command_review",
+                          "detachment_march_command_review",
                           "strategy_response_review",
-                          "campaign_supply_review", "field_engagement", "field_aftermath_review", "diplomacy",
+                          "strategy_political_result_review",
+                          "campaign_supply_review", "field_engagement", "field_aftermath_review",
+                          "headquarters_field_response_review", "diplomacy",
                           "diplomatic_review", "investigation", "civic_protest", "generation_maturity", "technique_copy",
                           "siege_campaign", "civic_general_strike"}
            for s in situations):
@@ -60,3 +63,7 @@ def resolve_dated(world, situations):
     observe_campaign_supply_needs(world)
     resolve_rites(world, [s for s in situations if s.kind in {"rite", "rite_interruption"}])
     resolve_diplomacy(world, [s for s in situations if s.kind == "diplomacy"])
+    # An attached commander reaches the destination with the column. If their
+    # appointing office lapsed during the march, release them there rather
+    # than either teleporting them home or retaining tactical authority.
+    revoke_invalid_detachment_commands(world)

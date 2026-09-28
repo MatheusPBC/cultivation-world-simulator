@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass, field
 
+from src.classes.causal_origin import CausalOrigin
+from src.classes.event import FactKind
+
 from .models import Character, Occupation, Organization, Polity, PopulationGroup, Settlement
 from .migration import MigrationJourney
 from .force import (AssemblyDenial, Detachment, DetachmentCommand, DetachmentTraining, FieldEngagement, ForcePosition, ForceStandoff,
@@ -272,18 +275,26 @@ class SocietyState(SocietySerialization):
         for detachment_id, command in self.detachment_commands.items():
             detachment = self.detachments.get(detachment_id)
             character = self.characters.get(command.character_id)
+            attached_march = (detachment is not None and character is not None
+                              and detachment.stage == "marching"
+                              and command.appointed_day == detachment.started_day
+                              and character.location_id == detachment.location_id)
+            local_command = (detachment is not None and character is not None
+                             and detachment.stage == "present"
+                             and character.location_id == detachment.location_id)
             if (detachment_id != command.id or command.detachment_id != detachment_id
                     or detachment is None or character is None or character.death_day is not None
-                    or detachment.stage != "present" or character.location_id != detachment.location_id
+                    or not (attached_march or local_command)
                     or command.character_id in commanded_characters):
-                raise ValueError("detachment command requires one living local person and present column")
+                raise ValueError("detachment command requires one living person attached to its column")
             commanded_characters.add(command.character_id)
             if world is not None:
                 office = world.authority.offices.get(command.office_id)
                 day = world.clock.absolute_day
-                if (office is None or office.institution_ref != command.institution_ref
-                        or "military" not in office.scopes or office.starts_day > day
-                        or (office.ends_day is not None and day >= office.ends_day)):
+                invalid_current_office = (office is None or office.institution_ref != command.institution_ref
+                                          or "military" not in office.scopes or office.starts_day > day
+                                          or (office.ends_day is not None and day >= office.ends_day))
+                if invalid_current_office and not attached_march:
                     raise ValueError("detachment command lacks current military office")
         for site_id, denial in self.assembly_denials.items():
             detachment = self.detachments.get(denial.detachment_id)
@@ -393,7 +404,6 @@ class SocietyState(SocietySerialization):
             raise ValueError("temporary work exceeds its population cohort")
         if world is None:
             return
-        from src.classes.event import FactKind
         from src.classes.mechanical_language import EntityRef
 
         events = world.event_index()
@@ -414,7 +424,9 @@ class SocietyState(SocietySerialization):
             knowledge_id = (f"technology:{detachment.owner_ref.kind}:{detachment.owner_ref.id}:"
                             f"{training.technology_id}")
             if (decision is None or started is None or final is None
-                    or decision.fact_kind != FactKind.DECISION or decision.decision is None
+                    or decision.fact_kind != FactKind.DECISION
+                    or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+                    or decision.decision is None
                     or decision.decision.get("action") != "train_detachment"
                     or decision.decision.get("actor_ref") != detachment.owner_ref.to_dict()
                     or not str(decision.decision.get("selected_affordance_id", "")).startswith(
@@ -486,7 +498,9 @@ class SocietyState(SocietySerialization):
                                     and delta.after == "active" for delta in event.deltas)), None)
             final = events.get(control.last_event_id)
             if (decision is None or started is None or final is None
-                    or decision.fact_kind != FactKind.DECISION or decision.decision is None
+                    or decision.fact_kind != FactKind.DECISION
+                    or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
+                    or decision.decision is None
                     or decision.decision.get("action") != "establish_territorial_control"
                     or decision.decision.get("actor_ref") != {"kind": control.controller_kind,
                                                               "id": control.controller_id}

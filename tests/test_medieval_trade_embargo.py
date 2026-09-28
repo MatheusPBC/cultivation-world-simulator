@@ -6,12 +6,12 @@ counterparty. It touches no route and no other owner's trade, and the target is
 told nothing by decree: it finds out when its own cargo comes back.
 """
 
-import asyncio
 import json
 
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval import ai_decider
 from src.sim.medieval.ai_decider import ProviderDecisionRequired
@@ -36,12 +36,12 @@ CHECKPOINT = f"customs:{SITE}"
 
 
 def declare(world, target_id=TARGET, kind="declare"):
-    from src.sim.medieval.embargo import _terms
-
     option = next(item for item in embargo_options(world, OPERATOR)
                   if item.target_id == target_id and item.kind == kind)
     decision = record_event(world, "trade_embargo_authorized", "Medida comercial.",
-                            fact_kind=FactKind.DECISION, decision=_terms(option))
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            decision=option.decision(),
+                            causal_payload={"decision_source": {"kind": "api"}})
     return execute_embargo(world, option, decision_event_id=decision.id)
 
 
@@ -53,7 +53,9 @@ async def prepared_world():
     actor = world.map.infrastructure_sites[SITE].owner_ref
     option = customs_open_options(world, SITE, actor)[0]
     decision = record_event(world, "customs_open_decided", "Abrir posto.",
-                            fact_kind=FactKind.DECISION, decision=option.decision())
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            decision=option.decision(),
+                            causal_payload={"decision_source": {"kind": "api"}})
     open_customs_checkpoint(world, option.id, decision_event_id=decision.id)
     await MedievalSimulator(world).step()
     assert checkpoint_active(world, world.economy.customs_checkpoints[CHECKPOINT])
@@ -90,6 +92,19 @@ async def test_declaring_and_lifting_is_one_dated_policy_transition():
     assert lifted.event_type == "trade_embargo_lifted"
     assert embargoes_of(world, OPERATOR) == ()
     world.authority.validate(world)
+
+
+async def test_embargo_rejects_an_exact_affordance_without_actor_authorship():
+    world = await prepared_world()
+    option = next(item for item in embargo_options(world, OPERATOR) if item.kind == "declare")
+    interpreted = record_event(world, "trade_embargo_interpreted", "Payload sem escolha da administração.",
+                               fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="new matching owner decision"):
+        execute_embargo(world, option, decision_event_id=interpreted.id)
+
+    assert world_snapshot(world) == before
 
 
 @pytest.mark.parametrize("missing", ["authority", "checkpoint", "target_self", "target_unknown"])
@@ -173,8 +188,7 @@ async def test_the_refused_order_keeps_its_remaining_answers(tmp_path):
     order = ship(world)
     await MedievalSimulator(world).step()
 
-    from src.sim.medieval.freight_recovery import (execute_freight_recovery,
-                                                   freight_recovery_options, refused_routes)
+    from src.sim.medieval.freight_recovery import freight_recovery_options, refused_routes
 
     kept = world.economy.freight_orders[order.id]
     assert kept.delivered_quantity == 0

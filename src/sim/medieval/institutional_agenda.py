@@ -2,10 +2,11 @@
 
 Civil supply/aid/repair, diplomacy, technique copying, civic demands and
 strategic adoption each already expose their own adapters over their own
-unchanged executors. This module only unions those adapters and their actor
-sets, so one institution answers **one** provider consultation per boundary
-across every discretionary domain it currently has, instead of one per
-vertical. It adds no executor, no option and no persisted state.
+unchanged executors. This module unions those adapters and their actor sets,
+so one institution answers one composed consultation instead of one per
+vertical. Newly-created same-day bilateral market requests have a separate
+seller-response pass after buyer turns; it adds no material executor or
+persisted planner.
 
 Deliberately outside the monthly turn: anything already in course (an
 accepted aid obligation being fulfilled or remediated, a promised teaching
@@ -38,10 +39,13 @@ from .technique_copy_policy import technique_copy_actors, technique_copy_adapter
 from .sabotage import (accusation_options, accusation_response_options, investigation_options,
                        sabotage_adapters, sabotage_options)
 from .espionage import espionage_adapters, espionage_options
+from .infrastructure import repair_authorization_options, site_reactivation_options
 from .bribery import (bribery_adapters, bribery_offer_options, bribery_payment_options,
                       bribery_response_options)
 from .technology_sale_policy import technology_sale_actors, technology_sale_adapters
-from .market_purchase_policy import market_purchase_actors
+from .market_purchase_policy import (market_purchase_adapters,
+                                     market_purchase_actors,
+                                     market_purchase_response_actors)
 from .technology_theft import technology_theft_adapters, technology_theft_options
 from .permanent_employment import (employment_staffing_adapters, employment_staffing_options,
                                    permanent_employment_adapters, permanent_employment_options)
@@ -62,6 +66,9 @@ from .household_provisioning import (household_provision_adapters,
 from .assembly_denial import assembly_denial_adapters, assembly_denial_options
 from .campaign_ceasefire import campaign_ceasefire_adapters
 from .force_training import training_adapters, training_options
+from .apprenticeship import apprenticeship_sponsor_adapters, apprenticeship_sponsor_options
+from .family_loans import (family_loan_adapters, family_loan_options,
+                           family_loan_repayment_options, family_loan_request_options)
 
 from src.classes.mechanical_language import EntityRef
 
@@ -82,11 +89,12 @@ def monthly_adapters(*, allow_offers=True):
             *migration_adapters(),
             *garrison_adapters(),
             *household_provision_adapters(),
+            *family_loan_adapters(),
             *relief_adapters(), *civic_adapters(), *strategy_adoption_adapters(),
             *garrison_supply_adapters(), *sabotage_adapters(),
             *training_adapters(),
             *espionage_adapters(), *bribery_adapters(), *assembly_denial_adapters(),
-            *campaign_ceasefire_adapters())
+            *campaign_ceasefire_adapters(), *apprenticeship_sponsor_adapters())
 
 
 def monthly_actors(world):
@@ -100,6 +108,9 @@ def monthly_actors(world):
                   if technology_theft_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if permanent_employment_options(world, actor))
+    actors.update(EntityRef("polity", identity) for identity in world.society.polities
+                  if family_loan_request_options(world, EntityRef("polity", identity))
+                  or family_loan_repayment_options(world, EntityRef("polity", identity)))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if employment_staffing_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
@@ -137,6 +148,9 @@ def monthly_actors(world):
     actors.update(EntityRef("population_group", group.id)
                   for group in world.society.population.values()
                   if household_provision_options(world, EntityRef("population_group", group.id)))
+    actors.update(EntityRef("population_group", group.id)
+                  for group in world.society.population.values()
+                  if family_loan_options(world, EntityRef("population_group", group.id)))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if household_provision_sale_options(world, actor))
     actors.update(strategy_adoption_actors(world))
@@ -147,6 +161,8 @@ def monthly_actors(world):
                   if actor is not None and garrison_supply_options(world, actor))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if espionage_options(world, actor))
+    actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
+                  if apprenticeship_sponsor_options(world, actor))
     # Organizations do not belong to the base polity set.  Include one when
     # it has a material bribery affordance of its own; otherwise an office
     # holder could publish a valid offer/payment/response that never reaches
@@ -156,6 +172,15 @@ def monthly_actors(world):
                   if any(options for options in (bribery_offer_options(world, actor),
                                                  bribery_response_options(world, actor),
                                                  bribery_payment_options(world, actor))))
+    infrastructure_actors = {
+        actor
+        for site in world.map.infrastructure_sites.values()
+        for actor in (site.owner_ref, site.maintainer_ref)
+        if actor is not None
+    }
+    actors.update(actor for actor in infrastructure_actors
+                  if repair_authorization_options(world, actor)
+                  or site_reactivation_options(world, actor))
     # Organizations are not part of the base polity set.  Include one when a
     # current sabotage, investigation, or accusation affordance belongs to it;
     # otherwise the shared conflict adapters would be registered but never
@@ -184,15 +209,32 @@ def monthly_actors(world):
 
 
 async def review_monthly_institutional_turn(world, *, allow_offers=True):
-    """One consultation per institution across every discretionary family.
+    """Compose monthly choices, then resolve newly-created market responses.
 
     Returns the same ``(claims, covered)`` every turn returns: ``claims`` for
     the deterministic passes that must skip a target already offered, and
     ``covered`` for the policies that must not ask the same institution again
     this boundary.
     """
-    return await review_institutional_decision_turn_with_provider(
+    claims, covered_actors = await review_institutional_decision_turn_with_provider(
         world, monthly_adapters(allow_offers=allow_offers), actors=monthly_actors(world))
+    if not world.config.ai_enabled:
+        return claims, covered_actors
+
+    # A polity's normal turn precedes organizational buyers. Their same-day
+    # purchase requests therefore cannot appear in a seller's already-used
+    # menu. Give only the affected sellers a separate response turn after all
+    # buyer choices; no material transfer occurs without that seller choice.
+    response_adapter = next(adapter for adapter in market_purchase_adapters()
+                            if adapter.name == "market_purchase_acceptance")
+    for seller in market_purchase_response_actors(world):
+        response_claims, response_covered = await review_institutional_decision_turn(
+            world, seller, (response_adapter,))
+        for kind, identities in response_claims.items():
+            claims.setdefault(kind, set()).update(identities)
+        if response_covered:
+            covered_actors.add(seller)
+    return claims, covered_actors
 
 
 def daily_adapters(situations):

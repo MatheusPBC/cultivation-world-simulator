@@ -4,23 +4,22 @@ A polity under food pressure may see, in the very same prompt, an
 engine-owned ``SupplyObjectiveOption`` (execute the current supply plan for
 one objective), any currently valid ``AidRequestOption`` for the same
 shortage, and any currently valid ``RepairAuthorizationOption`` for a site it
-maintains, plus NO_ACTION. None of these expose supplier, quantity, route,
-provider, blueprint, stock or account: those stay engine-owned inside their
-existing executors. This module introduces no new option type, resource, term
-or route, and never relaxes institutional aid's or infrastructure's own
-gating (open chain, dated knowledge limits, observation freshness); it only
-registers the existing option lists as adapters of ``institutional_decision_
-turn.py`` and dispatches the chosen ID to its own, unmodified executor. Causes
-given to the provider and recorded on the decision are canonical event IDs
-only — the current settlement/site report and the objective's or repair's own
-plan/receipt evidence, never a private quantity, stock or route.
+maintains, plus NO_ACTION. Supplier terms, foreign inventory and internal
+stock/account handles remain hidden. The maintenance family additionally shows
+the actor its own local repair inputs, treasury balance, dated damage report,
+and only route readings it has received, so it can compare the material
+commitment with its actual context. Owners still calculate and revalidate the
+project and every work batch. This module introduces no new option type,
+resource, term or route, and never relaxes aid or maintenance gating. It
+registers existing option lists as adapters and dispatches the chosen ID to its
+existing executor. Causes recorded on a decision remain canonical event IDs.
 """
 
 from src.classes.mechanical_language import EntityRef
 
 from .diplomacy_policy import schedule_review
-from .infrastructure import (REPAIR_AUTHORIZATION_ACTION, current_observation,
-                             execute_repair_authorization_option, repair_authorization_options,
+from .infrastructure import (current_observation, execute_repair_authorization_option, local_holdings,
+                             missing_permille, repair_authorization_options, site_blueprint,
                              site_reactivation_adapters, site_reactivation_options)
 from .institutional_aid import (
     aid_fulfillment_options,
@@ -37,7 +36,7 @@ from .institutional_aid_policy import _own_open_chain, _pressured_settlements
 from .actor_dossier import _own_production_readings
 from .institutional_decision_turn import (DiscretionaryAdapter,
                                           review_institutional_decision_turn_with_provider)
-from .procurement import (SUPPLY_OBJECTIVE_ACTION, execute_supply_objective_option,
+from .procurement import (execute_supply_objective_option,
                           market_purchase_options, supply_objective_options)
 from .market_purchase_policy import (market_purchase_acceptance_options,
                                      market_purchase_adapters)
@@ -67,6 +66,7 @@ from .campaign_ceasefire import (
     campaign_ceasefire_fulfillment_options,
     campaign_ceasefire_offer_options,
     campaign_ceasefire_response_options,
+    campaign_withdrawal_remediation_options,
     fulfill_campaign_ceasefire,
     offer_campaign_ceasefire,
     respond_campaign_ceasefire,
@@ -208,6 +208,52 @@ def _repair_causes(world, option):
                          (report.event_id if report else None, site.last_event_id) if item}))
 
 
+def _repair_situation(world, actor, options):
+    """Give a maintainer only its own repair terms and dated route knowledge."""
+    opportunities = []
+    for option in sorted(options, key=lambda item: item.id):
+        site = world.map.infrastructure_sites.get(option.site_id)
+        report = current_observation(world, actor, option.site_id)
+        blueprint = site_blueprint(world, site) if site is not None else None
+        stock, account = local_holdings(world, actor, site) if site is not None else (None, None)
+        if site is None or report is None or blueprint is None or stock is None or account is None:
+            raise ValueError("repair context requires the current maintainer report and local terms")
+        route_readings = []
+        for route_id in sorted(site.route_ids):
+            route = world.knowledge.route_report(actor, route_id)
+            if route is None:
+                continue
+            route_readings.append({
+                "route_id": route.route_id,
+                "event_id": route.event_id,
+                "observed_day": route.observed_day,
+                "age_days": max(0, world.clock.absolute_day - route.observed_day),
+                "operational_capacity": route.operational_capacity,
+                "travel_days": route.travel_days,
+            })
+        opportunities.append({
+            "affordance_id": option.id,
+            "site": {"id": site.id, "name": site.name, "kind": site.kind,
+                     "report_event_id": report.event_id, "observed_day": report.observed_day,
+                     "integrity": report.integrity,
+                     "missing_permille": missing_permille(report.integrity),
+                     "enabled": report.enabled},
+            "standard_batch": {
+                "restored_permille": blueprint.restored_permille,
+                "materials": dict(sorted(blueprint.inputs.items())),
+                "workers": blueprint.workers,
+                "wage_per_worker": blueprint.wage_per_worker,
+            },
+            "own_local_holdings": {
+                "materials": {resource_id: stock.goods.get(resource_id, 0)
+                              for resource_id in sorted(blueprint.inputs)},
+                "treasury_balance": account.balance,
+            },
+            "known_route_readings": route_readings,
+        })
+    return {"opportunities": opportunities}
+
+
 def _aid_causes(world, option):
     report = next((item for item in world.knowledge.settlements_for_actor(option.actor_ref)
                   if item.id == option.report_id), None)
@@ -311,12 +357,39 @@ AID_RESPONSE_ADAPTER = DiscretionaryAdapter(
     causes_fn=_aid_response_causes, execute_fn=_execute_aid_response,
     family="institutional_aid")
 
+
+def _aid_fulfillment_situation(world, actor, options):
+    """Show only this debtor's accepted obligation and engine-owned deadline."""
+    obligations = []
+    for option in options:
+        obligation = world.relations.obligations.get(option.obligation_id)
+        proposal = (world.relations.proposals.get(obligation.proposal_id)
+                    if obligation is not None else None)
+        if (obligation is None or proposal is None or obligation.status != "active"
+                or proposal.proposal_kind != "institutional_aid"
+                or not 0 <= obligation.clause_index < len(proposal.clauses)):
+            raise ValueError("aid fulfillment context requires a current obligation")
+        clause = proposal.clauses[obligation.clause_index]
+        if clause.debtor_ref != actor or option.actor_ref != actor:
+            raise ValueError("aid fulfillment context cannot disclose another debtor's obligation")
+        obligations.append({
+            "affordance_id": option.id,
+            "obligation_id": obligation.id,
+            "creditor_ref": clause.creditor_ref.to_dict(),
+            "resource_id": clause.resource_id,
+            "quantity": clause.quantity,
+            "due_day": clause.due_day,
+            "days_until_due": clause.due_day - world.clock.absolute_day,
+        })
+    return {"your_accepted_obligations": obligations}
+
+
 AID_FULFILLMENT_ADAPTER = DiscretionaryAdapter(
     name="aid_fulfillment", options_fn=aid_fulfillment_options,
     label_fn=lambda option: (
         f"Cumprir a ajuda acordada ({option.quantity} {option.resource_id})."),
     causes_fn=_aid_obligation_causes, execute_fn=_execute_aid_fulfillment,
-    family="institutional_aid")
+    family="institutional_aid", situation_fn=_aid_fulfillment_situation)
 
 AID_REMEDIATION_ADAPTER = DiscretionaryAdapter(
     name="aid_remediation", options_fn=aid_remediation_options,
@@ -329,7 +402,8 @@ REPAIR_ADAPTER = DiscretionaryAdapter(
     name="repair_authorization", options_fn=repair_authorization_options,
     label_fn=lambda option: f"Autorizar o reparo da instalação {option.site_id}.",
     causes_fn=_repair_causes, execute_fn=execute_repair_authorization_option,
-    claim_fn=lambda option: ("site", option.site_id))
+    claim_fn=lambda option: ("site", option.site_id), family="infrastructure_maintenance",
+    situation_fn=_repair_situation)
 
 SITE_REACTIVATION_ADAPTER = site_reactivation_adapters()[0]
 
@@ -496,6 +570,7 @@ def concurrent_civil_options(world, actor):
             *campaign_ceasefire_offer_options(world, actor),
             *campaign_ceasefire_response_options(world, actor),
             *campaign_ceasefire_fulfillment_options(world, actor),
+            *campaign_withdrawal_remediation_options(world, actor),
             *administration_concession_offer_options(world, actor),
             *administration_concession_response_options(world, actor),
             *administration_transfer_fulfillment_options(world, actor),

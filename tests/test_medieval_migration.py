@@ -4,6 +4,7 @@ import json
 import pytest
 
 from src.classes.economy.models import Stock
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -41,6 +42,8 @@ def decide(world, option):
                 world.knowledge.settlement_reports[option.destination_report_id].event_id,
                 *(world.knowledge.route_reports[report_id].event_id for report_id in option.route_report_ids)}
     return record_event(world, "migration_decided", "Escolha datada.", fact_kind=FactKind.DECISION,
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
                         decision=option.decision(), cause_ids=tuple(sorted(evidence)))
 
 
@@ -49,6 +52,8 @@ def decide_recovery(world, journey, option):
                 if report_id in world.knowledge.settlement_reports else world.knowledge.route_reports[report_id].event_id
                 for report_id in option.report_ids}
     return record_event(world, "migration_recovery_decided", "Escolha de recuperação.", fact_kind=FactKind.DECISION,
+                        causal_origin=CausalOrigin.ACTOR_DECISION,
+                        causal_payload={"decision_source": {"kind": "api"}},
                         decision=option.decision(journey.source_group_id), cause_ids=tuple(sorted(evidence)))
 
 
@@ -58,6 +63,53 @@ def test_migration_menu_requires_the_household_account_used_by_the_owner():
 
     del world.economy.accounts[f"household:{group.id}"]
     assert migration_options(world, group.id) == ()
+
+
+@pytest.mark.asyncio
+async def test_monthly_migration_rolls_back_after_late_owner_failure(monkeypatch):
+    from src.sim.medieval import migration
+
+    world, _, _ = pressured_household()
+    original = migration._start_migration_in_place
+
+    def fail_after_start(candidate, *args, **kwargs):
+        original(candidate, *args, **kwargs)
+        assert candidate.society.migrations
+        raise RuntimeError("migration failed after start")
+
+    monkeypatch.setattr(migration, "_start_migration_in_place", fail_after_start)
+    simulator = MedievalSimulator(world)
+    for _ in range(30):
+        before = world_snapshot(world)
+        events_before = tuple(world.events)
+        rng_before = world.rng.getstate()
+        try:
+            await simulator.step()
+        except RuntimeError as exc:
+            assert str(exc) == "migration failed after start"
+            assert world_snapshot(world) == before
+            assert tuple(world.events) == events_before
+            assert world.rng.getstate() == rng_before
+            assert not world.society.migrations
+            break
+    else:
+        pytest.fail("monthly migration was not reached")
+
+
+def test_food_access_projection_links_active_population_reservations_without_mutating_world():
+    from src.sim.medieval.household_access import public_food_access_projection
+
+    world, group, _ = pressured_household()
+    before_departure = public_food_access_projection(world, group.settlement_id)
+    option = migration_options(world, group.id)[0]
+    journey = start_migration(world, option.id, decision_event_id=decide(world, option).id)
+    before = world_snapshot(world)
+
+    projection = public_food_access_projection(world, group.settlement_id)
+
+    assert projection["household_cash"] < before_departure["household_cash"]
+    assert journey.last_event_id in projection["food_access_evidence_event_ids"]
+    assert world_snapshot(world) == before
 
 
 @pytest.mark.asyncio
@@ -71,6 +123,11 @@ async def test_known_pressure_moves_household_with_its_own_cash_and_rations(tmp_
     review_migration(world)
     journey = next(iter(world.society.migrations.values()))
     option = next(item for item in options if item.id == world.events[-2].decision["option_id"])
+    decision = next(event for event in world.events if event.event_type == "migration_decided")
+    assert decision.causal_origin.value == "actor_decision"
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "fallback", "policy": "routine-rules", "rule": "migration",
+    }
     assert journey.source_group_id == group.id
     assert world.society.population[group.id].count == group.count
     assert world.society.available_count(group.id) == group.count - journey.count
@@ -162,12 +219,60 @@ def test_migration_option_expires_without_mutating_the_household():
                 world.knowledge.settlement_reports[option.destination_report_id].event_id,
                 *(world.knowledge.route_reports[report_id].event_id for report_id in option.route_report_ids)}
     decision = record_event(world, "migration_decided", "Escolha datada.", fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
                             decision=option.decision(), cause_ids=tuple(sorted(evidence)))
     before = (dict(world.society.migrations), dict(world.economy.accounts), dict(world.economy.migration_provisions))
     world.clock = world.clock.advance(31)
     with pytest.raises(ValueError, match="stale"):
         start_migration(world, option.id, decision_event_id=decision.id)
     assert (world.society.migrations, world.economy.accounts, world.economy.migration_provisions) == before
+
+
+def test_migration_owner_rejects_deterministic_exact_affordance_choice():
+    world, group, _ = pressured_household()
+    option = migration_options(world, group.id)[0]
+    evidence = {world.knowledge.settlement_reports[option.source_report_id].event_id,
+                world.knowledge.settlement_reports[option.destination_report_id].event_id,
+                *(world.knowledge.route_reports[report_id].event_id for report_id in option.route_report_ids)}
+    decision = record_event(world, "migration_decided", "Intenção determinística com opção atual.",
+                            fact_kind=FactKind.DECISION, decision=option.decision(),
+                            cause_ids=tuple(sorted(evidence)))
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="actor decision"):
+        start_migration(world, option.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
+
+
+def test_invalid_named_traveler_does_not_leave_material_authorization_behind():
+    world, group, _ = pressured_household()
+    option = migration_options(world, group.id)[0]
+    decision = decide(world, option)
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError):
+        start_migration(world, option.id, decision_event_id=decision.id,
+                        character_ids=("character:unknown",))
+
+    assert world_snapshot(world) == before
+
+
+def test_migration_validation_failure_does_not_publish_material_effects(monkeypatch):
+    world, group, _ = pressured_household()
+    option = migration_options(world, group.id)[0]
+    decision = decide(world, option)
+    before = world_snapshot(world)
+
+    def reject_candidate(*_args, **_kwargs):
+        raise ValueError("rejected candidate history")
+
+    monkeypatch.setattr("src.sim.medieval.material_execution.validate_history", reject_candidate)
+    with pytest.raises(ValueError, match="rejected candidate history"):
+        start_migration(world, option.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def test_travel_rations_are_not_consumed_twice_on_one_monthly_boundary():
@@ -243,6 +348,40 @@ async def test_stranded_household_can_return_over_real_routes():
 
 
 @pytest.mark.asyncio
+async def test_recovery_failure_after_material_transition_leaves_world_unchanged(monkeypatch):
+    from src.sim.medieval import migration
+
+    world, group, _ = pressured_household()
+    option = min(migration_options(world, group.id), key=lambda item: (len(item.route_ids), item.id))
+    journey = start_migration(world, option.id, decision_event_id=decide(world, option).id)
+    destination = world.society.settlements[option.destination_id]
+    world.society.settlements[destination.id] = destination.model_copy(
+        update={"housing_capacity": world.society.population_at(destination.id)})
+    simulator = MedievalSimulator(world)
+    for _ in range(12):
+        if world.society.migrations[journey.id].stage == "stranded":
+            break
+        await simulator.step()
+    stranded = world.society.migrations[journey.id]
+    assert stranded.stage == "stranded"
+    recovery = next(item for item in recovery_options(world, journey.id)
+                    if item.action == "return_migration")
+    decision = decide_recovery(world, stranded, recovery)
+    before = world_snapshot(world)
+    real_record = migration._record_journey
+
+    def fail_after_record(*args, **kwargs):
+        real_record(*args, **kwargs)
+        raise RuntimeError("later recovery failure")
+
+    monkeypatch.setattr(migration, "_record_journey", fail_after_record)
+    with pytest.raises(RuntimeError, match="later recovery failure"):
+        recover_migration(world, recovery.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
+
+
+@pytest.mark.asyncio
 async def test_blocked_arrival_adds_bounded_destination_pressure_without_forcing_action():
     world, group, _ = pressured_household()
     option = min(migration_options(world, group.id), key=lambda item: (len(item.route_ids), item.id))
@@ -287,7 +426,10 @@ async def test_stranded_household_can_choose_a_second_known_destination():
     reroute = next(item for item in recovery_options(world, journey.id) if item.action == "reroute_migration")
     assert reroute.destination_id not in {group.settlement_id, initial.destination_id}
     before_population = world.society.present_population_at(reroute.destination_id)
-    event = recover_migration(world, reroute.id, decision_event_id=decide_recovery(world, stranded, reroute).id)
+    decision = decide_recovery(world, stranded, reroute)
+    from src.sim.medieval.migration_policy import migration_adapters
+    adapter = next(item for item in migration_adapters() if item.name == "migration_recovery")
+    event = adapter.execute_fn(world, EntityRef("population_group", group.id), reroute.id, decision.id)
     assert event.event_type == "migration_reroute_started"
     assert world.society.migrations[journey.id].destination_id == reroute.destination_id
     assert world.society.present_population_at(reroute.destination_id) == before_population
@@ -295,9 +437,11 @@ async def test_stranded_household_can_choose_a_second_known_destination():
                 if item in world.knowledge.settlement_reports
                 else world.knowledge.route_reports[item].event_id
                 for item in reroute.report_ids}
+    authorization = next(item for item in world.events if item.event_type == "migration_recovery_authorized"
+                         and any(link.cause_event_id == decision.id for link in item.causal_links))
     assert {link.cause_event_id for link in event.causal_links} == evidence | {stranded.last_event_id,
-                                                                                next(item.id for item in world.events
-                                                                                     if item.event_type == "migration_recovery_decided")}
+                                                                                authorization.id}
+    assert {link.cause_event_id for link in authorization.causal_links} == evidence | {decision.id}
 
 
 @pytest.mark.asyncio

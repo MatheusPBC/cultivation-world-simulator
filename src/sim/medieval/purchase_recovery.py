@@ -187,7 +187,8 @@ def purchase_recovery_response_options(world, seller_ref):
 
 def _decision(world, event_id, action):
     event = _event(world, event_id)
-    if (event is None or event.fact_kind != FactKind.DECISION or event.causal_origin == CausalOrigin.LLM_INTERPRETATION
+    if (event is None or event.fact_kind != FactKind.DECISION
+            or event.causal_origin is not CausalOrigin.ACTOR_DECISION
             or event.day != world.clock.absolute_day or event.decision is None
             or event.decision.get("action") != action
             or set(event.decision) != {"action", "actor_ref", "selected_affordance_id"}):
@@ -197,6 +198,14 @@ def _decision(world, event_id, action):
     except (TypeError, KeyError, ValueError) as exc:
         raise ValueError("purchase recovery decision has an invalid actor") from exc
     return event, actor
+
+
+def _authorship(decision, actor):
+    return CausalOrigin.ACTOR_DECISION, {
+        "decision_event_id": decision.id,
+        "actor_ref": actor.to_dict(),
+        "selected_affordance_id": decision.decision["selected_affordance_id"],
+    }
 
 
 def request_purchase_recovery(world, option_id, *, decision_event_id):
@@ -220,8 +229,10 @@ def request_purchase_recovery(world, option_id, *, decision_event_id):
     case_id = f"purchase-recovery:{order.id}:{decision_event_id}"
     if case_id in candidate.economy.freight_recovery_cases:
         raise ValueError("purchase recovery request already recorded")
+    origin, authorship = _authorship(decision, buyer)
     event = record_event(candidate, "purchase_recovery_requested", "O comprador solicitou o reenvio da compra bloqueada.",
                          fact_kind=FactKind.STATE_TRANSITION,
+                         causal_origin=origin, causal_payload=authorship,
                          deltas=(_delta("freight_recovery_case", case_id, "status", None, "requested"),),
                          cause_ids=_causes(decision_event_id, payment.id, opened.id, order.last_event_id, *blocked_events))
     from src.classes.economy.models import FreightRecoveryCase
@@ -254,8 +265,10 @@ def respond_purchase_recovery(world, option_id, *, decision_event_id):
         raise ValueError("purchase recovery case is stale")
     buy, sell, payment, opened, parcel, _, blocked_events = parts
     if option.kind == "reject":
+        origin, authorship = _authorship(decision, seller)
         event = record_event(candidate, "purchase_recovery_rejected", "O vendedor recusou o reenvio da compra.",
                              fact_kind=FactKind.STATE_TRANSITION,
+                             causal_origin=origin, causal_payload=authorship,
                              deltas=(_delta("freight_recovery_case", case.id, "status", "requested", "rejected"),),
                              cause_ids=_causes(decision_event_id, case.request_decision_id, payment.id,
                                                opened.id, order.last_event_id, *blocked_events))
@@ -273,9 +286,11 @@ def respond_purchase_recovery(world, option_id, *, decision_event_id):
     source = candidate.economy.stocks[case.source_id]
     if source.goods.get(case.resource_id, 0) - reserve_quantity(candidate, source.id, case.resource_id) < case.quantity:
         raise ValueError("seller lacks replacement stock")
+    origin, authorship = _authorship(decision, seller)
     successor = open_order(candidate, case.source_id, case.destination_id, case.resource_id, case.quantity,
                            route.route_ids, decision_ids=(decision_event_id,),
-                           cause_ids=(case.request_decision_id, payment.id, opened.id, order.last_event_id, *blocked_events))
+                           cause_ids=(case.request_decision_id, payment.id, opened.id, order.last_event_id, *blocked_events),
+                           causal_origin=origin, causal_payload=authorship)
     # The buyer's already-paid parcel is not destroyed to make room for the
     # replacement.  The accepted re-shipment returns that physically pending
     # cargo to the seller's source stock in the same material resolution that
@@ -292,6 +307,7 @@ def respond_purchase_recovery(world, option_id, *, decision_event_id):
     resolution = record_event(candidate, "purchase_recovery_completed",
                               "A carga bloqueada foi explicitamente resolvida e uma sucessora foi aberta.",
                               fact_kind=FactKind.STATE_TRANSITION,
+                              causal_origin=origin, causal_payload=authorship,
                               deltas=(_delta("cargo", parcel.id, "quantity", parcel.quantity, 0),
                                       _delta("stock", replacement_source.id, case.resource_id,
                                              replacement_source.goods.get(case.resource_id, 0), returned_quantity),

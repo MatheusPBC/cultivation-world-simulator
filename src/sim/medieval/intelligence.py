@@ -6,6 +6,7 @@ other actors are never copied to recipients.
 """
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.governance.authority import can_actor_act_for
 from src.classes.governance.models import KnowledgeReport
 from src.classes.mechanical_language import EntityRef
@@ -19,7 +20,6 @@ from .demand import reserve_quantity
 
 def refresh_reports(world):
     """Operating public stores/workshops disclose offers, not foreign inventories."""
-    day = world.clock.absolute_day
     refresh_site_reports(world)
     refresh_route_reports(world)
     refresh_settlement_reports(world)
@@ -82,12 +82,15 @@ def _report_resource(world, stock_id, resource_id, day, recipients, *, replace_t
     # Zero offers explicitly retract last month's disclosure at connected markets.
     decision = record_event(world, "offer_published", f"Oferta pública: até {surplus} de {name} em {place}.",
                             fact_kind=FactKind.DECISION,
+                            causal_origin=CausalOrigin.DETERMINISTIC,
                             decision={"action": "publish_offer", "actor_ref": owner.to_dict(), "resource_id": resource_id,
                                       "stock_id": stock.id, "quantity": surplus, "unit_price": market.prices[resource_id],
                                       "export_rate_permille": export_rate,
                                       "export_policy_event_id": export_policy_event_id,
                                       "export_collector_ref": (export_collector_ref.to_dict()
                                                                if export_collector_ref is not None else None)},
+                            causal_payload={"decision_source": {"kind": "owner", "owner": "knowledge",
+                                                                  "rule": "monthly_market_bulletin"}},
                             cause_ids=_causes(event.id, market.last_event_id, export_policy_event_id))
     for recipient in sorted(recipients, key=lambda r: (r.kind, r.id)):
         if recipient == owner:

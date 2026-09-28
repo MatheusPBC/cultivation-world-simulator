@@ -7,6 +7,7 @@ from copy import deepcopy
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.society.force import Detachment, Garrison
 from src.sim.medieval.campaign_ceasefire import (campaign_ceasefire_fulfillment_options,
                                                   campaign_ceasefire_offer_options,
@@ -77,7 +78,8 @@ def _foreign_garrison_premise(world):
 
 def _decide(world, option):
     return record_event(world, "test_campaign_decided", "Decisão institucional da fixture.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
 
 
 def _start_siege(monkeypatch, extra_food, *, dispatch_repeat_supply=True):
@@ -110,7 +112,7 @@ def _start_siege(monkeypatch, extra_food, *, dispatch_repeat_supply=True):
         payload = json.loads(prompt[prompt.index("{"):])
         supplied = any(notice.state == "fulfilled"
                        for notice in world.knowledge.campaign_supply_notices.values())
-        if not dispatch_repeat_supply and supplied and "supply_notice" in payload["situation"]:
+        if not dispatch_repeat_supply and supplied and "supply_needs" in payload["situation"]:
             return {"selected_id": ai_decider.NO_ACTION}
         chosen = next((choice for choice in payload["choices"]
                        if (f":{source_group.id}:" in choice["id"]
@@ -240,7 +242,8 @@ def test_pending_campaign_cargo_stays_at_its_destination_when_siege_could_withdr
     route_ids = ()
     decision = record_event(
         world, "test_pending_campaign_freight_decided", "A instituição decidiu enviar mais uma ração real.",
-        fact_kind=FactKind.DECISION,
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
         decision={"action": "freight", "source_id": source.id, "destination_id": destination_id,
                   "resource_id": "food", "quantity": 1, "route_ids": list(route_ids),
                   "actor_ref": OWNER.to_dict()})
@@ -269,6 +272,10 @@ def test_plan_column_can_negotiate_and_physically_withdraw(monkeypatch, tmp_path
     response = next(option for option in campaign_ceasefire_response_options(world, OCCUPIER)
                     if option.proposal_id == proposal.id and option.response == "accept")
     respond_campaign_ceasefire(world, OCCUPIER, response.id, _decide(world, response).id)
+    # The ceasefire is now an active obligation, not yet a physical withdrawal.
+    # Neither party may stack a second agreement over the same columns.
+    assert not campaign_ceasefire_offer_options(world, OWNER)
+    assert not campaign_ceasefire_offer_options(world, OCCUPIER)
     attacker = next(option for option in campaign_ceasefire_fulfillment_options(world, OWNER)
                     if option.campaign_id == siege.id)
     fulfilled = fulfill_campaign_ceasefire(world, OWNER, attacker.id, _decide(world, attacker).id)

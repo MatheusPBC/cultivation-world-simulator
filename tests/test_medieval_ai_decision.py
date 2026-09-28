@@ -84,7 +84,12 @@ async def test_a_provider_choice_becomes_a_canonical_decision_without_leaking(tm
     decision = next(item for item in world.events
                     if item.id in {link.cause_event_id for link in rejected.causal_links}
                     and item.decision and item.decision.get("action") == "respond_institutional_aid")
-    assert decision.causal_origin.value != "llm_interpretation"
+    assert decision.causal_origin.value == "actor_decision"
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "provider", "receipt_event_id": interpretation.id,
+    }
+    assert interpretation.id in {link.cause_event_id for link in decision.causal_links}
+    assert interpretation.id in {link.cause_event_id for link in decision.causal_links}
     assert set(decision.decision) == {"action", "actor_ref", "selected_affordance_id"}
     assert decision.decision["selected_affordance_id"] == option.id
     assert interpretation.id not in {link.cause_event_id for link in rejected.causal_links}
@@ -143,6 +148,12 @@ async def test_provider_can_select_a_current_request_option(monkeypatch):
                     if item.id in {link.cause_event_id for link in request.causal_links}
                     and item.decision and item.decision.get("action") == "request_institutional_aid")
     assert decision.decision["selected_affordance_id"] == option.id
+    interpretation = next(item for item in world.events if item.event_type == INTERPRETED_EVENT)
+    assert decision.causal_payload["decision_source"] == {
+        "kind": "provider", "receipt_event_id": interpretation.id,
+    }
+    assert decision.causal_origin.value == "actor_decision"
+    assert interpretation.id in {link.cause_event_id for link in decision.causal_links}
 
 
 async def test_private_affordance_handle_is_opaque_in_prompt_but_maps_back_to_canonical(monkeypatch):
@@ -166,6 +177,24 @@ async def test_private_affordance_handle_is_opaque_in_prompt_but_maps_back_to_ca
     assert selected == "research:polity:auren:stock:ferroalto:treasury:auren:character:011"
     assert "stock:ferroalto" not in prompts[0]
     assert "treasury:auren" not in prompts[0]
+
+
+async def test_provider_receipt_deduplicates_shared_menu_evidence(monkeypatch):
+    world = enable(pressured_world())
+    actor = EntityRef("polity", "auren")
+    cause = world.events[-1].id
+    provider(monkeypatch, {"selected_id": "current-option"})
+
+    selected = await ai_decider.select_option(
+        world, actor, {"today": world.clock.absolute_day},
+        [{"id": "current-option", "label": "Executar opção vigente."}],
+        causes=(cause, cause),
+    )
+
+    receipt = world.events[-1]
+    assert selected == "current-option"
+    assert receipt.event_type == INTERPRETED_EVENT
+    assert [link.cause_event_id for link in receipt.causal_links] == [cause]
 
 
 @pytest.mark.parametrize("answer", [RuntimeError("provider down"), {"selected_id": "forged:option"},
@@ -207,6 +236,25 @@ async def test_a_decline_is_its_own_event_type_not_a_sentence(monkeypatch):
     assert DECLINED_EVENT not in {INTERPRETED_EVENT, FAILED_EVENT}
     # A decline still spends the shared budget, exactly as before.
     assert ai_decider.spent_calls(world) == 1
+
+
+async def test_unavailable_provider_receipt_is_not_mislabeled_as_llm_interpretation(monkeypatch):
+    from src.classes.causal_origin import CausalOrigin
+
+    world = pressured_world()
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: False)
+
+    async def unexpected_provider_call(*args, **kwargs):
+        raise AssertionError("no provider call is made when AI is disabled")
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", unexpected_provider_call)
+    selected = await ai_decider.select_option(
+        world, EntityRef("polity", "auren"), {}, [{"id": "affordance:one", "label": "Opção real."}])
+
+    receipt = next(item for item in reversed(world.events) if item.event_type == FAILED_EVENT)
+    assert selected is None
+    assert receipt.causal_origin is CausalOrigin.DETERMINISTIC
+    assert receipt.deltas == ()
 
 
 async def test_aid_no_action_stops_later_family_consultations(monkeypatch):

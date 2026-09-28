@@ -15,7 +15,7 @@ from src.sim.medieval.concurrent_civil_decision import (
 from src.sim.medieval import ai_decider
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from tests.test_medieval_logistics import DEST, ROAD, SOURCE, cargo_world, ship, total_food
+from tests.test_medieval_logistics import ROAD, SOURCE, cargo_world, ship, total_food
 
 OWNER = EntityRef("polity", "auren")
 
@@ -47,7 +47,9 @@ async def blocked_world(quantity=40):
 
 def decide(world, option, *, origin=CausalOrigin.ACTOR_DECISION):
     return record_event(world, "freight_recovery_decided", "O proprietário escolheu uma opção de recuperação.",
-                        fact_kind=FactKind.DECISION, causal_origin=origin, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=origin, decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}} if origin is CausalOrigin.ACTOR_DECISION
+                        else None)
 
 
 async def test_a_blocked_order_offers_only_waiting_or_a_successor_over_another_route():
@@ -134,6 +136,26 @@ async def test_a_successor_moves_new_cargo_and_leaves_the_original_untouched(tmp
     assert world_snapshot(resumed) == world_snapshot(world)
     assert resumed.economy.freight_orders[successor.id] == successor
     assert freight_recovery_options(resumed, OWNER) != ()
+
+
+async def test_recovery_rolls_back_if_opening_successor_fails_after_material_work(monkeypatch):
+    from src.sim.medieval import freight_recovery
+
+    world, _order = await blocked_world()
+    option = next(item for item in freight_recovery_options(world, OWNER) if item.kind == "successor")
+    decision = decide(world, option)
+    before = world_snapshot(world)
+    open_order = freight_recovery.open_order
+
+    def fail_after_opening(candidate, *args, **kwargs):
+        open_order(candidate, *args, **kwargs)
+        raise RuntimeError("injected failure after freight opening")
+
+    monkeypatch.setattr(freight_recovery, "open_order", fail_after_opening)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        execute_freight_recovery(world, option.id, decision_event_id=decision.id)
+
+    assert world_snapshot(world) == before
 
 
 @pytest.mark.parametrize("rejection", ["invented", "stale", "replayed", "interpretation", "wrong_actor"])

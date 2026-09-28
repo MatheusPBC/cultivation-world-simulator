@@ -2,6 +2,7 @@
 import pytest
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.classes.economy.models import MoneyAccount
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.bribery import (
@@ -19,7 +20,23 @@ from tests.test_medieval_diplomacy import BUYER, SELLER, world_with_knowledge
 
 def _decision(world, option):
     return record_event(world, "bribery_decision", "Escolher uma opção de suborno.",
-                        fact_kind=FactKind.DECISION, decision=option.decision()).id
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(),
+                        causal_payload={"decision_source": {"kind": "api"}}).id
+
+
+def test_deterministic_intent_cannot_create_a_bribery_proposal():
+    world = world_with_knowledge()
+    option = next(item for item in bribery_offer_options(world, SELLER)
+                  if item.counterparty_ref == BUYER)
+    decision = record_event(world, "bribery_decision", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="exact current decision"):
+        execute_bribery_offer(world, SELLER, option.id, decision.id)
+
+    assert world_snapshot(world) == before
 
 
 def _offer(world):
@@ -45,9 +62,15 @@ def test_bribery_acceptance_is_independent_and_payment_is_later(tmp_path):
     world.clock = world.clock.advance(1)
     payment = next(item for item in bribery_payment_options(world, SELLER)
                    if item.proposal_id == proposal.id)
-    execute_bribery_payment(world, SELLER, payment.id, _decision(world, payment))
+    payment_decision_id = _decision(world, payment)
+    event_count_before_payment = len(world.events)
+    execute_bribery_payment(world, SELLER, payment.id, payment_decision_id)
     assert world.economy.accounts["treasury:escarlia"].balance == before - payment.amount
     assert world.relations.obligations[payment.obligation_id].status == "fulfilled"
+    payment_receipt = world.event_index()[world.economy.payments[payment_decision_id]]
+    assert payment_decision_id in {link.cause_event_id for link in payment_receipt.causal_links}
+    assert all(event.event_type != "bribery_payment_authorized"
+               for event in world.events[event_count_before_payment:])
     assert world.authority.offices == original_authority
     receipt = world.relations.obligations[payment.obligation_id].last_event_id
     assert memories_of(world, SELLER, receipt) is not None

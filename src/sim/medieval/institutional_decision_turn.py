@@ -25,7 +25,7 @@ from src.classes.mechanical_language import EntityRef
 
 from . import ai_decider
 from .actor_dossier import build_actor_dossier
-from .events import record_event
+from .events import record_event, record_no_action_decision
 
 DECISION_EVENT_TYPE = "institutional_decision_turn_decided"
 # A deliberate refusal is a decision like any other -- no deltas, same
@@ -160,12 +160,10 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
         # composed the menu and the affordances it turned down, so a reader
         # (or a downstream causal chain) can see the omission itself, not just
         # ``ai_decision_declined``'s receipt that the consultation happened.
-        record_event(
+        record_no_action_decision(
             world, DECLINED_DECISION_EVENT_TYPE,
             "O ator foi consultado e optou por não agir entre as opções institucionais concorrentes.",
-            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-            decision={"action": "no_action", "actor_ref": actor.to_dict(),
-                      "declined_option_ids": tuple(sorted(by_id))},
+            actor, affordance_ids=by_id,
             cause_ids=causes,
         )
         return claims, True

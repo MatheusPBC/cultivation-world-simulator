@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.creatures import (creature_options, execute_creature_option, offer_creature_tribute,
@@ -21,7 +22,8 @@ VALEDOURO = EntityRef("polity", "valedouro")
 
 def decide(world, option):
     return record_event(world, "creature_decided", "Decisão do habitante do rio.",
-                        fact_kind=FactKind.DECISION, decision=option.decision())
+                        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                        decision=option.decision(), causal_payload={"decision_source": {"kind": "api"}})
 
 
 def buy_across_the_river(world, quantity=10):
@@ -58,11 +60,26 @@ def pick(world, kind, **fields):
                 if item.kind == kind and all(getattr(item, key) == value for key, value in fields.items()))
 
 
+@pytest.mark.asyncio
+async def test_deterministic_intent_cannot_make_the_creature_choose():
+    world = await crossed_world()
+    option = pick(world, "request", route_id=ROUTE_ID)
+    decision = record_event(world, "creature_decided", "Intenção determinística de teste.",
+                            fact_kind=FactKind.DECISION, decision=option.decision())
+    before = world_snapshot(world)
+
+    with pytest.raises(ValueError, match="current decision"):
+        execute_creature_option(world, DRAKE_ID, option.id, decision.id)
+
+    assert world_snapshot(world) == before
+
+
 async def test_a_river_crossing_is_perceived_and_a_tribute_settles_the_demand(tmp_path):
     world = await crossed_world()
     drake = world.creatures.creatures[DRAKE_ID]
     assert drake.perceived_crossings > 0 and drake.condition < 1000
-    perception = next(item for item in reversed(world.events) if item.event_type == "creature_perceived_cargo")
+    perception = next(world.event_index()[event_id] for event_id in reversed(drake.memory_event_ids)
+                      if world.event_index()[event_id].event_type == "creature_perceived_cargo")
     departure = next(item for item in world.events
                      if item.id in {link.cause_event_id for link in perception.causal_links}
                      and item.event_type == "cargo_departed")
@@ -73,6 +90,7 @@ async def test_a_river_crossing_is_perceived_and_a_tribute_settles_the_demand(tm
     execute_creature_option(world, DRAKE_ID, request.id, decide(world, request).id)
     demand = next(iter(world.creatures.demands.values()))
     assert demand.stage == "open" and demand.food == drake.tribute_food
+    assert demand.perception_event_id == perception.id
     notices = [world.knowledge.creature_tribute_notices[key]
                for key in sorted(world.knowledge.creature_tribute_notices)]
     assert {item.recipient_ref for item in notices} == {AUREN, VALEDOURO}
