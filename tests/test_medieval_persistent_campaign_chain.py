@@ -38,22 +38,37 @@ from tests.test_medieval_strategy_response import (OCCUPIER, OWNER, SOURCE, TARG
 
 
 def _foreign_garrison_premise(world):
-    source = next(group for group in world.society.population.values()
-                  if group.settlement_id == TARGET)
+    source = max((group for group in world.society.population.values()
+                  if group.settlement_id == TARGET and group.occupation != "soldier"),
+                 key=lambda group: group.count)
+    assert source.count >= 20
     soldier_id = f"pop:{TARGET}:{source.people}:soldier"
-    world.society.population[soldier_id] = source.model_copy(
-        update={"id": soldier_id, "occupation": "soldier", "count": 20})
+    soldiers = world.society.population.get(soldier_id)
+    soldier_count = soldiers.count if soldiers is not None else 0
     detachment_id = "detachment:foreign-garrison-premise"
     arrival = record_event(
-        world, "test_foreign_garrison_arrived", "Premissa factual da guarnição ocupante.",
+        world, "test_foreign_garrison_arrived",
+        "A fixture transfere vinte moradores à coorte militar e inicia a guarnição abastecida.",
         fact_kind=FactKind.STATE_TRANSITION,
         causal_payload={"root_premise": {
             "kind": "scenario_bootstrap", "domain": "persistent_campaign_chain_fixture",
             "source_refs": [{"kind": "scenario", "id": "persistent_campaign_chain_fixture"},
                             {"kind": "settlement", "id": TARGET},
+                            {"kind": "population_group", "id": source.id},
                             {"kind": "population_group", "id": soldier_id}],
             "observed_day": world.clock.absolute_day}},
-        deltas=(_delta("detachment", detachment_id, "stage", None, "present"),))
+        deltas=(_delta("population_group", source.id, "count", source.count, source.count - 20),
+                _delta("population_group", soldier_id, "count", soldier_count,
+                       soldier_count + 20),
+                _delta("detachment", detachment_id, "stage", None, "present"),
+                _delta("detachment", detachment_id, "provisions", None, 600)))
+    world.society.population[source.id] = source.model_copy(
+        update={"count": source.count - 20, "last_event_id": arrival.id})
+    world.society.population[soldier_id] = (
+        soldiers.model_copy(update={"count": soldier_count + 20, "last_event_id": arrival.id})
+        if soldiers is not None else source.model_copy(
+            update={"id": soldier_id, "occupation": "soldier", "count": 20,
+                    "last_event_id": arrival.id}))
     world.society.detachments[detachment_id] = Detachment(
         id=detachment_id, owner_ref=OCCUPIER, source_group_id=soldier_id, count=20,
         location_id=TARGET, destination_id=TARGET, route_ids=(), route_index=0,
@@ -80,6 +95,32 @@ def _foreign_garrison_premise(world):
         account_id=account.id, decision_event_id=decision.id,
         started_day=world.clock.absolute_day, last_event_id=established.id)
     return garrison_id
+
+
+def test_campaign_garrison_fixture_transfers_existing_people_without_growth():
+    world, _, _ = occupied_response_world()
+    before = sum(group.count for group in world.society.population.values())
+    soldier_id = "pop:pedraclara:human:soldier"
+    existing_soldiers = world.society.population[soldier_id].count
+    source_count = max(group.count for group in world.society.population.values()
+                       if group.settlement_id == TARGET and group.occupation != "soldier")
+
+    garrison_id = _foreign_garrison_premise(world)
+
+    garrison = world.society.garrisons[garrison_id]
+    detachment = world.society.detachments[garrison.detachment_id]
+    soldier_group = world.society.population[detachment.source_group_id]
+    arrival = world.event_index()[detachment.last_event_id]
+    assert sum(group.count for group in world.society.population.values()) == before
+    assert soldier_group.occupation == "soldier" and detachment.count == 20
+    assert soldier_group.count == existing_soldiers + detachment.count
+    assert detachment.provisions == 600
+    population_changes = {(delta.before, delta.after) for delta in arrival.deltas
+                          if delta.owner_kind == "population_group" and delta.aspect == "count"}
+    assert population_changes == {
+        (str(existing_soldiers), str(existing_soldiers + 20)),
+        (str(source_count), str(source_count - 20)),
+    }
 
 
 def _decide(world, option):

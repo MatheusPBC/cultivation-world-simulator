@@ -9847,3 +9847,25 @@ fixtures e fecha somente o sub-recorte de seleção sem IDs; não prova provider
 real, ocorrência natural nem integra ainda operação, guarnição paga em ciclos
 e saída bilateral na mesma trajetória. Próximo: completar a integração M2 e
 contrafactual conforme o checkbox da matriz.
+
+## E285 — conservação de população na guarnição preparada — 28/09/2026
+
+Fingerprint de base: HEAD `ebc1324a49d04a85faf65337f5b2f7877c0dfbcc`; SHA-256
+do diff de `tests/test_medieval_persistent_campaign_chain.py`:
+`e83744d4b1070b4039aec57a25310897a7b8ca5825e36a0de0a635e72f78de78`.
+O bootstrap de guarnição não copia mais uma coorte civil para uma identidade
+militar que pode substituir soldados já existentes. Ele reduz uma coorte civil
+local em 20 e aumenta a coorte militar existente em 20, mantendo o total
+populacional idêntico; o mesmo receipt inclui ambos os deltas e a premissa do
+cenário. As 600 rações do destacamento seguem como estoque inicial explícito da
+fixture, não como carga entregue nem como evidência de logística emergente.
+
+Verificação reproduzível no namespace isolado:
+`CWS_DATA_DIR=/tmp/cws-m2-garrison-20260928 PYTHONPATH=.
+.venv/bin/python -m pytest -q tests/test_medieval_campaign_creature_interference.py
+tests/test_medieval_garrison_policy.py tests/test_medieval_garrison_supply_objective.py
+tests/test_medieval_persistent_campaign_chain.py` — `28 passed in 20.50s`.
+As trajetórias da campanha do módulo continuam executando auditoria causal nos
+seus saves finais. Isto fecha somente conservação de pessoas na premissa da
+guarnição; operação, abastecimento e saída política ainda não foram compostos
+na mesma trajetória autônoma exigida pelo M2.

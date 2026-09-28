@@ -431,6 +431,13 @@ Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Kno
   cenários distintos dentro da suíte, não uma mesma trajetória integrada. Isso
   torna as fixtures auditáveis, mas não as converte em ocorrências naturais nem
   fecha a integração autônoma exigida pelo item M2 acima.
+- [x] M2 sub-recorte (E285): o bootstrap da guarnição transfere vinte pessoas
+  de uma coorte local civil para a coorte militar existente, com deltas de
+  contagem nos dois grupos e headcount total invariável; `6` testes da campanha
+  e `28` do grupo focal passaram, incluindo as auditorias causais já presentes.
+  As `600` rações continuam declaradas como condição inicial preparada, não
+  como entrega logística. Remove-se criação gratuita de pessoas das premissas;
+  a integração M2 completa segue aberta.
 - [x] Gate C, observação limitada: inventariar saves naturais já existentes e
   registrar ausência da cadeia política completa sem transformá-la em cota
   de drama (`E141-finalização`). Todos os saves inspecionados usam
