@@ -20,7 +20,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   boundary and must not create a second planner or mutate the published world.
   Add a focused rejection/rollback check for each new direct command.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 78 (Society schema 21, economy schema 19, Knowledge schema 10, Strategy schema 3) requires the current snapshot shape and rejects incomplete
+  save schema 79 (Society schema 21, economy schema 20, Knowledge schema 10, Strategy schema 3) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -174,9 +174,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   stop offering without erasing history; an overdue loan persists until a
   separate borrower decision repays it. Multiple households may independently
   contribute once each; a partial contribution leaves the remaining request open,
-  bounded by its original principal and expiry. Save schema 78, Economy 19 and
+  bounded by its original principal and expiry. Save schema 79, Economy 20 and
   Knowledge 10 reject older snapshots; there is no credit creation, interest,
   default, partial repayment or public manual command.
+- `ProductionPriority` can order one facility in a same-owner payroll account
+  for the next boundary only after a current `production_limited` receipt proves
+  that shared payroll funds bind. It changes evaluation order, not cash,
+  reservation, cross-settlement worker allocation or guaranteed output. Economy
+  schema 20 and save schema 79 reject older snapshots without migration.
 - Institutional food aid is a prepared/direct-executor vertical. The requester
   uses only its own current causal `SettlementReport.missing_food` and selects a
   transient engine-enumerated option; the persisted notice contains only
@@ -206,7 +211,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 78 are rejected and preserved
+  older than schema 79 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction

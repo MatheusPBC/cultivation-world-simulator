@@ -266,7 +266,7 @@ def test_multiple_households_can_fund_a_request_without_overfunding(tmp_path):
         second_loan.id,
     }
     old_economy = loaded.economy.to_dict()
-    old_economy["schema_version"] = 18
+    old_economy["schema_version"] = 19
     with pytest.raises(ValueError, match="invalid economy schema"):
         EconomyState.from_dict(old_economy)
     old_knowledge = loaded.knowledge.to_dict()

@@ -12,6 +12,11 @@ Where people actually are, including absence while travelling. Residence alone
 does not make a traveller available for local work or meals.
 _Avoid_: Residence, registered population.
 
+**Population cohort**:
+An aggregate of residents grouped by settlement, people identity and occupation.
+It is not a family and does not imply shared money, kinship or dependency ties.
+_Avoid_: Household, lineage, named family.
+
 **Migration journey**:
 A group's deliberate movement toward a new residence, which may be delayed or
 abandoned. Intending or starting the journey is not arrival.
@@ -21,6 +26,19 @@ _Avoid_: Instant population transfer, government relocation.
 The people moving together and the portion of household property accompanying
 them. Named people are included in its population, not added to it.
 _Avoid_: Additional population, newly created wealth.
+
+## Medieval world — production finance
+
+**Shared production payroll pool**:
+An institutional money account used to evaluate wage affordability for multiple
+production facilities; the balance is fungible rather than reserved per site.
+_Avoid_: Facility budget, earmarked wages.
+
+**Production priority**:
+An institution's choice of which eligible facility is considered first against
+a shared payroll pool at the next production boundary; it changes precedence,
+not cash, and cannot guarantee a batch.
+_Avoid_: Production command, reserved budget, guaranteed output.
 
 ## Medieval world — family credit
 

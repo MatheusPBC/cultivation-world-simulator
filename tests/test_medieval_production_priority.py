@@ -40,7 +40,8 @@ def _world(*, second=True, day=30, authority=True):
     authority_state = SimpleNamespace()
     clock = SimpleNamespace(absolute_day=day)
     world = SimpleNamespace(
-        economy=SimpleNamespace(facilities=facilities, stocks=stocks, recipes=recipes),
+        economy=SimpleNamespace(facilities=facilities, stocks=stocks, recipes=recipes,
+                                production_priorities={}),
         clock=clock, events=[], authority=authority_state,
     )
     # Keep the fake deliberately narrow: production code uses the canonical
@@ -126,6 +127,89 @@ def test_selected_priority_survives_save_and_orders_only_the_next_boundary(tmp_p
     assert priority.last_event_id in {link.cause_event_id for link in receipt.causal_links}
     assert receipt.causal_payload["production"]["production_priority_event_id"] == priority.last_event_id
     world_snapshot(resumed)
+
+
+def test_shared_payroll_priority_is_receipt_gated_and_changes_next_boundary_order(tmp_path):
+    import copy
+    from src.systems.time import WorldClock
+    from src.sim.medieval.production_priority import set_production_priority
+
+    world = create_medieval_world(73)
+    actor = EntityRef("polity", "auren")
+    account_id = "treasury:auren"
+    world.clock = WorldClock(270)
+    world.economy.accounts[account_id] = world.economy.accounts[account_id].model_copy(
+        update={"balance": 0}
+    )
+    produce_monthly(world)
+
+    options = production_priority_options(world, actor)
+    pool_options = [item for item in options if item.scope == "shared_payroll_pool"]
+    assert len(pool_options) >= 2
+    assert {item.payroll_account_id for item in pool_options} == {account_id}
+    assert len({item.settlement_id for item in pool_options}) > 1
+    world.clock = WorldClock(271)
+    assert not any(item.scope == "shared_payroll_pool"
+                   for item in production_priority_options(world, actor))
+    world.clock = WorldClock(270)
+    viability = copy.deepcopy(world)
+    viability.economy.accounts[account_id] = viability.economy.accounts[account_id].model_copy(
+        update={"balance": 1_000_000}
+    )
+    viability.clock = WorldClock(300)
+    produce_monthly(viability)
+    target = next(item for item in pool_options
+                  if viability.economy.facilities[item.facility_id].last_batches > 0)
+    decision = record_event(
+        world, "institutional_decision_turn_decided", "Priorizar instalação do caixa comum.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=target.decision(),
+    )
+    priority = set_production_priority(
+        world, actor, target.id, decision_event_id=decision.id
+    )
+    assert priority.scope == "shared_payroll_pool"
+    assert priority.effective_day == 300
+    assert len(world.economy.production_priorities) == 1
+
+    path = tmp_path / "shared-priority.mws"
+    save_world(world, path)
+    world = load_world(path)
+    priority = world.economy.production_priorities[priority.id]
+    target = next(item for item in pool_options if item.facility_id == priority.facility_id)
+    tampered = copy.deepcopy(world)
+    receipt_index = next(index for index, event in enumerate(tampered.events)
+                         if event.id == priority.last_event_id)
+    receipt = tampered.events[receipt_index]
+    tampered.events[receipt_index] = receipt.model_copy(update={
+        "causal_payload": {**receipt.causal_payload, "facility_id": "works:forged"}
+    })
+    with pytest.raises(ValueError, match="invalid production priority provenance"):
+        tampered.economy.validate(tampered)
+
+    recipe = world.economy.recipes[world.economy.facilities[target.facility_id].recipe_id]
+    batch_cost = recipe.workers * world.economy.facilities[target.facility_id].wage_per_worker
+    world.economy.accounts[account_id] = world.economy.accounts[account_id].model_copy(
+        update={"balance": batch_cost}
+    )
+    world.clock = WorldClock(300)
+    event_start = len(world.events)
+    produce_monthly(world)
+
+    account_facility_events = [
+        event for event in world.events[event_start:]
+        if event.event_type in {"production_completed", "production_limited"}
+        and event.causal_payload["production"]["facility_id"] in {
+            item.id for item in world.economy.facilities.values()
+            if item.payroll_account_id == account_id
+        }
+    ]
+    assert account_facility_events[0].causal_payload["production"]["facility_id"] == target.facility_id
+    assert account_facility_events[0].causal_payload["production"]["batches"] > 0
+    assert account_facility_events[0].causal_payload["production"][
+        "production_priority_event_id"
+    ] == priority.last_event_id
+    world.economy.validate(world)
 
 
 def test_priority_is_registered_in_the_single_monthly_institutional_menu():

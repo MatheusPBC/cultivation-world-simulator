@@ -28,14 +28,14 @@ REGISTRIES["family_loans"] = FamilyLoan
 class EconomySerialization:
     def to_dict(self) -> dict:
         self.validate()
-        return {"schema_version": 19, "payments": dict(sorted(self.payments.items())), **{
+        return {"schema_version": 20, "payments": dict(sorted(self.payments.items())), **{
             name: {key: value.model_dump(mode="json") for key, value in sorted(getattr(self, name).items())}
             for name in REGISTRIES}}
 
     @classmethod
     def from_dict(cls, data):
         if (not isinstance(data, dict) or set(data) != {"schema_version", "payments", *REGISTRIES}
-                or type(data["schema_version"]) is not int or data["schema_version"] != 19):
+                or type(data["schema_version"]) is not int or data["schema_version"] != 20):
             raise ValueError("invalid economy schema")
         parsed = {}
         for name, model in REGISTRIES.items():

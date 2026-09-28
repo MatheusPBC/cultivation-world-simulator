@@ -25,7 +25,7 @@ Configuração persistente medieval contém seed, contagem inicial de personagen
 por provider são opt-in por mundo; o controle exige simulação pausada e provider
 disponível, e salva a escolha no autosave. A IA seleciona affordances, enquanto
 owners do motor revalidam e executam as consequências.
-Saves usam schema74; schemas anteriores são rejeitados e preservados, sem
+Saves usam schema79; schemas anteriores são rejeitados e preservados, sem
 sobrescrita ou migração. IDs de
 sessão/pausa/velocidade/locks continuam apenas no runtime.
 EconomyView inclui expansion_blueprints/expansions; folhas podem pertencer a obras

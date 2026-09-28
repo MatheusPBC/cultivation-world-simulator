@@ -35,7 +35,7 @@ PRODUCT = "medieval-world-simulator"
 # Family-credit requests and household notices now expose the financing purpose;
 # older snapshots are rejected without migration.
 # Older saves are rejected without rewriting data.
-SCHEMA = 78
+SCHEMA = 79
 EVENT_CHUNK_SIZE = 512
 
 

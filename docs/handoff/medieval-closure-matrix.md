@@ -9,7 +9,7 @@
 | Requisito do roadmap | Marco atual | Owners e integração exigida | Cobertura e evidência autoritativa |
 |---|---|---|---|
 | 0. Estabilizar fundação: autoria, affordances, causalidade, rollback, runtime | M0/M7/M8 | `material_execution`, `events`, owners canônicos e `MedievalSimulator`; decisão/causa, revalidação e publicação atômica | Base e limites em E265/E266; inventário e testes por família nas linhas Gate A. Cobertura global parcial; regressão final nas superfícies alteradas. |
-| 1. Economia e informação material: preço/demanda, mercado, tarifa, bloqueio, contrabando, escassez e propriedade | M1/M3/M7 | `economy`, `markets/procurement`, `logistics/routing`, `tariffs/embargo`, `society/demography`, `KnowledgeState` | Módulos e provas estreitas existem; E263 prova alívio agudo; E264 mostra oficina bloqueada por `payroll_funds` e controle confundido pelo fallback offline. Adaptação sustentada aberta. |
+| 1. Economia e informação material: preço/demanda, mercado, tarifa, bloqueio, contrabando, escassez e propriedade | M1/M3/M7 | `economy`, `markets/procurement`, `logistics/routing`, `tariffs/embargo`, `society/demography`, `KnowledgeState` | M1 preparado aceito em E208/E277/E282; a adaptação natural continua aberta para M8. E263 prova alívio agudo e E264 mostra que a oficina ficou bloqueada por `payroll_funds`. |
 | 2. Estratégia/diplomacia: objetivos, concessão, negociação, commitments, persuasão, espionagem, suborno e sabotagem | M2/M3/M6 | `StrategyState`, `AuthorityState`, `KnowledgeState`, `diplomacy*`, `commitments`, `espionage`, `bribery`, `sabotage` | Fixtures e escolhas OAuth/Luna situadas em E257–E261; composição autônoma entre autoridade, comando e memória posterior não demonstrada. Ver M2/M3. |
 | 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | Pesquisa/difusão/treino têm recortes, mas catálogo não equivale a consumidor material. Cada tecnologia nomeada ainda precisa de integração/prova no M3. |
 | 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | Fixtures persistentes e interferência são evidência histórica; M2 exige cenário autônomo com autoridade/QG/comandante e efeito civil após decisões independentes. Não extrapolar fixture para emergência natural. |
@@ -33,7 +33,7 @@
   versus histórico; a revisão das linhas detalhadas de cada requisito continua
   vinculada aos itens específicos do contrato.
 
-Atualizada em 28/09/2026. O checkout usa save schema 78, Economy schema 19 e Knowledge schema 10; saves anteriores continuam rejeitados. Esta matriz acompanha o plano V1 histórico, o diário de evidências e o roadmap. `Verificado` vale somente para o recorte descrito; `Existente` não comprova o aceite amplo; `Lacuna` indica prova ou implementação ausente. E1–E243 estão registrados antes deste adendo; E256–E264 documentam o corpus atual. E244–E255 foram classificados individualmente no diário E266 quando havia artefatos recuperáveis; E244, E246 e E250 não têm output reproduzível. E222, E225, E228 e E230 não produziram decisão live do provider.
+Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Knowledge schema 10; saves anteriores continuam rejeitados. Esta matriz acompanha o plano V1 histórico, o diário de evidências e o roadmap. `Verificado` vale somente para o recorte descrito; `Existente` não comprova o aceite amplo; `Lacuna` indica prova ou implementação ausente. E1–E243 estão registrados antes deste adendo; E256–E282 documentam o corpus e os recortes econômicos atuais. E244–E255 foram classificados individualmente no diário E266 quando havia artefatos recuperáveis; E244, E246 e E250 não têm output reproduzível. E222, E225, E228 e E230 não produziram decisão live do provider.
 
 ## Checklist de execução
 
@@ -110,10 +110,14 @@ Atualizada em 28/09/2026. O checkout usa save schema 78, Economy schema 19 e Kno
   alimentar cotidiana: só prepara estoque pré-pago para migração; consumo e
   compras do ciclo pertencem ao owner de subsistência. Isso vale para o snapshot
   final d1290, não prova ausência de opções em outras datas.
-- [ ] Gate B, localizar uma resposta viável que reduza pressão de forma
-  sustentada sem deslocar privação; medir acesso, renda, produção, caixa e saúde
-  por coorte e registrar a escolha/recusa no fluxo normal. E272 mostra que a
-  política fallback já cria emprego em ambos os ramos, mas não fecha esse aceite.
+- [x] Gate B/M1, resposta material viável em cenário preparado (`E208`, `E277`,
+  `E282`): crédito familiar voluntário paga folha e salário, prioridade direciona
+  caixa compartilhado sem criar produção, e decisão separada de relief move
+  alimento público apenas a grupos com ração não atendida. E282 sustentou a
+  resposta por seis ciclos contra seu controle, sem aumentar falta nos outros
+  assentamentos nem alterar moeda; testes de relief validam que a distribuição
+  não debita outra coorte. Aceite limitado a este cenário, sem provider ou
+  emergência natural; Gate B natural continua aberto em M8.
 - [x] Gate B/E274, experimento completo, mas não aceito como recuperação estrutural:
   avaliar primeiro e, se a lacuna se confirmar no contrato,
   estender o crédito voluntário existente para uma instalação de alimento cuja
@@ -146,12 +150,53 @@ Atualizada em 28/09/2026. O checkout usa save schema 78, Economy schema 19 e Kno
   promessa ou reserva de instalação; contexto do credor e rótulos passaram a
   declará-lo. Falta agregada do fechamento foi 129 nos dois ramos. Ver E275 no
   diário; nenhuma mutação ou save original foi feito.
-- [ ] E276, recompor opções atuais de prioridade produtiva no estado do E275 e
-  verificar em clone se uma decisão consegue direcionar produção ao local sem
-  apenas deslocar o custo/privação para outra coorte. Uma fronteira; não chamar
-  decisão preparada de comportamento natural ou provider.
-- [ ] Gate B estrutural: isolar adaptação de renda/payroll e medir produção,
-  salário e acesso sem confundir a resposta com a política offline.
+- [x] E276, recompor `production_priority_options` de Auren no source day 270 de
+  E275 (`event:8158`): menu vazio. O alvo Campos do Lume não tem concorrente na
+  mesma cidade/ocupação, embora três fazendas de assentamentos diferentes usem
+  `treasury:auren` e disputem caixa na rotação do próximo ciclo. A affordance atual
+  só deixa o ator ordenar conflito local de trabalho; não representa esse
+  conflito de caixa entre cidades. Sem decisão injetada ou provider neste recorte.
+- [x] E277, prioridade de uma instalação entre as próprias que compartilham
+  payroll account, ofertada apenas por receipt atual limitante de folha. No
+  contrafactual API seed 73, escolher Campomanso colocou sua instalação primeiro
+  no dia 300 e produziu 22 lotes; Pedra Clara e Montenegro receberam 9 e 1, em
+  vez de 29 e 3 no ramo só com empréstimo. O total do pool não subiu e a falta
+  permaneceu 129 no mundo/6 em Campomanso; não houve earmark nem recursos novos.
+  A affordance fecha a lacuna de decisão sobre precedência, não a adaptação do
+  acesso. Gate B continua aberto.
+- [x] E278, trace do dia 300: Campomanso ficou com 41.600/43.000 de alimento,
+  preço 1; 1.095/1.101 rações foram compradas. Os seis grupos com falta eram
+  soldados sem saldo e uma dependente sem conta. Auren tinha opções atuais de
+  relief por 6 ou 3, apoiadas pelo próprio estoque e relatório; não há patch de
+  economia. E279 verificará essa affordance em clone.
+- [x] E279, a decisão API no clone distribuiu 6 rations do estoque de
+  Campomanso para cinco pantries (1/1/1/2/1); receipt ligado à decisão,
+  relatório e falta; dinheiro conservado. Até dia 330, pantry foi consumida,
+  mas falta local ficou 0 versus 6 no controle, health +12/unrest -12. Prova uma
+  resposta causal por ciclo, não sua escolha autônoma ou sustentação secular.
+- [x] E280, continuidade offline até dia 330 sem resposta API: não há receipt de
+  relief; falta local 6 e opções atuais 6/3 permanecem. O fallback determinístico
+  exige shortfall ≥20, então ignora a opção e não registra decisão/NO_ACTION.
+  `ai_enabled=false`; isso não prova o que provider real escolheria.
+- [x] Gate B/E281 diagnóstico de renda e acesso (read-only): rastrear contas,
+  payroll, empregos/transições, salário militar, maturação e relief nos owners
+  atuais para as coortes de E278. A lacuna não é falta de affordance de relief:
+  grupos sem renda própria não têm renda recorrente salvo trabalho efetivamente
+  pago; dependentes não recebem emprego permanente e o modelo não relaciona seu
+  saldo ao de adultos. Nenhuma nova ação/dinheiro foi criado. Ver E281 no diário;
+  o aceite de adaptação sustentada continua aberto.
+- [x] Gate B/E282 experimento controlado: seis menus compostos mensais em clone;
+  Auren/Campomanso escolheu relief vigente em 4 deles (1.759 rações). Contra
+  API `NO_ACTION`, falta local `791→0`, sem falta adicional nos outros
+  assentamentos, com moeda conservada. Contra o fallback offline pareado, porém,
+  o recorte de ator único terminou com falta agregada 5.823 versus 433 e suprimiu
+  18 reliefs que a política offline aplicou aos demais atores. O ramo de ator
+  único não é comparação de política sistêmica; ainda assim, contra seu próprio
+  controle pareado, a resposta local foi sustentada por seis ciclos. Com o
+  contrato do owner testado em `test_relief_only_reaches_households_with_unpaid_rations`,
+  isso fecha somente o aceite preparado de M1. Zero egress; validações e 42
+  testes focados passaram no checkout atual. O gate natural de M8 segue aberto.
+  Ver E282 no diário e a revalidação focal desta execução.
 - [ ] Registrar e revisar individualmente E244–E255 no diário versionado; os
   artefatos existem localmente, mas seu histórico detalhado não foi sincronizado.
 - [ ] Gate B natural: demonstrar capacidade adaptativa e rastrear a cadeia
@@ -365,6 +410,15 @@ Atualizada em 28/09/2026. O checkout usa save schema 78, Economy schema 19 e Kno
   cenário; isso não fecha as duas caixas seguintes.
 - [x] Gate C: exercer interferência externa, decisões independentes, efeito
   extramilitar, `why()` e save/load nessa trajetória (`E139-finalização`).
+- [ ] M2 próximo recorte: estender E139 em uma trajetória integrada, sem
+  escolhas injetadas depois do início e sem política que seleciona etapas por
+  prefixo de affordance ou contador. A interferência datada de rota/carga deve
+  alterar decisões independentes do comandante e QG; continuar pela operação,
+  ocupação sustentada por guarnição efetivamente paga em ciclos sucessivos e
+  saída política bilateral. Um contrafactual de rota/informação deve mudar a
+  trajetória ou o controle material. Reusar owners atuais de campanha, Force,
+  logística e desescalada; provider stub controlado não será chamado de provider
+  real nem de ocorrência natural.
 - [x] Gate C, observação limitada: inventariar saves naturais já existentes e
   registrar ausência da cadeia política completa sem transformá-la em cota
   de drama (`E141-finalização`). Todos os saves inspecionados usam

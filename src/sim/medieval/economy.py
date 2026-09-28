@@ -82,11 +82,12 @@ def _rotated_facilities(world):
             digest = hashlib.sha256(f"{account_id}:{month}".encode("utf-8")).digest()
             offset = int.from_bytes(digest[:8], "big") % len(facilities)
             facilities = facilities[offset:] + facilities[:offset]
-        # A chosen priority can affect only the exact local workforce conflict
-        # it named, and only on the one future boundary it was selected for.
-        # It is an owned instruction, not a deficit response: without a live
-        # decision-backed record the monthly fair rotation above remains whole.
-        active = []
+        # A shared-pool choice gets first evaluation against this account's
+        # actual balance. It reserves nothing: each facility still pays its own
+        # workers and revalidates its own limits. Local priorities retain their
+        # narrower workforce-conflict ordering.
+        pool_priority = None
+        active_local = []
         for priority in world.economy.production_priorities.values():
             if priority.payroll_account_id != account_id or priority.effective_day != world.clock.absolute_day:
                 continue
@@ -101,13 +102,17 @@ def _rotated_facilities(world):
                     or (stock.owner_ref, stock.location_id, recipe.occupation)
                     != (priority.owner_ref, priority.settlement_id, priority.occupation)):
                 continue
-            competitors = _priority_competitors(world, facilities, priority)
-            if len(competitors) > 1:
-                active.append((priority, selected, competitors))
-        # Registry identity is one conflict key, so ties cannot exist in
-        # valid state.  Still keep a deterministic order for malformed direct
-        # callers before validation rejects them.
-        for _priority, selected, competitors in sorted(active, key=lambda item: item[0].id):
+            if priority.scope == "shared_payroll_pool":
+                pool_priority = (priority, selected)
+            else:
+                competitors = _priority_competitors(world, facilities, priority)
+                if len(competitors) > 1:
+                    active_local.append((priority, selected, competitors))
+        if pool_priority is not None:
+            _priority, selected = pool_priority
+            facilities.remove(selected)
+            facilities.insert(0, selected)
+        for _priority, selected, competitors in sorted(active_local, key=lambda item: item[0].id):
             facilities.remove(selected)
             first_competitor = min(facilities.index(item) for item in competitors if item in facilities)
             facilities.insert(first_competitor, selected)
@@ -124,9 +129,17 @@ def produce_monthly(world, available=None) -> None:
         available = monthly_workforce(world)
     for group in world.society.population.values():
         workers[group.settlement_id, group.occupation] += available[group.id]
-    active_priorities = {
+    active_pool_priorities = {
+        priority.payroll_account_id: priority
+        for priority in economy.production_priorities.values()
+        if priority.scope == "shared_payroll_pool"
+        and priority.effective_day == world.clock.absolute_day
+        and can_actor_act_for(world, priority.owner_ref, priority.owner_ref, "trade")
+    }
+    active_local_priorities = {
         priority.facility_id: priority
         for priority in economy.production_priorities.values()
+        if priority.scope == "local_workforce"
         if priority.effective_day == world.clock.absolute_day
         and can_actor_act_for(world, priority.owner_ref, priority.owner_ref, "trade")
     }
@@ -178,7 +191,8 @@ def produce_monthly(world, available=None) -> None:
             recipe.workers * (batches + 1) - workers[workforce]
             if "labor" in limitations else 0
         )
-        priority = active_priorities.get(facility.id)
+        priority = (active_pool_priorities.get(facility.payroll_account_id)
+                    or active_local_priorities.get(facility.id))
         payroll_release_events = tuple(
             contract.last_event_id
             for contract in economy.employment_contracts.values()

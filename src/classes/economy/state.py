@@ -86,11 +86,13 @@ class EconomyState(EconomySerialization):
             account = self.accounts.get(facility.payroll_account_id)
             if account is None or account.owner_ref != self.stocks[facility.stock_id].owner_ref:
                 raise ValueError("payroll requires the employer's account")
+        priority_boundaries = set()
         for priority in self.production_priorities.values():
             facility = self.facilities.get(priority.facility_id)
             account = self.accounts.get(priority.payroll_account_id)
             stock = self.stocks.get(facility.stock_id) if facility is not None else None
             recipe = self.recipes.get(facility.recipe_id) if facility is not None else None
+            boundary_key = (priority.payroll_account_id, priority.effective_day)
             if (facility is None or account is None or stock is None or recipe is None
                     or priority.owner_ref != account.owner_ref
                     or priority.owner_ref != stock.owner_ref
@@ -98,6 +100,23 @@ class EconomyState(EconomySerialization):
                     or stock.location_id != priority.settlement_id
                     or recipe.occupation != priority.occupation):
                 raise ValueError("production priority does not match its economic records")
+            if boundary_key in priority_boundaries:
+                raise ValueError("one production priority is allowed per payroll account and boundary")
+            priority_boundaries.add(boundary_key)
+            if priority.scope == "shared_payroll_pool":
+                if sum(item.payroll_account_id == priority.payroll_account_id
+                       for item in self.facilities.values()) < 2:
+                    raise ValueError("shared payroll priority requires competing facilities")
+            elif not any(
+                item.id != facility.id
+                and item.payroll_account_id == priority.payroll_account_id
+                and (other_stock := self.stocks.get(item.stock_id)) is not None
+                and (other_recipe := self.recipes.get(item.recipe_id)) is not None
+                and (other_stock.owner_ref, other_stock.location_id, other_recipe.occupation)
+                == (priority.owner_ref, priority.settlement_id, priority.occupation)
+                for item in self.facilities.values()
+            ):
+                raise ValueError("local workforce priority requires a real local conflict")
         if len({contract.cohort_id for contract in self.employment_contracts.values()}) != len(self.employment_contracts):
             raise ValueError("a cohort cannot hold multiple permanent employment contracts")
         for contract in self.employment_contracts.values():
@@ -329,6 +348,7 @@ class EconomyState(EconomySerialization):
                     or recipe.occupation != priority.occupation
                     or decision is None or last is None
                     or decision.fact_kind != FactKind.DECISION
+                    or decision.causal_origin is not CausalOrigin.ACTOR_DECISION
                     or decision.day >= priority.effective_day
                     or decision.day > world.clock.absolute_day
                     or last.day > world.clock.absolute_day
@@ -337,10 +357,26 @@ class EconomyState(EconomySerialization):
                     or decision.decision.get("actor_ref") != expected_owner
                     or decision.decision.get("selected_affordance_id") != priority.selected_affordance_id
                     or last.event_type != "production_priority_selected"
+                    or not isinstance(last.causal_payload, dict)
+                    or last.causal_payload.get("decision_event_id") != priority.decision_event_id
+                    or last.causal_payload.get("actor_ref") != expected_owner
+                    or last.causal_payload.get("selected_affordance_id") != priority.selected_affordance_id
+                    or last.causal_payload.get("scope") != priority.scope
+                    or last.causal_payload.get("facility_id") != priority.facility_id
+                    or last.causal_payload.get("effective_day") != priority.effective_day
                     or priority.decision_event_id not in {link.cause_event_id for link in last.causal_links}
                     or not any(delta.owner_kind == "production_priority" and delta.owner_id == priority.id
                                and delta.aspect == "selected_affordance_id"
                                and delta.after == priority.selected_affordance_id
+                               for delta in last.deltas)
+                    or not any(delta.owner_kind == "production_priority" and delta.owner_id == priority.id
+                               and delta.aspect == "scope" and delta.after == priority.scope
+                               for delta in last.deltas)
+                    or not any(delta.owner_kind == "production_priority" and delta.owner_id == priority.id
+                               and delta.aspect == "facility_id" and delta.after == priority.facility_id
+                               for delta in last.deltas)
+                    or not any(delta.owner_kind == "production_priority" and delta.owner_id == priority.id
+                               and delta.aspect == "effective_day" and delta.after == str(priority.effective_day)
                                for delta in last.deltas)):
                 raise ValueError("invalid production priority provenance")
         if any(group.last_event_id is not None and group.last_event_id not in events

@@ -76,6 +76,7 @@ class ProductionPriority(SocietyValue):
     id: Identity
     owner_ref: EntityRef
     payroll_account_id: Identity
+    scope: Literal["local_workforce", "shared_payroll_pool"]
     settlement_id: Identity
     occupation: Occupation
     facility_id: Identity

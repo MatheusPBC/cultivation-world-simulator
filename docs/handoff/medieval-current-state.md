@@ -1,5 +1,187 @@
 # Estado atual — Medieval World Simulator
 
+## E281 — renda recorrente não cobre todas as coortes — 28/09/2026
+
+- Reconciliação: o contrato e a matriz agora referenciam E280 como último
+  recorte antes desta investigação; o antigo “próximo após E273” foi removido.
+  Nenhum probe provider isolado de relief foi iniciado.
+- O diagnóstico read-only cruzou E278 com `src/sim/medieval/consumption.py`,
+  `labor.py`, `permanent_employment.py`, `workforce.py`, `demography.py`,
+  `force.py`, `relief.py` e `opening_income.py`. Compra de ração só reduz falta
+  para grupos que têm saldo em `household:{group_id}`. Trabalho pago deposita
+  salário na conta do grupo que realmente trabalhou; conta ausente pode ser
+  criada nesse pagamento, sem crédito. Emprego permanente só oferece coortes
+  empregáveis por uma linha produtiva local e exclui `dependent`. Uma transição
+  de trabalho exige demanda/notice datados e uma conta doméstica válida antes
+  da aceitação. Salário militar tem causa material em recrutamento ou guarnição
+  ativa; não remunera automaticamente toda reserva.
+- `dependent` é um grupo demográfico agregado, sem parentes/guardiões no modelo.
+  Nascimento cria dependentes; a maturação datada move quem restou à coorte de
+  farmers, sem escolher uma família ou transferir renda. `opening_income.py` é
+  uma transferência inicial finita, não uma folha recorrente. A alternativa
+  existente para cobrir falta observada é relief: depende de relatório e estoque
+  atuais e uma decisão pontual; a política offline ignora falta abaixo de 20.
+- Conclusão limitada: existe alívio material possível e há trabalho/salário
+  para coortes com ocupação e demanda reais, mas a representação não fornece
+  renda recorrente ou relação de sustento entre adulto e dependente. Não inferir
+  família por raça/assentamento, não atribuir salário a reserva parada e não
+  criar auxílio automático. O Gate B não passou.
+- Evidência reproduzível combinada: E278, seed 73, captura natural do dia 300
+  por `tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --trace-next-boundary --priority-facility-id
+  works:campos-do-lume`; inspeção dos owners acima no checkout `2eb1f9e3` mais
+  WIP E277–E280. Limitação: inspeção de contratos não mede uma nova trajetória,
+  nem prova que todo grupo soldado estava fora de guarnição.
+- Próximo recorte a registrar: selecionar um caminho estrutural existente de
+  emprego/renda ou acesso, definir seus owners e comparar por vários ciclos
+  contra controle sem transferir privação. Não acrescentar uma relação familiar
+  ou regra de benefício sem decisão de domínio e causal owners definidos.
+
+## E280 — affordance pequena permanece sem escolha no offline — 28/09/2026
+
+- A continuação sem interação/API do branch controle E270 foi levada do dia 300
+  ao 330. `world_ai_enabled=false`; não houve `relief_distributed`. Campomanso
+  terminou novamente com falta 6 e affordances atuais de relief por 6/3, baseadas
+  em relatório próprio atual.
+- O fallback declarado define `FALLBACK_MIN_SHORTFALL=20` e portanto ignora esse
+  caso de seis rações; não foi emitida decisão nem `NO_ACTION` receipt. Isso
+  explica a ausência sem atribuir intenção ao ator ou resultado ao provider.
+  `provider_available()` também retornou falso no ambiente desta execução. O
+  adapter entra no menu mensal provider-enabled pelo código, mas isso não foi
+  validado por chamada real neste recorte.
+- Comando: `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e280 .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --relief-settlement-id campomanso`. A consulta da falta
+  ocorreu após a revisão do ciclo e nenhum save original foi carregado/salvo.
+- Gate B permanece aberto porque a resposta comprovada foi uma decisão API e a
+  política offline não cobre essa falta menor. Gate de provider real ainda não
+  foi executado.
+
+## E279 — relief voluntário reduz a falta por um ciclo — 28/09/2026
+
+- No mesmo harness de clone E277/E278, uma decisão API explícita no dia 300
+  selecionou a affordance de distribuir 6 rações de `stock:campomanso`. Decision
+  `event:10071`; execução material `event:10072`; fontes: falta/subsistence
+  `event:9107`, relatório próprio de Auren `event:9485`, além da decisão.
+- O receipt moveu 6 alimentos do estoque público (41.600→41.594) a cinco
+  pantries (1/1/1/2/1) para grupos de soldados/dependente. Não alterou contas;
+  total monetário ficou igual entre branches.
+- Até dia 330, no ramo sem relief, Campomanso continuou com falta 6, health 989,
+  unrest 11. No ramo com relief, as pantries já tinham sido consumidas; Campomanso
+  terminou falta 0, health 1.000 e unrest 0 (diferença relativa +12/-12). No
+  agregado do mundo, falta caiu de 58 para 52. É melhora material de um ciclo;
+  não prova continuidade ou escolha por provider/offline. Sem saldo nas coortes,
+  a causa pode reaparecer em ciclos seguintes.
+- Comando: `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e279-final .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --priority-facility-id works:campos-do-lume
+  --relief-settlement-id campomanso`.
+  O harness valida Economy e causal history após cada avanço; os três branches
+  são cópias efêmeras, não saves de usuário.
+- E280 registrado antes de iniciar: observar, sem resposta injetada, se a
+  affordance de relief entra na próxima decisão offline quando a falta retorna,
+  que opções concorrem e qual decisão/NO_ACTION receipt resulta. Gate B permanece
+  aberto até evidência de decisão e repetição sustentada.
+
+## E278 — caixa priorizado não cobre coortes sem renda — 28/09/2026
+
+- O probe E277 foi ampliado para observar, no fechamento do dia 300, estoque
+  local, preço, grupos/contas domésticas, compras e `subsistence_resolved`, sem
+  mutar o mundo. Com a prioridade de Campomanso, a despensa pública terminou com
+  41.600 de 43.000 alimentos; o preço permaneceu 1. A necessidade era 1.101,
+  compras cobriram 1.095 e a falta ficou em 6.
+- O receipt `event:9107` identifica exatamente as seis unidades não cobertas:
+  dwarf soldier 1, elf soldier 1, human dependent 1, human soldier 2, orc
+  soldier 1. Os saldos correspondentes eram zero para as quatro coortes de
+  soldados; a dependente não tinha conta doméstica. Os grupos agrícolas e
+  artesãos com saldo compraram suas quotas. Logo o stock/output já existia e o
+  preço estava baixo; o gargalo imediato era acesso das coortes sem recursos,
+  não um preço alto nem falta física agregada.
+- Após o fechamento, o dono Auren tinha affordances correntes de `relief` para
+  6 ou 3 unidades, limitadas pelo relatório próprio e pelo estoque real. Como a
+  consulta ocorreu após o turno que gerou esse relatório, isso prova ação
+  elegível para o próximo review, não que fallback/provider a escolherá. Nenhuma
+  decisão foi executada neste diagnóstico.
+- Comando reproduzível:
+  `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e278 .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --trace-next-boundary
+  --priority-facility-id works:campos-do-lume`.
+  O branch foi regenerado em memória; nenhum save de usuário foi lido ou gravado.
+- Verificação adicional incluiu o traço datado das compras locais, source IDs,
+  payload de falta/affordability e affordances de relief. Próximo E279: exercer
+  apenas em clone a affordance de relief 6 via decisão API e comparar até o dia
+  330, incluindo uso de pantry/recorrência; isso mede capacidade existente, não
+  comportamento espontâneo.
+
+## E277 — precedência explícita no caixa produtivo compartilhado — 28/09/2026
+
+- A prioridade de produção existente agora também expõe opções entre instalações
+  próprias que compartilham payroll account, mas somente quando uma instalação
+  teve receipt atual `production_limited` com `payroll_funds`. IDs incluem o
+  próximo boundary; execução recompõe a affordance e exige decisão corrente
+  `ACTOR_DECISION`. Economy persiste um registro por account/boundary, com deltas
+  e payload para scope, instalação e data efetiva. O owner altera apenas a ordem
+  de avaliação; não reserva saldo, não move trabalhadores entre cidades nem
+  promete lote. Economy schema 20/save schema 79 rejeitam versões antigas.
+- Probe reproduzível (seed 73 regenerada em memória, sem carregar/salvar save de
+  usuário):
+  `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e277-final2 .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --priority-facility-id works:campos-do-lume`.
+  Captura natural no dia 270, `event:8158`; a affordance API selecionada foi
+  `production-priority:pool:polity:auren:treasury:auren:300:works:campos-do-lume`,
+  decisão `event:9005`, receipt de prioridade `event:9006`, efetiva no dia 300.
+- Resultado no primeiro boundary: controle sem empréstimo produziu 28/3/0
+  lotes nas fazendas de Pedra Clara/Montenegro/Campomanso; empréstimo sem
+  prioridade produziu 29/3/0; empréstimo + prioridade de Campomanso produziu
+  9/1/22. A escolha deslocou 22 lotes para Campomanso, sem elevar output total
+  do pool. A falta alimentar permaneceu 129 agregada e 6 em Campomanso nos três
+  ramos; dinheiro total ficou 76.000. O receipt local mudou de payroll limitante
+  para storage, demonstrando a revalidação do owner, não produção garantida.
+- Classificação: decisão API controlada; nenhum provider real ou política
+  offline selecionou a prioridade. A affordance fecha a lacuna de escolha sobre
+  competição entre cidades e persiste após save/load no teste focal. **Não fecha
+  Gate B:** agora é necessário explicar por que o output local não reduziu a
+  falta (estoque/capacidade, compra, distribuição e affordability) antes de
+  propor outra alavanca.
+- Verificações: `tests/test_medieval_production_priority.py`, persistência,
+  empréstimos familiares e projeção focal do observatório → 35 passed; o teste
+  inclui receipt-gating, decisão, save/load, prioridade efetiva no boundary e
+  conservação. O teste inicial da fixture estreita falhou por falta do registry
+  no fake; o helper recebeu o estado canônico vazio e a execução focal passou.
+- Próximo recorte registrado como E278: rastrear Campomanso no mesmo ciclo desde
+  produção local → estoque → quota/compra das famílias → falta/saúde, incluindo
+  causas e saldos; não mudar preços, inventário, renda ou regra de compra nesse
+  diagnóstico.
+
+## E276 — prioridade produtiva ausente entre cidades — 28/09/2026
+
+- Cenário regenerado pela ferramenta `tools/medieval_family_loan_counterfactual.py`
+  (`seed=73`, primeira oportunidade no dia 270, evento `event:8158`). A nova
+  seção `production_priority_options_at_source` recompõe o menu canônico antes
+  de qualquer decisão e retornou `[]` para Auren. Nenhuma prioridade foi criada.
+- As três instalações `works:campos-de-pedra-clara`,
+  `works:campos-de-pontenegro` e `works:campos-do-lume` compartilham
+  `treasury:auren`, mas estão em assentamentos diferentes. A implementação atual
+  agrupa affordances por owner/account/settlement/occupation e exige pelo menos
+  duas instalações na mesma chave; portanto o ator não pode priorizar Campos do
+  Lume frente às outras fazendas. Porém `_rotated_facilities` rotaciona as três
+  pelo mesmo account, criando disputa material entre cidades sem opção política
+  correspondente.
+- A mudança do utilitário foi validada com
+  `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e276-logs .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --trace-next-boundary`; reproduziu produção de 28/3/0
+  lotes no controle e 29/3/0 com o empréstimo. Uma prioridade não foi aplicada
+  neste trace; ele apenas prova a ausência atual de opção e a competição de caixa.
+- Próximo recorte E277: ampliar o `ProductionPriority` existente para escolha
+  engine-owned entre instalações próprias que compartilham payroll account,
+  habilitada apenas por receipts correntes de payroll limitante; então medir em
+  clone se Auren direciona um lote a Campomanso e qual cidade/coorte perde a
+  precedência. Não chamar essa decisão preparada de provider ou emergência
+  natural.
+
 ## E275 — destino do crédito alimentar na primeira fronteira — 28/09/2026
 
 - Baseline recuperável: commit local `6f78ea11`, branch
@@ -9590,3 +9772,55 @@ por caixa da folha seguem em diagnóstico. O próximo teste deve isolar uma
 alternativa existente (staffing/financiamento) e medir produção, salários e
 acesso por janela apropriada, sem misturar política offline como se fosse
 resposta do provider.
+
+## E282 — relief recorrente em menu mensal composto — 28/09/2026
+
+O contrafactual partiu do clone E277 após a fronteira comum do dia 450 e avançou
+seis turnos mensais (480–630). A engine foi executada com `ai_enabled=true`,
+mas selectors de provider foram interceptados em todos os módulos carregados:
+nenhuma chamada externa ocorreu. O controle registrou decisão API `NO_ACTION`
+para menus disponíveis; o tratamento fez o mesmo para todos os atores exceto
+Auren, que selecionou somente a maior affordance de relief vigente para
+Campomanso. O tratamento encontrou opção em quatro turnos (dias 510, 570, 600
+e 630; quantidades 448, 518, 275 e 518); nos outros dois não havia opção atual.
+Todos os atores compartilharam o menu mensal composto, e o owner revalidou a
+opção antes da execução. Nenhuma escolha foi feita após o turno.
+
+No dia 630, Campomanso terminou com falta `0` no tratamento contra `791` no
+controle API `NO_ACTION`, health/unrest `854/44` contra `658/235`. As 1.759
+rações foram retiradas do estoque público e alocadas a pantries; moeda agregada
+permaneceu 76.000. A comparação por assentamento contra `NO_ACTION` atribui a
+redução somente a Campomanso; os demais assentamentos tiveram delta zero.
+
+Também foi rodado o fallback offline normal a partir do mesmo dia 450. Em seis
+meses, ele produziu 18 receipts de relief e distribuiu 14.742 rações. Terminou
+com falta agregada 433 (Campomanso 0), contra 5.823 no tratamento API limitado
+a Auren/Campomanso. A diferença do ramo API contra offline ficou em `+5.390`
+rações agregadas, concentradas nos outros assentamentos (Cinzaverde +481,
+Ferroalto +1.440, Pedra Clara +1.480, Montenegro +243, Portovelho +1.347,
+Salgueiro +399; Brumafria e Campomanso sem diferença). Isto não indica
+transferência material causada pelo relief de Campomanso: revela que o desenho
+controlado manteve os demais atores em `NO_ACTION`, enquanto o fallback offline
+executou as decisões dos demais. Logo, o owner/affordance está provado, mas o
+teste não aprova uma política de ator único como agência sistêmica.
+
+As affordances existiram em 4/6 turnos (`510, 570, 600, 630`); não existiam em
+`480` e `540`. `validate_history` e validações de Economy/Knowledge passaram em
+cada ramo; os testes focados de relief/decision-turn passaram `28` após ajustar
+os toy adapters de teste para incluir `actor_ref` e `selected_affordance_id`,
+exigidos pelo contrato de autoria. Reavaliação do aceite limitado de M1: o ponto
+de partida contém o empréstimo voluntário e a prioridade de produção de E277;
+no ramo pareado, a única diferença de decisão é relief posterior. Com E208
+(crédito paga folha e gera salário), E277 (prioridade usa caixa existente) e
+este contrafactual, a cadeia preparada demonstra acesso material sustentado por
+seis ciclos, sem crédito de dinheiro/alimento. `test_relief_only_reaches_households_with_unpaid_rations`
+verifica que a distribuição vai somente a grupos com ração não atendida. O ramo
+de ator único não demonstra política sistêmica: os demais atores escolheram
+`NO_ACTION`, e o fallback offline agiu em 18 casos. Revalidação focal no checkout
+atual: `CWS_DATA_DIR=/tmp/cws-m1-focused-20260928 PYTHONPATH=. .venv/bin/python
+-m pytest -q tests/test_medieval_relief.py tests/test_medieval_family_loans.py
+tests/test_medieval_production_priority.py
+tests/test_medieval_institutional_decision_turn.py` — `42 passed in 11.05s`.
+M1 fecha apenas para o cenário preparado; provider real, escolha independente
+sistêmica, emergência natural, outros seeds e Gate B natural permanecem sem
+prova para M8. Nenhum save-fonte foi alterado; sem commit, push ou deploy.

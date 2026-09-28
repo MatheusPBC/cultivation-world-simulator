@@ -1,8 +1,11 @@
 # Contrato de conclusão do Medieval
 
 28/09/2026 — execução em andamento; M0 preservado em checkpoint local
-`6f78ea11`; M1 permanece aberto após E275.
-O checkpoint está 27 commits à frente de `github-personal/codex/medieval-remote`.
+`6f78ea11`; aceite controlado de M1 registrado em E282; Gate B natural segue
+aberto para M8.
+Na criação do checkpoint, a branch estava 27 commits à frente de
+`github-personal/codex/medieval-remote`. E275 foi registrado em `2eb1f9e3`; a
+branch agora está 28 commits à frente e continua sem push.
 E268 audita dois saves de continuação até o dia 1.110 sob o schema e fingerprint
 daquele recorte; não fecha M1, não é carregável no schema atual e não valida
 outros seeds.
@@ -98,10 +101,15 @@ Inventário finito; não abrir nova caça irrestrita a owners.
 
 ### M1 — Economia adaptativa
 
-- [ ] Isolar caixa → folha → emprego → produção → renda → compra → saúde;
+- [x] Isolar caixa → folha → emprego → produção → renda → compra → saúde e
   distinguir conhecimento, opção, autoridade, meios, prioridade e escala.
-- [ ] Fechar resposta estrutural com oficina/emprego, staffing, comércio ou
-  crédito voluntário existente. Nova mecânica só após demonstrar lacuna real.
+  E208 prova crédito voluntário → folha → salário; E264/E275 localizaram a
+  disputa real pelo caixa; E277 adicionou escolha de prioridade sem criar
+  produção; E282 percorreu o mesmo estado preparado até relief e subsistência.
+- [x] Fechar a resposta estrutural usando owners existentes, sem mecânica nova:
+  empréstimo voluntário e prioridade de produção abrem meios reais; relief é uma
+  decisão separada que move estoque público a pantries. A composição de seis
+  ciclos é E282; limites de fixture/API/fallback permanecem explícitos abaixo.
 - [x] Comparar resposta/controle por seis ciclos mensais desde o mesmo save e
   com a mesma política offline de fundo (E269). A contratação API de 31 artesãos
   orcs melhorou o resultado final em 65 rações de falta e 13 pontos de saúde,
@@ -164,11 +172,88 @@ Inventário finito; não abrir nova caça irrestrita a owners.
   intervenção gerou 100 alimentos extras no outro local sem reduzir a falta
   agregada no fechamento (129 em ambos); não prova adaptação sustentada. Detalhes
   e limites em E275 no diário.
-- [ ] E276, recompor as opções de prioridade produtiva no estado E275 e avaliar
-  se uma decisão atual consegue direcionar o pool compartilhado para a instalação
-  local sem transferir privação às demais coortes. Executar apenas em clones e
-  por uma fronteira mensal; não injetar decisão como se fosse provider ou evento
-  natural.
+- [x] E276, recompor as opções na fronteira natural de seed 73 (dia 270,
+  `event:8158`): `production_priority_options` de Auren retornou vazio. O alvo
+  Campos do Lume não tem outra instalação concorrente no mesmo assentamento e
+  ocupação; as outras fazendas compartilham o tesouro, mas ficam em assentamentos
+  diferentes. O engine rotaciona a ordem entre todas as instalações do account,
+  enquanto a affordance atual cobre apenas conflito local de trabalho. Assim,
+  o ator não tem opção para escolher qual cidade recebe o caixa compartilhado.
+  Evidência de recomposição adicionada ao trace do utilitário E275; nenhuma ação
+  foi escolhida nesse recorte.
+- [x] E277, estender `ProductionPriority` para permitir ao owner priorizar uma
+  instalação entre concorrentes do mesmo payroll account somente após receipt
+  atual `production_limited` com `payroll_funds`. A prioridade é decision-backed,
+  limitada ao próximo boundary, persistida sob Economy schema 20/save schema 79,
+  e muda a ordem de avaliação sem reservar caixa ou garantir output. No
+  contrafactual API seed 73, dia 270→300, selecionar `works:campos-do-lume`
+  direcionou 22 lotes a Campomanso; a produção total do pool não aumentou, foi
+  deslocada das outras fazendas. Falta agregada permaneceu 129 e a local 6.
+  Saldo monetário total ficou conservado em 76.000 nos três ramos. O fluxo agora
+  oferece a escolha que faltava, mas não prova adaptação alimentar; Gate B segue
+  aberto. Ver E277 no diário.
+- [x] E278, diagnóstico do ciclo do dia 300: produção prioritária elevou o
+  estoque de Campomanso a 41.600/43.000, preço permaneceu 1; mesmo assim, das
+  1.101 rações requeridas, famílias compraram 1.095. Faltaram 6, todas atribuídas
+  no receipt a grupos de soldados sem saldo e uma dependente sem conta; grupos
+  agrícolas/artesãos compraram a própria quota. Há affordance atual engine-owned
+  de relief por 6 (ou 3), com estoque público suficiente e relatório atual de
+  Auren. Assim, o gargalo imediato não é preço, estoque físico ou produção, mas
+  acesso de grupos sem renda/conta; existe uma ação material de relief ainda a
+  ser exercida/testada no boundary seguinte. Nenhum preço/estado foi alterado
+  nesta medição. Próximo E279 testa essa resposta existente em clone por mais
+  um ciclo, sem atribuir a escolha ao provider ou mundo natural.
+- [x] E279, no clone de dia 300, decisão API escolheu relief atual de 6; receipt
+  `event:10072` distribuiu o estoque público para cinco pantries (1/1/1/2/1)
+  e foi causado pela decisão, report `event:9485` e falta observada `event:9107`.
+  Ao dia 330, as pantries tinham sido consumidas, mas Campomanso terminou com
+  falta 0, health +12 e unrest -12 frente ao controle sem relief (falta 6).
+  Dinheiro total não mudou. Isso prova resposta material de um ciclo, não
+  escolha autônoma nem adaptação durável; Gate B segue aberto.
+- [x] E280, continuidade offline sem ação injetada até dia 330: `ai_enabled=false`,
+  não houve `relief_distributed`; a falta 6 reapareceu e as opções 6/3 estavam
+  atuais após a revisão. O fallback declara `FALLBACK_MIN_SHORTFALL=20`, logo não
+  seleciona esse resto pequeno e não emite decisão/NO_ACTION. Isso é resultado da
+  política offline, não evidência do provider. Nesta execução `provider_available`
+  também era falso. O adapter de relief participa do menu institucional provider-
+  enabled por código, mas não houve consulta live; a consulta real fica para o
+  gate do provider.
+- [x] E281, rastrear a falta residual de E278 contra os owners atuais, sem nova
+  affordance: renda doméstica nasce de trabalho efetivamente pago; grupos
+  `dependent` não recebem oferta de emprego permanente, e uma transição só é
+  possível após demanda datada de trabalho, notice conhecido e conta doméstica.
+  Soldados recebem salário quando recrutados/servidos em guarnição ativa; isso
+  não equivale a renda recorrente de toda coorte de reserva. Relief continua uma
+  decisão material pontual, limitada a estoque e relatório próprio. O código não
+  oferece hoje um vínculo familiar entre grupos que faça o saldo de adultos
+  sustentar dependentes. Isso demonstra uma lacuna de representação/integração,
+  não autoriza dinheiro, renda ou emprego automáticos. Ver E281 no diário; M1
+  estrutural continua aberto.
+- [x] E282, contrafactual controlado em clone E277: seis fronteiras mensais no
+  mesmo caminho do engine, após empréstimo voluntário e prioridade de produção
+  decididos, com menu composto atual e decisões API explícitas para relief.
+  O controle escolhe `NO_ACTION`; o tratamento escolhe o maior relief vigente
+  para Campomanso quando existe. Ambos usam `ai_enabled` no engine com todos os
+  selectors interceptados (zero egress). Houve opção em 4 de 6 turnos; o ramo
+  API entregou 1.759 rações em Campomanso e reduziu sua falta `791→0` contra
+  `NO_ACTION`, sem mudar moeda e sem aumentar falta em outros assentamentos
+  frente a esse controle. O controle offline pareado executou 18 reliefs,
+  totalizando 14.742 rações em vários assentamentos; terminou com falta
+  agregada 433, enquanto o ramo API limitado a Auren/Campomanso terminou com
+  5.823. Portanto a experiência valida o owner e a opção atual, mas não aprova
+  a política de ator único como resposta do mundo: ela retém decisões dos demais
+  atores e é pior que o fallback offline neste cenário. Isso não invalida o ramo
+  pareado: ele prova a resposta em cenário elegível quando a autoridade escolhe
+  relief; o teste focal `test_relief_only_reaches_households_with_unpaid_rations`
+  confirma que o owner aloca apenas a grupos com ração não atendida. Causalidade,
+  conservação, Economy/Knowledge e história passaram. E208/E277/E282 em conjunto
+  fecham a aceitação de M1 no cenário preparado usando somente crédito, prioridade
+  e estoque já existentes. Não provam provider real, adoção natural ou outros
+  seeds; o Gate B natural permanece em M8.
+E283 (proposta anterior de diagnóstico por coorte) foi retirada antes da
+execução por correção de escopo do usuário. Nenhum teste ou resultado E283 existe;
+não retomar essa proposta como próxima tarefa. O registro E282 continua sendo a
+evidência mais recente de M1.
 
 Aceite: resposta viável reduz pressão de forma sustentada no cenário elegível,
 sem criar riqueza nem esconder privação transferida a outra coorte. Um cenário
@@ -327,8 +412,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho: M1 permanece aberto após E273. Investigar alternativa que
-conecte emprego/renda a acesso sem transferir falta alimentar a outra coorte;
-não repetir o corte de folha como se fosse uma resposta aprovada. E269 e E272
-são pares controlados com fallback offline, não evidência de provider real ou
-emergência natural. Sem commit, push, merge ou deploy neste checkpoint.
+Próximo trabalho: M1 foi aceito no cenário preparado por E208/E277/E282; Gate B
+natural permanece explicitamente para M8. Não executar a proposta E283 retirada.
+Prosseguir para M2: integrar hierarquia política, QG, comandante, campanha,
+ambiente/logística e consequência civil conforme os aceites acima, começando por
+uma única trajetória autônoma controlada. Limites de M1: sem provider real,
+emergência natural ou outras seeds. Sem commit, push, merge ou deploy neste
+checkpoint.

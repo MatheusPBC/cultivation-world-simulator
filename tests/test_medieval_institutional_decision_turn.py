@@ -39,14 +39,17 @@ def provider(monkeypatch, answer):
 def toy_adapter(name, *, ids=("toy:1",), claim=None, executed=None):
     """A minimal, self-contained adapter with no real domain meaning."""
     class ToyOption:
-        def __init__(self, id_):
+        def __init__(self, id_, actor):
             self.id = id_
+            self.actor = actor
 
         def decision(self):
-            return {"action": name, "toy_id": self.id}
+            return {"action": name, "toy_id": self.id,
+                    "actor_ref": self.actor.to_dict(),
+                    "selected_affordance_id": self.id}
 
     def options_fn(world, actor):
-        return tuple(ToyOption(i) for i in ids) if actor == AUREN else ()
+        return tuple(ToyOption(i, actor) for i in ids) if actor == AUREN else ()
 
     def execute_fn(world, actor, option_id, decision_event_id):
         if executed is not None:
@@ -210,7 +213,9 @@ async def test_selected_option_dispatches_to_its_own_adapter_executor(monkeypatc
         "revalidation recomposes only the selected option's owner adapter"
     decision = next(e for e in world.events if e.event_type == "institutional_decision_turn_decided")
     assert decision.fact_kind == FactKind.DECISION
-    assert decision.decision == {"action": "b", "toy_id": "b:1"}
+    assert decision.decision == {"action": "b", "toy_id": "b:1",
+                                 "actor_ref": AUREN.to_dict(),
+                                 "selected_affordance_id": "b:1"}
 
 
 async def test_selected_id_that_becomes_stale_pauses_ai_without_material_mutation(monkeypatch):
@@ -286,11 +291,15 @@ async def test_owner_rejection_pauses_ai_instead_of_becoming_silent_no_action(mo
     class Option:
         id = "rejected:1"
 
+        def __init__(self, actor):
+            self.actor = actor
+
         def decision(self):
-            return {"action": "rejected", "selected_affordance_id": self.id}
+            return {"action": "rejected", "actor_ref": self.actor.to_dict(),
+                    "selected_affordance_id": self.id}
 
     adapter = DiscretionaryAdapter(
-        name="rejected", options_fn=lambda _world, _actor: (Option(),),
+        name="rejected", options_fn=lambda _world, actor: (Option(actor),),
         label_fn=lambda _option: "Opção rejeitada.", causes_fn=lambda *_args: (),
         execute_fn=lambda *_args: (_ for _ in ()).throw(ValueError("owner rejected")),
     )
