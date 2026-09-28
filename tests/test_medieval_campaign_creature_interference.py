@@ -469,17 +469,24 @@ async def test_prepared_crisis_runs_actor_choices_without_post_start_injection(m
         actor = EntityRef(**payload["you_are"])
         choices = payload["choices"]
         asked.append((world.clock.absolute_day, actor))
+        # Controlled scenario policy: interpret the current actor and the
+        # engine-authored option descriptions. It deliberately does not
+        # inspect affordance IDs or count consultations, so the same intent
+        # cannot fire a stage that the current owner did not offer.
+        labels = [item["label"] for item in choices]
         if actor.kind == "creature":
-            selected = next((item["id"] for item in choices if ":restrict:" in item["id"]), None)
-        elif actor.kind == "character":
-            selected = next((item["id"] for item in choices
-                             if item["id"].startswith("strategy-defense-authorize:")), None)
-            if selected is None:
-                selected = next((item["id"] for item in choices
-                                 if ROUTE_ID in item["id"] and ":160:" in item["id"]), None)
+            wanted = "Fechar a passagem até ser atendido."
+        elif actor.kind == "character" and any(
+                "Autorizar o QG" in label for label in labels):
+            wanted = "Autorizar o QG a preparar uma resposta material à ocupação observada."
+        elif actor.kind == "character" and any("40 dias" in label for label in labels):
+            wanted = next(label for label in labels if "40 dias" in label)
+        elif actor.kind in {"polity", "organization"} and any(
+                label.startswith("Nomear ") for label in labels):
+            wanted = next(label for label in labels if label.startswith("Nomear "))
         else:
-            selected = next((item["id"] for item in choices
-                             if item["id"].startswith("detachment-command-appoint:")), None)
+            return {"selected_id": ai_decider.NO_ACTION}
+        selected = next((item["id"] for item in choices if item["label"] == wanted), None)
         return {"selected_id": selected or ai_decider.NO_ACTION}
 
     monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose)

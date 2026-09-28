@@ -419,6 +419,18 @@ Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Kno
   trajetória ou o controle material. Reusar owners atuais de campanha, Force,
   logística e desescalada; provider stub controlado não será chamado de provider
   real nem de ocorrência natural.
+- [x] M2 sub-recorte de seleção: o stub de E139 passou a usar papel do ator e
+  descrições das opções recompostas, sem ler IDs nem contador de consultas;
+  `test_prepared_crisis_runs_actor_choices_without_post_start_injection`
+  passou em E284. É evidência controlada, não provider real, e não fecha a
+  operação, guarnição sustentada nem saída bilateral exigidas pelo item M2 acima.
+- [x] M2 sub-recorte de autoria das fixtures de campanha: premissas materiais
+  de estoque, presença inicial da guarnição e rota interrompida agora declaram
+  `root_premise`; o grupo focal que cobre interferência, operação, guarnição e
+  saída bilateral passou (`27 passed` nos quatro módulos, E284). São provas em
+  cenários distintos dentro da suíte, não uma mesma trajetória integrada. Isso
+  torna as fixtures auditáveis, mas não as converte em ocorrências naturais nem
+  fecha a integração autônoma exigida pelo item M2 acima.
 - [x] Gate C, observação limitada: inventariar saves naturais já existentes e
   registrar ausência da cadeia política completa sem transformá-la em cota
   de drama (`E141-finalização`). Todos os saves inspecionados usam

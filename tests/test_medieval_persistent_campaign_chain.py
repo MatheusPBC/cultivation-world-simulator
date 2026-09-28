@@ -47,6 +47,12 @@ def _foreign_garrison_premise(world):
     arrival = record_event(
         world, "test_foreign_garrison_arrived", "Premissa factual da guarnição ocupante.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "persistent_campaign_chain_fixture",
+            "source_refs": [{"kind": "scenario", "id": "persistent_campaign_chain_fixture"},
+                            {"kind": "settlement", "id": TARGET},
+                            {"kind": "population_group", "id": soldier_id}],
+            "observed_day": world.clock.absolute_day}},
         deltas=(_delta("detachment", detachment_id, "stage", None, "present"),))
     world.society.detachments[detachment_id] = Detachment(
         id=detachment_id, owner_ref=OCCUPIER, source_group_id=soldier_id, count=20,
@@ -96,6 +102,11 @@ def _start_siege(monkeypatch, extra_food, *, dispatch_repeat_supply=True):
         stocked = record_event(
             world, "test_campaign_source_stock_premise", "Premissa factual de estoque da expedição.",
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"root_premise": {
+                "kind": "scenario_bootstrap", "domain": "persistent_campaign_chain_fixture",
+                "source_refs": [{"kind": "scenario", "id": "persistent_campaign_chain_fixture"},
+                                {"kind": "stock", "id": source_stock.id}],
+                "observed_day": world.clock.absolute_day}},
             deltas=(_delta("stock", source_stock.id, "food", before_food, before_food + extra_food),))
         world.economy.stocks[source_stock.id] = source_stock.model_copy(update={
             "goods": {**source_stock.goods, "food": before_food + extra_food},
@@ -319,6 +330,11 @@ def test_physical_route_closure_interrupts_the_same_campaign(monkeypatch, tmp_pa
     closure = record_event(
         world, "test_route_closed_by_external_cause", "Premissa factual de passagem interrompida.",
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "persistent_campaign_route_interference_fixture",
+            "source_refs": [{"kind": "scenario", "id": "persistent_campaign_route_interference_fixture"},
+                            {"kind": "route", "id": route_id}],
+            "observed_day": world.clock.absolute_day}},
         deltas=(_delta("route", route_id, "enabled", True, False),))
     route.update_runtime(enabled=False)
     due = tick(world)

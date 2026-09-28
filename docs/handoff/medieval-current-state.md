@@ -9824,3 +9824,26 @@ tests/test_medieval_institutional_decision_turn.py` — `42 passed in 11.05s`.
 M1 fecha apenas para o cenário preparado; provider real, escolha independente
 sistêmica, emergência natural, outros seeds e Gate B natural permanecem sem
 prova para M8. Nenhum save-fonte foi alterado; sem commit, push ou deploy.
+
+## E284 — seleção contextual de E139 e raízes das fixtures de campanha — 28/09/2026
+
+Fingerprint de base: HEAD `e6ac8d374e8d0726c2567e18f54b5ada7e097dce`; SHA-256
+do diff dos dois arquivos de teste alterados:
+`6a043669bfa016b5d629ddbe6bbff67e6a7310a263202a20796bc5e4d5f7bc33`.
+O stub controlado da crise E139 passou a escolher entre os textos e o papel do
+ator no menu atual, sem consultar prefixo de affordance nem contador. As
+fixtures persistentes agora declaram `root_premise` para o estoque inicial,
+chegada da guarnição e interrupção de rota, que a auditoria havia apontado como
+eventos materiais sem raiz.
+
+Verificação reproduzível, com estado de teste isolado:
+`CWS_DATA_DIR=/tmp/cws-m2-focused-20260928 PYTHONPATH=.
+.venv/bin/python -m pytest -q tests/test_medieval_campaign_creature_interference.py
+tests/test_medieval_garrison_policy.py tests/test_medieval_garrison_supply_objective.py
+tests/test_medieval_persistent_campaign_chain.py` — `27 passed in 20.23s`;
+`git diff --check` passou. O provider não estava configurado (`provider_available()
+== False`), nenhuma consulta externa foi feita. Isto melhora a validade de
+fixtures e fecha somente o sub-recorte de seleção sem IDs; não prova provider
+real, ocorrência natural nem integra ainda operação, guarnição paga em ciclos
+e saída bilateral na mesma trajetória. Próximo: completar a integração M2 e
+contrafactual conforme o checkbox da matriz.
