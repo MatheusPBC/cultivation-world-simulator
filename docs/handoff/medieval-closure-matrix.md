@@ -20,9 +20,11 @@
   owners/integradores e evidência/limites acima. Os requisitos internos têm
   checklists próprios em M1–M8; esta tabela não declara capacidades concluídas.
 
-- [x] Preservar o WIP do HEAD `51c213df` em snapshot local recuperável: patch
-  binário dos arquivos rastreados, arquivo dos 23 arquivos não rastreados,
-  status/branch/HEAD e hashes em `/tmp/medieval-m0-checkpoint.refkrM/` (`E265`).
+- [x] Preservar o WIP do HEAD `51c213df` em snapshot local recuperável (`E265`)
+  e depois em checkpoint Git local `6f78ea11` na branch
+  `codex/medieval-remote` (275 arquivos; `git diff --cached --check` limpo).
+  O commit está local, sem push/merge/deploy; o WIP do checkpoint permanece
+  revisável e o histórico remoto não foi alterado.
 - [x] Revisar individualmente o conjunto recuperável E244–E255 e classificar
   limites (`E266`): dez saves E245/E247–E249/E251–E255 passaram a auditoria
   causal atual. E244, E246 e E250 não têm output reproduzível preservado; manter
@@ -134,11 +136,20 @@ Atualizada em 28/09/2026. O checkout usa save schema 78, Economy schema 19 e Kno
   não uma estimativa generalizável. A affordance não fecha adaptação M1.
 - [x] E274.b executado com a ferramenta reproduzível a partir de uma fronteira
   natural no schema atual; nenhum save antigo foi carregado ou alterado.
-- [ ] E275, diagnóstico read-only: rastrear as 40 moedas emprestadas pela
-  primeira fronteira de produção; localizar a destinação, comparar a ordem das
-  facilities e explicar por que o alvo continuou bloqueado. Decidir se o
-  affordance atual representa crédito operacional geral com transparência ou
-  precisa ser restringido/removido. Não implementar earmark/reserva futura.
+- [x] E275, rastrear em clone seed 73 a aplicação das 40 moedas até a produção
+  do dia 300. `treasury:auren` é compartilhado por três fazendas: o controle
+  produziu 28 lotes em Pedra Clara, 3 em Ponte Negro e 0 em Campos do Lume; a
+  intervenção produziu 29, 3 e 0. O extra foi 100 alimentos em Pedra Clara;
+  quando o alvo foi avaliado, restavam 22 moedas frente ao custo de 40 por lote.
+  Trabalho (87), capacidade, integridade e armazenamento não limitavam. A
+  affordance permanece somente como crédito fungível de folha alimentar, sem
+  promessa ou reserva de instalação; contexto do credor e rótulos passaram a
+  declará-lo. Falta agregada do fechamento foi 129 nos dois ramos. Ver E275 no
+  diário; nenhuma mutação ou save original foi feito.
+- [ ] E276, recompor opções atuais de prioridade produtiva no estado do E275 e
+  verificar em clone se uma decisão consegue direcionar produção ao local sem
+  apenas deslocar o custo/privação para outra coorte. Uma fronteira; não chamar
+  decisão preparada de comportamento natural ou provider.
 - [ ] Gate B estrutural: isolar adaptação de renda/payroll e medir produção,
   salário e acesso sem confundir a resposta com a política offline.
 - [ ] Registrar e revisar individualmente E244–E255 no diário versionado; os

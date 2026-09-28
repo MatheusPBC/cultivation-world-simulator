@@ -85,12 +85,64 @@ def _target_batches(events, facility_id):
 
 
 async def _advance(world, start_day, days, *, facility_id, account_id, lender_id,
-                   settlement_id, loan_id=None):
+                   settlement_id, loan_id=None, trace_payroll_pool=False):
     simulator = MedievalSimulator(world)
     checkpoints = []
     history_start = len(world.events)
+    shared_facilities = {
+        item.id
+        for item in world.economy.facilities.values()
+        if item.payroll_account_id == account_id
+    }
+    pool_balance = world.economy.accounts[account_id].balance
+    traced_account_events = []
+    traced_production_events = []
+    first_boundary_trace = None
     while world.clock.absolute_day < start_day + days:
+        event_start = len(world.events)
         await simulator.step()
+        if trace_payroll_pool and first_boundary_trace is None:
+            boundary_events = world.events[event_start:]
+            for event in boundary_events:
+                production = (
+                    event.causal_payload.get("production")
+                    if isinstance(event.causal_payload, dict) else None
+                )
+                if (isinstance(production, dict)
+                        and production.get("facility_id") in shared_facilities
+                        and event.event_type in {"production_completed", "production_limited"}):
+                    traced_production_events.append({
+                        "event_id": event.id,
+                        "facility_id": production["facility_id"],
+                        "event_type": event.event_type,
+                        "batches": production.get("batches"),
+                        "limitations": production.get("limitations", []),
+                        "payroll_funds": production.get("limits", {}).get("payroll_funds"),
+                        "account_balance_at_evaluation": pool_balance,
+                    })
+                for delta in event.deltas:
+                    if (delta.owner_kind == "account" and delta.owner_id == account_id
+                            and delta.aspect == "balance"):
+                        before = int(delta.before)
+                        after = int(delta.after)
+                        traced_account_events.append({
+                            "event_id": event.id,
+                            "event_type": event.event_type,
+                            "before": before,
+                            "after": after,
+                            "delta": after - before,
+                        })
+                        pool_balance = after
+            if (world.clock.absolute_day > start_day
+                    and world.clock.absolute_day % 30 == 0):
+                first_boundary_trace = {
+                    "day": world.clock.absolute_day,
+                    "payroll_account_id": account_id,
+                    "shared_facility_ids": sorted(shared_facilities),
+                    "account_events": traced_account_events,
+                    "production_events": traced_production_events,
+                    "balance_after_boundary": pool_balance,
+                }
         if world.clock.absolute_day % 30 == 0:
             target = world.economy.facilities[facility_id]
             target_event = world.event_index().get(target.last_event_id)
@@ -116,7 +168,7 @@ async def _advance(world, start_day, days, *, facility_id, account_id, lender_id
     lender_group = world.society.population[lender_id]
     lender_account = world.economy.accounts[f"household:{lender_id}"]
     lender_reserve = lender_group.count * world.economy.markets[settlement_id].prices["food"]
-    return {
+    result = {
         "day": world.clock.absolute_day,
         "checkpoints": checkpoints,
         "food_produced_during_branch": _food_output(events),
@@ -133,9 +185,12 @@ async def _advance(world, start_day, days, *, facility_id, account_id, lender_id
         "total_money": sum(account.balance for account in world.economy.accounts.values()),
         "event_count": len(events),
     }
+    if trace_payroll_pool:
+        result["first_boundary_payroll_pool_trace"] = first_boundary_trace
+    return result
 
 
-async def compare(seed=73, days=180, max_source_day=900):
+async def compare(seed=73, days=180, max_source_day=900, *, trace_next_boundary=False):
     capture = {}
     original = engine_module.review_monthly_institutional_turn
 
@@ -207,6 +262,7 @@ async def compare(seed=73, days=180, max_source_day=900):
         "account_id": choice.account_id,
         "lender_id": lender_id,
         "settlement_id": choice.settlement_id,
+        "trace_payroll_pool": trace_next_boundary,
     }
     control_result = await _advance(control, start_day, days, **common)
     intervention_result = await _advance(intervention, start_day, days,
@@ -243,10 +299,18 @@ def main():
     parser.add_argument("--seed", type=int, default=73)
     parser.add_argument("--days", type=int, default=180)
     parser.add_argument("--max-source-day", type=int, default=900)
+    parser.add_argument(
+        "--trace-next-boundary",
+        action="store_true",
+        help="include account movements and shared-facility production at the first later monthly boundary",
+    )
     args = parser.parse_args()
     if args.days <= 0 or args.days % 30:
         parser.error("--days must be a positive multiple of 30")
-    print(json.dumps(asyncio.run(compare(args.seed, args.days, args.max_source_day)),
+    print(json.dumps(asyncio.run(compare(
+        args.seed, args.days, args.max_source_day,
+        trace_next_boundary=args.trace_next_boundary,
+    )),
                      ensure_ascii=False, sort_keys=True))
 
 

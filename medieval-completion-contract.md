@@ -1,9 +1,11 @@
 # Contrato de conclusão do Medieval
 
-28/09/2026 — execução em andamento; M0 reconciliado (E267), M1 aberto (E273).
-Referência-base: HEAD `51c213df`; checkout tem WIP amplo preservado e está 26
-commits à frente de `github-personal/codex/medieval-remote`. E268 audita dois
-saves de continuação até o dia 1.110; isso não fecha M1 nem valida outros seeds.
+28/09/2026 — execução em andamento; M0 preservado em checkpoint local
+`6f78ea11`; M1 permanece aberto após E275.
+O checkpoint está 27 commits à frente de `github-personal/codex/medieval-remote`.
+E268 audita dois saves de continuação até o dia 1.110 sob o schema e fingerprint
+daquele recorte; não fecha M1, não é carregável no schema atual e não valida
+outros seeds.
 
 ## Resultado e autoridade documental
 
@@ -77,10 +79,12 @@ responsável e o trabalho retorna ao marco original.
 
 ### M0 — Checkpoint recuperável e lista finita
 
-- [x] Preservar WIP em checkpoint local recuperável após conferir o status e
-  arquivos não rastreados; registrar HEAD, hashes e branch. E265 criou o snapshot
-  reversível em `/tmp/medieval-m0-checkpoint.refkrM/`. Não houve commit; a
-  autoridade local atual proíbe commit/push/merge/deploy.
+- [x] Preservar WIP em checkpoint local recuperável após conferir status e
+  arquivos não rastreados. E265 criou um snapshot reversível em
+  `/tmp/medieval-m0-checkpoint.refkrM/`; o checkpoint revisável seguinte é o
+  commit local `6f78ea11` (`wip: checkpoint medieval completion work before E275`),
+  feito na branch `codex/medieval-remote`. Ele registra 275 arquivos e mantém o
+  estado anterior recuperável; não houve push, merge ou deploy.
 - [x] Reconciliar gates atuais com E199/E200 históricos e E256–E266. E266
   auditou dez saves recuperáveis dos artefatos E244–E255; E244/E246/E250
   ficaram classificados como sem output recuperável. Isso não certifica gates
@@ -147,12 +151,24 @@ Inventário finito; não abrir nova caça irrestrita a owners.
 - [ ] Demonstrar uma resposta normal viável cuja melhora se sustente sem
   transferir privação a outra coorte; seguir acesso, renda, produção, caixa,
   saúde e as decisões por coorte. A vaga observada em E272 não fecha esse aceite.
-- [ ] E275, diagnóstico sem mutação: rastrear o destino das 40 moedas do crédito
-  na próxima fronteira de produção e identificar por que o caixa compartilhado
-  não elevou os batches da instalação que originou o pedido. Separar pagamentos,
-  ordem das instalações, força de trabalho e recursos; decidir se a affordance
-  atual é honesta como crédito de operação alimentar geral ou se deve ser
-  restringida/removida. Não criar reserva/earmark nem nova política fiscal.
+- [x] E275, diagnóstico de uma fronteira, com cenário regenerado seed 73 e
+  clones em memória: o empréstimo de 40 elevou `treasury:auren` de 2.903 para
+  2.943, mas esse caixa é compartilhado por três fazendas. No dia 300, o pool
+  financiou 29 lotes em Pedra Clara (28 no controle) e 3 em Ponte Negro nos dois
+  ramos; ao avaliar Campos do Lume havia 22 moedas, abaixo dos 40 do próximo
+  lote, e o alvo ficou em zero nos dois ramos. Trabalho (87), capacidade, local,
+  integridade e armazenamento permitiam produzir; só `payroll_funds` limitou.
+  O fluxo é honesto como crédito de caixa fungível para folha de produção
+  alimentar, não como promessa de produção naquela instalação. O contexto e os
+  rótulos agora deixam claro que não há earmark nem resultado garantido. A
+  intervenção gerou 100 alimentos extras no outro local sem reduzir a falta
+  agregada no fechamento (129 em ambos); não prova adaptação sustentada. Detalhes
+  e limites em E275 no diário.
+- [ ] E276, recompor as opções de prioridade produtiva no estado E275 e avaliar
+  se uma decisão atual consegue direcionar o pool compartilhado para a instalação
+  local sem transferir privação às demais coortes. Executar apenas em clones e
+  por uma fronteira mensal; não injetar decisão como se fosse provider ou evento
+  natural.
 
 Aceite: resposta viável reduz pressão de forma sustentada no cenário elegível,
 sem criar riqueza nem esconder privação transferida a outra coorte. Um cenário

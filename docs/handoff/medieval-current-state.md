@@ -1,5 +1,44 @@
 # Estado atual — Medieval World Simulator
 
+## E275 — destino do crédito alimentar na primeira fronteira — 28/09/2026
+
+- Baseline recuperável: commit local `6f78ea11`, branch
+  `codex/medieval-remote`, sem push. Evidência reproduzida contra seed 73
+  regenerada em memória, na primeira affordance de crédito alimentar (dia 270,
+  origem `event:8158`); pedido e contribuição API foram feitos somente em clone.
+  Nenhum save de usuário foi carregado, gravado ou alterado.
+- Comando: `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e275-logs .venv/bin/python -u
+  tools/medieval_family_loan_counterfactual.py --seed 73 --days 30
+  --max-source-day 900 --trace-next-boundary`. O novo trace registra mudanças do
+  saldo e produção de todas as instalações que compartilham a conta.
+- O credor `pop:campomanso:orc:farmer` transferiu 40 para
+  `treasury:auren` (`event:9004`): saldo de 2.903 para 2.943; a soma de dinheiro
+  permaneceu 76.000. Três fazendas usam a mesma conta. No dia 300, o controle
+  produziu 28 lotes em Pedra Clara e 3 em Ponte Negro; o ramo do crédito produziu
+  29 em Pedra Clara e 3 em Ponte Negro. Campos do Lume, origem do pedido,
+  produziu zero em ambos. O crédito permitiu um lote de 100 alimentos em outra
+  instalação do mesmo pool, não desapareceu nem foi reservado à fazenda-alvo.
+- Na avaliação de Campos do Lume, havia 18 no controle e 22 no ramo do crédito;
+  cada lote custa 40. Trabalho disponível era 87 e os limites de capacidade,
+  integridade e armazenamento permitiam produção. O único limitador foi
+  `payroll_funds=0`. A rotação/ordem do pool e folha compartilhada consumiram a
+  liquidez antes do alvo. A falta alimentar agregada ao fechamento foi 129 em
+  ambos, portanto o lote extra não reduziu pressão nesse dia.
+- Conclusão: a affordance serve apenas como crédito voluntário, fungível, para
+  folha alimentar institucional; não promete o lote/local que originou o gatilho.
+  Ajustei rótulos e o contexto do credor para explicitar caixa compartilhado,
+  ausência de earmark e ausência de resultado garantido. Sem novo mecanismo,
+  reserva, política fiscal ou mudança de economia. E274/E275 não satisfazem a
+  adaptação sustentada do M1.
+- Verificação após a transparência: `PYTHONPATH=. CWS_DATA_DIR=/tmp/cws-e275-logs
+  .venv/bin/pytest -q tests/test_medieval_family_loans.py` → 5 passed;
+  `git diff --check` e `compileall` dos três módulos/tool alterados passaram.
+  O provider não foi chamado; os resultados são um recorte de uma seed e uma
+  fronteira, com escolhas API preparadas, não escolha natural.
+- Próximo: E276, recompor no dia 270 as affordances de prioridade de produção e
+  testar em clone se existe uma escolha material para priorizar a fazenda local
+  sem apenas transferir falta/custo a outra coorte.
+
 ## E274 — crédito voluntário para lote alimentar limitado por folha — 28/09/2026
 
 - O contrato do crédito familiar aceitava apenas `unpaid_funds` de contrato

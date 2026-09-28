@@ -20,6 +20,7 @@ from src.sim.medieval.family_loans import (
     record_family_loan_decision,
     repay_family_loan,
     request_family_loan,
+    _context as family_loan_context,
 )
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.permanent_employment import (
@@ -389,6 +390,15 @@ def test_family_credit_can_fund_one_food_batch_without_producing_automatically()
     refresh_reports(world)
     offer = next(item for item in family_loan_options(world, lender)
                  if item.request_id == request.id)
+    known_request = next(
+        item for item in family_loan_context(world, lender, (offer,))["known_requests"]
+        if item["request_id"] == request.id
+    )
+    assert known_request["purpose"] == "food_production_payroll"
+    assert known_request["disbursement_scope"] == "borrower_account_fungible_balance"
+    assert known_request["earmarked_for_request"] is False
+    assert known_request["outcome_guaranteed"] is False
+    assert "production_facility_id" not in known_request
     loan_decision = record_family_loan_decision(
         world, lender, offer.id, action=LEND_ACTION,
         decision_source={"kind": "api"},

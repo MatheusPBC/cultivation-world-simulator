@@ -919,6 +919,9 @@ def _context(world, actor, options):
                 "settlement_id": notice.settlement_id,
                 "purpose": notice.purpose,
                 "requested_principal": notice.requested_principal,
+                "disbursement_scope": "borrower_account_fungible_balance",
+                "earmarked_for_request": False,
+                "outcome_guaranteed": False,
                 "expires_day": notice.expires_day,
                 "status": notice.status,
             }
@@ -963,9 +966,10 @@ def family_loan_adapters():
             "family_loan_request",
             family_loan_request_options,
             lambda option: (
-                f"Pedir {option.principal} unidades para "
-                f"{'uma folha não paga' if option.purpose == 'employment_payroll' else 'um lote de alimento limitado por folha'} "
-                f"em {option.settlement_id}; sem juros, vencimento em 180 dias."
+                f"Pedir {option.principal} unidades de crédito para "
+                f"{'uma folha não paga' if option.purpose == 'employment_payroll' else 'a folha de produção alimentar (gatilho: um lote bloqueado)'} "
+                f"em {option.settlement_id}; o valor entra no caixa compartilhado, sem reserva ou garantia de resultado; "
+                "sem juros, vencimento em 180 dias."
             ),
             REQUEST_ACTION,
             request_family_loan,
@@ -974,7 +978,8 @@ def family_loan_adapters():
             "family_loan_lend",
             family_loan_options,
             lambda option: (
-                f"Emprestar voluntariamente {option.principal} unidades à instituição, com principal devido em 180 dias e sem juros."
+                f"Emprestar voluntariamente {option.principal} unidades à instituição; o valor entra no caixa compartilhado, "
+                "sem destinação reservada ou resultado garantido; principal devido em 180 dias e sem juros."
             ),
             LEND_ACTION,
             lend_to_polity,
