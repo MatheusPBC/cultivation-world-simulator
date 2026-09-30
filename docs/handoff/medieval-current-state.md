@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E336.h — 30/09/2026
+## Situação vigente — E337 em execução — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -115,6 +115,15 @@ CWS_DATA_DIR=/tmp/cws-v1-final-e337.SdyTOb/data /usr/bin/time -v -o /tmp/cws-v1-
 Processo iniciado, não concluído. Budgets congelados mantidos; report,
 auditorias anuais, conservação, equivalência e retomada precisam terminar
 antes de marcar gate. Nenhuma nova consulta real nem alteração de save fonte.
+
+Observação intermediária da mesma sessão (sem reinício): seed 73 dia 2070,
+171 pedidos de ajuda, 152 cumprimentos, 195 alívios, 278 compras, 201 migrações,
+32 vínculos de trabalho permanente e 161 transições ocupacionais. São contagens
+observadas, não prova isolada de recuperação sustentada. No dia 1980, a saúde
+média era 315.38 e havia 979 mortes por privação: adaptação ainda exige análise
+da trajetória completa, mesmo com ações materiais reais. Cinco checkpoints
+anuais gravados até dia 1800; auditoria histórica final e budgets ainda pendentes.
+O gate não foi aprovado e o processo continua vivo no handle original.
 
 ## Histórico de checkpoints — E334.b2 e anteriores
 

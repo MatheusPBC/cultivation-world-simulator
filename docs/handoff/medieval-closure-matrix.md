@@ -14,7 +14,7 @@
 | 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | M3/E320 aceito pelos recortes materiais referenciados em seu checklist; E295–E318 conectam aquisição/aplicação, inclusive E300–E308 pólvora/artilharia. Catálogo sozinho não conta; generalização/naturalidade não são inferidas desses recortes. |
 | 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | M2/E294 e composição M7/E335 provam cenários controlados com autoridade/QG/comandante, interferência e consequência civil, sem escolha de ação pós-início pelo teste. Não extrapolar política stub para provider real ou emergência natural. |
 | 5. Magia, criaturas e ação individual | M4/M5/M6 | Society/Research owners e `rites`, `site_services`, `creature*`, `character_*`, `assembly_denial` | M4/E324.d, M5/E328 e M6/E332 aceitos em recortes controlados: trabalho dos quatro povos, elemental/evocação com custos e contramedidas, adesão independente e resposta social. Composição/navegabilidade E335; gates amplos continuam M8. |
-| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; E336 regressão apropriada. E199/E200 é histórico. Corpus real atual, três seeds naturais e custos permanecem abertos em M8. |
+| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; E336 regressão apropriada e corpus real limitado fechado em E336.h. E199/E200 é histórico. Três seeds naturais e custos seguem em execução em M8/E337. |
 
 - [x] M0 crosswalk: mapear as sete seções (0–6) do roadmap a M0–M8,
   owners/integradores e evidência/limites acima. Os requisitos internos têm
@@ -286,11 +286,12 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     dois ramos com save/load/audit ok. Browser Finanças → folha → why passou.
     Ensino prévio é premissa explícita, não nova prova de pesquisa paga.
     M7 fechado no escopo controlado E333–E335; natural/provider/finais são M8.
-- [ ] M8/E336: preservar checkpoint revisável e congelar fingerprints do
+- [x] M8/E336: preservar checkpoint revisável e congelar fingerprints do
   código M0–M7; levantar regressões/gates ainda devidos e saldo real de consultas,
   sem apagar falhas conhecidas nem usar execução histórica stale como aceite.
   Preflight de disco: externalizar/remover somente artefatos identificados,
-  autorizados e com cópia verificada; aguardando decisão sobre quatro diretórios.
+  autorizados e com cópia verificada; concluído em E336.h. Checkpoint documental
+  local 700fede5; gate natural permanece separado e aberto em E337.
   - [x] E336.a: preservar patch/untracked e reproduzir a falha de conservação
     da migração no fechamento mensal. Diagnóstico soma receipts fora do ledger:
     perda pública de armazenamento -303, exatamente a divergência. Incluir o

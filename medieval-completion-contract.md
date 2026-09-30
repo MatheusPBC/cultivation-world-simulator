@@ -599,8 +599,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E336, preservar checkpoint revisável, congelar
-fingerprints e reconciliar regressões, disco e orçamento de consultas reais.
+Próximo trabalho imediato: acompanhar o mesmo processo M8/E337, três seeds
+naturais por 3600 dias, iniciado após fechar E336.h (corpus e backup verificado).
+Preservação, freeze, regressões e preflight já registrados; nenhuma nova física.
 E330–E335.c constam
 concluídos apenas nos recortes/evidências da matriz, não como gate natural.
 M4/E324.d concluiu trabalho remunerado para os
