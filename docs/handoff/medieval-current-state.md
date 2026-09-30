@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E340 íntegro / performance reprovada — 30/09/2026
+## Situação vigente — E342 verificado / E343 candidato congelado — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -33,6 +33,11 @@
   Performance limitada reprovou: p95 de seis meses 69.4166s >35s; nenhum gate
   completo foi iniciado. E341 concluiu o perfil do sucessor; próximas correções
   devem abordar buscas repetidas de proveniência sem enfraquecer validadores.
+- E342 implementa somente índice transitório de última causa de rota, com
+  processamento incremental do suffix e mapa isolado em transaction_copy.
+  Três testes de equivalência/atualização/isolamento adicionados, 47 testes do
+  recorte passaram, mais 49 de migração/persistência. Benchmark e comparação
+  natural preservaram causas/snapshot/história/RNG; próximo gate integral E343.
 
 ## E339 — Cópia por owner e ciclos de Knowledge — 30/09/2026
 
@@ -139,6 +144,66 @@ consulta não pode substituir esse validator. Próximo recorte deve limitar-se a
 proveniência de rotas, medir ganho e provar causas idênticas, sem novo owner,
 mudança de física, truncamento ou relaxamento de auditoria. Demais hotspots não
 serão reescritos juntos. M8 permanece aberto; sem push/merge/deploy.
+
+## E342 — Índice transitório de causas das rotas — 30/09/2026
+
+Base `f6fdb6aa`. Arquivos: `src/classes/core/medieval_world.py`,
+`src/sim/medieval/logistics.py`, `tests/test_medieval_history_performance.py`.
+Projection guarda somente route_id→event_id e assinatura do prefixo; consulta
+processa append, reconstrói após shrink/substituição do boundary. Candidate clona
+o mapa; persistência continua sem cache. Prefixo comprometido é imutável no
+runtime normal; validator integral segue responsável por adulteração, não índice.
+Nenhuma autoridade, lei material, escolha ou fonte histórica foi alterada.
+
+Luna executou `CWS_DATA_DIR=/tmp/cws-e342-test .venv/bin/python -m pytest -q
+tests/test_medieval_history_performance.py tests/test_medieval_logistics.py`:
+47 passed in 15.39s, com três novos casos de causas iguais/rotas nunca tocadas,
+append/replacement/shrink e isolamento de rollback. `git diff --check` passou.
+Scripts temporários `/tmp/cws-e342-route-benchmark.py` e
+`/tmp/cws-e342-route-equivalence.py` comparam contra `_route_causes` do commit
+`f6fdb6aa`. O segundo usa hashes em streaming e nenhum evento sintético na
+prova natural. Resultados em `/tmp/cws-e340-late.MZvmQB/e342-*`; não sobrescrevem
+o checkpoint 3060. Medição isolada em execução, depois par natural 3060→3090;
+sem provider, GC thresholds ou reescrita de save. Não aprova gate M8.
+MetaGame/Laya não está exposto entre ferramentas desta sessão; nenhuma consulta
+shadow nova foi presumida como executada. Revisão principal permanece local.
+
+Resultados concluídos, ambos comandos exit 0:
+
+```text
+CWS_DATA_DIR=/tmp/cws-e340-late.MZvmQB/data .venv/bin/python /tmp/cws-e342-route-benchmark.py
+CWS_DATA_DIR=/tmp/cws-e340-late.MZvmQB/data .venv/bin/python /tmp/cws-e342-route-equivalence.py
+CWS_DATA_DIR=/tmp/cws-e342-parent-tests .venv/bin/python -m pytest -q tests/test_medieval_migration.py tests/test_medieval_persistence.py
+```
+
+Benchmark no save 3060: nove rotas, 131.559 eventos, causas iguais e fonte
+intacta. Cold CPU 0.074505→0.072860s; warm 50 chamadas 4.046743→0.000666s.
+Não inferir essa proporção para o mês inteiro. Par natural 3060→3090,
+131.559→132.631 eventos, snapshot/RNG/história inteira iguais. Baseline CPU
+30.278560s/parede 30.715261s; otimizado CPU 29.573660s/parede 29.712043s.
+História SHA-256 `f56cf25310563b7e327a3d2caa9b8e03a7c3f94a48490bbfcfede5c2f8dd4468`;
+snapshot `221ba67ecccc1f2883c0bfba28828e3367a506f15d740da084c730191ffb27b4`.
+AI desabilitada em ambos, zero eventos sintéticos, fonte intacta. Regressão
+principal: 49 passed in 23.51s; diff check limpo. Ganho aceito no recorte,
+não p95 de 120 meses nem gate amplo. Sem consulta provider/push/merge/deploy.
+
+## E343 — Novo candidato do gate final natural — 30/09/2026
+
+Pré-registro após E342, código congelado. Fingerprint pelo comando E196:
+`bdffc18991756f621881ea12cc80ca1fe3136040814779695381711913f7eba9`.
+Saída nova `/tmp/cws-v1-final-e343.PJuJih`, não substitui E337/E340.
+Disco 8.8 GiB livres, load 3.00/5.80/7.43 no preflight. Seeds 73/101/137
+sequenciais, 3.600 dias cada, checkpoints 360, sem provider e sem stub injetado.
+Budgets permanecem ≤3.600s por seed, p95 mensal ≤35s, RSS ≤4GiB, save ≤512MiB,
+save/load ≤60s e why20 ≤2s. Nenhuma mudança de código durante esse run.
+Sem declaração de aceite até relatório consolidado e auditorias completas.
+
+```text
+CWS_DATA_DIR=/tmp/cws-v1-final-e343.PJuJih/data /usr/bin/time -v -o /tmp/cws-v1-final-e343.PJuJih/host-time.txt .venv/bin/python tools/medieval_release_gate.py --seeds 73,101,137 --days 3600 --checkpoint-days 360 --final-v1 --output-dir /tmp/cws-v1-final-e343.PJuJih
+```
+
+stdout `gate.json`, stderr `gate.stderr.log`; evidência por seed/checkpoint
+será registrada sem promover resultados parciais a aprovação integral.
 
 ### Estado herdado do checkpoint E336.g
 

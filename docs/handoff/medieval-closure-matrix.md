@@ -421,6 +421,18 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     17.70s, buscas de causas de rota 6.41s e concessões 5.69s (instrumentados,
     cumulativos sobrepostos). Próximo recorte: somente busca de causas de rota,
     sem substituir validação integral por cache de consulta.
+  - [x] E342: indexar apenas a proveniência consultada das rotas sobre o ledger
+    append-only, sem persistir cache nem usar o índice para aprovar integridade.
+    Provar equivalência com a busca anterior, atualização por append/substituição
+    do último evento, isolamento de candidato e ganho medido no save tardio.
+    47 testes do recorte e 49 de migração/persistência passaram. Causas iguais;
+    50 consultas: CPU 4.046743→0.000666s; cold quase igual. Par natural
+    3060→3090 preservou snapshot/RNG e 132.631 eventos, CPU 30.28→29.57s.
+    Não equivale a budget final aprovado; corpus real não foi repetido.
+  - [ ] E343: novo gate final natural 73/101/137 ×3.600 dias, sequencial,
+    checkpoints anuais, fingerprint bdffc18991756f621881ea12cc80ca1fe3136040814779695381711913f7eba9.
+    Fonte congelada; nenhuma nova alteração durante execução. Conservação,
+    auditoria, save/load/continuação e budgets originais precisam passar todos.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

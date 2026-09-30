@@ -6,6 +6,7 @@ import pytest
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.classes.state_delta import StateDelta
+from src.sim.medieval.events import WorldEvent
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
 
@@ -71,6 +72,100 @@ def test_recording_a_cause_addresses_its_event_without_traversing_the_history():
     assert [link.cause_event_id for link in effect.causal_links] == [cause.id]
     assert world.events[-1] is effect
     assert world.events.traversals == 0
+
+
+def test_route_delta_index_matches_legacy_lookup_for_touched_and_untouched_routes():
+    from src.sim.medieval.logistics import _route_causes
+    from src.sim.medieval.economy import _causes
+
+    world = create_medieval_world(73)
+    touched, untouched = tuple(world.map.routes)[:2]
+    first = record_event(
+        world, "route_changed", "Primeira alteração de rota.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="route", owner_id=touched, aspect="enabled",
+                            before="True", after="False"),),
+    )
+    record_event(
+        world, "observed", "Observação sem alteração de rota.",
+    )
+
+    def legacy(route_ids):
+        pending = set(route_ids)
+        latest = {}
+        for event in reversed(world.events):
+            for delta in event.deltas:
+                if delta.owner_kind == "route" and delta.owner_id in pending:
+                    latest[delta.owner_id] = event.id
+                    pending.remove(delta.owner_id)
+            if not pending:
+                break
+        return latest
+
+    route_ids = (touched, untouched)
+    expected_latest = legacy(route_ids)
+    expected_causes = {
+        route_id: _causes(expected_latest.get(route_id), *(s.last_event_id
+            for s in world.map.infrastructure_sites.values() if route_id in s.route_ids))
+        for route_id in route_ids
+    }
+    assert world.route_delta_event_index() == expected_latest
+    assert _route_causes(world, route_ids) == expected_causes
+    assert first.id == world.route_delta_event_index()[touched]
+    assert untouched not in world.route_delta_event_index()
+
+
+def test_route_delta_index_rebuilds_after_suffix_replacement_and_shrink():
+    world = create_medieval_world(73)
+    route_a, route_b = tuple(world.map.routes)[:2]
+    first = record_event(
+        world, "route_changed", "Rota A.", fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="route", owner_id=route_a, aspect="enabled",
+                            before="True", after="False"),),
+    )
+    assert world.route_delta_event_index()[route_a] == first.id
+    appended = record_event(
+        world, "route_changed", "Rota B.", fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="route", owner_id=route_b, aspect="enabled",
+                            before="True", after="False"),),
+    )
+    assert world.route_delta_event_index()[route_b] == appended.id
+
+    replacement = WorldEvent(
+        id=appended.id, day=appended.day, sequence=appended.sequence,
+        event_type="route_replaced", content="Substituição de rota.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(id=f"{appended.id}:delta:0", event_id=appended.id,
+                           owner_kind="route", owner_id=route_a, aspect="enabled",
+                           before="False", after="True"),),
+    )
+    world.events[-1] = replacement
+    rebuilt = world.route_delta_event_index()
+    assert rebuilt[route_a] == replacement.id
+    assert route_b not in rebuilt
+
+    world.events.pop()
+    assert world.route_delta_event_index() == {route_a: first.id}
+
+
+def test_transaction_copy_isolates_route_delta_index_map():
+    world = create_medieval_world(73)
+    route_a, route_b = tuple(world.map.routes)[:2]
+    record_event(
+        world, "route_changed", "Rota A.", fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="route", owner_id=route_a, aspect="enabled",
+                            before="True", after="False"),),
+    )
+    world.route_delta_event_index()
+    candidate = world.transaction_copy()
+    assert candidate._route_delta_cache[2] is not world._route_delta_cache[2]
+    record_event(
+        candidate, "route_changed", "Rota B candidata.", fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(StateDelta(owner_kind="route", owner_id=route_b, aspect="enabled",
+                            before="True", after="False"),),
+    )
+    assert candidate.route_delta_event_index()[route_b].startswith("event:")
+    assert route_b not in world.route_delta_event_index()
 
 
 def test_actor_transition_requires_a_real_decision_cause_at_record_time():

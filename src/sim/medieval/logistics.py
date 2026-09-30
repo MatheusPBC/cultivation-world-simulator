@@ -91,16 +91,9 @@ def queue_freight(world, source_id, destination_id, resource_id, quantity, route
 
 def _route_causes(world, route_ids):
     """Derive provenance once for this batch; cargo cannot mutate routes/sites."""
-    pending = set(route_ids)
-    latest = {}
-    if pending:
-        for event in reversed(world.events):
-            for delta in event.deltas:
-                if delta.owner_kind == "route" and delta.owner_id in pending:
-                    latest[delta.owner_id] = event.id
-                    pending.remove(delta.owner_id)
-            if not pending:
-                break
+    if not route_ids:
+        return {}
+    latest = world.route_delta_event_index()
     return {route_id: _causes(latest.get(route_id), *(s.last_event_id
             for s in world.map.infrastructure_sites.values() if route_id in s.route_ids))
             for route_id in route_ids}

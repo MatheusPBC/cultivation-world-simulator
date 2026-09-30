@@ -51,6 +51,8 @@ class MedievalWorld:
         default=None, repr=False, compare=False)
     _actor_decision_cache: tuple[int, int, dict[tuple[str, str], tuple["WorldEvent", ...]]] | None = field(
         default=None, repr=False, compare=False)
+    _route_delta_cache: tuple[int, int, dict[str, str]] | None = field(
+        default=None, repr=False, compare=False)
     _strategic_capacity_cache: tuple[tuple[int, int], dict[tuple[str, str], dict]] | None = field(
         default=None, repr=False, compare=False)
     _diplomatic_context_cache: tuple[tuple[int, int, int], dict[tuple[str, str], object]] | None = field(
@@ -108,6 +110,10 @@ class MedievalWorld:
                         if cached is not None else None)
             elif name == "_actor_decision_cache":
                 setattr(candidate, name, self._actor_decision_cache)
+            elif name == "_route_delta_cache":
+                cached = self._route_delta_cache
+                setattr(candidate, name, (cached[0], cached[1], dict(cached[2]))
+                        if cached is not None else None)
             elif name == "_strategic_capacity_cache":
                 setattr(candidate, name, self._strategic_capacity_cache)
             elif name == "_diplomatic_context_cache":
@@ -175,6 +181,44 @@ class MedievalWorld:
                       {actor: tuple(items) for actor, items in grouped.items()})
             self._actor_decision_cache = cached
         return cached[2].get((actor_kind, actor_id), ())
+
+    def route_delta_event_index(self) -> dict[str, str]:
+        """Return the latest route-delta event for each route in the ledger.
+
+        This query projection assumes the committed event prefix is immutable;
+        it is not an integrity validator.  Full history validators remain the
+        authority for detecting tampering.  Keep the transient projection
+        incremental across an appended suffix, while rebuilding if a caller
+        replaces the cached boundary or shrinks the ledger.  It is deliberately
+        not saved.
+        """
+        event_count = len(self.events)
+        last_identity = id(self.events[-1]) if self.events else 0
+        cached = self._route_delta_cache
+        if cached is not None:
+            cached_count, cached_last_identity, latest = cached
+            boundary_unchanged = (
+                cached_count == 0
+                or event_count >= cached_count
+                and id(self.events[cached_count - 1]) == cached_last_identity
+            )
+            if boundary_unchanged:
+                for index in range(cached_count, event_count):
+                    event = self.events[index]
+                    for delta in event.deltas:
+                        if delta.owner_kind == "route":
+                            latest[delta.owner_id] = event.id
+                self._route_delta_cache = (event_count, last_identity, latest)
+                return latest
+
+        latest = {}
+        for index in range(event_count):
+            event = self.events[index]
+            for delta in event.deltas:
+                if delta.owner_kind == "route":
+                    latest[delta.owner_id] = event.id
+        self._route_delta_cache = (event_count, last_identity, latest)
+        return latest
 
     def __deepcopy__(self, memo):
         """Use the transactional clone for the medieval world's atomic forks."""
