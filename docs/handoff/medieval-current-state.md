@@ -6,8 +6,10 @@
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
   30 dias passaram. Ganho medido em Relations sintético, não gate tardio.
   Saves/scripts históricos de `/tmp` indisponíveis nesta retomada; código e
-  registros versionados preservados. Próximo E348 reconstrói fonte tardia em
-  `.tmp_codex/`, sem inferir exclusão humana nem repetir consultas reais.
+  registros versionados preservados. E348 recuperou a fonte tardia exata em
+  `.tmp_codex/` (SHA igual ao histórico), conservação/save-load/continuação
+  passaram. E349 confirmou equivalência tardia, com ganho mensal pequeno.
+  E350 discrimina custo observado do smoke; ainda não fecha o gate integral.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -387,7 +389,7 @@ sem recuperar fonte tardia; E348 reconstrói seed73 até2520 com journal e
 checkpoints em diretório ignorado do repo. M8 permanece aberto; sem consultas
 reais, push, merge, deploy ou relaxamento de budget.
 
-## E348 — Reconstrução natural tardia em execução — 30/09/2026
+## E348 — Reconstrução natural tardia concluída — 30/09/2026
 
 Código congelado `c531cdad`, fingerprint95543bab (E347). Preflight:
 ~13GiB livres, RAM disponível6.5GiB, load3.43/4.54/3.43, swap500KiB usada.
@@ -400,14 +402,59 @@ Comando iniciado: `CWS_DATA_DIR=$REPO/.tmp_codex/e348-natural-ul8iI0/data
 $REPO/.tmp_codex/e348-natural-ul8iI0/progress.jsonl --output
 $REPO/.tmp_codex/e348-natural-ul8iI0/seed73-day2520.mws`, com `$REPO` igual a
 `/home/matheus/Documentos/vscode/baseDev/cultivation-world-causal-kernel`.
-Stdout/stderr em `run.log`; handle72120, ainda sem exit terminal. Journal
-confirma avanço natural inicial, não conclusão. Política persistida
+Stdout/stderr em `run.log`; handle72120 terminou exit0. Journal confirma
+avanço até2520 e continuação equivalente até2521. Política persistida
 `routine-rules`, AI desabilitada, sem stub/provider/injeção de decisão.
 
-Alvo é recuperar save tardio para medir o patch, não provar três seeds3600
-nem declarar budget aprovado. Checkpoints verificam save/load/conservação;
-auditoria histórica completa e comparação tardia continuam devidas. Não
-alterar fonte durante esta execução nem iniciar outra seed concorrente.
+Save2520:108.417 eventos,28.659.712bytes, SHA-256
+`346f23f52907bb43cab3d794579363e29bf4d331e616844822eb3fe2d0cc2b69`, igual ao
+hash histórico E346. Portanto recuperou a fonte exata naquele ponto, sem
+assumir equivalência apenas por contagem. Recursos integralmente contabilizados
+e dinheiro conservado; checkpoints720/1440/2160 passaram save/load. Save final
+24.7609s, load22.5448s, RSS máximo1.460.563.968bytes, execução1572.46s.
+P95 limitado34.6118s/84 amostras; quatro >35s:2160/36.7565,2370/35.3967,
+2400/38.2697 e2520/38.7780. Não são as120 amostras do gate de3600 dias.
+População8926;2.005 mortes por privação, saúde média187.75. Não é evidência de
+economia saudável ou aprovação do Gate B natural.
+
+Alvo cumprido: recuperar save tardio, não provar três seeds3600 nem budget
+aprovado. Auditoria histórica completa e comparação tardia continuam devidas.
+E349 usa `.tmp_codex/e348-natural-ul8iI0/compare_copy.py`, SHA
+`c8a063d347564e72fde6112afa0c2f4e737504cc20da795123c831dbbbf6fd43`:
+baseline do helper pré-E347 conferido por equivalência AST contra `ae9172b4`,
+medição de avanço termina antes de hashes/snapshots; saída compacta preserva
+evidência completa comparada em memória. Script preparado/revisado, ainda
+não executado nesta entrada; nenhum arquivo de fonte alterado durante E348.
+
+## E349 — Comparação natural tardia da cópia — 30/09/2026
+
+Executada somente após E348 exit0, com fonte2520 intacta. Comando:
+`CWS_DATA_DIR=$REPO/.tmp_codex/e348-natural-ul8iI0/compare-data .venv/bin/python
+.tmp_codex/e348-natural-ul8iI0/compare_copy.py --source
+.tmp_codex/e348-natural-ul8iI0/seed73-day2520.mws --output
+.tmp_codex/e348-natural-ul8iI0/e349-comparison.json`;
+`$REPO=/home/matheus/Documentos/vscode/baseDev/cultivation-world-causal-kernel`.
+Stdout/stderr `e349-comparison.log`, terminal23715 exit0. Fingerprint95543bab
+inalterado; baseline pré-E347, loader atual nas duas variantes. Sem provider,
+mudança de GC, stub ou persistência no source.
+
+2520→2550,108.417→109.947 eventos; snapshot, história integral, datas e fonte
+byte a byte iguais. Hash canônico da história (JSON array ordenado por keys):
+`006c2df3ee6838a4304b5c07a1f93d93bfe5e85365f0466e47d5f6b68bd286f7`.
+O formato do hash difere do E346; não comparar strings de métodos distintos
+como se significassem mudança de história.
+
+CPU avanço baseline26.300519→atual25.756166s; parede26.368270→25.849616s.
+41 cópias de mundo em ambos: CPU6.459405→5.409094s. Containers369 chamadas,
+CPU5.977637→4.947190s (subconjunto, não somar ao custo do mundo). Tempos
+excluem load e serialização da prova. Uma dupla sequencial, baseline primeiro,
+não amostra p95 nem garantia de ganho em execução contínua. Redução de cópia
+~1.05s não se converte integralmente em redução do mês (~0.54s).
+
+E348 observou meses35–39s no avanço contínuo; E349 carregado levou25.85s.
+Próximo E350 separa step, checks de conservação/caixa, métricas mensais e GC
+no mesmo save, antes de atribuir diferença ao smoke/host/caches. Sem alterações
+de código enquanto mede; M8/3seeds3600/entrega continuam abertos.
 
 ### Estado herdado do checkpoint E336.g
 

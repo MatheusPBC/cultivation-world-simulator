@@ -10,8 +10,11 @@ E343 reprovou novamente o budget mensal; E345 mediu validação/GC, E346 reduziu
 um subscan de relações mantendo estado/história/RNG. Ganho mensal pequeno;
 E347 reduziu recursão escalar da cópia mantendo isolamento (47 testes e
 equivalência natural inicial de30 dias). Mediana sintética melhor, não prova
-tardia: saves históricos de `/tmp` indisponíveis nesta retomada; próximo E348
-reconstrói fonte tardia em diretório ignorado persistente do repo.
+tardia: E348 reconstruiu fonte2520 idêntica ao SHA histórico; conservação,
+save/load e continuação passaram, mas houve quatro meses >35s/84 observados.
+E349 confirmou história/estado/datas/fontes iguais: cópia reduziu ~1.05s CPU,
+mês completo só~0.54s. E350 discrimina instrumentação/GC no mesmo save antes
+de novo patch ou gate; nenhuma mudança de fonte durante a medição.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -625,8 +628,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E348, reconstruir fonte natural tardia para
-medição do candidato E347, sem novo domínio ou alteração de física. E347
+Próximo trabalho imediato: M8/E350, discriminar step/observação/GC no save
+natural tardio recuperado E348, sem novo domínio ou alteração de física. E349
+confirmou equivalência tardia com ganho mensal pequeno. E347
 preserva isolamento e equivale no mundo inicial, não fecha o gate. E346 fechou um subscan com74 testes e
 equivalência natural; CPU do mês24.39→24.19s, insuficiente para aprovar M8.
 E343 reprovou p95 (oito meses >35s entre97), encerrado com checkpoint2880

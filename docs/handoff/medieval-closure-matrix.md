@@ -481,11 +481,27 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     47 testes focados passaram; seed73 natural inicial0→30 preservou estado
     e819 eventos. Mediana sintética CPU0.027602→0.019482s, com outlier novo
     0.053699s; não extrapolar para mês/gate. Fingerprint95543bab.
-  - [ ] E348: reconstruir seed73 offline natural até2520 dias, em diretório
+  - [x] E348: reconstruir seed73 offline natural até2520 dias, em diretório
     ignorado persistente do repo, com checkpoints720dias e journal mensal;
     recuperar uma fonte tardia para comparar cópia/avanço no candidato E347.
     Não é gate final de três seeds, não injeta decisões, não usa provider real
     e não substitui E343 reprovado. Nenhuma mudança de fonte durante a medição.
+    Terminal72120 exit0,108.417 eventos, continuidade2521 equivalente;
+    conservação e save/load passaram. Save SHA346f23f5… igual ao ponto histórico
+    E346; novos artefatos recuperaram a fonte exata, não um mundo equivalente
+    presumido. 2.005 mortes por privação; não declarar economia saudável.
+  - [x] E349: comparar2520→2550 com helper pré-E347 e atual, carregando ambos
+    pelo loader atual; medir avanço/cópia separados da serialização da prova,
+    conferir fonte intacta/snapshot/história integral/datas. Uma dupla medida
+    não aprova orçamento p95/3seeds. Rodou após E348 terminal confirmado.
+    Terminal23715 exit0: snapshot/história/datas iguais, fonte SHA intacta;
+    CPU avanço26.3005→25.7562s, parede26.3683→25.8496s; CPU de41 cópias
+    do mundo6.4594→5.4091s. Uma dupla, não p95. História109.947 eventos.
+  - [ ] E350: discriminar custo da instrumentação do smoke no mesmo save2520:
+    avanço normal, accounting de recursos/caixa e métricas mensais separados;
+    medir GC passivamente, sem mudar thresholds, e conferir história igual
+    ao E349. Diferença entre meses contínuos e forks carregados não prova
+    sozinha que o observador é o culpado. Sem nova fonte/owner/physics patch.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
