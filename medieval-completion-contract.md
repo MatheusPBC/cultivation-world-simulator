@@ -50,7 +50,9 @@ registrou diagnóstico M1; E303 integrou pré-posicionamento por Freight e E304
 conectou produção paga, estoque, Freight, cerco e consumo no mesmo cenário
 controlado. Não houve merge ou deploy; E304, E306, E307 e E308 permanecem no WIP
 local; o recorte E300 está aceito em cenário controlado.
-M1 tem aceite controlado em E282; Gate B natural segue aberto para M8. E288
+M1 tem aceite controlado em E282; E356 comprova capacidade adaptativa natural
+no recorte Campomanso/seed73/240–420, com controle institucional explícito.
+Não certifica estabilidade econômica global ou provider real. E288
 provou interferência criatura → rota/carga → campanha/comandante → consequência
 civil. E294 uniu essa interferência, QG/comandante, operação/ocupação, guarnição
 paga e saída política bilateral em uma trajetória controlada sem decisões
@@ -638,12 +640,15 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E356, comparação econômica curta no runtime
-60efe86c após corrigir mortalidade de grupos alimentados em E355 (35 testes).
+Próximo trabalho imediato: M8/E357, gate final no runtime60efe86c/fingerprint
+41aeba02, após corrigir mortalidade em E355 (35 testes) e verificar em E356
+adoção natural de emprego com recuperação por seis ciclos no código atual.
 E354 reconciliou adoção natural histórica de emprego em Campomanso240→420:
 déficit17→0 em seis ciclos, salários/tributos/compras conservados, sem redução
-da coorte ou auxílio. Não é contrafactual nem aceite atual; E356 compara
-continuação natural com recusa explícita de novos empregos de Auren.
+da coorte ou auxílio. E356 reproduz isso no código atual e compara com exclusão
+diagnóstica de novos empregos de Auren: faltas219/172, auxílio e migração mudam
+o controle. Capacidade adaptativa aceita nesse recorte; não efeito exclusivo
+de um contrato, estabilidade global ou IA real. Não forçar prosperidade.
 E353 reconciliou Campomanso1440→1620: salários reais e auxílio reduzem falta,
 mas a produção fica em zero por caixa e o estoque cai; GateB não aprovado. O gate
 técnico73/101/137×3600 passou no código congelado95543bab; a correção de

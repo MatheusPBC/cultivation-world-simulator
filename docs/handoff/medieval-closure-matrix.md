@@ -561,7 +561,7 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Ruff/diff-check limpos. Contraste por consumo real, quatro fontes inválidas
     rejeitadas sem perda/população/evento, cap anônimo e persistência verificados.
     Não fecha a adaptação natural E354/GateB nem o gate final do candidato novo.
-  - [ ] E356: executar uma única comparação econômica curta no runtime60efe86c:
+  - [x] E356: executar uma única comparação econômica curta no runtime60efe86c:
     seed73 natural até210, continuação natural versus exclusão diagnóstica de
     novos empregos de Auren240–420 pelo hook existente de exclusão institucional.
     Nenhuma decisão injetada no ramo natural, recurso inventado ou contrato apagado.
@@ -570,6 +570,18 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     os novos empregos de Auren, não estima isoladamente um único contrato.
     O hook não emite decisão de recusa: não chamar o controle de recusa auditada.
     Se não houver adoção ou melhora, registrar falha sem forçar o resultado.
+    Seed73, fork210→420: adoção natural8284/8285 mantém219 residentes e elimina
+    falta própria270–420, sem relief. Caixa0→465 e comida conservados.
+    Controle tem faltas219/172 e recebe auxílio219, imigrantes11 e salário de
+    produção920; não é efeito isolado de um contrato, nem desastre obrigatório.
+    Ambos auditados420: zero causas quebradas/Story/LLM materiais; conservação
+    por passo passou. Aceite de capacidade adaptativa natural no recorte,
+    não estabilidade global/longa ou provider real. Resultado/hashes no diário.
+  - [ ] E357: candidato material60efe86c estabilizado; repetir uma única vez
+    o gate final natural73/101/137×3600 sequencial no fingerprint41aeba02,
+    com os budgets originais, conservação, auditorias, persistência e continuação.
+    E351 é histórico: não promover o resultado antigo ao runtime novo. Sem
+    alteração de código, provider ou simulação concorrente durante esse gate.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
@@ -842,8 +854,11 @@ Atualizada em 29/09/2026. No início de E286, o checkout estava limpo em `3c6e59
   E244/E246/E250 não conservaram output reproduzível e permanecem histórico
   não verificado. A classificação encerra esta pendência documental, não
   reconstitui decisões originais nem garante que os artefatos ainda existam.
-- [ ] Gate B natural: demonstrar capacidade adaptativa e rastrear a cadeia
-  econômica completa no checkout estabilizado.
+- [x] Gate B natural: capacidade adaptativa focal comprovada em E356 no runtime
+  estabilizado60efe86c: pressão→emprego escolhido→salário pago→compra/pantry→
+  déficit próprio zero por seis ciclos, com conservação e controle institucional
+  explícito. Não certifica recuperação de todas as cidades, estabilidade longa,
+  efeito exclusivo de um contrato ou decisões de provider real.
 - [ ] Gate C natural integrado: observar política/QG/comandante e consequência
   econômica/social reagindo a interferência ambiental sem decisão injetada.
   Observação natural ainda não comprovada. O aceite contratual de M2 está

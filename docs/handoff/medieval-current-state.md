@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E355 corrigido / adaptação natural aberta / gate E351 histórico — 30/09/2026
+## Situação vigente — E356 adaptação natural focal / gate atual E357 pendente — 30/09/2026
 
 - E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
@@ -17,8 +17,10 @@
   focados passaram; E351 permanece prova histórica, não gate do novo runtime.
   E354 fechou o diagnóstico histórico de adoção de emprego em Campomanso:
   déficit17→0 em seis ciclos, sem relief/migração/morte e com caixa/comida
-  reconciliadas. GateB atual continua aberto; E356 é a comparação curta
-  natural versus recusa institucional no runtime60efe86c. Saves intactos.
+  reconciliadas. E356 confirmou essa adoção no runtime60efe86c e contrastou
+  seis ciclos com exclusão diagnóstica de novos empregos de Auren. Capacidade
+  adaptativa natural focal aceita; não estabilidade global. Próximo E357:
+  gate final atualizado, sem usar E351 histórico como aprovação atual.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -631,7 +633,10 @@ Runtime da fonte95543bab/E351, não o novo60efe86c. Diagnóstico somente leitura
 `CWS_DATA_DIR=/tmp/cws-e354-natural-windows-v3 .venv/bin/python`.
 Exit0. Fonte SHA antes/depois
 `1a2ec8ef73fb5258a626033ff18dfc24fd9ab65b44a0856bdcd3bd3e19887ef4`.
-Script SHA `06f791657219611bc7bbf04238cf1b6f192d5f678ea08374516f53a0ae9e9dce`;
+Script SHA conferido nesta retomada
+`3a344576e02085fd40007af80a8bc5944093383f0065fa0a05be54675b284e16`;
+o hash06f79165 informado antes pelo executor não foi confirmado. Sem repetir
+o carregamento da fonte só para reproduzir esse detalhe operacional.
 JSON SHA `6503b0ac4fbe957302a238e117de1e195e5bee9572a2e8f6a3bde9f2ec030c97`.
 
 36 contratos novos, 36 janelas detalhadas exportadas. V1/V2 rejeitados: conta
@@ -669,6 +674,68 @@ seed73, natural versus exclusão de novos empregos de Auren, com demais polític
 inalteradas. A recusa institucional afeta mais de um contrato; declarar esse
 limite: o hook não emite uma decisão real de recusa. Nenhuma nova física,
 provider, save original alterado ou smoke longo.
+
+## E356 — Recuperação econômica natural no código atual — 30/09/2026
+
+Código material60efe86c, HEAD de documentação0c061428; fingerprint global
+`41aeba02decd232e1202197c460c4eadcb8d23f85fd66bc10c2875a1cc1305af`,
+repetido nesta continuação. Diagnóstico novo somente em `.tmp_codex/`, nenhum
+patch de produção/teste ou provider. Comando executado exit0:
+
+```bash
+CWS_DATA_DIR=/tmp/cws-e356-economic-pair-v2 .venv/bin/python \
+  .tmp_codex/e356-economic-pair/compare_economic_pair.py \
+  --seed 73 --start-day 210 --target-day 420 \
+  --output .tmp_codex/e356-economic-pair/economic-pair.json
+```
+
+Uma tentativa anterior falhou antes de produzir artefato; não são dois pares
+concluídos. Fonte nova `bootstrap_household_income=True`, mesma premissa inicial
+do smoke natural, provider desligado. Fork por transaction_copy em210,
+preservando RNG/história; natural sem decisão injetada. Controle usa somente o
+hook de exclusão de Auren para novos empregos; não emite recusa fictícia,
+não remove contratos existentes ou inventa dinheiro/comida.
+
+Ramo natural: decisão8284/contrato8285 em240;219 residentes, falta própria17.
+Seis ciclos270–420: falta própria0/0/0/0/0/0, regional5/5/5/6/6/6.
+Sem auxílio, morte ou mudança de população da coorte. Revisão independente
+dos deltas ordenados por sequência: salário2216, tributo-218, compra imediata
+-430, provisões-1103, caixa0→465; nenhuma lacuna before/after. Pantry recebe
+1103 e consome884; reserva final219. Consumo total1314=219×6. Recuperação
+material sustentada no recorte, não uma métrica ajustada pelo diagnóstico.
+
+Controle: falta própria nos seis ciclos219/0/172/0/0/0, soma391 versus0.
+Auxílio219 em270 explica comida em300. Migração11019 no dia310 adiciona11
+residentes,47 de caixa e11 rações. População final230; produção paga920
+em360, tributo-92; compras imediatas346 e provisões391; caixa138, pantry0.
+Não atribuir todas as diferenças a um único contrato: três novos empregos
+de Auren foram suprimidos; decisões/produção/auxílio/migração reagiram.
+O ramo controle também encontra respostas reais: não é tragédia roteirizada.
+
+O resumo do script conta migração usando aspect=count, mas o receipt usa
+resident_count: migration_delta=0 exportado é incorreto. A revisão acima usa
+os deltas brutos canônicos e registra +11; não repetir a simulação por esse
+erro do extrator. public_food exportado soma todos os stocks, não estoque
+público local. food_purchase_cash_delta inclui240; comparação principal usa
+apenas270–420. Esses campos não sustentam o aceite.
+
+Recursos e dinheiro conferidos por passo nos ramos. Auditoria final420:
+natural16016 eventos/11374 materiais; controle16481/11555. Ambos ok=true,
+zero causas quebradas/Story-material/interpretação-material e demais erros de
+autoria. Saves temporários novos de auditoria foram removidos pelo executor;
+originais históricos preservados. JSON mantém receipts e auditorias compactas.
+Script SHA `5fa05a2cd7684ae1406adab883b1eb8a4ec2328cf9d9bb642a3d1eed2d8a5ebf`;
+JSON SHA `b1d99f3f22db9b95966a5994863aad70afb33708c24677e78697826b992538ac`.
+Pós-processamento sem nova simulação: `economic-pair-reviewed.json`, SHA
+`115ae44935d1277ac2c3d6ae2953cbe603504b99e0a7362fbea7e7b2e20c6f44`,
+separa ciclos e corrige resident_count. Duração original não medida: não usar
+esse diagnóstico como prova de budget/performance. Relatório bruto preservado.
+
+Aceito: capacidade adaptativa natural do recorte, com contraste de política
+institucional e conservação. Não prova efeito isolado, recuperação de todas
+as cidades, estabilidade longa ou provider real. E356 fechado; E357 registrado
+antes da execução: três seeds×3600 no candidato atual, sem novos ajustes durante
+o gate e sem relaxar budgets. Publicação/deploy ainda não executados.
 
 ## E354.a — Mortalidade de coortes alimentadas confirmada — 30/09/2026
 
