@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E337 reprovado / E338 diagnóstico — 30/09/2026
+## Situação vigente — E337 reprovado / E339 ciclos transacionais — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -23,6 +23,68 @@
   custos reais terminou, sem reiniciar o gate longo.
   Save original preservado em `/tmp/cws-v1-final-e337.SdyTOb`.
   A alteração de fonte invalida o fingerprint 1c2e7f como candidato novo.
+- E339: medição por owner e callbacks de GC confirmaram picos de coleta de
+  ciclos, não custo do Map/rebind. Referência fraca do registry ao KnowledgeState
+  implementada, sem alterar física, thresholds, snapshots ou retenção histórica;
+  isolamento e equivalência natural verificados. Continuação tardia E340 é o
+  próximo aceite operacional; não é gate final. Base local `6f2f913e`.
+
+## E339 — Cópia por owner e ciclos de Knowledge — 30/09/2026
+
+Base `6f2f913e`, branch `codex/medieval-remote`. Medições temporárias via scripts
+`/tmp/cws-e339-copy-breakdown.py` e `/tmp/cws-e339-gc-profile.py`, rodados com
+`CWS_DATA_DIR=/tmp/cws-v1-final-e337.SdyTOb/data .venv/bin/python SCRIPT`,
+outputs `e339-copy-breakdown.json` / `e339-gc-profile.json` no mesmo diretório.
+Ambos exit 0, provider desabilitado, avanço só em memória 2880→2910,
+125.148→126.201 eventos, hash do checkpoint intacto `a8b157e8…`.
+
+Breakdown: 51.894743s parede / 48.140115s CPU; das 32 cópias, RelationsState
+somou 7.594845s / 6.705216s, com outliers 2.4356s e 2.1948s CPU. Nas demais,
+o mesmo registro de 1.522 propostas levou ~0.05–0.09s. Map somou 0.004864s,
+rebind Knowledge 0.041198s, sem justificativa para otimizá-los.
+
+Callbacks GC: mês 46.252437s parede / 42.511614s CPU; coleta somou 5.853567s
+CPU. As duas varreduras de geração 2 começaram dentro da cópia de Relations:
+1.497769s/15.948 objetos e 1.530965s/38.347 objetos; zero uncollectable.
+Thresholds permaneceram `(700, 10, 10)` antes/depois. Custos acumulados se
+sobrepõem, não somar wrappers como parcelas independentes.
+
+Inspeção de fonte confirma ciclo `KnowledgeState → _RegistryDict → owner`.
+Correção restrita em `src/classes/governance/knowledge.py`: referência fraca
+ao owner, getter mantém identidade, deepcopy usa memo para remapear o owner e
+copia entradas sem tocar epochs na reconstrução. Não há GC freeze/disable,
+cache de autorização, remoção de histórico ou alteração de schema.
+Testes principais adicionados em `tests/test_medieval_history_performance.py`:
+owner liberado sem GC cíclico, deepcopy com epochs independentes e vínculo
+transacional correto. Agente executou 30 testes do módulo; verificação principal
+executou 80 testes em 38.20s, exit 0, cobrindo history performance, engine,
+material execution, persistence e knowledge verticals fail closed.
+
+Comparação `/tmp/cws-e339-owner-equivalence.py`, relatório completo
+`/tmp/cws-v1-final-e337.SdyTOb/e339-owner-equivalence.json`: snapshot, história
+integral, RNG e contagem iguais; 2880→2910, 125.148→126.201 eventos. SHA-256
+da fonte permaneceu `a8b157e8f60aa410392295c8200f57e2d8f15136d74bb9240ee3b209707a5917`.
+Baseline forte: 88.50s parede / 74.46s CPU; referência fraca: 31.39s / 30.84s.
+Geração 2 coletou 45.930 objetos no baseline e zero no ramo corrigido, sem
+alterar thresholds `(700, 10, 10)`. Variação de carga impede atribuir todo o
+ganho de tempo ao patch; equivalência e remoção dos ciclos são as provas fortes.
+O relatório terminou e stderr está vazio, mas o handle desapareceu após retomada
+da sessão: exit code desse comando não foi recuperado e não é declarado zero.
+Isso não aprova p95 de 120 meses nem substitui as três seeds completas.
+
+## E340 — Continuação tardia do candidato E339 — 30/09/2026
+
+Escopo pré-registrado: retomar checkpoint natural 2880 por mais 180 dias em
+diretório novo, provider desabilitado, original intacto. Medir seis meses,
+conservação, save/load e auditoria do sucessor. Nenhuma nova física, orçamento
+relaxado ou decisão injetada. Resultado e caminho serão registrados ao terminar;
+o gate final continua exigindo três seeds frescas de 3.600 dias na fonte estável.
+Execução iniciada em `/tmp/cws-e340-late.MZvmQB`, com journal `progress.jsonl`,
+resultado `result.json` e medição de host `host-time.txt`:
+
+```text
+CWS_DATA_DIR=/tmp/cws-e340-late.MZvmQB/data /usr/bin/time -v -o /tmp/cws-e340-late.MZvmQB/host-time.txt .venv/bin/python tools/medieval_autonomy_smoke.py --resume-save /tmp/cws-v1-final-e337.SdyTOb/natural-73.checkpoint-day-02880.mws --days 180 --output /tmp/cws-e340-late.MZvmQB/natural-73-day-03060.mws --progress-jsonl /tmp/cws-e340-late.MZvmQB/progress.jsonl
+```
 
 ### Estado herdado do checkpoint E336.g
 

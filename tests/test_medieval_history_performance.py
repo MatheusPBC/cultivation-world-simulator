@@ -227,6 +227,8 @@ def test_transaction_copy_shares_frozen_knowledge_values_but_not_registries():
 
     assert candidate.knowledge is not world.knowledge
     assert candidate.knowledge.reports is not world.knowledge.reports
+    assert world.knowledge.reports._owner is world.knowledge
+    assert candidate.knowledge.reports._owner is candidate.knowledge
     assert candidate.knowledge.reports["report:test"] is world.knowledge.reports["report:test"]
     assert candidate.knowledge._semantic_validation_key is None
     assert candidate.knowledge._query_cache is not world.knowledge._query_cache
@@ -237,6 +239,56 @@ def test_transaction_copy_shares_frozen_knowledge_values_but_not_registries():
     replacement = candidate.knowledge.reports["report:test"].model_copy(update={"quantity": 1})
     candidate.knowledge.reports["report:test"] = replacement
     assert world.knowledge.reports["report:test"] is not replacement
+
+
+def test_knowledge_registry_does_not_keep_owner_alive_without_cyclic_gc():
+    import gc
+    import weakref
+
+    from src.classes.governance.knowledge import KnowledgeState
+
+    state = KnowledgeState()
+    registry = state.reports
+    owner_ref = weakref.ref(state)
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        del state
+        assert owner_ref() is None
+        assert registry._owner is None
+        registry["orphaned"] = object()
+        assert registry["orphaned"] is not None
+    finally:
+        if gc_was_enabled:
+            gc.enable()
+
+
+def test_knowledge_state_deepcopy_rebinds_registry_owner_and_epochs():
+    import copy
+
+    from src.classes.governance.knowledge import KnowledgeState
+
+    state = KnowledgeState()
+    state.reports["original"] = object()
+    copied = copy.deepcopy(state)
+
+    assert copied is not state
+    assert copied.reports is not state.reports
+    assert copied.reports._owner is copied
+    assert copied.notices._owner is copied
+    assert copied._registry_epoch == state._registry_epoch
+    assert copied._registry_epochs == state._registry_epochs
+
+    original_epoch = state._registry_epoch
+    copied_epoch = copied._registry_epoch
+    original_reports_epoch = state._registry_epochs["reports"]
+    copied.reports["copied"] = object()
+
+    assert copied._registry_epoch == copied_epoch + 1
+    assert copied._registry_epochs["reports"] == original_reports_epoch + 1
+    assert state._registry_epoch == original_epoch
+    assert state._registry_epochs["reports"] == original_reports_epoch
+    assert "copied" not in state.reports
 
 
 def test_knowledge_semantic_validation_cache_is_invalidated_by_new_facts():

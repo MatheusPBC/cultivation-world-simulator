@@ -395,6 +395,22 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
       Fonte restante apenas isola payloads extras/privados; cinco testes passaram.
     - [x] Medir custos agregados sem cProfile por valor: mês 34.38s, cópia
       7.22s, relações 5.74s, economia 4.47s; fonte preservada.
+  - [x] E339: discriminar o custo real da cópia durante o mesmo horizonte
+    natural 2880→2910 por owner/Map/rebind de Knowledge, sem profiler por valor
+    ou alteração de física. Corrigir só o custo dominante identificado, provar
+    isolamento/rollback e equivalência da história antes de novo candidato M8.
+    - [x] Medição por owner concluída: RelationsState concentrou o custo da
+      cópia em dois outliers; Map/rebind são pequenos. Fonte preservada.
+    - [x] Correlacionar picos ao GC sem alterar thresholds: 5.85s de CPU
+      coletando ciclos, duas varreduras geração 2, fonte intacta.
+    - [x] Eliminar referência forte de registry ao KnowledgeState, preservando
+      epochs/deepcopy/rollback; medir efeito e comparar história/snapshot/RNG.
+      80 testes focados passaram; estado, RNG e 126.201 eventos idênticos.
+      Coleta geração 2: 45.930→0 objetos. Tempo 88.50→31.39s sujeito a carga;
+      relatório completo, exit code do comando não recuperado após retomada.
+  - [ ] E340: continuação natural offline 2880→3060 no candidato E339,
+    sem alterar o save original. Seis meses medidos, conservação/save-load e
+    auditoria; evidência tardia limitada, não substitui o gate final 3×3.600 dias.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

@@ -1,10 +1,12 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, checkpoint de código local `5b4b5227` (E336.e),
+`codex/medieval-remote`, base local `6f2f913e`, correção E339 verificada,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
-backup multipart em verificação. Gate natural e entrega continuam pendentes.
+backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
+por performance; E339 preservou estado/história/RNG e E340 mede continuação tardia.
+Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
 read-only E325 mapeou a base mágica existente; E326 fechou a operação elemental
@@ -599,8 +601,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E338, perfilar checkpoint natural preservado e
-corrigir o custo que reprovou E337 (p95 mensal inevitavelmente >35s).
+Próximo trabalho imediato: M8/E340, validar seis meses tardios após remover os
+ciclos transacionais de Knowledge em E339 (80 testes e equivalência comprovados).
+Experimentos E338 sem ganho foram retirados; E339 não altera política de GC,
+leis materiais ou retenção histórica. Comparar estado/história e custo real.
 Não relaxar o budget; repetir as três seeds completas no novo candidato.
 E336.h (corpus e backup verificado) preservado; nenhuma nova física neste diagnóstico.
 E330–E335.c constam

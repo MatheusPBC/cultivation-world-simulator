@@ -1,7 +1,9 @@
 """Single owner of actor-specific observations; canonical truth stays elsewhere."""
 
 from dataclasses import dataclass, field
+import copy
 import json
+import weakref
 from .models import (KnowledgeReport, DiplomaticNotice, AuthorityClaimNotice, FiscalRouteReport, RouteReport, SettlementReport, SiteReport,
                      CustomsNotice, WorkforceDemandReport, WorkforceOfferNotice, InstitutionalAidNotice,
                      CreatureTributeNotice, CreatureDamageNotice, ForceContactNotice, FieldEngagementOfferNotice,
@@ -20,8 +22,26 @@ class _RegistryDict(dict):
 
     def __init__(self, *args, owner=None, name=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self._owner = owner
+        self._owner_ref = weakref.ref(owner) if owner is not None else None
         self._name = name
+
+    @property
+    def _owner(self):
+        return self._owner_ref() if self._owner_ref is not None else None
+
+    def __deepcopy__(self, memo):
+        existing = memo.get(id(self))
+        if existing is not None:
+            return existing
+        result = type(self)(owner=None, name=self._name)
+        memo[id(self)] = result
+        owner = self._owner
+        if owner is not None:
+            copied_owner = copy.deepcopy(owner, memo)
+            result._owner_ref = weakref.ref(copied_owner)
+        for key, value in self.items():
+            dict.__setitem__(result, copy.deepcopy(key, memo), copy.deepcopy(value, memo))
+        return result
 
     def _touch(self):
         owner = self._owner
