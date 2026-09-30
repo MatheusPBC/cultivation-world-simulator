@@ -482,7 +482,7 @@ para alterar observador; encerra a hipótese em vez de micro-otimizá-lo.
 Código continua95543bab, p95 limitado E34834.6118s/84, não gate aprovado.
 Próximo E351 é o gate integral, em vez de mais sondas sintéticas locais.
 
-## E351 — Gate integral preparado — 30/09/2026
+## E351 — Gate integral em execução — 30/09/2026
 
 Código `c531cdad`/fingerprint95543bab inalterado após E349/E350; documentos
 posteriores não mudam runtime/testes/ferramentas. Diretório novo ignorado
@@ -496,7 +496,11 @@ $REPO/.tmp_codex/e351-final-TxnsDs`.
 Sem `--pressured`, `--economic`, provider real ou injeção de decisões. Três
 seeds sequenciais com todas as120 amostras/seed, auditorias de checkpoints,
 conservação, save/load/continuação e20why por seed. Nenhum resultado antecipado,
-nem conversão de E348 em gate de3600 dias.
+nem conversão de E348 em gate de3600 dias. Comando iniciado após checkpoint
+documental `b11f77c4`; handle8401 confirmado ativo. Stdout final `gate.json`,
+progresso stderr `progress.log`; relatório final só é evidência após término
+terminal confirmado e leitura integral de seus checks. Seed73 iniciou;
+seeds101/137 ainda não são resultados verificados. Sem push/merge/deploy.
 
 ### Estado herdado do checkpoint E336.g
 
