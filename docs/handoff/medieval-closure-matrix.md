@@ -343,6 +343,12 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     geradas, sem publicar branch ou alegar M8 concluído.
     Código: 5b4b5227, 109 arquivos, cached diff-check passou; screenshots e
     estado do runner permanecem locais. Documentação acompanha separadamente.
+  - [x] E336.f: revalidar famílias materiais alteradas restantes fora dos
+    grupos A/B antes de congelar M8: alfândega, aprendizagem/trabalho,
+    embargo/intriga/propriedade e consumidores militares/mágicos adjacentes.
+    Reusar módulos existentes; registrar falhas reais sem novos smokes longos.
+    204 passed em 16 módulos, 75.65s; candidato congelado c13f4e/source 5b4b5227.
+    Não fecha provider, gates naturais ou publicação.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

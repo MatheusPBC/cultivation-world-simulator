@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E336.e — 29/09/2026
+## Situação vigente — E336.f — 30/09/2026
 
 - Checkpoint de código local `5b4b5227` preserva 109 arquivos da integração
   acumulada desde `3c6e590e`, incluindo os scripts reprodutíveis de navegador.
@@ -17,7 +17,12 @@
   continuam aguardando autorização. Disco principal ~120 MiB, ainda
   insuficiente para iniciar os gates longos com checkpoints.
 - Próxima tarefa única: resolver preflight de armazenamento e orçamento real,
-  então congelar o candidato e executar M8. Sem push, merge ou deploy.
+  então executar os gates M8 sobre o candidato congelado c13f4e (E336.f).
+  Sem push, merge ou deploy.
+- E336.f: 204 testes adicionais de famílias alteradas passaram em 75.65s,
+  sem mudança de código. Documentação preservada no commit local `2a3e3898`
+  antes deste registro; fonte no commit `5b4b5227`. Corpus real e gate longo
+  continuam abertos, nenhum resultado histórico stale virou prova atual.
 
 ## Histórico de checkpoints — E334.b2 e anteriores
 
@@ -12441,3 +12446,28 @@ Também corrigidas superfícies documentais: topo do diário estava em E334.b2,
 crosswalk da matriz ainda chamava M4–M6 de abertos, embora seus checklists e
 contrato já registrassem os aceites controlados. Atualizados com as referências
 existentes, preservando limites de fixture/provider/natural e histórico.
+
+## E336.f — Famílias restantes e candidato congelado — 30/09/2026
+
+Grupo C, módulos existentes: customs, apprenticeship, defensive_barrier,
+technology_theft, trade_embargo, productive_conveyance, route_interdiction,
+workforce_transitions, persistent_campaign_chain, creature_magic_interaction,
+creatures, economy, society, dossier, observatory e tariffs.
+
+Comando: CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python -m pytest
+os 16 módulos acima (tests/test_medieval_<nome>.py) -q --tb=short.
+Resultado: **204 passed in 75.65s**. git diff --check: exit 0.
+
+Nenhum teste novo, ajuste de expectativa, mudança do owner ou egress nesta
+rodada. Com E336.b1/b2, fecha a regressão apropriada do candidato e dos
+negativos críticos, não a suíte legada inteira nem cobertura de todos os
+callsites não exercitados. Freeze de código 5b4b5227, fingerprint
+`c13f4e0ce9fb377a389ae66ad97927ead894da89c2408776d41ba377429684d3`,
+repetido após o grupo e igual. Commit de documentação `2a3e3898` verificado;
+só screenshots e estado do runner permaneceram não rastreados nesse ponto.
+
+Primeiro checkbox M8 congelamento/regressão agora fechado; seguem abertos
+corpus real novo, três seeds naturais/3.600 dias/orçamentos e entrega. Não
+extrapolar 204 testes para desempenho tardio, adoção natural ou provider. Os
+gates longos ainda não foram iniciados por disco; espaço ~109 MiB na rodada.
+Backup tmpfs continua preparado, originais intactos, autorização pendente.

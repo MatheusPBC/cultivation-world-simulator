@@ -538,8 +538,12 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
 
 ### M8 — Checkout congelado, gates e entrega
 
-- [ ] Congelar fingerprint após M0–M7; revalidar famílias alteradas e negativos
+- [x] Congelar fingerprint após M0–M7; revalidar famílias alteradas e negativos
   críticos de autoria, opção stale, conservação e publicação atômica.
+  E336.b1/b2/f: inventário delimitado e famílias selecionadas revalidadas;
+  candidato de código 5b4b5227, fingerprint
+  `c13f4e0ce9fb377a389ae66ad97927ead894da89c2408776d41ba377429684d3`.
+  Correção material posterior invalida a prova afetada e exige novo candidato.
 - [ ] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
