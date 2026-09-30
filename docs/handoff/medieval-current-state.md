@@ -1,6 +1,15 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E359 corrigido / E357 falhou / E358 empacotamento local — 30/09/2026
+## Situação vigente — E360 em execução / E358 e E359 concluídos localmente — 30/09/2026
+
+E360 iniciado no commit congelado `e5089542`, fingerprint
+`22e14698cba5f522dc6f357b718259fee8a582da65ca6ea9e294ad0a5e718c83`:
+`CWS_DATA_DIR=/tmp/cws-e360-final .venv/bin/python tools/medieval_release_gate.py
+--seeds 73,101,137 --days 3600 --checkpoint-days 360 --final-v1
+--output-dir .tmp_codex/e360-final-eSYNUE`.
+Saídas em `report.json` e `progress.log` nesse diretório; sequência natural,
+provider desligado, budgets originais. Em andamento não significa aprovado.
+Sem alterações de runtime durante a execução; M8 e entrega continuam abertos.
 
 - E357 terminou com exit1, não aprovado. A seed73 preservou checkpoint3240;
   o avanço posterior falhou em `mortality.py:60` com `deprivation requires the
