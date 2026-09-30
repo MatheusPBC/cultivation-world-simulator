@@ -541,6 +541,21 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     acordos iniciais com resposta nova ou demanda reduzida por mortes/migração.
     Se não houver candidato verificável, registrar a lacuna de escolha/política
     antes de qualquer alteração; sem novo smoke longo ou provider.
+    Inventário v2 confirma36 novos contratos com decisões fallback próprias,
+    não bootstrap inferido pela data; rastreio adaptativo ainda não aceito.
+  - [x] E354.a: confirmar no save original o contraste alimentar/mortalidade.
+    Cinzaverde/dia1050: subsistência38922 registra déficit zero para farmers
+    humano/orc; morte39029 cita38922 e remove1/3 desses mesmos grupos.
+    SHA da fonte permanece1a2ec8ef. Erro semântico confirmado, não balanceamento.
+  - [x] E355: restringir privação aos expostos do recibo canônico atual,
+    preservar nomeados/ausentes e rejeitar fonte ausente/stale/incompatível;
+    receipt com déficit/exposição/perda por grupo e regressão focal.
+    Uma frente material: mortality.py. E351 passa a evidência histórica no
+    fingerprint95543bab; novo gate final somente após estabilizar a regra.
+    Commit local60efe86c, fingerprint41aeba02;35 testes focados passaram,
+    Ruff/diff-check limpos. Contraste por consumo real, quatro fontes inválidas
+    rejeitadas sem perda/população/evento, cap anônimo e persistência verificados.
+    Não fecha a adaptação natural E354/GateB nem o gate final do candidato novo.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
@@ -821,10 +836,11 @@ Atualizada em 29/09/2026. No início de E286, o checkout estava limpo em `3c6e59
   fechado pelo cenário autônomo controlado E294, com composição E335; este
   registro histórico não impõe guerra ou drama às três seeds naturais de M8.
   Manter separados capacidade controlada, emergência natural e provider real.
-- [x] Gate D final: três seeds naturais por 3.600 dias no checkout final, com
+- [ ] Gate D final atual: três seeds naturais por 3.600 dias no checkout final, com
   checkpoints, conservação, save/load/continuação, auditoria e budgets.
-  E351 exit0 no fingerprint95543bab; aprovação técnica não fecha GateB natural
-  nem revisão/entrega de M8.
+  E351 exit0 no fingerprint95543bab permanece aprovado historicamente; E355
+  altera mortalidade, exigindo candidato novo. Aprovação técnica não fecha
+  GateB natural nem revisão/entrega de M8.
 
 - [x] Economia pós-V1: empréstimo familiar voluntário com autoria do pedido,
   aviso local e escolha do grupo, transferência sem criação de dinheiro,

@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E351 técnico aprovado / adaptação natural e entrega abertas — 30/09/2026
+## Situação vigente — E355 corrigido / adaptação natural aberta / gate E351 histórico — 30/09/2026
 
 - E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
@@ -12,8 +12,10 @@
   E350 descartou o observador como gargalo. E351 terminou exit0 no código
   congelado: três seeds×3600, conservação, persistência, auditorias e budgets
   passaram. E353 reconciliou uma janela econômica natural, mas não demonstrou
-  adaptação sustentada; E354 rastreará uma resposta efetivamente escolhida e
-  a mesma coorte por seis ciclos, sem nova vertical nem alteração dos saves.
+  adaptação sustentada. E354.a confirmou mortes por privação em coortes
+  alimentadas. E355 corrigiu só esse caminho no commit local60efe86c,35 testes
+  focados passaram; E351 permanece prova histórica, não gate do novo runtime.
+  E354 adaptativo continua aberto; saves intactos.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -616,6 +618,85 @@ Não há delta local de morte/migração nesta seleção histórica. Existem sal
 e compras reais, mas não foi provada resposta estrutural nova nem reposição do
 estoque; queda do déficit não aprova GateB. Próximo E354 procura uma escolha
 natural de emprego/transição e acompanha a mesma coorte, não repete o gate.
+
+## E354.a — Mortalidade de coortes alimentadas confirmada — 30/09/2026
+
+Base3015b718, runtimec531cdad/fingerprint95543bab. Leitura direta do save
+`.tmp_codex/e351-final-TxnsDs/natural-73.mws`, sem avanço, gravação ou provider.
+Comando: `CWS_DATA_DIR=/tmp/cws-mortality-confirm .venv/bin/python` carrega via
+`load_world`, seleciona IDs38922/39029 e imprime `model_dump_json()`; SHA-256
+antes/depois `1a2ec8ef73fb5258a626033ff18dfc24fd9ab65b44a0856bdcd3bd3e19887ef4`.
+Exit0. Ambos eventos canônicos têm dia1050 e39029 cita38922 diretamente.
+
+Subsistência38922/Cinzaverde:455 necessárias,333 compradas,122 faltantes.
+`household_group_ids` inclui farmers humano e orc; `unmet_by_group` os omite
+(déficit próprio zero). Mortes39029: anãofarmer227→223 (déficit118),
+humanfarmer59→58 e orcfarmer157→154 (ambos alimentados). Mortalidade usava
+apenas saúde/deficit regional e2% de todas as coortes disponíveis. Autoria e
+links válidos não provam essa lei semântica correta. O gate E351 continua
+tecnicamente aprovado para seu fingerprint, mas não aprova a correção futura.
+
+Inventário diagnóstico v2 preservado em `employment-cohort-inventory-v2.json`
+e script `inventory_employment_cohort_v2.py` no mesmo diretório.36 contratos
+criados e260 transições; a contagem inicial0/238 foi rejeitada. Contrato do
+dia60 tem decisão fallback própria1638 e criação1639, não bootstrap inferido
+pela data. Essa seleção não demonstra adaptação sustentada. Não continuar
+extrações amplas antes de corrigir a morte incompatível com seus recibos.
+
+Próximo recorte E355: lei20permille aplicada somente à exposição alimentar
+comprovada no recibo atual, limitada à disponibilidade e população anônima;
+falha fechada de fonte inválida e receipt explícito. Testes focados, sem novo
+owner/estado de saúde, comida gratuita, provider ou smoke longo nesta mudança.
+Após verificação, retomar capacidade adaptativa; só no candidato estabilizado
+reabrir as três seeds finais. M8 e entrega continuam abertos.
+
+## E355 — Privação limitada à exposição factual da coorte — 30/09/2026
+
+Commit local `60efe86c`; arquivos `src/sim/medieval/mortality.py` e
+`tests/test_medieval_mortality.py`. Fingerprint completo
+`41aeba02decd232e1202197c460c4eadcb8d23f85fd66bc10c2875a1cc1305af`,
+calculado pelo mesmo inventário rg/src/tests/tools/static/web do gate anterior.
+Não houve push, merge, deploy, mudança de schema, provider ou avanço dos saves.
+
+O owner exige subsistência canônica `STATE_TRANSITION`, dia atual, settlement
+correto, grupos existentes e déficit inteiro positivo cuja soma reconcilia o
+total. Valida todas as fontes antes de produzir perdas. Exposição por grupo é
+`min(available_count, unmet_by_group[group])`; aplica20permille aos expostos,
+limitados à parcela anônima desse pool. Grupo com déficit zero não sofre morte
+por falta de outro. O acumulador regional de saúde continua existindo; não foi
+criado outro estado de saúde nem redistribuída comida/renda. Receipt de morte
+registra fonte da subsistência, settlement e déficit/exposição/perda por grupo.
+
+Regressão principal usa `consume_monthly` real: estoque atende a cidade, contas
+pagam rações, exceto uma coorte sem saldo. Coorte alimentada participa do mesmo
+receipt sem déficit e não perde pessoas; coorte não alimentada perde exatamente
+a quantidade da lei. Quatro negativos cobrem payload ausente, receipt real30
+dias velho, settlement errado e soma divergente, sem nova perda/população/evento.
+O cap unitário modela50 disponíveis e50 nomeados (sem cap perderia1, com cap0);
+é um check controlado da regra, não viagem natural. Testes anteriores preservam
+nomeados, encerramento por idade e equivalência de save/load.
+
+Verificação final do principal, após revisão e ajustes dos negativos:
+
+```bash
+CWS_DATA_DIR=/tmp/cws-e355-verified .venv/bin/python -m pytest tests/test_medieval_mortality.py tests/test_medieval_demography.py tests/test_medieval_economy.py tests/test_medieval_causal_audit.py -q --tb=short
+ruff check src/sim/medieval/mortality.py tests/test_medieval_mortality.py
+git diff --check
+```
+
+Exit0: **35 passed in13.73s**, Ruff e diff-check limpos. A primeira tentativa
+`.venv/bin/python -m ruff` não tinha o módulo instalado; usado o binário Ruff
+já disponível. Import residual não usado foi removido antes do check final.
+Nenhuma instalação. Grupo completo medieval/UI não repetido por alteração
+restrita à física de mortalidade e seu receipt aberto, sem contrato DTO novo.
+
+E355 fechado no recorte, não release. A regra muda a trajetória material e
+portanto E351/95543bab não é gate atual. As fontes históricas permanecem
+intactas e reproduzíveis. Próximo E354: revisar resposta econômica natural
+com renda/compra/falta por coorte durante seis ciclos, separando mudanças de
+ocupação, população e auxílio; nenhum aceite por queda agregada da falta.
+O contrato ainda exige capacidade adaptativa, candidato final estabilizado
+e três seeds atuais antes de entrega operacional. Sem nova vertical.
 
 ### Estado herdado do checkpoint E336.g
 

@@ -585,12 +585,14 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   (elemental, evocação, composição); somam-se às duas adesões de E336.b3.
   Receipts LLM sem deltas, save original intacto. São decisões em forks
   preparados, não provider real durante dez anos nem emergência natural.
-- [x] Três seeds naturais por 3.600 dias no mesmo checkout, sequenciais, com
+- [ ] Três seeds naturais por 3.600 dias no mesmo checkout final, sequenciais, com
   checkpoints, conservação, auditoria, save/load e continuação.
   E351 exit0: seeds73/101/137,30 checkpoints anuais auditados,120 amostras
   mensais/20why por seed, continuação equivalente3601, todos os budgets
   originais passaram no fingerprint95543bab. P95 mensal29.4579/27.4409/31.6937s.
   Sem provider real; mortes4121/3567/3553. GateB natural continua aberto.
+  Prova histórica95543bab: E354.a confirmou mortes de grupos alimentados;
+  a correção material E355 exige novo candidato e revalidação final afetada.
 - [x] Build/type-check, regressão medieval apropriada e navegador; relatar
   falhas/exclusões legadas sem declarar suíte inteira verde.
   E334–E335: navegador/Atlas/dossiê/why e lifecycle/save/load/retomada.
@@ -634,12 +636,13 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E354, rastrear uma resposta natural efetivamente
-escolhida e a mesma coorte por seis ciclos nos receipts preservados de E351.
+Próximo trabalho imediato: M8/E354, retomar o rastreio adaptativo após corrigir
+mortalidade de grupos alimentados em E355 (60efe86c,35 testes focados).
 E353 reconciliou Campomanso1440→1620: salários reais e auxílio reduzem falta,
 mas a produção fica em zero por caixa e o estoque cai; GateB não aprovado. O gate
-técnico73/101/137×3600 passou no código congelado95543bab; não o repetir sem
-mudança que invalide a prova. E350 encerrou hipótese
+técnico73/101/137×3600 passou no código congelado95543bab; a correção de
+mortalidade invalida sua aplicação ao próximo candidato, não seu registro
+histórico. Não reiniciar gate longo durante alterações. E350 encerrou hipótese
 de observador caro, sem mudança especulativa. E349
 confirmou equivalência tardia com ganho mensal pequeno. E347
 preserva isolamento e equivale no mundo inicial, não fecha o gate. E346 fechou um subscan com74 testes e
