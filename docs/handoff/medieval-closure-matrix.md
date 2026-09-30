@@ -349,6 +349,12 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Reusar módulos existentes; registrar falhas reais sem novos smokes longos.
     204 passed em 16 módulos, 75.65s; candidato congelado c13f4e/source 5b4b5227.
     Não fecha provider, gates naturais ou publicação.
+  - [x] E336.g: permitir selecionar somente os três casos provider pendentes,
+    com teto por tentativa sem retries e prévia sem egress. Testar o guard com
+    cliente falso, preservar fonte/configuração e registrar fingerprint da
+    ferramenta, sem nova consulta ou alteração da engine congelada.
+    5 testes passaram e preview dos três casos completo, 0 egress. Commit local
+    4f1df5f0; fingerprint global 1c2e7f, runtime/src/static/UI sem alteração.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

@@ -541,8 +541,9 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
 - [x] Congelar fingerprint após M0–M7; revalidar famílias alteradas e negativos
   críticos de autoria, opção stale, conservação e publicação atômica.
   E336.b1/b2/f: inventário delimitado e famílias selecionadas revalidadas;
-  candidato de código 5b4b5227, fingerprint
-  `c13f4e0ce9fb377a389ae66ad97927ead894da89c2408776d41ba377429684d3`.
+  runtime congelado 5b4b5227; E336.g altera somente diagnóstico/teste em
+  4f1df5f0. Fingerprint do candidato incluindo ferramentas:
+  `1c2e7f0a9f36c98ecf070460955af3f6bda31ccc149b158205409ad8d1b15b06`.
   Correção material posterior invalida a prova afetada e exige novo candidato.
 - [ ] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de

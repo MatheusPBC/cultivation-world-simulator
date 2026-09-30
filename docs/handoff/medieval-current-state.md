@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E336.f — 30/09/2026
+## Situação vigente — E336.g — 30/09/2026
 
 - Checkpoint de código local `5b4b5227` preserva 109 arquivos da integração
   acumulada desde `3c6e590e`, incluindo os scripts reprodutíveis de navegador.
@@ -8,7 +8,8 @@
   do runner seguem preservados localmente, fora desse commit.
 - M0–M7 aceitos nos recortes controlados registrados; não equivale a emergência
   natural ampla. M8 segue aberto para corpus real, três seeds/3.600 dias,
-  limites operacionais e publicação. Fingerprint de código: c13f4e (E336.b3).
+  limites operacionais e publicação. Runtime congelado 5b4b5227;
+  fingerprint com o diagnóstico atualizado: 1c2e7f (E336.g).
 - E336.b2: UI 89 + build/type-check; backend A 162, B 194 antes dos dois erros
   do verificador, revalidados com 17 testes. E336.b3: duas adesões Luna válidas,
   terceiro caso falhou; budget/retries impede presumir saldo de consultas.
@@ -17,7 +18,7 @@
   continuam aguardando autorização. Disco principal ~120 MiB, ainda
   insuficiente para iniciar os gates longos com checkpoints.
 - Próxima tarefa única: resolver preflight de armazenamento e orçamento real,
-  então executar os gates M8 sobre o candidato congelado c13f4e (E336.f).
+  então executar os gates M8 sobre o runtime congelado (E336.f/g).
   Sem push, merge ou deploy.
 - E336.f: 204 testes adicionais de famílias alteradas passaram em 75.65s,
   sem mudança de código. Documentação preservada no commit local `2a3e3898`
@@ -12471,3 +12472,33 @@ corpus real novo, três seeds naturais/3.600 dias/orçamentos e entrega. Não
 extrapolar 204 testes para desempenho tardio, adoção natural ou provider. Os
 gates longos ainda não foram iniciados por disco; espaço ~109 MiB na rodada.
 Backup tmpfs continua preparado, originais intactos, autorização pendente.
+
+## E336.g — Somente casos provider restantes, sem retries — 30/09/2026
+
+O diagnóstico aceita --cases com nomes canônicos e distintos. A prévia permanece
+padrão; o teto agora é o número de casos selecionados (máximo cinco), contado
+antes de chamar o cliente. max_retries=0 obrigatório. Pode executar somente
+elemental/evocation/composed sem gastar novamente consultas de fé já válidas.
+Nenhuma autorização é inferida do flag; as três tentativas adicionais continuam
+aguardando resposta. Não houve egress nesta continuação.
+
+No módulo existente test_medieval_provider_corpus_probe, dois checks com cliente
+falso confirmam zero calls em preview, três no modo de egress simulado, kwargs
+max_retries=0, fonte byte-a-byte intacta, configuração original restaurada e
+receipts sem deltas. Resultado: **5 passed em 2.40s**, incluindo os três checks
+anteriores. Isso não é prova de provider real.
+
+Preview do save integrado, comando reproduzível:
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python
+tools/medieval_completion_provider_probe.py --source
+/tmp/cws-e334-browser/saves/medieval/composed-integrated-blocked.mws
+--cases elemental evocation composed.
+complete=true, opções 2/2/41, real_attempts=0, fonte SHA-256 inalterado 6b7a2f.
+
+Commit local `4f1df5f0` (dois arquivos), cached diff-check passou. Nenhuma mudança
+em src/static/web; provas do kernel congelado 5b4b5227 continuam aplicáveis.
+Fingerprint global, incluindo ferramentas/testes:
+`1c2e7f0a9f36c98ecf070460955af3f6bda31ccc149b158205409ad8d1b15b06`.
+Substitui c13f4e somente por esse diagnóstico e seus checks, sem repetir toda
+a regressão. M8 segue aberto: orçamento provider, espaço/checkpoints naturais
+e entrega. Sem upload, exclusão dos quatro diretórios, push, merge ou deploy.
