@@ -71,9 +71,14 @@ com `{}` para um salto. Consultas ficam em `/api/v2/query/*`.
 O servidor é local e não possui autenticação para exposição pública.
 A variável `SERVER_PORT` permite escolher a porta.
 
+Para executar com Docker, `docker-compose.yml` monta `./docker-data` no
+container como `CWS_DATA_DIR=/data`; esse diretório contém os dados persistentes
+e não deve ser removido sem backup. A operação na VPS, incluindo o túnel SSH e
+as verificações de saúde v2, está em [Deploy na VPS](docs/customizations/vps-deployment.md).
+
 Sem override, dados usam a pasta de aplicativo `MedievalWorldSimulator(-dev)`,
-separada da origem. Saves estão em `saves/medieval/*.mws`, schema 71 (Society 21,
-economia 16). Saves xianxia e schemas anteriores ao 71 são rejeitados e
+separada da origem. Saves estão em `saves/medieval/*.mws`, schema 84 (Society 23,
+Knowledge 12). Saves xianxia e schemas anteriores ao 84 são rejeitados e
 preservados, sem sobrescrita nem migração.
 O histórico causal é mantido integralmente em blocos compactados, com índice
 de IDs, sequência e dia. Salvar substitui o arquivo de forma atômica; em caso

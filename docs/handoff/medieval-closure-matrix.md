@@ -592,14 +592,22 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Corrigido consumidor para aceitar fato determinístico, mantendo guardas;
     36 testes focados passaram e continuação3240→3360 atravessou a falha.
     Save original intacto. Fingerprint6c7631e8; não aprova gate longo/performance.
-  - [ ] E358: após E359, fechar somente empacotamento local Medieval já existente
+  - [x] E358: após E359, fechar somente empacotamento local Medieval já existente
     antes de congelar o novo candidato ao gate final:
     trocar healthchecks v1 pelo endpoint atual, copiar dist-medieval no Docker,
     portar smokes operacionais/CI legados para v2, e documentar acesso via túnel
     localhost sem relaxar Host/Origin. Sem nova mecânica ou camada compatível.
     Diagnóstico preparatório confirmou Compose/Dockerfile/CI obsoletos;
-    drafts não promovidos, ainda sem build ou deploy. Publicação condicionada à
+    Patch promovido: build e navegador v2 real passaram, 19 contratos passaram.
+    Docker real passou1 teste/17.06s após corrigir readiness e redescobrir
+    porta efêmera após restart. Save/load persistidos; cleanup só do projeto
+    isolado. Sem deploy. Publicação condicionada à
     autorização operacional corrente solicitada, com backup e smoke próprios.
+  - [ ] E360: congelar candidato E358/E359 e executar uma única rodada final
+    natural73/101/137×3600 sequencial, checkpoints360, budgets originais,
+    conservação, auditorias e save/load com continuação. Sem alteração de
+    código, provider ou simulações concorrentes. E351 histórico e E357 falho
+    não substituem o resultado deste candidato. Registrar progresso e saída.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

@@ -1,68 +1,38 @@
-# Execucao na VPS
+# Execução na VPS
 
-## Topologia
+Mantenha o Compose ligado ao loopback (`CWS_BIND_IP=127.0.0.1`). O backend fica
+na porta 8002 e o frontend na 8123 por padrão; ajuste apenas
+`CWS_BACKEND_PORT`/`CWS_FRONTEND_PORT` quando necessário. Não amplie TrustedHost
+ou CORS para o endereço da VPS.
 
-O Compose executa dois servicos:
-
-- `backend`, na porta 8002;
-- `frontend`, na porta 8123, com proxy `/api` para o backend.
-
-O bind e controlado por `CWS_BIND_IP`. Copie `.env.example` para `.env` e use um endereco
-privado da VPS, como o IP Tailscale. O `.env` real nao deve ser commitado.
+Use um túnel SSH na estação do operador:
 
 ```bash
-cp .env.example .env
+ssh -N -L 8123:127.0.0.1:8123 -L 8002:127.0.0.1:8002 user@vps
 ```
 
-## Persistencia
-
-`./docker-data` e montado como `/data` no backend. Configuracoes, segredos e saves de producao
-permanecem fora da imagem e fora do Git. Antes de alterar um save, crie backup e valide uma
-copia.
-
-## Preparar OAuth do Codex
-
-O host precisa ter Node e Codex CLI instalados e uma sessao OAuth valida em um diretorio
-dedicado. O Compose monta:
-
-- `/usr/bin/node` como somente leitura;
-- `/usr/lib/node_modules/@openai/codex` como somente leitura;
-- `/home/codex-agent/.codex` em `/codex-home`.
-
-Esses caminhos podem ser ajustados para outra VPS, mas nunca copie `auth.json` ou outro
-material OAuth para o repositorio ou para a imagem.
-
-## Build e atualizacao
-
-Para atualizar toda a aplicacao:
+Na VPS:
 
 ```bash
+test -f .env || cp .env.example .env
 docker compose build
 docker compose up -d
+curl -fsS http://127.0.0.1:8123/api/health
+curl -fsS http://127.0.0.1:8002/api/v2/query/status
 ```
 
-Para uma mudanca exclusivamente visual:
+`./docker-data` é montado como `/data` (`CWS_DATA_DIR=/data`); configurações,
+segredos e saves ficam fora da imagem e do Git. Faça backup antes de alterar
+saves e valide uma cópia antes de qualquer rollback. O fluxo Medieval
+usa `/api/v2/command/*` para criar, avançar, pausar/retomar, salvar e carregar,
+e `/api/v2/query/*` para consulta. Os caminhos antigos `/api/v1` e
+`/api/settings` não são contratos de deploy. Saves xianxia e schemas anteriores
+ao schema 84 são rejeitados e preservados, sem sobrescrita nem migração.
 
-```bash
-docker compose build frontend
-docker compose up -d --no-deps frontend
-```
-
-A segunda forma nao reinicia o backend nem altera o estado do mundo.
-
-## Verificacao
-
-```bash
-docker compose ps
-curl -fsS "http://${CWS_BIND_IP}:8123/api/v1/query/runtime/status"
-```
-
-Confirme:
-
-- frontend e backend `healthy`;
-- `status` igual a `ready`;
-- `is_paused` no estado esperado antes de abandonar a sessao;
-- `llm_check_failed` falso quando o provider Codex estiver configurado.
-
-O jogo nao deve depender de um navegador conectado para manter o container vivo. Pausa e
-retomada sao comandos explicitos do runtime e devem ser verificadas pela API.
+O Compose monta Node (`/usr/bin/node`) e o módulo Codex
+(`/usr/lib/node_modules/@openai/codex`) como volumes somente de leitura, além
+do diretório OAuth dedicado
+(`/home/codex-agent/.codex` em `/codex-home`) gravável para refresh da sessão
+quando o provider estiver configurado. O diretório OAuth deve permanecer privado
+e fora do Git. Esses caminhos podem ser ajustados para outra VPS. Nunca copie
+`auth.json` ou outro material OAuth para o repositório ou para a imagem.

@@ -1,14 +1,11 @@
-version: '3.8'
-
 services:
   # 后端服务
   backend:
     build:
       context: .
       dockerfile: deploy/Dockerfile.backend
-    container_name: cultivation-backend
     ports:
-      - "${CWS_BIND_IP:-127.0.0.1}:8002:8002"
+      - "${CWS_BIND_IP:-127.0.0.1}:${CWS_BACKEND_PORT:-8002}:8002"
     environment:
       - PYTHONUNBUFFERED=1
       - CWS_DATA_DIR=/data
@@ -18,7 +15,7 @@ services:
       - CWS_CODEX_HOME=/codex-home
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/api/v1/query/runtime/status"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -33,15 +30,14 @@ services:
     build:
       context: .
       dockerfile: deploy/Dockerfile.frontend
-    container_name: cultivation-frontend
     ports:
-      - "${CWS_BIND_IP:-127.0.0.1}:8123:80"
+      - "${CWS_BIND_IP:-127.0.0.1}:${CWS_FRONTEND_PORT:-8123}:80"
     depends_on:
       backend:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/api/v1/query/runtime/status"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--output-document=/dev/null", "http://127.0.0.1:80/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

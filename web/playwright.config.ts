@@ -5,6 +5,7 @@ const skipWebServer = process.env.CWS_SMOKE_SKIP_WEBSERVER === '1'
 
 export default defineConfig({
   testDir: './e2e',
+  testMatch: '**/production-smoke.spec.ts',
   timeout: 30_000,
   expect: {
     timeout: 10_000,

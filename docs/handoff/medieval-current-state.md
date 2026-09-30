@@ -7,8 +7,8 @@
   current canonical subsistence receipt`. `report.json` está vazio e o traceback
   está em `.tmp_codex/e357-final-ii49zB/progress.log`. Seeds101/137 não executadas.
   E359 corrigiu a rejeição de OCCURRENCE determinística com prova focal e
-  continuação3240→3360. Próximo E358: empacotamento local antes de congelar o
-  candidato final; sem deploy ou novo gate durante alterações desse recorte.
+  continuação3240→3360. E358 concluiu empacotamento local, incluindo Docker
+  real. Próximo E360: gate final no candidato congelado; sem deploy.
 
 - E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
@@ -72,6 +72,48 @@
   Seeds101/137 não executadas. Checkpoint auditado exit0/ok=true, 125.148 eventos,
   hash byte a byte igual ao E337. E345 mediu o pico de validação/GC;
   sem relaxamento de teto, novo gate ou publicação automática.
+
+## E358 — Empacotamento do produto v2 — 30/09/2026
+
+Base local ea0153f2. Compose agora usa `/api/health`, frontend copia
+`dist-medieval`, portas são configuráveis e nomes fixos de containers foram
+removidos para isolar smokes. Teste Docker usa projeto único, portas aleatórias,
+volume próprio e mounts vazios de provider; não monta dados ou credenciais reais.
+CI e smoke de produção foram portados para v2 real, sem fake API antiga.
+O CI de regressão passa a selecionar `tests/test_medieval_*.py` e cobertura do
+kernel Medieval com mínimo60%; não é aprovação da suíte legada ou do CI remoto.
+Três specs e2e antigas permanecem históricas e fora do smoke ativo, não portadas.
+
+Verificação principal: `npm run build` passou (type-check e dist-medieval;
+aviso de chunk>500kB preservado). API isolada com
+`CWS_DATA_DIR=/tmp/cws-e358-browser-K6Vhij .venv/bin/uvicorn
+src.server.main:app --host 127.0.0.1 --port 8002`; `npm run smoke:production`
+em web passou1 teste/8.1s contra API real: criar, avançar, pausar/retomar,
+salvar/carregar, IA desligada. API temporária174848 encerrada com TERM após
+verificação; dados de teste preservados. Sem provider ou alteração da VPS.
+
+`CWS_DATA_DIR=/tmp/cws-e358-main-contracts-final .venv/bin/python -m pytest
+tests/test_docker_build_contract.py tests/test_docker_readme_contract.py
+tests/test_nginx_proxy_contract.py -q --tb=short`:19 passed/2.59s. Primeira
+rodada teve18 passed/1 failed por persistência omitida no README; corrigida.
+Ruff dos dois testes Docker e diff-check passaram. Compose/workflows foram
+parseados pelo agente, sem aprovação do workflow no GitHub.
+
+Docker isolado, primeiro comando com `CWS_DATA_DIR=/tmp/cws-e358-docker-isolated
+.venv/bin/python -m pytest tests/test_docker_runtime_smoke.py -m docker -q
+--tb=short`: exit1/232.29s após imagens construídas; ConnectionReset ao consultar
+frontend ainda sem readiness. Projeto `cws-smoke-cb642afffc` e seu volume foram
+removidos pelo cleanup próprio. Teste agora espera frontend pronto, verifica
+produto/HTML e imprime logs em falha antes de limpar. Segunda rodada terminou
+exit1/130.76s: o restart reatribuiu a porta publicada e o teste consultou a
+antiga. Corrigido apenas o teste para redescobrir a porta após restart.
+Terceira rodada, `CWS_DATA_DIR=/tmp/cws-e358-docker-isolated-current
+.venv/bin/python -m pytest tests/test_docker_runtime_smoke.py -m docker -q
+--tb=short -rP`, passou1 teste/17.06s (exit0). Porta32773→32775 confirma a
+causa anterior; criação, avanço, pausa/retomada, save, restart e load passaram.
+Projeto isolado `cws-smoke-47b261e2fb`, seus containers, rede e volume removidos
+pelo cleanup próprio. Sem dados/credenciais reais, provider ou deploy.
+E358 concluído localmente; não equivale a CI remoto ou entrega na VPS.
 
 ## E359 — Rejeição de recibo sem novos deltas — 30/09/2026
 

@@ -1,163 +1,65 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-const mockApi = process.env.CWS_SMOKE_MOCK_API === '1'
-const allowConsolePatterns = [
-  /Failed to load resource: net::ERR_FAILED/,
-  /favicon/i,
-]
-
-const mockSettings = {
-  schema_version: 1,
-  ui: {
-    locale: 'zh-CN',
-    audio: {
-      bgm_volume: 0,
-      sfx_volume: 0,
-    },
-  },
-  simulation: {
-    auto_save_enabled: false,
-    max_auto_saves: 5,
-  },
-  llm: {
-    profile: {
-      base_url: '',
-      model_name: '',
-      fast_model_name: '',
-      mode: 'default',
-      max_concurrent_requests: 4,
-      has_api_key: false,
-      api_format: 'openai',
-    },
-  },
-  new_game_defaults: {
-    content_locale: 'zh-CN',
-    init_npc_num: 9,
-    sect_num: 3,
-    npc_awakening_rate_per_month: 0.01,
-    world_lore: '',
-  },
+function readDay(text: string | null): number {
+  const match = text?.match(/\d+/)
+  if (!match) throw new Error(`Missing day in UI text: ${text}`)
+  return Number(match[0])
 }
 
-const mockRuntimeStatus = {
-  ok: true,
-  data: {
-    status: 'idle',
-    phase: 0,
-    phase_name: 'idle',
-    progress: 0,
-    elapsed_seconds: 0,
-    error: null,
-    version: 'smoke',
-    llm_check_failed: false,
-    llm_error_message: '',
-    is_paused: false,
-    pause_reason: null,
-    roleplay: null,
-  },
-}
-
-const mockMapPresets = {
-  ok: true,
-  data: {
-    maps: [
-      {
-        id: 'classic',
-        name: '九州中土',
-        desc: '',
-        size_label: '',
-        is_default: true,
-      },
-    ],
-  },
-}
-
-const mockWorldSecretMeta = {
-  options: [
-    { id: 'none', title: '无' },
-    { id: 'random', title: '随机' },
-  ],
-}
-
-async function installApiMocks(page: Page) {
-  if (!mockApi) return
-
-  await page.route('**/assets/splash.png', async (route) => {
-    await route.fulfill({
-      status: 204,
-      contentType: 'image/png',
-      body: '',
-    })
-  })
-
-  await page.route('**/assets/splash.mp4', async (route) => {
-    await route.fulfill({
-      status: 204,
-      contentType: 'video/mp4',
-      body: '',
-    })
-  })
-
-  await page.route('**/api/settings', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(mockSettings),
-    })
-  })
-
-  await page.route('**/api/v1/query/runtime/status', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(mockRuntimeStatus),
-    })
-  })
-
-  await page.route('**/api/v1/query/world/map-presets**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(mockMapPresets),
-    })
-  })
-
-  await page.route('**/api/v1/query/meta/world-secrets', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(mockWorldSecretMeta),
-    })
-  })
-}
-
-test('production build renders the first screen without browser errors', async ({ page }) => {
-  const consoleErrors: string[] = []
+test('Medieval observer renders against the real v2 production contract', async ({ page }) => {
   const pageErrors: string[] = []
+  const failedRequests: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  page.on('requestfailed', request => failedRequests.push(`${request.method()} ${request.url()}`))
 
-  page.on('console', (message) => {
-    if (message.type() !== 'error') return
-    const text = message.text()
-    if (allowConsolePatterns.some((pattern) => pattern.test(text))) return
-    consoleErrors.push(text)
-  })
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message)
-  })
-
-  await installApiMocks(page)
   await page.goto('/', { waitUntil: 'networkidle' })
+  await expect(page.locator('.subtitle, .eyebrow').filter({ hasText: 'MEDIEVAL WORLD SIMULATOR' }).first()).toBeVisible()
+  expect((await page.request.get('/api/health')).ok()).toBeTruthy()
+  expect((await page.request.get('/api/v2/query/status')).ok()).toBeTruthy()
 
-  const app = page.locator('#app')
-  await expect(app).toBeAttached()
-  await expect(app).not.toBeEmpty()
-  await expect(page.locator('.splash-container, .app-layout, .loading-overlay').first()).toBeVisible()
+  const create = page.locator('form[data-testid="create-world"]')
+  await expect(create).toBeVisible()
+  await create.locator('input[name="seed"]').fill('73')
+  await create.locator('input[name="character_count"]').fill('2')
+  await create.getByRole('button', { name: 'Criar mundo', exact: true }).click()
+  await expect(page.getByTestId('absolute-day')).toBeVisible()
+  const initialDay = readDay(await page.getByTestId('absolute-day').textContent())
+  const initial = await page.request.get('/api/v2/query/observatory')
+  const initialEnvelope = await initial.json()
+  expect(initialEnvelope.data.status.paused).toBe(true)
+  expect(initialEnvelope.data.world.config.ai_enabled).toBe(false)
+  await expect(page.getByTestId('ai-toggle')).toContainText('IA desligada')
+  const revision = initialEnvelope.revision
 
-  if (!mockApi) {
-    const status = await page.request.get('/api/v1/query/runtime/status')
-    expect(status.ok()).toBeTruthy()
-  }
+  await page.getByTestId('step').click()
+  await expect.poll(async () => readDay(await page.getByTestId('absolute-day').textContent())).toBeGreaterThan(initialDay)
+  const steppedDay = readDay(await page.getByTestId('absolute-day').textContent())
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click()
+  await expect(page.locator('.status-pill')).toContainText('Em andamento')
+  await page.getByRole('button', { name: 'Pausar', exact: true }).click()
+  await expect(page.locator('.status-pill')).toContainText('Pausado')
+  const savedWorldDay = readDay(await page.getByTestId('absolute-day').textContent())
+  expect(savedWorldDay).toBeGreaterThanOrEqual(steppedDay)
 
+  await page.getByTestId('open-saves').click()
+  await page.getByTestId('save-world').locator('input[name="save_id"]').fill('e358-smoke')
+  await page.getByTestId('save-world').getByRole('button', { name: 'Salvar mundo', exact: true }).click()
+  await expect(page.getByTestId('save-world').getByRole('status')).toBeVisible()
+  await page.getByTestId('close-saves').click()
+
+  await page.getByTestId('step').click()
+  await expect.poll(async () => readDay(await page.getByTestId('absolute-day').textContent())).toBeGreaterThan(savedWorldDay)
+  await page.getByTestId('open-saves').click()
+  await page.locator('[data-load="e358-smoke"]').click()
+  await page.getByTestId('confirm-load').click()
+  await expect(page.getByTestId('close-saves')).toBeHidden()
+  await expect.poll(async () => readDay(await page.getByTestId('absolute-day').textContent())).toBe(savedWorldDay)
+  const loaded = await page.request.get('/api/v2/query/observatory')
+  const loadedEnvelope = await loaded.json()
+  expect(loadedEnvelope.data.status.paused).toBe(true)
+  expect(loadedEnvelope.data.world.day).toBe(savedWorldDay)
+  expect(loadedEnvelope.data.world.config.ai_enabled).toBe(false)
+  expect(loadedEnvelope.revision).toBeGreaterThan(revision)
   expect(pageErrors).toEqual([])
-  expect(consoleErrors).toEqual([])
+  expect(failedRequests).toEqual([])
 })

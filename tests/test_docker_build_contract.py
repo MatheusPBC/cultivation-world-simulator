@@ -81,9 +81,11 @@ def test_frontend_registry_import_targets_static_registry():
 
 def test_frontend_dockerfile_copies_shared_locale_registry():
     dockerfile = get_project_root() / "deploy" / "Dockerfile.frontend"
+    dockerfile_text = dockerfile.read_text(encoding="utf-8")
     copy_sources = parse_copy_sources(dockerfile)
 
     assert "web/" in copy_sources
+    assert "/app/dist-medieval" in dockerfile_text
     assert "static/locales/registry.json" in copy_sources, (
         "Frontend Docker build must copy the shared locale registry because "
         "web/src/locales/registry.ts imports it from outside web/."
@@ -127,7 +129,7 @@ def test_main_ci_runs_frontend_production_build_and_smoke():
 
     assert "npm run build" in workflow
     assert "npm run smoke:production" in workflow
-    assert "CWS_SMOKE_MOCK_API" in workflow
+    assert "CWS_SMOKE_BASE_URL" in workflow
     assert "npx playwright install --with-deps chromium" in workflow
 
 
@@ -135,8 +137,8 @@ def test_docker_smoke_ci_builds_and_browser_tests_compose_frontend():
     workflow = get_workflow_text("docker-smoke.yml")
 
     assert "docker compose build" in workflow
-    assert "docker compose up -d --build" in workflow
-    assert "http://localhost:8123/api/v1/query/runtime/status" in workflow
+    assert "docker compose -p cws-browser-smoke up -d --build" in workflow
+    assert "http://127.0.0.1:8123/api/health" in workflow
     assert "CWS_SMOKE_BASE_URL" in workflow
     assert "CWS_SMOKE_SKIP_WEBSERVER" in workflow
     assert "npm run smoke:production" in workflow
@@ -226,10 +228,10 @@ def test_backend_compose_contract_exposes_port_and_healthcheck():
     backend_block = get_service_block(compose_text, "backend")
 
     assert backend_block, "Expected backend service in docker-compose.yml"
-    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:8002:8002"', backend_block)
+    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:\$\{CWS_BACKEND_PORT:-8002\}:8002"', backend_block)
     assert "healthcheck:" in backend_block
     assert "test:" in backend_block
-    assert "http://127.0.0.1:8002/api/v1/query/runtime/status" in backend_block
+    assert "http://127.0.0.1:8002/api/health" in backend_block
     assert "http://localhost:8002/api/v1/query/runtime/status" not in backend_block
     assert "interval:" in backend_block
     assert "timeout:" in backend_block
@@ -244,10 +246,10 @@ def test_frontend_compose_contract_depends_on_backend_and_exposes_port():
     assert 'depends_on:' in frontend_block
     assert 'backend:' in frontend_block
     assert 'condition: service_healthy' in frontend_block
-    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:8123:80"', frontend_block)
+    assert re.search(r'"\$\{CWS_BIND_IP:-127\.0\.0\.1\}:\$\{CWS_FRONTEND_PORT:-8123\}:80"', frontend_block)
     assert "healthcheck:" in frontend_block
     assert "test:" in frontend_block
-    assert "http://127.0.0.1:80/api/v1/query/runtime/status" in frontend_block
+    assert "http://127.0.0.1:80/api/health" in frontend_block
     assert "http://localhost:80/api/v1/query/runtime/status" not in frontend_block
     assert "interval:" in frontend_block
     assert "timeout:" in frontend_block

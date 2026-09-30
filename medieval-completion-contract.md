@@ -1,7 +1,7 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, código atual E359 / fingerprint `6c7631e8`,
+`codex/medieval-remote`, código atual E358/E359 / fingerprint `22e14698`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
@@ -643,8 +643,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E358, fechar empacotamento local antes de congelar
-o candidato ao novo gate. E359 corrigiu a rejeição de receipt de mortalidade
+Próximo trabalho imediato: M8/E360, executar o gate final no candidato congelado.
+E358 fechou empacotamento local: build, navegador real, 19 contratos e Docker
+com save/load após restart passaram. Não aprova CI remoto ou deploy.
+E359 corrigiu a rejeição de receipt de mortalidade
 que encerrou E357 com exit1 após checkpoint3240 da seed73.
 Seeds101/137 não executadas; o gate no runtime60efe86c/fingerprint41aeba02 não
 foi aprovado. E359 tem 36 testes e continuação focal até3360; E356 verificou
