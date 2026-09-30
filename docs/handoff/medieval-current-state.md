@@ -15,7 +15,10 @@
   adaptação sustentada. E354.a confirmou mortes por privação em coortes
   alimentadas. E355 corrigiu só esse caminho no commit local60efe86c,35 testes
   focados passaram; E351 permanece prova histórica, não gate do novo runtime.
-  E354 adaptativo continua aberto; saves intactos.
+  E354 fechou o diagnóstico histórico de adoção de emprego em Campomanso:
+  déficit17→0 em seis ciclos, sem relief/migração/morte e com caixa/comida
+  reconciliadas. GateB atual continua aberto; E356 é a comparação curta
+  natural versus recusa institucional no runtime60efe86c. Saves intactos.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -618,6 +621,54 @@ Não há delta local de morte/migração nesta seleção histórica. Existem sal
 e compras reais, mas não foi provada resposta estrutural nova nem reposição do
 estoque; queda do déficit não aprova GateB. Próximo E354 procura uma escolha
 natural de emprego/transição e acompanha a mesma coorte, não repete o gate.
+
+## E354 — Adoção natural histórica e renda reconciliadas — 30/09/2026
+
+Runtime da fonte95543bab/E351, não o novo60efe86c. Diagnóstico somente leitura:
+`.tmp_codex/e351-final-TxnsDs/employment_natural_windows.py --source
+.tmp_codex/e351-final-TxnsDs/natural-73.mws --output
+.tmp_codex/e351-final-TxnsDs/employment-natural-windows-v3.json`, usando
+`CWS_DATA_DIR=/tmp/cws-e354-natural-windows-v3 .venv/bin/python`.
+Exit0. Fonte SHA antes/depois
+`1a2ec8ef73fb5258a626033ff18dfc24fd9ab65b44a0856bdcd3bd3e19887ef4`.
+Script SHA `06f791657219611bc7bbf04238cf1b6f192d5f678ea08374516f53a0ae9e9dce`;
+JSON SHA `6503b0ac4fbe957302a238e117de1e195e5bee9572a2e8f6a3bde9f2ec030c97`.
+
+36 contratos novos, 36 janelas detalhadas exportadas. V1/V2 rejeitados: conta
+do empregador confundida com renda doméstica, limites temporais e filtros
+incompletos de população/pantry/relief. V3 conserva deltas de todos os owners
+relevantes. Para reconciliação, ordenar eventos pelo número do ID: a lista
+exportada usa ordenação lexical e não representa a ordem de execução.
+
+Candidato não confundido com auxílio ou encolhimento da população:
+`pop:campomanso:orc:farmer`. Dia240: subsistência7495 registra déficit próprio17
+e regional22; decisão fallback8284 escolhe o ID canônico de emprego, contrato
+8285 contrata até109 trabalhadores a4. Não é bootstrap, decisão injetada ou
+recurso grátis. A política exige relatório próprio; os pais diretos da decisão
+são estado/estoque/caixa, não um link explícito ao relatório de pressão.
+
+Nos dias270/300/330/360/390/420, receipts de subsistência8642/9723/11158/12501/
+13856/15114 registram déficit próprio zero; regional5/5/5/6/6/6. Não há perda,
+migração ou relief dessa coorte nessa janela. Salários positivos somam2216;
+tributos218; compras mensais430; provisões1103. Caixa0→465, sem lacunas:
+`2216 - 218 - 430 - 1103 = 465`. Pantry comprada1103, consumida884, reserva219;
+comida consumida `430 + 884 = 1314 = 219 pessoas × 6 ciclos`.
+No dia390 foram pagos só36, não436; reservas pagas antes sustentam o ciclo.
+Contrato é obrigação condicionada ao caixa, não salário mágico garantido.
+
+Receipts de emprego8559/9635/11079/12423/13776/15042 encadeiam o contrato e
+execuções anteriores; salários/tributos possuem seus próprios deltas. A
+reconciliação independente usa somente eventos da conta/pantry/coorte exatas,
+não todos os pagamentos de Auren. Não extrapolar para saúde regional, dez anos,
+provider real ou efeito exclusivo do emprego. Portovelho/human farmer também
+recupera acesso, mas recebe relief: não é prova limpa de emprego sozinho.
+
+E354 concluído como diagnóstico histórico. GateB aberto: falta contrafactual e
+validação no runtime corrigido. E356 registrado antes da execução: um par curto
+seed73, natural versus exclusão de novos empregos de Auren, com demais políticas
+inalteradas. A recusa institucional afeta mais de um contrato; declarar esse
+limite: o hook não emite uma decisão real de recusa. Nenhuma nova física,
+provider, save original alterado ou smoke longo.
 
 ## E354.a — Mortalidade de coortes alimentadas confirmada — 30/09/2026
 

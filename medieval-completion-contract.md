@@ -1,7 +1,7 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, código verificado E347 / fingerprint `95543bab`,
+`codex/medieval-remote`, código atual E355/60efe86c / fingerprint `41aeba02`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
@@ -17,7 +17,9 @@ mês completo só~0.54s. E350 descartou observador como gargalo (~0.0873s),
 sem outro patch. E351 terminou exit0 no código congelado: três seeds×3600,
 conservação, save/load/continuação, auditorias e budgets passaram, com relatório
 SHA a4a6a690. Adaptação econômica natural e entrega continuam pendentes;
-o resultado técnico não certifica uma economia capaz de se recuperar.
+o resultado técnico não certifica uma economia capaz de se recuperar e é
+histórico após E355. E354 reconciliou recuperação natural de uma coorte;
+E356 compara o código atual com recusa institucional, sem abrir nova vertical.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
 read-only E325 mapeou a base mágica existente; E326 fechou a operação elemental
@@ -636,8 +638,12 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E354, retomar o rastreio adaptativo após corrigir
-mortalidade de grupos alimentados em E355 (60efe86c,35 testes focados).
+Próximo trabalho imediato: M8/E356, comparação econômica curta no runtime
+60efe86c após corrigir mortalidade de grupos alimentados em E355 (35 testes).
+E354 reconciliou adoção natural histórica de emprego em Campomanso240→420:
+déficit17→0 em seis ciclos, salários/tributos/compras conservados, sem redução
+da coorte ou auxílio. Não é contrafactual nem aceite atual; E356 compara
+continuação natural com recusa explícita de novos empregos de Auren.
 E353 reconciliou Campomanso1440→1620: salários reais e auxílio reduzem falta,
 mas a produção fica em zero por caixa e o estoque cai; GateB não aprovado. O gate
 técnico73/101/137×3600 passou no código congelado95543bab; a correção de

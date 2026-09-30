@@ -535,14 +535,19 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     seguinte; produção24 lotes em1470 e zero nos outros cinco ciclos por caixa.
     Diagnóstico concluído, adaptação sustentada NÃO aprovada. Diário conserva
     comando/hashes/receipts e distingue deltas locais de saldo global do tesouro.
-  - [ ] E354: identificar nos receipts naturais preservados uma contratação
+  - [x] E354: identificar nos receipts naturais preservados uma contratação
     ou transição efetivamente escolhida após pressão conhecida; rastrear a
     mesma coorte por seis ciclos, renda e acesso alimentar, sem confundir
     acordos iniciais com resposta nova ou demanda reduzida por mortes/migração.
     Se não houver candidato verificável, registrar a lacuna de escolha/política
     antes de qualquer alteração; sem novo smoke longo ou provider.
-    Inventário v2 confirma36 novos contratos com decisões fallback próprias,
-    não bootstrap inferido pela data; rastreio adaptativo ainda não aceito.
+    Inventário v3 contém36 contratos e respectivas janelas; v1/v2 rejeitados
+    por contas, datas e filtros incompletos. Campomanso/orc farmer: decisão8284
+    e contrato8285 em240; déficit próprio17→0 nos seis ciclos270–420,
+    sem relief, perda ou migração da coorte. Caixa0→465: salários2216,
+    tributos218 e compras1533; comida1314 consumida e219 de reserva.
+    Diagnóstico histórico95543bab concluído, não contrafactual nem aprovação
+    atual do GateB. Hashes e limites no diário; E356 verifica o novo runtime.
   - [x] E354.a: confirmar no save original o contraste alimentar/mortalidade.
     Cinzaverde/dia1050: subsistência38922 registra déficit zero para farmers
     humano/orc; morte39029 cita38922 e remove1/3 desses mesmos grupos.
@@ -556,6 +561,15 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Ruff/diff-check limpos. Contraste por consumo real, quatro fontes inválidas
     rejeitadas sem perda/população/evento, cap anônimo e persistência verificados.
     Não fecha a adaptação natural E354/GateB nem o gate final do candidato novo.
+  - [ ] E356: executar uma única comparação econômica curta no runtime60efe86c:
+    seed73 natural até210, continuação natural versus exclusão diagnóstica de
+    novos empregos de Auren240–420 pelo hook existente de exclusão institucional.
+    Nenhuma decisão injetada no ramo natural, recurso inventado ou contrato apagado.
+    Comparar a mesma coorte, seis ciclos, renda, comida, relief, demografia e
+    efeitos regionais; verificar conservação e auditoria. O controle afeta todos
+    os novos empregos de Auren, não estima isoladamente um único contrato.
+    O hook não emite decisão de recusa: não chamar o controle de recusa auditada.
+    Se não houver adoção ou melhora, registrar falha sem forçar o resultado.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
