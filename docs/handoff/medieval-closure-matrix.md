@@ -582,12 +582,23 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     com os budgets originais, conservação, auditorias, persistência e continuação.
     E351 é histórico: não promover o resultado antigo ao runtime novo. Sem
     alteração de código, provider ou simulação concorrente durante esse gate.
-  - [ ] E358: após E357, fechar somente empacotamento/entrega Medieval já existentes:
+    Resultado: exit1 após checkpoint3240 da seed73; mortality rejeitou o
+    receipt de subsistência atual. Seeds101/137 não rodaram; gate não aprovado.
+  - [x] E359: reproduzir a rejeição E357 a partir de cópia do checkpoint3240,
+    corrigir somente a causa comprovada e verificar regressão/continuação focal.
+    Preservar saves, autoria, isolamento e exclusão de coortes alimentadas.
+    Sem novo gate longo ou provider antes de estabilizar este recorte.
+    Fonte real3330/event137587 era OCCURRENCE canônica sem novos deltas.
+    Corrigido consumidor para aceitar fato determinístico, mantendo guardas;
+    36 testes focados passaram e continuação3240→3360 atravessou a falha.
+    Save original intacto. Fingerprint6c7631e8; não aprova gate longo/performance.
+  - [ ] E358: após E359, fechar somente empacotamento local Medieval já existente
+    antes de congelar o novo candidato ao gate final:
     trocar healthchecks v1 pelo endpoint atual, copiar dist-medieval no Docker,
     portar smokes operacionais/CI legados para v2, e documentar acesso via túnel
     localhost sem relaxar Host/Origin. Sem nova mecânica ou camada compatível.
-    Diagnóstico preparatório somente leitura confirmou Compose/Dockerfile/CI
-    obsoletos; ainda sem patch, build ou deploy. Publicação condicionada à
+    Diagnóstico preparatório confirmou Compose/Dockerfile/CI obsoletos;
+    drafts não promovidos, ainda sem build ou deploy. Publicação condicionada à
     autorização operacional corrente solicitada, com backup e smoke próprios.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores

@@ -173,6 +173,58 @@ def _real_floor_receipt_world():
     return world, receipt
 
 
+def _real_zero_delta_receipt_world():
+    world = famine_world()
+    need = world.economy.needs[TARGET]
+    groups = [item for item in world.society.population.values()
+              if item.settlement_id == TARGET and world.society.available_count(item.id) > 0]
+    unfed = max(groups, key=lambda item: item.count)
+    available = {item.id: world.society.available_count(item.id) for item in groups}
+    stock = world.economy.stocks[need.stock_id]
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={"goods": {**stock.goods, "food": sum(available.values())}})
+    price = world.economy.markets[TARGET].prices["food"]
+    for item in groups:
+        account = world.economy.accounts[f"household:{item.id}"]
+        world.economy.accounts[account.id] = account.model_copy(
+            update={"balance": 0 if item.id == unfed.id else available[item.id] * price})
+    world.economy.needs[TARGET] = need.model_copy(
+        update={"health": 0, "unrest": 1000, "missing_food": available[unfed.id]})
+    consume_monthly(world)
+    receipt = next(event for event in reversed(world.events)
+                   if event.event_type == "subsistence_resolved"
+                   and event.causal_payload["subsistence"]["settlement_id"] == TARGET)
+    return world, receipt, unfed
+
+
+def test_deprivation_accepts_deterministic_zero_delta_receipt_and_rejects_llm_origin():
+    world, receipt, unfed = _real_zero_delta_receipt_world()
+    assert receipt.fact_kind is FactKind.OCCURRENCE
+    assert receipt.causal_origin is CausalOrigin.DETERMINISTIC
+    assert not receipt.deltas
+    counts_before = {group.id: group.count for group in world.society.population.values()}
+    available_before = world.society.available_count(unfed.id)
+    removed = _deprivation_deaths(world)
+    expected = min(available_before, receipt.causal_payload["subsistence"]["unmet_by_group"][unfed.id]) * 20 // 1000
+    assert removed.get(unfed.id, 0) == expected
+    assert all(group.count == count for group_id, count in counts_before.items()
+               for group in [world.society.population[group_id]]
+               if group_id != unfed.id)
+    death = next(event for event in world.events if event.event_type == "deprivation_deaths")
+    assert death.causal_payload["source_subsistence_event_id"] == receipt.id
+
+    invalid = _real_zero_delta_receipt_world()[0]
+    invalid_receipt = next(event for event in reversed(invalid.events)
+                           if event.event_type == "subsistence_resolved"
+                           and event.causal_payload["subsistence"]["settlement_id"] == TARGET)
+    index = invalid.events.index(invalid_receipt)
+    invalid.events[index] = invalid_receipt.model_copy(update={"causal_origin": CausalOrigin.LLM_INTERPRETATION})
+    before = world_snapshot(invalid)
+    with pytest.raises(ValueError, match="canonical subsistence receipt"):
+        _deprivation_deaths(invalid)
+    assert world_snapshot(invalid) == before
+
+
 @pytest.mark.parametrize("variant", ("missing", "stale", "wrong_settlement", "aggregate_mismatch"))
 def test_deprivation_rejects_invalid_real_receipt_without_mutation(variant):
     world, receipt = _real_floor_receipt_world()

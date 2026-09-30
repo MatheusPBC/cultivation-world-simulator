@@ -1,6 +1,14 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E356 adaptação natural focal / gate atual E357 pendente — 30/09/2026
+## Situação vigente — E359 corrigido / E357 falhou / E358 empacotamento local — 30/09/2026
+
+- E357 terminou com exit1, não aprovado. A seed73 preservou checkpoint3240;
+  o avanço posterior falhou em `mortality.py:60` com `deprivation requires the
+  current canonical subsistence receipt`. `report.json` está vazio e o traceback
+  está em `.tmp_codex/e357-final-ii49zB/progress.log`. Seeds101/137 não executadas.
+  E359 corrigiu a rejeição de OCCURRENCE determinística com prova focal e
+  continuação3240→3360. Próximo E358: empacotamento local antes de congelar o
+  candidato final; sem deploy ou novo gate durante alterações desse recorte.
 
 - E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
@@ -19,8 +27,8 @@
   déficit17→0 em seis ciclos, sem relief/migração/morte e com caixa/comida
   reconciliadas. E356 confirmou essa adoção no runtime60efe86c e contrastou
   seis ciclos com exclusão diagnóstica de novos empregos de Auren. Capacidade
-  adaptativa natural focal aceita; não estabilidade global. Próximo E357:
-  gate final atualizado, sem usar E351 histórico como aprovação atual.
+  adaptativa natural focal aceita; não estabilidade global. E357 falhou;
+  E359 corrigido, sem usar E351 histórico como aprovação atual.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -64,6 +72,45 @@
   Seeds101/137 não executadas. Checkpoint auditado exit0/ok=true, 125.148 eventos,
   hash byte a byte igual ao E337. E345 mediu o pico de validação/GC;
   sem relaxamento de teto, novo gate ou publicação automática.
+
+## E359 — Rejeição de recibo sem novos deltas — 30/09/2026
+
+Reprodução limitada desde checkpoint3240, sem provider ou mudança no original:
+`CWS_DATA_DIR=/tmp/cws-e359-mortality-reproduction .venv/bin/python
+.tmp_codex/e359-mortality-reproduction/reproduce.py --source
+.tmp_codex/e357-final-ii49zB/natural-73.checkpoint-day-03240.mws --output
+.tmp_codex/e359-mortality-reproduction/reproduction.json --max-days 360`.
+Diagnóstico exit0, falha interna capturada no dia3330; último estado publicado
+3326, 58.656s. Hash antes/depois da fonte:
+`e91b93a7b804aa53f9f8a80a67f616de66721f8fc1e26eeaa5dd318cbe1f6aa5`.
+
+Pontenegro: health0, missing_food139, receipt `event:137587` do próprio dia3330,
+tipo `subsistence_resolved`, `fact_kind=occurrence`, sem deltas. Settlement,
+grupos e soma das faltas são corretos. `consume_monthly` registra OCCURRENCE
+quando nenhum indicador muda; a guarda exigia exclusivamente STATE_TRANSITION.
+É uma incompatibilidade entre consumidor e fato canônico, não ausência de
+evidência. O consumidor agora aceita OCCURRENCE/STATE_TRANSITION apenas com
+origem DETERMINISTIC; dia, settlement, grupos e soma continuam obrigatórios.
+Não foi fabricado delta nem alterado o emissor ou a lei material de mortalidade.
+
+Verificação principal independente: `CWS_DATA_DIR=/tmp/cws-e359-main-verification
+.venv/bin/python -m pytest tests/test_medieval_mortality.py
+tests/test_medieval_demography.py tests/test_medieval_economy.py
+tests/test_medieval_causal_audit.py -q --tb=short`: exit0, 36 passed em15.00s.
+Ruff nos dois arquivos e `git diff --check` passaram. Novo teste usa consumo
+real sem delta, preserva grupos alimentados e rejeita interpretação sem mutação.
+
+Continuação com o mesmo script/fonte e `--max-days 120 --output
+.tmp_codex/e359-mortality-reproduction/continuation-fixed.json`: exit0,
+3240→3360, 87.146s, failed=false, fonte com hash inalterado. É continuação
+focal sem nova auditoria standalone, contabilidade agregada ou benchmark;
+as validações normais do engine permaneceram ativas. Não aprova três seeds.
+Fingerprint código/testes `6c7631e83ee297acf4e00b244f300d23626c18f07e14c04d311cb48fcaf8a81a`.
+Hashes do script/reprodução/continuação:
+`118f5d5e880560b7376ece1b9a8440634d7ffeb5ea949602ab4fd7299e5ddbf3`,
+`77c34509c9907a8d9b2383eea97882eb086fe437005c06419519abab74a64c24`,
+`2deeda695341f430e3979404db969f0407b3657ae3db5c0f4b5d4c4f2ff7846f`.
+E359 fechado no recorte; E357 permanece falha registrada e M8 aberto.
 
 ## E339 — Cópia por owner e ciclos de Knowledge — 30/09/2026
 

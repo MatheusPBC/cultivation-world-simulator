@@ -1,7 +1,7 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, código atual E355/60efe86c / fingerprint `41aeba02`,
+`codex/medieval-remote`, código atual E359 / fingerprint `6c7631e8`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
@@ -19,7 +19,10 @@ conservação, save/load/continuação, auditorias e budgets passaram, com relat
 SHA a4a6a690. Adaptação econômica natural e entrega continuam pendentes;
 o resultado técnico não certifica uma economia capaz de se recuperar e é
 histórico após E355. E354 reconciliou recuperação natural de uma coorte;
-E356 compara o código atual com recusa institucional, sem abrir nova vertical.
+E356 compara o código com exclusão diagnóstica de novos empregos de Auren,
+não uma recusa escolhida por ator. E357 falhou por rejeitar recibo factual
+sem novos deltas no dia3330. E359 corrigiu esse consumidor: 36 testes e
+continuação3240→3360 passaram; o gate completo continua devido.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
 read-only E325 mapeou a base mágica existente; E326 fechou a operação elemental
@@ -640,8 +643,11 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E357, gate final no runtime60efe86c/fingerprint
-41aeba02, após corrigir mortalidade em E355 (35 testes) e verificar em E356
+Próximo trabalho imediato: M8/E358, fechar empacotamento local antes de congelar
+o candidato ao novo gate. E359 corrigiu a rejeição de receipt de mortalidade
+que encerrou E357 com exit1 após checkpoint3240 da seed73.
+Seeds101/137 não executadas; o gate no runtime60efe86c/fingerprint41aeba02 não
+foi aprovado. E359 tem 36 testes e continuação focal até3360; E356 verificou
 adoção natural de emprego com recuperação por seis ciclos no código atual.
 E354 reconciliou adoção natural histórica de emprego em Campomanso240→420:
 déficit17→0 em seis ciclos, salários/tributos/compras conservados, sem redução

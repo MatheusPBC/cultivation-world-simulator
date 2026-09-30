@@ -13,6 +13,7 @@ but the person: assets, offices, columns and administrations keep their owners,
 and the existing revocations decide what stops working.
 """
 
+from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 
 from .economy import _causes, _delta
@@ -47,8 +48,11 @@ def _deprivation_deaths(world, available=None):
         subsistence = payload.get("subsistence") if isinstance(payload, dict) else None
         group_ids = subsistence.get("household_group_ids") if isinstance(subsistence, dict) else None
         unmet = subsistence.get("unmet_by_group") if isinstance(subsistence, dict) else None
+        # A deterministic reading may be an occurrence when health, unrest and
+        # deficit remain unchanged; it is still canonical state evidence, not prose.
         if (receipt is None or receipt.event_type != "subsistence_resolved"
-                or receipt.fact_kind is not FactKind.STATE_TRANSITION
+                or receipt.fact_kind not in {FactKind.STATE_TRANSITION, FactKind.OCCURRENCE}
+                or receipt.causal_origin is not CausalOrigin.DETERMINISTIC
                 or receipt.day != day
                 or not isinstance(subsistence, dict)
                 or subsistence.get("settlement_id") != need_id
