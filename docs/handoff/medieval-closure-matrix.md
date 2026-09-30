@@ -10,11 +10,11 @@
 |---|---|---|---|
 | 0. Estabilizar fundação: autoria, affordances, causalidade, rollback, runtime | M0/M7/M8 | `material_execution`, `events`, owners canônicos e `MedievalSimulator`; decisão/causa, revalidação e publicação atômica | Base e limites em E265/E266; inventário e testes por família nas linhas Gate A. Cobertura global parcial; regressão final nas superfícies alteradas. |
 | 1. Economia e informação material: preço/demanda, mercado, tarifa, bloqueio, contrabando, escassez e propriedade | M1/M3/M7 | `economy`, `markets/procurement`, `logistics/routing`, `tariffs/embargo`, `society/demography`, `KnowledgeState` | M1 preparado aceito em E208/E277/E282; a adaptação natural continua aberta para M8. E263 prova alívio agudo e E264 mostra que a oficina ficou bloqueada por `payroll_funds`. |
-| 2. Estratégia/diplomacia: objetivos, concessão, negociação, commitments, persuasão, espionagem, suborno e sabotagem | M2/M3/M6 | `StrategyState`, `AuthorityState`, `KnowledgeState`, `diplomacy*`, `commitments`, `espionage`, `bribery`, `sabotage` | Fixtures e escolhas OAuth/Luna situadas em E257–E261; composição autônoma entre autoridade, comando e memória posterior não demonstrada. Ver M2/M3. |
-| 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | Pesquisa/difusão/treino têm recortes, mas catálogo não equivale a consumidor material. Cada tecnologia nomeada ainda precisa de integração/prova no M3. |
-| 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | Fixtures persistentes e interferência são evidência histórica; M2 exige cenário autônomo com autoridade/QG/comandante e efeito civil após decisões independentes. Não extrapolar fixture para emergência natural. |
-| 5. Magia, criaturas e ação individual | M4/M5/M6 | Society/Research owners e `rites`, `site_services`, `creature*`, `character_*`, `assembly_denial` | Quatro povos e recortes de rito/ward/drake/serpente existem. Diferenciação material, elemental/evocação, ameaça/contramedida e agência religiosa continuam abertos. |
-| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | E256–E261 registra corpus e limites; E199/E200 é histórico. Experiência integrada e gates no checkout estabilizado seguem abertos. |
+| 2. Estratégia/diplomacia: objetivos, concessão, negociação, commitments, persuasão, espionagem, suborno e sabotagem | M2/M3/M6 | `StrategyState`, `AuthorityState`, `KnowledgeState`, `diplomacy*`, `commitments`, `espionage`, `bribery`, `sabotage` | Recortes controlados M2/E294, M3/E320 e M6/E332 aceitos; memória/decisões independentes e autoria verificadas nos recortes. Escolhas OAuth/Luna E257–E261 são situadas, não composição natural. Corpus atual e gates naturais em M8. |
+| 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | M3/E320 aceito pelos recortes materiais referenciados em seu checklist; E295–E318 conectam aquisição/aplicação, inclusive E300–E308 pólvora/artilharia. Catálogo sozinho não conta; generalização/naturalidade não são inferidas desses recortes. |
+| 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | M2/E294 e composição M7/E335 provam cenários controlados com autoridade/QG/comandante, interferência e consequência civil, sem escolha de ação pós-início pelo teste. Não extrapolar política stub para provider real ou emergência natural. |
+| 5. Magia, criaturas e ação individual | M4/M5/M6 | Society/Research owners e `rites`, `site_services`, `creature*`, `character_*`, `assembly_denial` | M4/E324.d, M5/E328 e M6/E332 aceitos em recortes controlados: trabalho dos quatro povos, elemental/evocação com custos e contramedidas, adesão independente e resposta social. Composição/navegabilidade E335; gates amplos continuam M8. |
+| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; E336 regressão apropriada. E199/E200 é histórico. Corpus real atual, três seeds naturais e custos permanecem abertos em M8. |
 
 - [x] M0 crosswalk: mapear as sete seções (0–6) do roadmap a M0–M8,
   owners/integradores e evidência/limites acima. Os requisitos internos têm
@@ -32,8 +32,421 @@
 - [x] Mapear as sete seções do roadmap para M0–M8 e registrar estado corrente
   versus histórico; a revisão das linhas detalhadas de cada requisito continua
   vinculada aos itens específicos do contrato.
+- [x] M0/E286: reconciliar o cabeçalho do contrato, a matriz e o diário com o
+  checkout limpo em `3c6e590e`, E284–E285 e a referência local de upstream;
+  registrar limites de atualidade e manter M2 como próxima frente sem reabrir
+  E283 cancelado. A referência é local, não confirmação do remoto ao vivo.
+- [x] M0/E301: preservar e reconciliar o novo checkpoint `3c6e590e` + WIP
+  E286–E311, com o estado parcial de E300, schema e próxima tarefa alinhados
+  entre contrato, matriz e diário. Evidência exigida: snapshot recuperável do
+  diff rastreado e arquivos não rastreados, hashes, status/branch/HEAD e limites.
+- [x] M1/E302: retomar o diagnóstico da adaptação econômica natural a partir
+  do bloqueio de folha/renda, sem alterar regras antes de localizar causa,
+  conhecimento, affordance, autoridade, recursos, política e efeito em famílias.
+  Usar a evidência E264/E269–E282 como baseline, não como prova de recuperação
+  natural; registrar um diagnóstico reproduzível antes de qualquer solução.
+  Reconciliado com o checkout atual: owners de subsistência, labor, emprego,
+  workforce, demografia, relief, renda inicial, empréstimo e prioridade estão
+  sem diff; a alteração econômica corrente é perda material do excedente público
+  por conservação (E298), não uma nova fonte de renda. E281 segue diagnóstico
+  read-only autoritativo do mecanismo; saves dessa série são históricos e não
+  foram carregados no schema 80. Conclusão: bloqueio estrutural de renda própria
+  para coortes sem trabalho pago/dependentes agregados, mais caixa institucional
+  comprometido; relief/crédito/preferência não provaram adaptação natural. M1
+  segue aceito somente no cenário preparado; Gate B natural segue aberto em M8.
+- [x] M0/E305: preservar o WIP integrado até E304 antes do próximo recorte.
+  Branch `codex/medieval-remote`, HEAD `3c6e590e`, 31 tracked modifications e
+  quatro untracked; snapshot local em `/tmp/medieval-resume-e304-20260929.patch`
+  (SHA-256 `36f83c2e0deb65316c5e1af0099b1fdaad8c249ffa0d5bcfaeaa424f40c1bd3e`)
+  e `/tmp/medieval-resume-e304-20260929-untracked.tar.gz` (SHA-256
+  `3a3e1d04b9113d236e208fcb779d57b72779aa8aa71b92c98d625f61444a8713`).
+  Cópia local recuperável, sem commit/push/deploy. Contrato, matriz e diário
+  reconciliados para E304; próximo recorte único é E306 dentro de E300.
+- [x] M0/E321: checkpoint recuperável criado antes da reconciliação; contrato,
+  matriz e diário agora registram M3 fechado em E320. Naquele ponto M4/E322 era
+  o próximo recorte; a auditoria E322 abaixo o concluiu e abriu E323. O snapshot
+  pré-edição contém todo o WIP rastreado e não rastreado;
+  veja hashes e limites no contrato e na entrada E321 do diário. Sem commit,
+  push, merge ou deploy.
+- [x] M4/E322-audit: mapear a identidade dos quatro povos através de geração,
+  nascimento/maturação, personagem/coorte, migração, trabalho, recrutamento,
+  persistência e superfícies de observação. `People` é um enum de quatro valores,
+  o gerador inclui todos em cada assentamento, os owners transferem pela coorte
+  preservando `people`, e DTO/UI exibem os nomes PT-BR. A bateria focal passou
+  `17 passed`; detalhes e limitações no E322 do diário.
+- [x] M4/E323.a: remover a correlação acidental de worldgen entre posição da
+  personagem e povo do membro da organização; comprovar uma instituição mista
+  em seed fixa sem selecionar membros com base no povo. `src/run/medieval_society.py`
+  embaralha as pessoas elegíveis com RNG determinístico namespaced por seed e
+  distribui-as em round-robin; seed 73 passou a ter organizações com composição
+  mista. Novo assert no teste de worldgen; grupo focal da identidade:
+  `17 passed`.
+- [x] M4/E323.a-ui: listar membros nomeados no inspector como links para os
+  dossiers de personagem e exibir povo traduzido PT-BR; organização sem membros
+  nomeados tem estado vazio traduzido. Teste do dossier: `5 passed` e
+  `npm run type-check` passou; isso cobre exibição, não alteração de filiação.
+- [x] M4/E323.b: maturação de coortes para trabalho conforme os valores de lore
+  autorizados: humano 15, elfo 25, anão 20, orc 12 anos (360 dias/ano). Persistir
+  a duração efetivamente aplicada à coorte; provar due dates, transição material,
+  save/load, rejeição explícita do schema antigo e explicação na UI. `BirthCohort`
+  persiste duração e data, o evento de nascimento registra ambas, a maturação
+  agendada produz delta de população, Society schema 22/save schema 81 rejeitam
+  formatos antigos, e a API/inspector mostram a idade. Demografia focada:
+  `3 passed`; API: `1 passed`; dossier: `6 passed`; type-check passou. Veja E323.b
+  no diário para os comandos e limites.
+- [x] M4/E324.a: exercitar as quatro identidades pelo mesmo caminho de mudança
+  ocupacional e migração, verificando conservação e identidade de povo no
+  destino. Regressão: `tests/test_medieval_society.py` → `14 passed`.
+  Escopo: contrato do owner Society, sem alegar affordance/política,
+  aprendizagem ou diferença fisiológica.
+- [x] M4/E324.b: executar o cenário de migração material já existente para cada
+  povo, mantendo a pressão observada, decisão/fallback, saldo e provisões,
+  save/load, chegada e identidade no destino. O mesmo teste passou para os
+  quatro valores: `4 passed`. Não adicionada regra racial.
+- [x] M4/E324.c: exercitar seleção de affordance de aprendizagem e instrução
+  paga para um especialista de cada povo, com habilidade equivalente e a mesma
+  configuração causal. O teste parametrizado passou para os quatro povos
+  (`4 passed`). A fixture posiciona personagens e registra uma chegada preparada;
+  não conta como migração causal (coberta separadamente por E324.b), nem prova
+  maturação, recrutamento ou elegibilidade universal a emprego.
+- [x] M4/E324.d: parametrizar a decisão por affordance de trabalho remunerado
+  para os quatro povos sob a mesma demanda, autoridade e recursos; confirmar
+  pagamento, ocupação e causalidade, sem bônus por povo. Humano, elfo, anão e
+  orc selecionaram ID oferecido num teste do provider stub; o owner pagou o
+  estipêndio, concluiu a transição e preservou povo. Regressão combinada de
+  workforce, Society e demografia: `59 passed`. Fixture controlada, sem provider
+  remoto ou execução natural.
 
-Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Knowledge schema 10; saves anteriores continuam rejeitados. Esta matriz acompanha o plano V1 histórico, o diário de evidências e o roadmap. `Verificado` vale somente para o recorte descrito; `Existente` não comprova o aceite amplo; `Lacuna` indica prova ou implementação ausente. E1–E243 estão registrados antes deste adendo; E256–E282 documentam o corpus e os recortes econômicos atuais. E244–E255 foram classificados individualmente no diário E266 quando havia artefatos recuperáveis; E244, E246 e E250 não têm output reproduzível. E222, E225, E228 e E230 não produziram decisão live do provider.
+M4 fechado em recortes controlados no E324.d: identidade, maturação 15/25/20/12,
+composição institucional, migração, instrução e escolha de trabalho dos quatro
+povos têm evidência. Isso não implica bônus racial, discriminação emergente nem
+prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrato.
+- [x] M5/E325: inventariar, sem alterar regras, cada Skill mágica declarada, o
+  owner que executa o efeito, custos/alcance/recuperação e testes existentes;
+  selecionar uma operação já prevista para fechar primeiro, registrando o que
+  já está materialmente provado e o que é só skill/ritual nominal. Ritos de
+  restauração e wards/contramedidas têm owners/blueprints/testes materiais;
+  `elemental_magic` e `evocation_magic` existem só em `Skills`, sem operação
+  medieval registrada. Os quatro módulos de ritos/alcance/política/interação
+  com criaturas passaram `26 passed`.
+- [x] M5/E326: implementar o rito elemental de conformação de terra para reparar
+  `Passagem Negra` quando danificada: só Auren como mantenedor, com relatório de
+  sítio próprio e atual, personagem presente com `elemental_magic >= 35`, 4
+  reagentes + 1 cristal, 2 artesãos pagos, 6 dias, recuperação de 3 dias e
+  integridade +0,10 no máximo. Usar decisão independente de oficiante e
+  patrocínio, mesmo owner Map/Economy e validação de save; não reativar sítio
+  interditado, não duplicar projeto de reparo, sem recurso/rota gratuito. Provar
+  com contrafactual que o estado/dano corrente, custo insuficiente ou observação
+  stale remove/bloqueia a opção; não criar DSL, feitiço genérico ou estado de
+  mundo novo. Entregue no owner de ritos existente, com observação local própria
+  do praticante, patrocínio transacional pelo caminho comum, efeito de Map,
+  consumo/folha de Economy e save schema 82/Research 4. O turno de personagem e
+  o patrocínio do dia seguinte selecionam IDs atuais em prova provider stub.
+  Negação militar observada interrompe o rito antes da recuperação. Evidência
+  E326 no diário: `94 passed`, type-check, negativos e contrafactuais controlados.
+- [x] M5/E327: fixar e implementar uma manifestação evocada temporária usando
+  os owners existentes, com origem causal, praticante, custos, alvo/alcance,
+  duração/recuperação, efeito físico limitado e encerramento datado explícito.
+  Sua contramedida precisa mudar o resultado; não substituir evocação por um
+  ward apenas renomeado nem criar população, bens permanentes ou novo bestiário.
+  Lei E327 fixada antes de codar: `rite-of-evoked-bulwark`, praticante residente
+  com `evocation_magic >= 35`, sítio aquático local habilitado com transporte,
+  proprietário/patrocinador explícito e observações próprias; 6 reagentes,
+  2 cristais, 2 artesãos pagos a 2 moedas, 4 dias e recuperação de 2 dias.
+  Research possui a manifestação vinculada ao rito/sítio por até 12 dias:
+  absorve metade de um golpe de drake/serpente no sítio, limitado a 0,05 de
+  integridade, e se dissolve nesse impacto; sem golpe, expira por agenda.
+  Nenhum efeito sobre população, outros sítios ou rotas nominalmente; a lei
+  hazard original continua calculando o golpe. Relatórios locais registram a
+  presença visível; negação de assembleia impede a formação. Provar custo,
+  seleção independente, consumo/encerramento, contrafactual, save/load e UI.
+  Evidência E327 no diário: 72 testes Python, 5 testes UI e type-check passaram;
+  decisões provider stub independentes, expiração e impacto com dissolução,
+  dano pareado 0,05/0,10 e negação no dia de conclusão. Save 83/Research 5/
+  Knowledge 11. Prova preparada, sem provider real nem emergência natural.
+- [x] M5/E328: reconciliar os cinco aceites de M5 com E325–E327 e provas de
+  drake/serpente, negociação/recuo, memória e resposta civil. Fechar somente
+  ligações ainda ausentes; não abrir nova criatura ou escola de magia.
+  Revisão inicial: quatro capacidades materiais exercitadas nos 72 testes
+  E327; drake tem tributo/memória/recuo e dano com ward/anteparo. Serpente tem
+  ecologia e dano civil exercitados, mas sua resposta institucional por tributo
+  ainda precisa de uma trajetória focada antes do aceite agregado M5.
+  Trajetória adicional executada: pedido da serpente → escolha própria de
+  Auren → consumo real de alimento → memória → save/load, `1 passed in 1.06s`.
+  Cinco aceites reconciliados no E328 do diário. M5 fechado por capacidades
+  controladas; integração ampla/naturalidade continuam em M7/M8.
+- [x] M6/E329: inventariar identidade religiosa, instituições, membros e adesão;
+  fechar a primeira ligação real ausente com escolhas próprias e duas tradições
+  coexistentes, sem inferir fé por povo nem criar conversão automática.
+  Lei do recorte: Aurora e Coro preservam identidade/doctrina próprias. Uma
+  instituição com autoridade diplomática, membro fisicamente local disponível
+  e relatório próprio recente pode convidar um residente/grupo presente no
+  mesmo lugar. Knowledge possui o convite local privado (válido por sete dias);
+  Society possui apenas a adesão escolhida pelo destinatário, nunca deduzida
+  de membership, raça ou fé da coorte. Não há ganho material, conversão em
+  massa por texto ou mudança de membership/autoridade. Recusa/NO_ACTION não
+  gera adesão; troca de tradição exige outro convite aceito. Provar duas
+  decisões, causalidade, stale/ausência de presença, rollback e save/load.
+  Owner direto, Knowledge/Society, save 84/Society 23/Knowledge 12 e API/UI
+  implementados. Prova focada: 47 testes Python, teste de projeção repetido
+  (1 passed), 7 testes UI e type-check. Duas tradições no mesmo cenário e escolha
+  independente por API; nenhum provider/naturalidade. Menu normal ainda ausente.
+- [x] M6/E330: integrar convite e resposta religiosa aos turnos concorrentes
+  existentes (instituição, personagem e coorte), apresentando somente convite
+  próprio/doctrina divulgada e adesão própria. Revalidar NO_ACTION/recusa,
+  escolhas independentes em datas diferentes e influência na decisão posterior;
+  não criar uma consulta paralela exclusiva nem converter pela política offline.
+  Evidência E330: sete módulos, 58 passed; cinco provas de religião repetidas
+  após contrafactual adicional. Convite institucional e resposta amanhã nos
+  turnos existentes; aceitação/NO_ACTION de personagem/coorte, save/load do
+  convite pendente, privacidade e doutrina/adesão prévia no contexto. Stub
+  explícito condicionado à doutrina; não coerência de provider real ou emergência.
+- [x] M6/E331: fechar uma cadeia religiosa de resposta social: assembleia
+  observada, decisão de permitir/negar com força/custo reais e resposta
+  independente da ordem/grupo/governo por mecanismo cívico existente. Inventariar
+  informação já emitida pela interrupção antes de adicionar outro estado; nenhuma
+  perseguição, protesto ou conversão obrigatória.
+  39 testes focados passaram. Pressão material renova só observadores locais já
+  presentes; dossiê mostra interferência pública com fonte, não contrato/caster.
+  Grupo escolhe greve limitada ou NO_ACTION; governo escolhe levantar a negação.
+  Reagentes perdidos não retornam, rito não ressuscita; save/load e história
+  validados. Premissa pressionada e menus chamados explicitamente com stub;
+  não trajetória espontânea ou calendário autônomo completo.
+- [x] M6/E332: reconciliar oferta/participação/patrocínio/ensino dos mecanismos
+  existentes com instituições religiosas e adesão; fechar somente ligação
+  contratada ausente. Verificar crença versus fato/efeito na UI antes de concluir
+  M6, sem criar escola de magia, cosmos ou conversão coletiva automática.
+  48 testes Python, 7 UI e type-check passaram. Ordem recebe técnica por ensino
+  anterior e depois oferece/negocia/cobra/ensina com decisões independentes nos
+  menus existentes; aluno escolhe aceitar, nenhuma fé/matéria/capacidade nasce.
+  Oferta/oficiante e patrocínio de Aurora revalidados no módulo de iniciativa.
+  ResearchView/API/UI agora expõem execuções e wards reais com estágios e fontes,
+  separados do catálogo/doutrina. Cinco aceites M6 reconciliados no E332 do diário:
+  fechado no escopo controlado, não em mundo espontâneo ou provider real.
+- [x] M7/E333: auditar e completar a navegação da cadeia religiosa/mágica no
+  dossiê do personagem/instituição e why(): informação datada, decisões próprias,
+  fonte e custo/resultado. Não apresentar explicação retrospectiva como pensamento
+  real. Preparar a verificação humana no navegador com cadeias persistidas reais.
+  - [x] E333.1: adesão própria e data no dossiê, decisão canônica própria no
+    histórico e convite/decisão via why, sem decisão privada de outro ator.
+    13 testes Python, 8 UI, type-check e diff-check passaram. Prova owner/API
+    preparada e componentes, não navegador.
+  - [x] E333.2: atividade/resultado do rito no dossiê do oficiante e patrocinador,
+    preservando privacidade de estoque/conta do patrocinador na perspectiva do
+    personagem. Completar fontes de custo/efeito e navegação Dao antes do browser.
+    11 testes Python, 9 UI e type-check passaram. Ritual_activity mostra papel,
+    início/prazo, stage e materiais planejados públicos. Resultado/decisão têm
+    fonte; recibo do oficiante omite deltas de estoque/conta privados, enquanto
+    patrocinador/Dao mantêm evidência completa. Nenhum contexto de ator é
+    alimentado pelo observatório. E333 fechado nesse recorte, não M7 inteiro.
+- [x] M7/E334: revisar cargos, atividades, objetivos e fontes nos dossiês dos
+  personagens/instituições; fechar lacunas de produto sem inferir intenção ou
+  conceder conhecimento de planos da instituição só porque alguém ocupa cargo.
+  Preparar trajetória persistida e browser Atlas/Crônica/why/save/load.
+  - [x] E334.a: projetar atividade própria, cargo/escopos/vigência e comando
+    próprio; melhorar objetivos/planos PT-BR e retirar corte silencioso de dez
+    fatos carregados. Provas de privacidade, ausência de fonte inventada e
+    paginação: 21 Python, 8 UI, type-check e diff-check. Não fecha navegador.
+  - [x] E334.b: preparar trajetória isolada e verificar navegador integrado,
+    Atlas/Crônica/dossiê/why e pausa/avanço/save/load/retomada. Conferir disco
+    primeiro: E334.a registrou somente 149 MiB livres; não duplicar saves grandes.
+    - [x] E334.b1: build atual, dois smokes existentes de personagem/causa e
+      save/load/continuar/pausar, mais navegador do rito preparado pendente →
+      conclusão material no dia 10 → why com delta → reload pendente → retomada
+      e mesma conclusão. Zero page errors. Somente runtime isolado local, sem
+      mock HTTP; decisões iniciais de rito por API/fixture, offline depois.
+    - [x] E334.b2: conectar execução ritual ao local selecionado no Atlas e
+      navegar local → rito → oficiante/dossiê → why. 15 UI, build/type-check,
+      browser Chromium com clique real no mapa e zero page errors. Widget
+      compartilhado filtra povoado/site e preserva escolhas/receipt; não muta.
+- [x] M7/E335: compor os marcos M1–M6 num cenário controlado persistido,
+  reutilizando campanha/interferência/efeito civil existentes e incorporando
+  povos, magia e religião com decisões próprias e disputa por recursos reais.
+  Depois verificar a trajetória no observatório/Atlas/Crônica/dossiês/why.
+  Não converter fixture em prova natural ou provider real nem impor atividade.
+  - [x] E335.a: ampliar a trajetória controlada existente de campanha/criatura/
+    efeito civil/cessar-fogo com adesão independente, povos e ritos concorrentes
+    por estoque real. Sem injeção depois da linha de início. Exigir que a
+    falha por falta material aponte ao consumo canônico, não só ao contrato.
+    Evidência E335.a: 23 testes focados passaram; ambos os ramos preservam
+    adesão independente, rito concluído/concorrente sem meios, save/load e audit.
+    Cenário preparado e provider stub, sem injeção material depois do início.
+  - [x] E335.b: carregar os ramos persistidos no navegador real e investigar
+    Atlas → campanha/rota, local → ritos concorrentes → why e personagens.
+    Reutilizar projeções/controles existentes; sem provider real ou nova física.
+    Navegador real: ok=true, dia 90, zero page errors. Rito falho → consumo
+    concorrente; Atlas → rota/relatório; governo → coluna sem provisões;
+    controle → acordo bilateral → execução material da retirada.
+  - [x] E335.c: reconciliar a composição com os aceites M1/M3 existentes e
+    demonstrar aplicação tecnológica material na mesma trajetória, reutilizando
+    pesquisa/ensino/treinamento existentes. Não contar catálogo como aplicação
+    nem pressão econômica isolada como adaptação sustentada.
+    Mesmo mundo por 240 dias: treinamento abastecido de guarnição, obra/
+    fundação escolhidas pelo governo, oficina, folha e compra causal de alimento;
+    dois ramos com save/load/audit ok. Browser Finanças → folha → why passou.
+    Ensino prévio é premissa explícita, não nova prova de pesquisa paga.
+    M7 fechado no escopo controlado E333–E335; natural/provider/finais são M8.
+- [ ] M8/E336: preservar checkpoint revisável e congelar fingerprints do
+  código M0–M7; levantar regressões/gates ainda devidos e saldo real de consultas,
+  sem apagar falhas conhecidas nem usar execução histórica stale como aceite.
+  Preflight de disco: externalizar/remover somente artefatos identificados,
+  autorizados e com cópia verificada; aguardando decisão sobre quatro diretórios.
+  - [x] E336.a: preservar patch/untracked e reproduzir a falha de conservação
+    da migração no fechamento mensal. Diagnóstico soma receipts fora do ledger:
+    perda pública de armazenamento -303, exatamente a divergência. Incluir o
+    fato canônico no verificador, sem mudar recursos/lei de perdas; testar
+    migração e conservação alimentar antes de congelar novo fingerprint.
+    Patch/untracked verificados em /tmp/cws-e336-checkpoint-lWKBOj. Falha
+    76014 ≠ 76317 reproduzida; correção somente no verificador, 2 passed.
+  - [ ] E336.b: validar inventário de emissores/contratos e famílias alteradas
+    no candidato atual; conferir cobertura material do ledger e provas críticas
+    sem declarar suíte legada verde. Gerar fingerprint após qualquer correção.
+    - [x] E336.b1: cruzar inventário com o save composto dia 240 e revalidar
+      o gate operacional. 86 tipos materiais/203 grupos de delta; audit ok.
+      Nove premissas fixture e dois nomes dinâmicos explicam os 11 nomes sem
+      correspondência estática. Quatro testes do release gate passaram.
+    - [x] E336.b2: regressão final das famílias selecionadas M0–M7 e UI, no
+      fingerprint atual; separar contratos obsoletos de falhas materiais reais.
+      - [x] Interface medieval: 89 testes/17 módulos, build/type-check; teste
+        fiscal agora seleciona o cartão pelo botão da política, não primeiro
+        stock-card. Sem mudança de UI/regra fiscal. Aviso chunk >500 kB mantido.
+      - [x] Backend: famílias materiais/causais selecionadas, negativos críticos,
+        persistência e API; não equivale à suíte legada inteira verde.
+        - [x] Autoria/engine/save/load, demografia/migração, pesquisa/indústria,
+          magia/religião/dossiês: 162 passed em 17 módulos, 60.69s, E336.b2-backend-A.
+        - [x] Bilateralidade, authority/Knowledge, instituição/campanha e API:
+          194 passed / 2 failed inicialmente; perdas físicas de armazenamento
+          explicam ambas. Corrigidos somente teste/verificador; mercados e
+          preservação revalidados: 17 passed. Sem provider real nem gate longo.
+    - [ ] E336.b3: prévia e corpus limitado dos contratos novos/composição:
+      fé sem adesão anterior, fé com memória própria, iniciativa elemental,
+      evocação e menu institucional do save integrado. Reusar os turnos nativos,
+      fontes intactas e receipts sem deltas; prévia não conta como provider real.
+      - [x] Prévia de cinco casos passou, opções 1/1/2/2/41, fonte intacta.
+      - [ ] Corpus real: duas adesões válidas em memória, terceiro caso falhou.
+        Budget precisa reconciliar retries: três chamadas do boundary não
+        provam três transportes. Guard corrigido para max_retries=0; sem novo
+        egress. Não presumir saldo restante da autorização E260 (15/20).
+  - [x] E336.c: preparar/verificar backup local em tmpfs dos quatro diretórios
+    de teste E196–E199; sem cópia adicional no disco principal e sem apagar
+    originais. Upload/remoção continuam dependentes da autorização pendente;
+    metadata do backup remoto de 23/09 não cobre esses diretórios atuais.
+    Archive SHA-256 952de40e2681d276898b23ea1575430c9da074256fe35644c95489660c47d557;
+    tar --compare passou. Cópia tmpfs não é persistente nem backup externo.
+    - [ ] Upload autorizado e verificado, seguido de remoção somente dos quatro
+      originais identificados; só então preflight das três seeds finais.
+  - [x] E336.d: reconciliar caixa M1 com o aceite controlado explícito E282 e
+    registrar UI/browser verificados em M8, sem converter essas provas em
+    adoção natural, provider completo ou validação de dez anos.
+  - [x] E336.e: preservar fonte/configurações ficcionais/testes/UI e scripts de
+    navegador em commits locais revisáveis; registrar hashes e exclusões
+    geradas, sem publicar branch ou alegar M8 concluído.
+    Código: 5b4b5227, 109 arquivos, cached diff-check passou; screenshots e
+    estado do runner permanecem locais. Documentação acompanha separadamente.
+- [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
+  que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
+  nem publicar dados. Registrar limites de commit/push e inventário do WIP.
+  `/tmp/cws-e332-checkpoint-BBa3yR`: worktree.patch SHA-256
+  `87ef50b2eb464672c8c705744e5ac179684706e871c302d15e8e67bac82a9394`;
+  untracked.tar.gz `cc3d77a4711f52a9954696a43f8f4a47e6a3616a623c9416dd893f8d13bcb72a`.
+  Reverse apply --check passou sem aplicar; tar listing confirmou 17 arquivos.
+  102 caminhos no WIP; snapshot antecede apenas esta anotação de hashes/check.
+- [x] M0/E325: preservar snapshot local do WIP ao fechar a auditoria mágica.
+  Branch `codex/medieval-remote`, HEAD `3c6e590e`, 67 caminhos no worktree;
+  patch `/tmp/cws-medieval-e325-20260929.patch` SHA-256
+  `4cb0ea6cc857c1b0225fec90f2e882315e0d1dbe2b1bfba1d51e6aa8e0a50e02` e tarball
+  dos cinco untracked SHA-256
+  `c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`. Local,
+  sem commit/push/merge/deploy.
+- [x] M3/E303: pré-posicionar artilharia/pólvora em bagagem de força presente
+  por Freight comum, usando relatório atual do QG, antes de o ator investir o
+  assentamento; depois iniciar cerco e consumir pólvora em bombardeio. Investir
+  fecha a rota e invalida a escolha anterior sem mutação parcial. Evidência no
+  diário; é cenário preparado com estoque-premissa e API, não fecha produção
+  real→campanha, provider/naturalidade ou E300 completo.
+- [x] M3/E304: ligar output de linhas pagas de produção ao estoque de origem
+  realmente despachado para a bagagem da mesma instituição e força; a prova
+  precisa percorrer produção → estoque/causa → rota conhecida → Freight → cerco
+  → consumo, sem equipamento-premissa e sem misturar proprietários. A prova
+  integrada `test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines`
+  conclui em E304; tropa/defensor são premissas explícitas da fixture. Continua
+  aberto o restante de E300 (rota interrompida, equipamento ao mover/dissolver,
+  provider real quando disponível e contrafactual pareado).
+- [x] M3/E306: cobrir a interrupção de uma rota depois da partida de artilharia
+  por Freight e sua retomada após decisão independente de levantamento. A carga
+  permaneceu em trânsito, `cargo_delayed` citou a interdição e conservou
+  quantidade/entrega zero; depois da abertura, `cargo_delivered` passou a citar
+  a causa corrente da rota e a cadeia chegou ao disparo do mesmo cerco. A
+  fixture declara a permanência da coluna como premissa; o teste é separado da
+  integração de produção paga E304 e não prova por si só a emergência natural.
+  Regressão: artilharia, logística e interdição, `21 passed`; `git diff --check`
+  limpo. E300 continua aberto para contrafactual pareado e provider real quando
+  disponível.
+- [x] M3/E307: mover bagagem de artilharia/pólvora com a retirada real de uma
+  coluna e dissolvê-la depois, preservando o estoque no destino, sem duplicação
+  nem perda tácita. A marcha/chegada agora também cita os eventos causais da
+  rota atravessada. A prova round-trips save/load e passa `validate_history`.
+  Incluída na regressão focada de campanha/cerco, logística e interdição:
+  `44 passed in 21.05s`; `git diff --check` limpo.
+- [x] M3/E308: comparar duas cópias do mesmo estado com ambos os fretes já em
+  trânsito: rota aberta entrega no prazo e permite investimento/cerco/disparo;
+  interdição atrasa as duas cargas, impede investimento e cerco naquele prazo,
+  e não altera endurance por bombardeio. Round-trip no estado interditado,
+  depois levantamento, entrega e disparo no ramo de intervenção; auditoria nos
+  dois ramos. `provider_available()` retornou `False`, sem egress; não houve
+  consulta externa. A prova de produção paga de E304 foi revalidada separada.
+  Aceite E300 limitado: E304 `1 passed`, regressão E306–E308 `44 passed`,
+  `git diff --check` limpo. Cenário preparado, não emergência natural ou
+  provider real; M3 permanece aberto para outras capacidades.
+- [x] M3/E309: cruzar os requisitos de M3 (conservação, aço, vapor, pólvora,
+  artilharia, logística, barreiras, doutrina, difusão, intriga, compromissos,
+  comércio e patrimônio produtivo) com owners e testes existentes. Quatro grupos
+  focados passaram: indústria/preservação/barreiras/treino/difusão `38 passed`;
+  diplomacia/intriga/tarifas/embargo/logística/comando/conveyance `96 passed`;
+  alfândega/contratos/ajuda/memória diplomática `72 passed`; migração/ensino
+  aplicado `10 passed`. A auditoria achou que E138 exercita a paliçada com
+  conhecimento introduzido por `learn_technology`, não pesquisa paga nem ensino
+  bilateral; o próximo elo é tornar verificável uma rota legítima de aquisição
+  de `defensive_barriers`, sem chamar conhecimento inserido diretamente de
+  pesquisa executada. Limites: provas em cenários controlados, não ocorrência
+  natural ou provider real. E309 não fecha M3.
+- [x] M3/E310: o breach conhecido de ensino gera memória direcional; numa nova
+  proposta equivalente, o provider de teste recebeu a memória no prompt canônico
+  e escolheu rejeitar, enquanto a cópia sem histórico escolheu aceitar. A
+  engine/owner executou respostas diferentes, sem texto como causa nem deltas
+  do receipt LLM. O menu também expôs renegociação e remediação de breach; a
+  primeira passagem revelou e corrigiu `_choice` para os dois tipos de opção
+  sem `action`. Dois testes de aceitação passaram; regressão de diplomacia,
+  memória e indústria `62 passed`; `git diff --check` limpo. Provider é mock
+  local; nenhum egress. M3 permanece aberto.
+- [x] M3/E311: pesquisa paga de `defensive_barriers` por Auren no site próprio
+  `passagem-negra`, com consentimento independente do pesquisador, consumindo
+  seis ferramentas e pagando folha; depois a obra paga em Pedra Clara consome
+  materiais/trabalho e cita o evento da pesquisa como causa. A cadeia prévia
+  `field_drill` → `siegecraft` → `fortification` é premissa declarada da fixture;
+  não prova sua pesquisa emergente. Round-trip save/load passou. Regressão
+  focal de barreira, pesquisa e indústria: `38 passed`; `git diff --check`
+  limpo. Efeitos de cerco seguem nos testes separados anteriores; não houve
+  provider nem egress.
+- [x] M3/E312: o teste integrado da cadeia aço/vapor agora seleciona
+  metalurgia, aço e engenharia a vapor pelas affordances correntes; pesquisador
+  aceita separadamente. A pesquisa conclui antes de fornos/linhas consumirem os
+  materiais e máquinas correspondentes. Recursos, carvão inicial, linhas-base e
+  instalação são premissas preparadas; não prova surgimento natural. Regressão
+  focada indústria/pesquisa/barreira: `38 passed`; `git diff --check` limpo.
+  HEAD-base `3c6e590e`; SHA-256 do arquivo alterado:
+  `52dca9d537148961d126a2bd9eef108e2e8da94b42b67807f10c8826ec28b807`.
+- [x] M3/E313: registrar transferência produtiva bilateral no turno mensal
+  existente. O vendedor aparece no menu composto; oferta recém-escolhida gera
+  depois uma consulta limitada à contraparte, independente e ligada à decisão
+  do vendedor. Teste prova transferência e owner de produção; sem broker ou
+  estado de planner.
+- [x] M3/E314: Observatório `/api/v2` e `why()` mostram transferência produtiva
+  real, tarifas, embargo/recusa e alfândega/contrabando pela superfície genérica
+  já existente; sem UI ou projeção paralela. E314a/b abaixo registram evidência
+  e limites. Dossier de ator continua limitado a conhecimento próprio.
+
+Atualizada em 29/09/2026. No início de E286, o checkout estava limpo em `3c6e590e`; E286–E314 deixam alterações locais não commitadas. O checkout agora usa save schema 80, Economy schema 20 e Knowledge schema 10; saves anteriores continuam rejeitados sem migração. A referência remota não foi consultada nesta rodada. Esta matriz acompanha o contrato vigente, o diário de evidências e o roadmap. `Verificado` vale somente para o recorte descrito; `Existente` não comprova o aceite amplo; `Lacuna` indica prova ou implementação ausente. E1–E243 estão registrados antes deste adendo; E256–E282 documentam o corpus e os recortes econômicos; E284–E314 registram recortes recentes de campanha, difusão tecnológica, conservação alimentar, pólvora, decisão diplomática por memória, aquisição canônica de tecnologia, transferência produtiva e observabilidade causal de eventos materiais. E244–E255 foram classificados individualmente no diário E266 quando havia artefatos recuperáveis; E244, E246 e E250 não têm output reproduzível. E222, E225, E228 e E230 não produziram decisão live do provider.
 
 ## Checklist de execução
 
@@ -410,7 +823,7 @@ Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Kno
   cenário; isso não fecha as duas caixas seguintes.
 - [x] Gate C: exercer interferência externa, decisões independentes, efeito
   extramilitar, `why()` e save/load nessa trajetória (`E139-finalização`).
-- [ ] M2 próximo recorte: estender E139 em uma trajetória integrada, sem
+- [x] M2 próximo recorte (fechado em E294): estender E139 em uma trajetória integrada, sem
   escolhas injetadas depois do início e sem política que seleciona etapas por
   prefixo de affordance ou contador. A interferência datada de rota/carga deve
   alterar decisões independentes do comandante e QG; continuar pela operação,
@@ -418,7 +831,314 @@ Atualizada em 28/09/2026. O checkout usa save schema 79, Economy schema 20 e Kno
   saída política bilateral. Um contrafactual de rota/informação deve mudar a
   trajetória ou o controle material. Reusar owners atuais de campanha, Force,
   logística e desescalada; provider stub controlado não será chamado de provider
-  real nem de ocorrência natural.
+  real nem de ocorrência natural. E294 registra a trajetória, o contrafactual,
+  o efeito civil, o ciclo de guarnição, a saída bilateral e save/load/`why()`/
+  auditoria; M2 fecha somente o aceite controlado.
+- [x] M2/E287: `_start_siege` transfere a diferença de efetivo de uma coorte
+  civil da mesma raça para a coorte militar, com dois deltas e premissa causal;
+  o headcount é verificado invariável. Fingerprint de base `3c6e590e`, diff
+  SHA-256 `9233f826d5fe8d3872a55fb1f76d0b7f363c49658a8c91805ddc87ba22c6fd9c`;
+  os módulos de campanha persistente e política de guarnição passaram (8 testes).
+  Isso corrige a raiz da fixture de mobilização; não integra ainda operação,
+  interferência, guarnição sustentada e saída bilateral numa trajetória.
+- [x] M2/E288: reexecutar no checkout atual a composição já registrada de
+  interferência da criatura e campanha: o teste focal passou com stub seletor,
+  decisões independentes de comandante/QG, bloqueio real da rota, atraso de
+  carga e efeito civil; o controle sem bloqueio avançou mais; save/load, `why()`
+  e auditoria passaram. Ver E288 no estado atual. Limite: não integra ocupação
+  sustentada e saída bilateral à mesma trajetória; M2 continua aberto.
+- [x] M2/E289 — cenário controlado derivado da preparação de E288, agora com
+  força defensora física: soldados
+  preexistentes e conta/provisões formam a premissa; `garrison_options` e
+  `establish_garrison` do owner criam a obrigação real. Sem escolhas injetadas
+  após o start, o stub escolhe pela situação/descrições; a mesma coluna reroteia,
+  chega e cria contato datado. O controle sem restrição chega antes. A guarnição
+  continua ativa com pelo menos três pagamentos reais; ambos os ramos salvam,
+  recarregam e passam auditoria (`11 passed` no grupo focal). Detalhes e hash em
+  E289 no estado atual. Limite: sem batalha/cerco, captura, guarnição vencedora
+  sustentada ou saída bilateral na mesma trajetória.
+- [x] M2/E290 — desde o contato de E289, a mesma coluna usa menus correntes
+  para preparar posição, investir o assentamento, iniciar e sustentar cerco,
+  romper a defesa e escolher ocupação; o owner altera `occupier_id`. O controle
+  pareado sem bloqueio chega à ocupação, enquanto a rota fechada impede a
+  operação. O preparo e carregamento da coluna agora criam observação de rotas
+  locais datada e reabrem a revisão institucional; a decisão é ligada ao recibo
+  de preparo/observação. Nenhum resultado posterior ao início é escrito pela
+  fixture. Save/load e auditoria passaram em ambos os ramos. Ver E290 no estado
+  atual. Limite: cenário preparado com provider stub, não ocorrência natural,
+  provider real, guarnição vencedora sustentada nem saída bilateral; M2 continua
+  aberto.
+- [x] M2/E291 — após a transição de ocupação de E290, a alteração material
+  reabre uma decisão de campo; o ator escolhe separadamente estabelecer
+  guarnição, o owner revalida provisões/tesouro, e a mesma coluna registra ao
+  menos três recibos reais de manutenção paga. Quando as provisões acabam, o
+  owner encerra a guarnição e remove o ocupante, com delta causal. Save/load e
+  auditoria causal continuam válidos nos ramos pareados; grupo focal militar →
+  `97 passed`. Evidência de cenário preparado e provider stub, não manutenção
+  por vários meses nem campanha natural. M2 segue aberto para saída política
+  bilateral.
+- [x] M2/E292 — integrar cessar-fogo mútuo da campanha ao turno atual de
+  contato físico: após início/progresso/brecha, somente as instituições cujas
+  colunas estão presentes recebem revisão datada. Atacante pode propor, a
+  contraparte conhece e aceita/recusa em decisão independente, e cada devedor
+  escolhe seu próprio cumprimento por rota atual; owner retira apenas sua força
+  e revalida obrigação, autoridade e caminho. O teste do turno real inclui a
+  brecha antes das retiradas: o atacante sai primeiro, removendo materialmente
+  o investimento, e a coluna defensora — ainda presente embora sua garrison
+  tenha colapsado — escolhe depois sua própria rota. O controle administrativo
+  continua com a defensora e a ocupação fica vazia; não há transferência
+  automática. Sem decisão injetada após o start; save/load e auditoria causal
+  passaram. Grupo focado de cerco, contato, campanha, rotas, comando, suprimento
+  e guarnição: `97 passed` (E292). Limite: cenário inicial preparado e provider
+  stub; não prova ocorrência natural nem provider real, e M2 continua aberto.
+- [x] M2/E293 — cobrir a retirada bilateral depois da ocupação, quando a coluna
+  atacante está vinculada a uma guarnição ativa e paga: o cumprimento da própria
+  obrigação precisa encerrar essa duty pelo owner antes de mover a coluna, sem
+  deixar guarnição ativa em força ausente. A defensora colapsada, ainda presente,
+  recebe opção e decide sua retirada somente depois que o atacante libera a rota.
+  Preservar administrador, limpar ocupação apenas pela saída material, ligar os
+  dois movimentos às decisões corretas e provar save/load/auditoria. `98`
+  testes focados passaram (E293). A política usa provider stub em cenário
+  preparado; provider real e ocorrência natural continuam fora deste recorte.
+  É extensão do lifecycle já aberto em M2, sem regra nova de guerra ou sistema
+  paralelo.
+- [x] M2/E294 — unir E288–E293 na mesma trajetória controlada derivada de E139:
+  o mesmo plano/QG/comandante, criatura alterando rota/carga, operação que muda
+  controle, guarnição paga e retirada bilateral depois da ocupação. Nenhuma
+  decisão nem resultado pode ser injetado após a linha de início; o stub escolhe
+  apenas affordances correntes por papel e contexto. O ramo sem bloqueio e seu
+  controle contrafactual precisam terminar com controle diferente; o ramo
+  bloqueado continua sem captura. `why()`, save/load e auditoria no estado final.
+  O teste integrado registra a rota/carga atrasada no ramo da criatura, diferença
+  material de entrega/falta/saúde no assentamento, quatro manutenções diárias da
+  mesma guarnição antes da proposta e duas retiradas independentes com decisões
+  e movimento físico. Um re-preparo legítimo da mesma posição revelou que a
+  validação exigia um único evento de início histórico; agora a posição corrente
+  ancora-se no início mais recente, mantendo todas as tentativas no ledger.
+  Verificação focal e regressão de campanha/contato/cerco anexadas em E294 no
+  diário. Limite: cenário controlado com provider stub, não emergência natural
+  nem validação de provider real.
+- [x] M3/E295 — provar uma via completa de tecnologia por migração material
+  real: o owner `start_migration`/resolução move um especialista nomeado para
+  outra instituição; conhecimento prévio na origem habilita oferta e instrução
+  paga no destino; a tecnologia aprendida abre um consumidor material existente
+  (irrigação), ainda sujeito a local, insumos e trabalho. Preservar a técnica na
+  origem e ligar migração, decisões, aprendizado e aplicação por eventos/causas.
+  Evidência: `test_real_migration_carries_technique_into_paid_irrigation_application`
+  e `test_a_migrated_specialist_instructs_for_real_wages_before_any_technique_exists`
+  passaram junto com o módulo de aprendizagem e um teste do owner de migração
+  (`10 passed`; E295, `CWS_DATA_DIR=/tmp/cws-e295-focused`). Cenário controlado;
+  sem prova de emergência natural, provider real ou fechamento do catálogo M3.
+  Reusar owners existentes; sem tecnologia ou capacidade gratuita.
+- [x] M3/E296 — compor roubo bem-sucedido de `metallurgy` com consumidor
+  material existente: o alvo mantém uma linha de carvão operante e observada;
+  o ator rouba apenas com agente/relatório/conhecimento válidos; a técnica
+  habilita `efficient-furnaces` numa linha própria de ferro; obra consome
+  materiais e folha, muda a receita, e a produção posterior muda materialmente.
+  Verificar a cadeia de causas e o ramo sem conhecimento antes do roubo.
+  Evidência: `test_stolen_metallurgy_unlocks_a_paid_local_production_upgrade`
+  incluído na regressão `tests/test_medieval_technology_theft.py` (`7 passed in
+  1.83s`; E296, `CWS_DATA_DIR=/tmp/cws-e296-final`). Cenário controlado com API,
+  sem alegar provider real ou ocorrência natural.
+- [x] M3/E297 — compor a pesquisa custeada de `field_drill`, o consentimento
+  independente do pesquisador, o treinamento pago e abastecido de uma coluna
+  existente e o aumento de força usado pelo cálculo de combate. Conhecimento
+  institucional sozinho não concede força; pesquisa sem consentimento, falta
+  de ferramenta/ração ou treino incompleto também não. Provar causas, decisão
+  datada e round-trip do save. `tests/test_medieval_force_training.py::test_paid_field_drill_research_and_training_reach_a_material_field_battle`
+  passou com auditoria causal no save; regressão de pesquisa/treino:
+  `29 passed` (E297). Recorte preparado com decisões API; não declarar decisão
+  espontânea/provider real ou fechar M3 inteiro.
+- [x] M3/E298 — fechar conservação alimentar em um recorte público limitado:
+  estoque acima da necessidade mensal sofre perda determinística de 0,5% por
+  ciclo, arredondada para baixo; estoque necessário ao ciclo atual nunca apodrece.
+  Pesquisa `food_preservation` habilita construir um smokehouse mantido pelo
+  proprietário, cuja capacidade efetiva deriva de integridade física e reduz
+  somente o excedente exposto. Dano reduz proteção; reparo pago a recompõe.
+  Provar pesquisa → obra → operação/perda menor → dano → reparo → recuperação,
+  com contrafactual idêntico sem preservação, conservação, causal links,
+  rollback de rejeição e save/load. Recorte não afeta alimentos domésticos,
+  estoques em trânsito, migração ou comida abaixo da reserva mensal; fixture não
+  prova provider real, ocorrência natural nem calibração global.
+  Evidência E298: `tests/test_medieval_food_preservation.py` compõe pesquisa,
+  consentimento independente, obra paga, perda de 238→228 no par controlado,
+  dano (perda 231), reparo pago e recuperação da capacidade; round-trip do save,
+  `validate_history` e rollback passam. Regressão focal de seis módulos:
+  `107 passed in 85.41s`. SHA-256s registrados no diário E298. Provider real,
+  causalidade natural e calibração de longo horizonte continuam fora da prova.
+- [x] M3/E299 — inventariar o menor caminho material de pólvora e artilharia
+  usando Force/cerco/economia existentes; antes de codar, fixar o consumidor
+  físico e o contrafactual. E299 confirmou `SiegeCampaign.garrison_endurance`
+  (`src/sim/medieval/siege_campaign.py::_garrison_wear` e
+  `resolve_siege_campaigns`) como consumidor: uma decisão explícita de
+  bombardeio pode reduzir endurance em passo limitado, enquanto o dono mantém a
+  pressão diária existente. O contrafactual pareado deverá diferir somente pela
+  presença/uso de artilharia e munição: sem conhecimento, equipamento ou
+  pólvora a opção não aparece; com ambos, uma decisão atual consome pólvora,
+  preserva a peça de artilharia e produz delta de endurance, com fontes causais
+  e save/load.
+  Inventário: `economy.json` já declara `sulfur` e `saltpeter`, mas nenhum deles
+  tem receita/facility de produção; também não existem recursos/receitas de
+  pólvora ou artilharia. `Recipe` e linhas de produção por `ExpansionBlueprint`
+  já suportam insumo/produção paga e bloqueio por tecnologia. `campaign_stock`
+  é um `Stock` canônico co-localizado com a coluna e pode guardar mercadorias,
+  mas `load_campaign_baggage()` (`campaign_supply.py`) carrega apenas alimento;
+  não há decisão de transferência de munição/equipamento ao estoque da coluna.
+  O modelo de `SiegeCampaign` ainda não persiste bateria e não deve receber um
+  booleano redundante: presença é derivável do equipamento real na bagagem.
+  E299 é somente inventário e fixação do consumidor/contrafactual; não prova
+  produção, transporte, pesquisa, decisão nem efeito de artilharia. E300 é o
+  próximo recorte de implementação: fonte material de salitre/enxofre → pesquisa
+  custeada de pólvora → linha paga de munição/peça → despacho por logística
+  existente para uma coluna → escolha atual de bombardear → consumo de pólvora e
+  dano limitado à endurance de cerco. Reusar estoque/bagagem, receitas, frete,
+  pesquisa e cerco; não criar classe de unidade ou combate paralelo. Se a
+  limitação de transporte exigir owner novo, registrá-lo como parte de E300 e
+  usar `execute_material` para seu comando direto.
+- [x] M3/E300 — implementar pólvora e artilharia sobre Economy, Freight,
+  bagagem de campanha, Research e o consumidor de cerco fixado em E299. O mapa
+  declara o depósito mineral real; mão de obra/insumos pagos produzem salitre e
+  enxofre; pesquisa requer esses produtos; receitas tecnológicas produzem
+  pólvora e uma peça; o QG decide despachar carga por rota conhecida à bagagem;
+  só então o atacante pode decidir bombardear uma campanha ativa. O tiro consome
+  pólvora, mantém a peça, reduz endurance em incremento limitado e pode causar
+  brecha somente ao zerar o mesmo estado de cerco; sem tecnologia, peça ou
+  munição, opção/delta ausentes. Bagagem com artilharia só se move junto da
+  coluna por caminho físico permitido, e equipamentos não desaparecem ao
+  dissolver a força. Comparar controle e intervenção da mesma fixture, incluindo
+  frete, rota interrompida, consumo, links, rejeição/rollback, save/load e
+  auditoria; incluir ao menos um menu real provider quando disponível. Sem nova
+  classe de força ou combate paralelo. Isso fecha apenas o recorte de pólvora e
+  cerco, não árvore tecnológica nem M3 inteiro.
+  - [x] Catálogo atual: recurso/site de extração, pesquisa `gunpowder`, receitas
+    e linhas pagas de separação mineral, pólvora e artilharia; bump explícito
+    para save schema 80, sem compatibilidade ou migração.
+  - [x] Contrato do owner de campanha: opções atuais de despacho por estoque,
+    rota/relatório e capacidade; frete normal para bagagem co-localizada; tiro
+    material via `execute_material`, com consumo de pólvora e endurance limitada.
+  - [x] Prova controlada de produção: pesquisa paga de `metallurgy`, separação
+    paga de salitre/enxofre, pesquisa paga de pólvora, linhas pagas e produção
+    física; `validate_history` e save/load passam (`test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines`).
+  - [x] Prova controlada de campanha: peça e pólvora chegam por frete real à
+    bagagem, a opção de pólvora só surge depois da peça, um disparo consome uma
+    carga, preserva a peça, causa delta de endurance e um ID stale é rejeitado
+    sem mutação parcial; round-trip do save (`tests/test_medieval_campaign_ordnance.py`).
+  - [x] E304 integrou a produção paga do mesmo ator, o estoque causal de origem,
+    rota/report do HQ, Freight à bagagem, investimento, cerco, consumo de
+    pólvora e delta de endurance no mesmo mundo (`test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines`).
+  - [x] E306/E307 cobrem interrupção/retomada de Freight, conservação e entrega
+    causal da carga, movimento da bagagem com retirada, permanência institucional
+    após dissolução, save/load e auditoria. São fixtures controladas com
+    tropas/defensor preparados; não provam emergência natural.
+  - [x] E308 compara duas cópias do mesmo estado com ambos os fretes já em
+    trânsito: rota aberta entrega a tempo e permite investimento/cerco/disparo;
+    interdição atrasa as duas cargas, impede investimento e cerco naquele prazo,
+    e não altera endurance por bombardeio. Round-trip no estado interditado,
+    depois levantamento, entrega e disparo no ramo de intervenção; auditoria nos
+    dois ramos. `provider_available()` retornou `False`, sem egress; não houve
+    consulta externa. Produção integrada de E304 foi revalidada separadamente.
+  - [x] Aceite E300 limitado: teste integrado E304 passou `1 passed`; regressão
+    focal campanha/cerco, logística e interdição passou `44 passed`;
+    `git diff --check` limpo. E300 conclui somente pólvora/artilharia; M3 segue aberto para
+    as demais tecnologias e intriga. Cenários preparados não provam emergência
+    natural nem decisão provider real.
+- [x] M3/E309: cruzar os requisitos remanescentes de M3 com consumidores e
+  testes existentes, rodar os grupos focados e selecionar a próxima ligação
+  ausente. A evidência e os limites estão registrados acima; M3 não fecha.
+- [x] M3/E310: provar que memória institucional direcional de breach altera
+  uma escolha provider em proposta posterior, sem deltas no receipt, e permitir
+  NO_ACTION com opções de remediação/renegociação. Prova local mockada; sem
+  egress. O detalhe e os limites estão no diário e no contrato.
+- [x] M3/E311: pesquisa paga de `defensive_barriers` por Auren no site próprio
+  `passagem-negra`, com consentimento independente do pesquisador, consumindo
+  seis ferramentas e pagando folha; depois a obra paga em Pedra Clara consome
+  materiais/trabalho e cita o evento da pesquisa como causa. A cadeia prévia
+  `field_drill` → `siegecraft` → `fortification` é premissa declarada da fixture;
+  não prova sua pesquisa emergente. Round-trip save/load passou. Regressão
+  focal de barreira, pesquisa e indústria: `38 passed`; `git diff --check`
+  limpo. Efeitos de cerco seguem nos testes separados anteriores; não houve
+  provider nem egress.
+- [x] M3/E312: no teste integrado aço/vapor, a metalurgia inicial e as
+  pesquisas de aço/vapor agora usam IDs selecionados de menus atuais, com
+  consentimento separado. Regressão indústria/pesquisa/barreira `38 passed`;
+  recursos/instalações são premissas preparadas, sem provider ou naturalidade.
+  Hash do teste e limites acima.
+- [x] M3/E313: transferência produtiva registrada em `monthly_adapters` e
+  `monthly_actors`; ofertas novas de organizações recebem uma consulta posterior
+  do comprador em adapter limitado àquela oferta, pois o ordenamento normal
+  consulta polities antes de organizações. A escolha do seller oferece, o buyer
+  aceita independentemente e o owner revalida/transferiu os bindings; não cria
+  estado/planner adicional. A verificação revelou também recusa de pesquisa
+  persistente por busca no tipo errado de evento; `_offer_was_declined` agora
+  exige decisão atual authored e o ID exato recusado.
+  Regressão focal `tests/test_medieval_productive_conveyance.py
+  tests/test_medieval_research.py tests/test_medieval_industry.py
+  tests/test_medieval_technology_sale.py
+  tests/test_medieval_knowledge_verticals_fail_closed.py
+  tests/test_medieval_institutional_aid_policy.py`: `73 passed`;
+  `git diff --check` limpo. Provider mock, sem egress. Base HEAD `3c6e590e`;
+  SHA-256s: `productive_conveyance_policy.py`
+  `256e4d3ab092e03586f259073e17940baa696b45e4dacfa5c43ba3dd7bb491e8`,
+  `institutional_agenda.py`
+  `9ae57325083fdc24e08e105285fcd8d4a683f971874a3f19be8b1f403ae49795`,
+  `research.py` `d2a5d6061626a02a80d089ffec1f89836481879f353e03c966eacb0103f04502`,
+  `test_medieval_productive_conveyance.py`
+  `8e4812d59ab51066e1c202faa50c286a741f57b943aadc198e6326d51416bde1`.
+- [x] M3/E314a: provar pela API ativa `/api/v2` que o snapshot do Observatório
+  reflete owner/maintainer e bindings após transferência real, e que `why()` do
+  recibo navega às decisões bilaterais e expõe os quatro deltas de controle.
+  `tests/test_medieval_observatory.py::test_productive_conveyance_is_visible_in_observatory_and_why`
+  passou. GET público cobre snapshot e causal query, sem mutar o mundo.
+- [x] M3/E314b: o mesmo `causal_view` navega tarifa cobrada, embargo que causa
+  recusa de carga, classificação de contrabando e detecção de evasão. `why()` é
+  global para o Dao; dossier privado não é ampliado nem recebe conhecimento
+  implícito. `tests/test_medieval_trade_embargo.py::test_only_the_named_counterparty_is_refused_and_goods_are_conserved`,
+  `tests/test_medieval_trade_embargo.py::test_declaring_and_lifting_is_one_dated_policy_transition`,
+  `tests/test_medieval_tariffs.py::test_export_quote_collects_once_without_losing_the_seller_alias_or_delivery`
+  e testes focados em `tests/test_medieval_customs.py` cobrem os recibos. Regressão
+  dos cinco módulos Python: `71 passed`; `web/src/medieval/__tests__/chronicle.test.ts`:
+  `4 passed`; `git diff --check` limpo. Base HEAD `3c6e590e`; hashes E314:
+  `customs.py` `4e8d719a8f80000c6eef217dbd48f48feb6eccd150b2af3a8a2f0889ba85dafb`,
+  `embargo.py` `48b856f0fd458521e05e7902e5017cd42a009b969a5c7d91b797a941728b4fa6`,
+  `test_medieval_observatory.py` `df2cebe232dcf5a30a932202056c615f08958f949a6acf94bba79f242095f8a3`.
+- [x] M3/E315: reconciliei as cinco linhas do M3 com owners e provas atuais:
+  conservação/tecnologia/operação (E298, E300–E312), difusão/aplicação
+  (E295–E297, E311–E312), diplomacia/intriga (E310 e provas de persuasão,
+  espionagem, suborno, sabotagem/investigação/acusação), compromissos/memória
+  (E310 e aid remediation), e fiscalidade/transferência (E313–E314). Uma seleção
+  de 19 testes focados passou nesta revisão. Não encontrei capacidade sem owner;
+  encontrei lacuna de prova no menu mensal completo para tarifa/customs. Isso não
+  fecha M3: E316 cobre essa lacuna e os aceites do marco continuam abertos.
+- [x] M3/E316: exercitar opções atuais de tarifa e customs pelo menu mensal
+  institucional completo (não somente adapters de família), com atores elegíveis
+  e decisão selecionada por ID corrente; conferir seus efeitos materiais e
+  preservar o turno único/consulta independente. Tarifa e evasão aduaneira foram
+  selecionadas em menu completo por mock local; detecção atualiza estado/receipt.
+  Contrabando catalogado usa retorno/apreensão e tem cobertura própria, não uma
+  opção ilegal de evasão. Regressão dos cinco módulos: `72 passed`, E316.
+- [x] M3/E317: completar escolha e efeito do embargo na trajetória do menu
+  mensal. O owner agora registra `ACTOR_DECISION`, ID da affordance e decisão
+  fonte na mudança de política; uma carga posterior do alvo é recusada e o
+  `why()` chega à declaração. Novo teste no menu composto; cinco módulos:
+  `73 passed`. Isso não fecha a linha M3 toda nem demonstra mundo natural.
+- [x] M3/E318: provar a decisão de treinamento de `field_logistics` no menu
+  mensal completo (sem API injetada), após premissas datadas de conhecimento e
+  treino-base. O provider recebe token opaco, não ID canônico com `stock:`, e a
+  engine o resolve para affordance atual; ferramentas são consumidas, três dias
+  abastecidos decorrem, e a capacidade material da bagagem aumenta. Regressão
+  force-training + campaign-supply: `15 passed`.
+- [x] M3/E319: selecionar apreensão de contrabando catalogado pelo menu mensal
+  completo do operador, em vez de somente chamar o owner diretamente; provar
+  consumo/transferência física para estoque, autoria da decisão e `why()` da
+  detecção/apreensão. Contrabando não pode escolher a affordance de evasão.
+  Provider mock selecionou a opção atual; apreensão moveu a carga real ao estoque
+  civil do posto. O owner emite `ACTOR_DECISION` com decisão/ator/affordance, sem
+  causar a mutação diretamente pelo receipt de interpretação. Cinco módulos:
+  `73 passed`.
+- [x] M3/E320: reconciliar cada aceite M3 com prova corrente no checkout; os
+  cinco requisitos têm consumidor e evidência focada (`27 passed` + `7 passed`);
+  M3 fechado em cenário controlado/provider mock. Não prova naturalidade,
+  provider real ou composição dos marcos M1/M2/M4–M8.
 - [x] M2 sub-recorte de seleção: o stub de E139 passou a usar papel do ator e
   descrições das opções recompostas, sem ler IDs nem contador de consultas;
   `test_prepared_crisis_runs_actor_choices_without_post_start_injection`
@@ -1030,8 +1750,8 @@ Ruff/diff-check passaram. Ferramenta pronta não é gate de dez anos verde.
 | 2 — protesto, movimento cívico e rebelião | `civic_protest.py`, `civic_movement.py`, `civic_strike.py`, Society/Economy | verificado em fixture | Protesto gera demanda limitada; recusa/lapso pode catalisar movimento; cada grupo que adere escolhe separadamente; greve organizada precede rebelião, sem transferir administração. Repressão só é enumerada com destacamento próprio presente e abastecido, consome provisão e eleva unrest. Em 25/09, adicionei regressão em que origem determinística copiando a affordance de repressão é recusada sem mutação; formação multigrupo e cadeia rebelião/repressão passaram (`2 passed` em recorte focal). | Não prova formação espontânea nem resposta de provider real; não modela combate/casualidades de repressão nem revolução completa; não impor revolta por seed. |
 | 2 — influência, espionagem, suborno, sabotagem e acusação | `espionage.py`, `investigation.py`, `sabotage.py`, `bribery.py` e políticas | existente | Testes focados de consentimento, descoberta e owners (E23, E28); Luna escolheu `NO_ACTION` em suborno | Falta uma cadeia material representativa de intriga com provider real sem forçar escolha; não contar recusa espontânea como pagamento executado. |
 | 2 — quebra deliberada e repercussão futura | RelationsState/commitments, mercados, conhecimento e memória | vertical material verificada em fixture | Repudiação explícita → notice/memória → recourse escolhido → destacamento (E114). Em 25/09, venda bilateral que consome o estoque/recurso nomeado por uma obrigação de entrega agora cria breach ligado à decisão do vendedor e ao receipt de frete; a contraparte notificada lê `materially_breached` e a API distingue `commitment_materially_breached` (`tests/test_medieval_reciprocal_supply.py::test_material_sale_of_the_promised_stock_records_an_authored_breach`). | A prova cobre venda de estoque prometido, não toda ação econômica concorrente; preservar distinção entre incompatibilidade deliberada, impossibilidade e lapso de prazo. Fixture não prova frequência natural nem escolha de provider real. |
-| 3 — catálogo e dependências tecnológicas | `static/game_configs/medieval/research.json`, ResearchState | existente | Catálogo inclui irrigação, rotação, metalurgia, aço, vapor, treino, cerco, fortificação, logística e barreiras defensivas; aço/vapor têm prova material (`tests/test_medieval_industry.py`), paliçada construída/reparada e testada em cerco (E138), e `field_drill` foi pesquisada com soldados do mundo gerado, insumos e salário reais (E141). Em 25/09, os owners de pesquisa passaram a exigir decisão de ator tanto no patrocínio como no consentimento; quatro módulos de pesquisa/difusão passaram (`48 passed`). | Pólvora, artilharia, conservação e doutrina permanecem ausentes ou sem aceite material; conhecimento de barreiras foi premissa da fixture, não descoberta natural. A autoria foi verificada no recorte, não a árvore ampla, difusão natural ou provider real. Não chamar a árvore ampla de completa. |
-| 3 — difusão por ensino, venda, roubo e migração | `teaching.py`, `technique_copy.py`, `technology_sale.py`, `technology_theft.py`, KnowledgeState | existente | Testes focados para as quatro vias. Roubo exige produção técnica recente (E121) e requer `ACTOR_DECISION`; cópia paga também valida decisão atual do ator e affordance recomposta (`20 passed` na regressão conjunta com roubo, venda, treino e sighting). Divulgação/sighting voluntária exige autoria, inclusive na proposta de ensino (`24 passed` em recorte de tecnologia/diplomacia). Ensino exige consentimento atual `ACTOR_DECISION` do docente e aprendiz; payload determinístico exato falha sem alterar conhecimento. Venda bilateral de `field_drill` → treino pago/datado → força da coluna (E122); ensino → conhecimento → treino local → força após conclusão com save/load/auditoria (E137). O grupo focal de 25/09 para pesquisa, ensino, treinamento, ajuda e patrimônio produtivo passou `74` testes. | Ensino é transferência imediata de conhecimento, não curso institucional; migração e roubo ainda precisam de composição aplicada equivalente. São fixtures com decisões injetadas, não prova de difusão ampla nem provider real. |
+| 3 — catálogo e dependências tecnológicas | `static/game_configs/medieval/research.json`, ResearchState | verificado em recortes | Catálogo inclui irrigação, rotação, metalurgia, aço, vapor, treino, cerco, fortificação, logística, barreiras e `food_preservation`; aço/vapor têm prova material (`tests/test_medieval_industry.py`), paliçada construída/reparada e testada em cerco (E138), `field_drill` pesquisada com soldados do mundo gerado, insumos e salário reais (E141/E297). E297 compõe pesquisa paga → consentimento independente → treino pago/abastecido → força citada no combate. E298 compõe pesquisa paga de `food_preservation` → casa de defumação → perda menor do excedente, dano e reparo pago; regressão focal de economia/consumo/pesquisa/obra/reparo: `107 passed`. Em 25/09, owners de pesquisa passaram a exigir decisão de ator no patrocínio e consentimento (`48 passed`). | Pólvora e artilharia permanecem ausentes. Barreiras ainda usam conhecimento preparado na prova de aplicação. E297 cobre a doutrina `field_drill`, não conecta `hold`/`press` a pesquisa/instrução. E298 é fixture/API e uma lei de deterioração pública limitada, não prova calibração global, provider real ou emergência natural. Árvore ampla, difusão natural e provider real continuam sem prova. Não chamar a árvore tecnológica ampla de completa. |
+| 3 — difusão por ensino, venda, roubo e migração | `teaching.py`, `technique_copy.py`, `technology_sale.py`, `technology_theft.py`, `apprenticeship.py`, KnowledgeState | verificado em recortes | Testes focados para as quatro vias. Roubo exige produção técnica recente (E121) e requer `ACTOR_DECISION`; E296 liga `metallurgy` roubada a obra paga de `efficient-furnaces` e maior saída de ferro pela linha local, com conhecimento datado e sem efeito quando ausente. Cópia paga também valida decisão atual e affordance recomposta (`20 passed` na regressão conjunta com roubo, venda, treino e sighting). Divulgação/sighting voluntária exige autoria, inclusive na proposta de ensino (`24 passed` em recorte de tecnologia/diplomacia). Ensino exige consentimento atual `ACTOR_DECISION` do docente e aprendiz; payload determinístico exato falha sem alterar conhecimento. Venda bilateral de `field_drill` → treino pago/datado → força da coluna (E122); ensino → conhecimento → treino local → força após conclusão com save/load/auditoria (E137). E295 completa o recorte de migração material → instrução paga → conhecimento no destino → obra de irrigação → produção maior. E297 liga pesquisa paga → instrução da coluna → efeito em combate para `field_drill`. | E295–E297 são cenários preparados/API, não emergência natural nem provider real. As tecnologias restantes, árvore ampla, difusão natural e roubo de outras capacidades continuam incompletos. |
 | 3 — aplicação, operador, equipamento e manutenção | Research/Economy/Map/Force | existente | Metalurgia → forno → +98 ferro com Luna e owners (E22); cerco defensivo exige posição e provisões (E115); produção avançada cai sem trabalho/sítio (E116). Treino de campo por coluna exige técnica, decisão, ferramentas e três dias abastecidos; combate cita conclusão (E119). `field_logistics` só expande bagagem/provisões após treino (E120). Paliçada exige obra paga, altera resistência em cerco apenas enquanto operante e volta após reparo pago (E138). Em 25/09, `repair_started` propaga a decisão/affordance do mantenedor ao lado do receipt owner dos termos; teste focal de reparo, desgaste, serviços e campanha: `40 passed`. | Árvore tecnológica ampla e difusão aplicada permanecem parciais. As provas são fixtures; smokes naturais anteriores não validam este checkout. |
 | 4 — força, marcha, provisões e comando | `force.py`, `force_command.py`, `campaign_supply.py`, `garrison_policy.py` | existente | Mobilização e despacho reais com Luna, carga física e save/load (E18–E19); plano defensivo sobrevive à mobilização e reage à perda da coluna (E123). A mesma coluna marchou, recebeu frete real, cercou e permaneceu até a revisão do dia 31 em fixture abastecida (E126). Estoque baixo faz o cerco expirar sem ocupação (E127); fechamento físico de acesso também o interrompe (E130). Menu de defesa permite 10/40 dias com custo real; 30 dias de consumo/agenda preservam a coluna e elevam fadiga (E134), alterando perdas em combate posterior controlado (E135). A abertura do mundo possui pequenas coortes de ocupação militar dentro da população total, sem colunas ou salários gratuitos; as três instituições têm opções de mobilização após relatórios atuais (E139). Em 25/09, mobilização, preparo em posição, nomeação de comandante, doutrina e despacho/frete de campanha passam a carregar autoria material explícita; regressão focal com retirada e campanha persistente: `37 passed`. | Recrutamento por iniciativa de campanha e campanha natural longa ainda não foram provados; decisões de provider real não foram validadas neste checkout. |
 | 4 — recrutamento e reposição de pessoas | Society/Knowledge, `workforce.py`, `research.py`, `strategy_response.py`, `force.py` | existente | E142 compõe falta real de assistentes em pesquisa → oferta → decisão de grupo → conversão sem criar população. E144 compõe soldados comprometidos em outras colunas → plano defensivo sem força → falta tipada só com rota/ração/caixa válidos → escolha da instituição de convidar → escolha independente do grupo → bolsa/30 dias → nova decisão de mobilizar a coorte formada. Save/load e auditoria causal passam; `NO_ACTION` e ID forjado não criam oferta. | A prova de campanha é fixture com decisões injetadas, não escolha de provider real. Guarnição já permite rotação material; o roadmap não define efetivo-alvo para reposição após perdas, então não criar quota automática sem decisão de produto. O smoke natural curto não inclui esta pressão. |

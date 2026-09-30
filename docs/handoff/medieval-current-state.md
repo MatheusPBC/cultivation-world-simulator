@@ -1,5 +1,806 @@
 # Estado atual — Medieval World Simulator
 
+## Situação vigente — E336.e — 29/09/2026
+
+- Checkpoint de código local `5b4b5227` preserva 109 arquivos da integração
+  acumulada desde `3c6e590e`, incluindo os scripts reprodutíveis de navegador.
+  Não é release e não foi enviado ao remoto. Screenshots e estado transitório
+  do runner seguem preservados localmente, fora desse commit.
+- M0–M7 aceitos nos recortes controlados registrados; não equivale a emergência
+  natural ampla. M8 segue aberto para corpus real, três seeds/3.600 dias,
+  limites operacionais e publicação. Fingerprint de código: c13f4e (E336.b3).
+- E336.b2: UI 89 + build/type-check; backend A 162, B 194 antes dos dois erros
+  do verificador, revalidados com 17 testes. E336.b3: duas adesões Luna válidas,
+  terceiro caso falhou; budget/retries impede presumir saldo de consultas.
+- E336.c: backup local em tmpfs comparado aos originais, 1.882.079.288 bytes;
+  RAM é temporária, não backup remoto. Upload/remoção dos quatro diretórios
+  continuam aguardando autorização. Disco principal ~120 MiB, ainda
+  insuficiente para iniciar os gates longos com checkpoints.
+- Próxima tarefa única: resolver preflight de armazenamento e orçamento real,
+  então congelar o candidato e executar M8. Sem push, merge ou deploy.
+
+## Histórico de checkpoints — E334.b2 e anteriores
+
+- E334 fechado no recorte: navegador real percorreu Atlas → Pedraclara →
+  Hospício → oficiante → dossiê → why; cartões locais são filtrados/reutilizados.
+  15 UI e build/type-check passaram, browser sem page errors. Próximo M7/E335:
+  cenário composto M1–M6. M7/M8 abertos, sem conclusão de emergência natural.
+
+- E334.b1: build do checkout atual e navegador real local passaram. Dois smokes
+  existentes (personagem/dossiê/causa e save/load/continuação/pausa); rito real
+  preparado foi carregado pendente, concluiu no dia 10 com deltas navegáveis e
+  repetiu a conclusão após load/retomada. Zero page errors. Próximo E334.b2:
+  Atlas/local → rito → oficiante/dossiê/why. M7/M8 continuam abertos.
+
+- M7/E334.a: cargos/escopos/vigência, atividades e comando próprios projetados;
+  cargo não concede planos privados. Objetivos/planos em PT-BR; histórico não
+  corta fatos anteriores após carregar página. 21 Python, 8 UI, type-check e
+  diff-check passaram. Próximo E334.b navegador/retomada. M7/M8 abertos.
+  Disco local: cerca de 149 MiB livres, impeditivo operacional para saves/gates
+  grandes sem liberar/externalizar artefatos identificados e verificados.
+
+- M7/E333 fechou acompanhamento religioso/mágico em dossiê/why: adesão,
+  decisão própria, atividade/papel/datas/materiais previstos e resultado real
+  do rito. Oficiante não recebe conta/estoque/deltas privados do patrocinador;
+  Dao mantém custos completos pelo why. 11 testes Python, 9 UI, type-check e
+  diff-check passaram. Próximo E334: cargos/atividades/objetivos e preparação
+  browser. M7/M8 abertos; nenhum navegador, provider real ou smoke longo.
+
+- M7 em execução: dossiê agora projeta adesão própria com data, convites próprios
+  e escolha canônica registrada. why liga adesão a convite/decisão. 13 testes
+  Python, 8 UI, type-check e diff-check passaram; sem navegador/provider real.
+  Atividade/resultado do rito nos dossiês foi entregue em E333.2 acima;
+  E333 agregado fechado nesse recorte. M7/M8 continuam abertos.
+
+- M6 fechado por recortes controlados E329–E332. Ensino técnico pela ordem usa
+  técnica recebida, negociação/pagamento e dois consentimentos próprios; não
+  converte nem gera capacidade material. Ofertas/patrocínio de Aurora revalidados.
+- API/UI expõem ritos realmente executados e wards, separados de catálogo e
+  doutrina, com estágio/data e fontes de escolhas/efeito. 48 testes Python,
+  7 UI, type-check e diff-check passaram. Sem provider real, naturalidade ou
+  navegador. Próximo M7/E333: dossiês/why/navegação de cadeias reais. M8 aberto.
+
+- M6/E331 compôs assembleia negada → interrupção/reagentes perdidos → pressão
+  percebida por observadores existentes → grupo escolhe greve ou NO_ACTION →
+  governo escolhe liberar. Dossiê mantém fonte pública sem contrato/caster.
+  39 testes focados passaram; cenário preparado e turnos chamados com stub,
+  não emergência natural ou calendário autônomo completo. Próximo E332:
+  reconciliação de oferta/ensino/patrocínio e crença/fato na UI concluída em E332.
+
+- M6/E330 integrou convite religioso ao menu institucional mensal e adesão
+  aos turnos já existentes: personagem/coorte recebe oportunidade de decidir
+  amanhã, dentro da validade de sete dias. Coorte compara também trabalho,
+  alimentação, migração e opções cívicas. NO_ACTION não converte.
+- Dossiê/turno individual expõem só adesão própria e doutrina recebida/declarada;
+  memória da própria escolha aponta para seu fato causal. Sete módulos focados,
+  58 passed; cinco casos repetidos com contrafactual da doutrina. Provider stub,
+  sem IA real/emergência natural. Resposta social fechada no recorte E331 acima;
+  M6 segue aberto. Sem pausa solicitada; execução continua.
+
+- M6/E329 entregou o owner direto de convite/adesão, persistência e API/UI:
+  instituição convida localmente; personagem/coorte decide separadamente.
+  Membership/raça não produzem fé, coorte não converte personagens nomeados e
+  doutrina não altera física. Save corrente 84/Society 23/Knowledge 12.
+- Prova preparada/API: 47 testes Python, 1 projeção API repetida, 7 testes UI,
+  type-check e diff-check. Sem provider real/naturalidade. O recorte E330
+  integrou menus concorrentes, NO_ACTION e influência posterior.
+
+- M5 fechado por recortes controlados de restauração, proteção, elemental,
+  evocação e criaturas. E328 reconciliou cinco aceites e adicionou prova de
+  serpente → pedido → decisão independente institucional → tributo consumido →
+  memória → save/load (`1 passed in 1.06s`). Nenhuma emergência natural ou
+  provider real é declarada. Religião/adesão progrediu em E329–E331 acima.
+
+- E327 fechou anteparo evocado temporário: oferta/patrocínio independentes,
+  custos, quatro dias de trabalho, recuperação, observação, impacto único e
+  expiração em 12 dias. Sem população ou bens grátis. Corrigida colisão entre
+  interrupção militar e conclusão do rito no mesmo dia.
+- Verificação E327: oito módulos Python, `72 passed in 19.85s`; UI research,
+  `5 passed`; type-check e `git diff --check` passaram. Prova preparada/API e
+  provider stub, sem IA real ou ocorrência natural. Formato corrente: save 83,
+  Research 5 e Knowledge 11. E326/schema 82 abaixo é evidência histórica.
+- Próximo recorte único: M5/E328, revisão dos cinco aceites e composição com
+  criaturas (concluído abaixo). M6–M8 seguem abertos; sem commit/push/merge/deploy
+  nesta retomada.
+
+- M5/E326 concluiu conformação elemental local da Passagem Negra por um residente
+  qualificado e o mantenedor Auren: duas decisões próprias com informação datada,
+  seis dias, quatro reagentes, um cristal, dois artesãos pagos, integridade +0,10
+  no máximo e recuperação de três dias. Interdição, custo insuficiente,
+  observação antiga/ausente e reparo concorrente bloqueiam; negação militar
+  interrompe o efeito. Save schema 82/Research 4; UI traduz a escola Elemental.
+- Verificação focal E326: oito módulos de magia, decisão, persistência,
+  infraestrutura e conhecimento → `94 passed in 37.33s`; type-check passou.
+  Não houve consulta real de IA nem smoke longo; M5 continua aberto. Próximo
+  recorte único é E327 (evocação temporária); M6–M8 continuam pendentes.
+- Os registros M4/schema 81 abaixo são evidência histórica daquele recorte;
+  o formato corrente é schema 82. WIP local em `codex/medieval-remote`, HEAD
+  `3c6e590e`; sem commit/push/merge/deploy nesta retomada.
+
+- M4/E323.b concluído neste recorte: maturação de coortes usa 15 anos para
+  humanos, 25 para elfos, 20 para anões e 12 para orcs (360 dias/ano). Birth
+  receipt registra duração/data; `BirthCohort` persiste ambas; agenda move apenas
+  sobreviventes de `dependent` para `farmer`; Society schema 22 e save schema 81
+  rejeitam saves antigos, sem migração. API/Inspector mostram a idade de entrada
+  no trabalho.
+- Evidência focada: demografia + sociedade + persistência + migração,
+  excluindo a falha conhecida descrita abaixo, `63 passed, 1 deselected`; instrução
+  paga nos quatro povos `4 passed`; projeção API `1 passed`; dossier UI `6 passed`;
+  `npm run type-check` passou; `git diff --check` passou. E324.c usa chegada
+  preparada, enquanto a migração real é coberta separadamente em E324.b.
+- Uma falha reproduzível permanece em
+  `test_migration_provision_crossing_a_month_is_visible_to_resource_ledger`:
+  total de comida 76014 versus ledger esperado 76317. Ela também aparecia na
+  bateria anterior; sua autoria não foi isolada, ela não foi corrigida e ainda não foi
+  comparada a um baseline limpo. Não classificar o conjunto amplo como verde.
+- M4 fechou com a regressão M4 focal (`59 passed`); M5–M8 seguem abertos. E325
+  concluiu a auditoria read-only e E326 implementou o primeiro rito elemental.
+  Sem commit/push/merge/deploy.
+- Checkpoint anterior após E324.d: branch `codex/medieval-remote`, HEAD `3c6e590e`,
+  67 caminhos alterados, sem staging. WIP rastreado em
+  `/tmp/cws-medieval-e324d-20260929.patch` (SHA-256
+  `30b48be8fc1d0655559751ef94d8870ec4c8565d4dc3dce703afb913d3d48381`);
+  cinco arquivos não rastreados em
+  `/tmp/cws-medieval-e324d-untracked-20260929.tar.gz` (SHA-256
+  `c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`).
+  Cópias locais recuperáveis, sem commit ou publicação.
+- Checkpoint mais recente após E325: mesmo branch/HEAD e 67 caminhos alterados,
+  sem staging. WIP rastreado em `/tmp/cws-medieval-e325-20260929.patch`
+  (SHA-256 `4cb0ea6cc857c1b0225fec90f2e882315e0d1dbe2b1bfba1d51e6aa8e0a50e02`);
+  cinco untracked em `/tmp/cws-medieval-e325-untracked-20260929.tar.gz` (SHA-256
+  `c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`).
+  São snapshots locais recuperáveis, não commits nem artefatos de deploy.
+
+## Situação anterior — E324.b — 29/09/2026
+
+- Contrato ativo: M4, próximo recorte E323.b. M3 foi fechado em E320 após
+  reconciliar os cinco aceites com provas focadas (`27 passed` + `7 passed`);
+  trata-se de cenários controlados/provider mock, não de prova natural ou
+  provider real. E321 reconciliou este diário, a matriz e o contrato; E322
+  auditou identidade e E323.a removeu viés de composição por índice.
+- Branch `codex/medieval-remote`, HEAD `3c6e590e`. O checkout contém WIP amplo
+  anterior e alterações locais sem commit; esta rodada não os atribui todos a
+  este goal. Nenhum commit, push, merge ou deploy ocorreu.
+- Checkpoint reconciliado E321 do WIP rastreado: `/tmp/cws-medieval-e321-reconciled-20260929.patch`
+  (SHA-256 `a2e667ba7960f6e7ff545fd05119c2a16c6fff362e41c191f87af7e1f8967d2c`)
+  e não rastreados: `/tmp/cws-medieval-e321-reconciled-untracked-20260929.tar.gz`
+  (SHA-256 `c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`).
+  O patch contém o WIP rastreado e a reconciliação M0, antecedendo a auditoria
+  e os registros E322; não é commit nem representa código validado para deploy.
+- E314 corrigiu a autoria causal da recusa de carga por embargo e validou
+  transferência, tarifa, embargo e eventos aduaneiros nas superfícies atuais.
+  Regressão focada: 71 testes Python e quatro testes de Crônica.
+- Limites: fixture controlada, sem consulta externa/provider real, sem save real,
+  smoke natural ou gate longo. Dossier continua limitado ao conhecimento próprio
+  do ator; `why()` e Crônica são a visão global do Dao.
+- Snapshot E324.a do WIP rastreado: `/tmp/cws-medieval-e324a-20260929.patch`
+  (SHA-256 `a8b0dd176b41f7b7cc20af1677a4c5214e08eb15d8345bf1fcc25635b0bc2de2`)
+  e não rastreados: `/tmp/cws-medieval-e324a-untracked-20260929.tar.gz`
+  (SHA-256 `c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`).
+  O patch foi criado imediatamente antes desta referência ao próprio snapshot e
+  contém WIP herdado, código e evidência E324.a. É local/recuperável, não commit
+  nem prova para deploy. O snapshot E323.a-ui segue disponível em `/tmp`.
+
+## E305 — checkpoint recuperável após E304 — 29/09/2026
+
+- Antes de abrir o próximo recorte, confirmei branch `codex/medieval-remote`,
+  HEAD `3c6e590e`, 31 caminhos rastreados modificados e quatro arquivos
+  untracked. O trabalho acumulado não foi atribuído integralmente a este goal.
+- Snapshot local completo do WIP rastreado em
+  `/tmp/medieval-resume-e304-20260929.patch` (SHA-256
+  `36f83c2e0deb65316c5e1af0099b1fdaad8c249ffa0d5bcfaeaa424f40c1bd3e`); os
+  untracked foram preservados em
+  `/tmp/medieval-resume-e304-20260929-untracked.tar.gz` (SHA-256
+  `3a3e1d04b9113d236e208fcb779d57b72779aa8aa71b92c98d625f61444a8713`).
+  Snapshot apenas local, recuperável; sem commit, push, merge ou deploy.
+- Reconcilei o trecho “Próximo trabalho” do contrato, que ainda apontava E304,
+  e a matriz agora registra que E304 está concluído e E300 permanece aberto.
+  M3/E306 é o próximo recorte: carga de artilharia já despachada encontra rota
+  interrompida; verificar conservação sem teleportar/descartar nem aplicar tiro.
+- Limite da verificação M0: snapshot não é commit nem prova de estado remoto.
+  Nenhum save real foi carregado, alterado ou migrado.
+
+## E304 — produção paga até o tiro de cerco — 29/09/2026
+
+- A cadeia de E300 agora cruza os mesmos owners no mesmo mundo controlado:
+  produção paga de salitre/enxofre → pesquisa paga de pólvora → linhas pagas
+  de pólvora e artilharia → deltas no estoque de Escarlia → Freight por rota
+  e relatório atual do HQ → bagagem da coluna → investimento/cerco → tiro que
+  consome pólvora e altera `garrison_endurance`. Os dois lados materiais da
+  cadeia compartilham o mesmo proprietário. A prova segue os ancestrais
+  causais do stock e confirma que o tiro aponta para os receipts de chegada.
+- Nenhum equipamento é inserido como premissa. Carvão para a linha mineral é
+  uma premissa explícita da fixture; tropas já presentes e guarnição também são
+  premissas explícitas para isolar a cadeia de artilharia, não recrutamento ou
+  campanha emergente. Decisões são API; não houve provider real nem cenário
+  natural. `validate_history` e round-trip save/load passam no teste integrado.
+- Teste principal: `tests/test_medieval_industry.py::test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines`
+  → **1 passed**. Regressão de `tests/test_medieval_campaign_ordnance.py`
+  e `tests/test_medieval_siege_campaign.py` → **26 passed**. A execução dos
+  três módulos juntos (`industry`, `campaign_ordnance`, `siege_campaign`)
+  terminou com **31 passed, 6 failed**: os seis falham no helper antigo
+  `tests/test_medieval_industry.py::build`, que chama `start_expansion` com uma
+  decisão direta sem affordance/receipt atual. Não alterei esse caminho fora
+  do escopo E304; isso não é baseline comparado, portanto não classifico como
+  regressão nova nem como suíte verde.
+- `ruff check --select F` nos três módulos e `git diff --check` passaram após
+  a mudança. WIP permanece local e não commitado/enviado/implantado.
+- E304 fecha apenas a composição produção→campanha. E300 continua aberto para
+  rota interrompida/relatório stale durante transporte, deslocamento e
+  dissolução da bagagem, provider real quando disponível e contrafactual
+  pareado. Próxima tarefa material do contrato: fechar esses resíduos de E300,
+  sem saltar para outra vertical M3.
+
+## E303 — pré-posicionamento material de artilharia por Freight — 29/09/2026
+
+- O owner `campaign_ordnance` agora aceita dispatch para uma coluna atacante
+  presente no destino de sua mobilização, antes de `SettlementInvestment`.
+  Recompõe IDs a cada chamada, limita a um canhão/três cargas, usa o estoque
+  comum, conta parcels/capacidade pendentes e procura apenas rotas com relatório
+  atual do HQ. O Freight mantém sua própria execução e validação física.
+- A janela termina quando o investimento do assentamento fica ativo; assim,
+  quando o investimento fecha as entradas, a engine não abre um caminho mágico
+  para levar munição ao cerco. A mesma bagagem acompanha a força; o fluxo de
+  bombardeio continua consumindo uma pólvora e reduzindo endurance pelo owner
+  existente.
+- Fixture reproduzível: seed 211, atacante em Ferroalto preparado antes do
+  investimento, garrison existente e estrada Ponte Negro–Ferroalto observada
+  no dia corrente por `character:002` (HQ). Estoque de artilharia/pólvora é
+  `root_premise` explícita, não output de produção. A decisão despacha ambos
+  via Freight, os receipts apontam para o relatório; só após a entrega o ator
+  investe o assentamento, inicia o cerco e bombardeia. O controle negativo guarda
+  a opção antiga, investe (rota passa a capacidade 0) e confirma rejeição sem
+  alteração ao tentar executá-la. A cadeia registra decisões API/fatos e owners,
+  mas não é emergência natural nem provider real.
+- Teste de contrato: `test_ordnance_uses_known_freight_before_investment_then_fires_in_siege`
+  e `test_prepositioned_ordnance_option_expires_when_investment_closes_route`.
+  Adjacência executada: `CWS_DATA_DIR=/tmp/cws-e303-tests PYTHONPATH=.
+  .venv/bin/pytest -q tests/test_medieval_campaign_ordnance.py
+  tests/test_medieval_siege_campaign.py tests/test_medieval_campaign_supply.py`
+  → **36 passed in 20.80s**. `ruff check --select F` nos três módulos/testes e
+  `git diff --check` passaram; AST parse dos três arquivos Python passou.
+- Fingerprints SHA-256: `campaign_ordnance.py`
+  `334b5ce1bc80ffedbf8f79c9134061460de6fa5edd39eead0ec32bb766dff3c8`;
+  `test_medieval_campaign_ordnance.py`
+  `83976f08f6247de068000e9ee9b19beb41b7e89ce3a72648622ace893af289bc`;
+  `test_medieval_siege_campaign.py`
+  `a385dadd7f26d2f5082b8b4d84db5797707572c6df7390fb44c953aeba92dae4`.
+- Limites: o equipamento vem de uma premissa material da fixture; o teste de
+  produção paga E300 continua em mundo separado. Save/load permanece coberto no
+  teste anterior de bombardeio local, não por este novo caminho de Freight. Não
+  foi feita chamada provider real. Portanto E303 fecha apenas o recorte de
+  logística pré-investimento; E300 segue aberto e E304 é o próximo recorte.
+- Snapshot revisável após E303: `/tmp/medieval-e303-checkpoint-20260929.patch`
+  e `/tmp/medieval-e303-checkpoint-20260929-untracked.tar.gz`. SHA-256:
+  `6d8e2e0662810e5be74a6119cad0a35abf48ea6969a4271d702475167e9d3918` e
+  `3a3e1d04b9113d236e208fcb779d57b72779aa8aa71b92c98d625f61444a8713`.
+  É cópia local, sem commit/push/merge/deploy.
+
+## E302 — reconciliação read-only do bloqueio econômico M1 — 29/09/2026
+
+- Usei E281 como diagnóstico causal existente, não como novo smoke: ele seguiu
+  `household:{group_id}` → compra/subsistência, trabalho pago → salário,
+  contratos recorrentes, transições datadas, reserva militar, maturação de
+  dependentes e relief. O achado continua estrutural: coortes sem trabalho pago
+  não têm renda recorrente; `dependent` é agregado, sem guardião/parentesco; a
+  renda inicial é finita. Não é seguro inferir que adultos de mesma raça/cidade
+  sustentem dependentes.
+- Rebase read-only no checkout atual: `git diff HEAD --` dos owners
+  `consumption`, `labor`, `permanent_employment`, `workforce`, `demography`,
+  `relief`, `opening_income`, `production_priority` e `family_loans` está vazio.
+  A única mudança adjacente observada é E298 em `economy.consume_monthly`:
+  deterioração causal do excedente de alimento público. Isso reduz estoque
+  excedente; não cria salário/renda nem muda elegibilidade de coortes.
+- E269–E274 descartaram contratar via realocação como solução geral e E274.b
+  não mostrou melhoria sustentada do empréstimo para folha. E282 demonstra uma
+  resposta controlada de relief por seis ciclos, não adoção natural; por isso
+  M1 está aceito apenas no cenário preparado e Gate B natural permanece em M8.
+- Salva da trilha econômica foram produzidos antes do schema 80 e não foram
+  carregados nem migrados. Nenhuma métrica nova de trajetória atual é afirmada.
+  Não fiz mudança de regra, balanceamento ou transferência automática. Revisão
+  read-only de código/documentos; sem suíte de testes nesta etapa.
+- Conclusão para a sequência: não há correção local de `payroll_funds` que
+  resolva a falta de renda das coortes dependentes sem novo vínculo causal
+  explícito. O diagnóstico está fechado; não abrir agora um modelo de família
+  especulativo. M3/E304 volta a ser a próxima tarefa material prevista no
+  contrato, mantendo o Gate B natural para validação M8.
+
+## E301 — checkpoint e reconciliação M0 — 29/09/2026
+
+- Antes de editar, confirmei branch `codex/medieval-remote`, HEAD `3c6e590e`
+  (`test: conserve troops in medieval campaign fixtures`) e 35 caminhos locais
+  alterados/não rastreados: 31 rastreados e quatro novos. Não atribuo esse WIP
+  inteiro a E301 nem o reescrevi.
+- Snapshot recuperável em `/tmp/medieval-resume-20260929.patch` (diff binário
+  do HEAD) e `/tmp/medieval-resume-20260929-untracked.tar.gz` (arquivos não
+  rastreados). SHA-256: patch
+  `77a254256c745aaa844315d18902a9c239b0cfa935a229680c81ce4d044d8b56`;
+  arquivo de não rastreados
+  `1e1dc172a2bd459354a91bc2c8a7a714e0606b1b9d7c427f9cc2d4c92a8dcc80`.
+  O snapshot é local e reversível; não foi commitado, enviado ou aplicado a
+  nenhum ambiente externo.
+- Contrato, matriz e este diário agora concordam: E300 é parcial; teste integrado
+  de produção→rota→coluna, rota obsoleta/interrompida, decisão/provider e
+  contrafactual continuam faltando. O save schema é 80, Economy 20, Knowledge
+  10. A última validação E300 documentada (35 testes) pertence ao checkpoint
+  descrito abaixo e não foi repetida ainda neste checkout.
+- O M0 anterior E286 cobria apenas o estado limpo daquele momento. E301 atualiza
+  o checkpoint e reconcilia a próxima ordem; o WIP original permanece intacto.
+  Não consultei upstream e não afirmo paridade remota.
+- Próxima tarefa registrada antes de executá-la: M1/E302, diagnóstico causal
+  da adaptação econômica natural com foco em caixa/folha/renda, sem balancear
+  nem adicionar mecanismo antes de localizar o bloqueio atual.
+
+## E300 parcial — cadeia material de pólvora/artilharia — 29/09/2026
+
+- O inventário E299 agora tem uma implementação delimitada sobre os owners
+  existentes: o mapa dá `volatile_mineral_extraction` à mina de Ferroalto;
+  Economy declara salitre, enxofre, pólvora e peça, além de receitas/linhas
+  separadas; `gunpowder` exige a pesquisa paga correspondente. O save schema foi
+  elevado de 79 para 80 porque catálogo e mapa mudaram. Economy permanece schema
+  20; saves antigos continuam rejeitados sem migração.
+- `campaign_ordnance.py` recompõe opções transitórias para remeter peça/munição
+  via Freight comum até a bagagem co-localizada e para bombardear cerco ativo.
+  A autoridade, pesquisa, estoque, capacidade e decisão são revalidados no
+  owner; o disparo usa `execute_material`, consome uma pólvora, conserva a peça
+  e reduz `garrison_endurance` em até 2. Brecha só ocorre ao chegar a zero e usa
+  o owner existente de colapso de guarnição. A bagagem só pode se mover com a
+  coluna se estiver vazia ou contiver apenas esse equipamento; não se adicionou
+  estado redundante à força/cerco.
+- Prova de produção preparada: `tests/test_medieval_industry.py::test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines`
+  percorre pesquisa paga de metalurgia → obra paga da linha mineral → produção
+  de salitre/enxofre → pesquisa paga de pólvora → obras pagas do moinho e
+  fundição → produção de pólvora e artilharia. `validate_history` e save/load
+  passaram. A premissa de carvão é explicitamente `root_premise`; o cenário
+  inicia com estoques preparados e decisões API.
+- Prova de combate preparada:
+  `tests/test_medieval_campaign_ordnance.py` verifica que a opção não aparece
+  sem tecnologia/equipamento, a peça chega por uma ordem Freight (sem rota,
+  pois fonte e bagagem já estão no mesmo assentamento), pólvora só é oferecida
+  após a peça chegar, o tiro consome munição e reduz endurance, e uma escolha
+  stale não publica mutação. O save round-trip passa. A tech e o estoque deste
+  teste são premissas de cenário, não resultado do teste de produção.
+- Validação focada final — campanha de cerco + suprimento comum + os dois testes
+  de E300: `CWS_DATA_DIR=/tmp/cws-e300-final PYTHONPATH=. .venv/bin/python
+  -m pytest -q tests/test_medieval_campaign_ordnance.py
+  tests/test_medieval_industry.py::test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines
+  tests/test_medieval_siege_campaign.py tests/test_medieval_campaign_supply.py`
+  — **35 passed in 22.21s**. `ruff check --select F` nos módulos/testes
+  tocados passou; AST parse dos seis arquivos Python, JSON dos três catálogos e
+  `git diff --check` passaram. O Ruff completo ao incluir `test_medieval_industry.py`
+  também aponta E701/E702 antigos em outras linhas desse arquivo; não foram
+  reformatados neste recorte.
+- A execução mais ampla também incluiu
+  `tests/test_medieval_industry.py` e teve falhas no helper antigo de expansão,
+  que chama `start_expansion` sem affordance atual/decisão de ator; isso não foi
+  tratado como prova E300 nem corrigido afrouxando o owner. `git diff --check`,
+  parsing JSON e o recorte de Ruff acima foram repetidos após o ajuste final.
+- E300 permanece aberto: produção e cerco ainda são dois cenários separados;
+  falta ligar produto da linha ao atacante por rota conhecida, testar rota
+  interrompida/relatório obsoleto, movimento/dissolução da bagagem, prova
+  pareada no mesmo cenário e integração com menu/provider real quando
+  disponível. Nenhuma consulta real ao provider foi feita neste checkpoint.
+- Próximo: consolidar essas lacunas de E300 antes de abrir outra vertical de
+  M3. Não rodar o gate longo, não fazer commit/push/deploy sem pedido.
+
+## E299 — inventário da ligação de pólvora/artilharia — 29/09/2026
+
+- Revisão local: HEAD `3c6e590e` (`codex/medieval-remote`), com WIP E286–E298
+  já presente e preservado; este recorte não alterou código nem os artefatos de
+  E298. Verificação do catálogo (`static/game_configs/medieval/economy.json`)
+  encontrou recursos `sulfur`/`saltpeter`, porém nenhuma receita/facility que os
+  produza; não há recursos `gunpowder`/`artillery`, receita de munição/peça ou
+  technology ID correspondente. Portanto, a cadeia não existe ainda.
+- Consumidor fixado antes de implementação: `SiegeCampaign.garrison_endurance`,
+  que o owner `resolve_siege_campaigns` reduz sob pressão diária. A futura ação
+  do ator será um bombardeio escolhido para uma campanha ativa; deve consumir
+  pólvora do estoque físico carregado pela coluna, manter a peça no estoque e
+  reduzir a endurance em incremento limitado, sem substituir a mecânica de cerco
+  existente nem encerrar/ocupar automaticamente.
+- Evidência de co-localização: `campaign_supply.ensure_campaign_stock` cria um
+  `Stock` real junto à coluna. A bagagem aceita mercadorias pelo modelo de
+  `Stock`, mas o loader atual (`load_campaign_baggage`) só carrega `food` e o
+  despacho institucional de campanha também é específico para alimento. Assim,
+  a rota de logística de artilharia ainda requer affordance/execução que mande
+  peças e munição para a bagagem por frete comum; não se pode assumir carga
+  transportada só porque o item foi produzido.
+- Cadeia E300 registrada: extração paga de salitre/enxofre em instalação mineira
+  existente → pesquisa custeada de pólvora → produção paga de munição e peça via
+  receitas/linhas de produção → decisão de despacho por rotas/relatórios atuais
+  para bagagem de coluna → affordance atual de bombardeio → consumo de pólvora e
+  delta de `garrison_endurance`. O teste pareado deve diferir somente pela
+  decisão/material de artilharia: sem tecnologia, equipamento ou pólvora não há
+  affordance nem delta; no ramo armado, a peça permanece, a pólvora diminui e o
+  cerco apresenta endurance menor. Cobrir links causais, rejeição/rollback e
+  save/load. Reusar Economy, Freight, Knowledge/Research, campaign stock e
+  SiegeCampaign; nenhum estado de bateria duplicado em `SiegeCampaign`.
+- Verificação deste inventário: busca focal em `economy.json`, `research.json`,
+  `src/classes/society/force.py`, `src/sim/medieval/{siege_campaign,campaign_supply}.py`
+  e `tests/test_medieval_siege_campaign.py`; somente leitura, sem smoke ou
+  suíte executados porque não houve mudança funcional; `git diff --check`
+  passou. SHA-256 da base inspecionada: `economy.json`
+  `32c2f3e562ec4658f72d80de3f366adba954361b93d581716c4205f825d3a8f0`,
+  `research.json` `b65d593f040e9a6b586c3a8d5e7f6ff128bd31a8f7495aefc32f170ed66c0117`,
+  `force.py` `7c7002f7acaa140c0391d1085d2750516a32753825860ea094a4f6aa991d5e6c`,
+  `siege_campaign.py` `7e9006a72536ebb9286225b8ba538fb11f9f3c23f549e1bb1672cb741b0f1480`,
+  `campaign_supply.py` `1ce4f05fd5a43cb0b4df8d0d0c01051234820b904f6deb5ffda25472414fd4d3`,
+  teste de cerco `c382422ae952c6b5a8720ccc122070cd2f27fb46acc1f58001db05e2cbda6ced`.
+  Limitação: E299 é mapa arquitetural reproduzível, não prova de artilharia
+  existente; próximo é E300.
+
+## E298 — conservação física de alimento público — 29/09/2026
+
+- Tecnologia `food_preservation` agora pode ser pesquisada pelo caminho pago
+  existente. Após decisão de financiamento, pesquisadora distinta aceita a
+  affordance vigente; seis ciclos pagam madeira, ferramentas e salários antes
+  de registrar conhecimento. Esse conhecimento habilita obra paga de uma casa
+  de defumação no Map; proprietário é explicitamente o mantenedor.
+- O ciclo de consumo deteriora deterministicamente 5‰ (0,5%) apenas do estoque
+  público acima da necessidade alimentar corrente e da capacidade de proteção.
+  Estoque necessário ao ciclo não apodrece; privado e carga em trânsito não são
+  tocados. Uma instalação íntegra protege 2.000 rações por capacidade física,
+  quantizada pela integridade; dano reduz proteção e reparo material pago a
+  recompõe. Cada perda tem deltas e aponta para os fatos de estoque/necessidade/
+  instalação, ou premissa explícita de geração quando não há receipt anterior.
+- O contrafactual controlado com 50.000 rações no mesmo assentamento perdeu 238
+  sem instalação e 228 com a instalação íntegra. Após dano à metade, perdeu
+  231; depois de cinco lotes de reparo pago, a capacidade voltou a 2.000 e uma
+  perda posterior foi menor que 231. Nenhum cálculo dependeu de prosa.
+- O teste também prova reserva corrente sem perda, rollback atômico de falha
+  injetada na abertura da obra, validação de histórico, conservação material e
+  round-trip do save. Corrigi a saturação numérica do repair owner para que
+  cinco incrementos de 10% alcancem integridade exatamente 1.0.
+- Verificação reproduzível — regressão focal de economia, consumo, pesquisa,
+  obra e reparo:
+
+  ```bash
+  CWS_DATA_DIR=/tmp/cws-e298-final PYTHONPATH=. .venv/bin/python -m pytest -q \
+    tests/test_medieval_food_preservation.py \
+    tests/test_medieval_site_construction.py \
+    tests/test_medieval_infrastructure.py tests/test_medieval_research.py \
+    tests/test_medieval_consumption.py tests/test_medieval_economy.py
+  ```
+
+  Resultado: **107 passed in 85.41s**. `git diff --check` e parsing dos dois
+  catálogos JSON também passaram. SHA-256 do módulo:
+  `6e5ef906fb304846a4398f814e115f9ccdf3e0e08499222f29648df38e23b738`;
+  SHA-256 do teste E298:
+  `960d89742d9c37ce38f9f2a48dee160466caef14e6afd1aa84c7bbf7ee7c26eb`.
+- Limite: cenário preparado com decisões API, não provider real nem surgimento
+  natural. A taxa/capacidade são leis V1 limitadas e ainda não foram calibradas
+  em smokes longos; dano foi preparado como fato material para exercitar o
+  reparo. E298 fecha apenas essa capacidade do M3, não conservação em domicílios,
+  cargas, migração ou armazenamento abaixo da reserva.
+- Próximo: implementar E300, o caminho material de pólvora e artilharia
+  delimitado em E299; manter conservação alimentar fora das áreas já aceitas e
+  não abrir outro sistema.
+
+## E297 — pesquisa, instrução e efeito de combate de exercício de campo — 29/09/2026
+
+- No cenário controlado, Auren escolhe a affordance corrente para financiar
+  `field_drill`; uma pesquisadora distinta aceita a oferta atual. O owner conclui
+  seis ciclos, paga ferramentas e salários e só então registra conhecimento por
+  pesquisa. A coluna não ganha força com conhecimento institucional sozinho.
+- Com a técnica conhecida, o ator escolhe treinamento material da coluna:
+  ferramentas são consumidas, a coluna permanece abastecida por três dias e o
+  owner registra a conclusão. A força derivada aumenta apenas depois disso; a
+  resolução de combate posterior aponta para a conclusão do treino e para a
+  descoberta. Save/load e auditoria causal passam.
+- Verificação reproduzível: `CWS_DATA_DIR=/tmp/cws-e297-field-drill-regression
+  PYTHONPATH=. .venv/bin/python -m pytest -q tests/test_medieval_force_training.py
+  tests/test_medieval_research.py` — **29 passed in 6.66s**. SHA-256 do diff
+  de `tests/test_medieval_force_training.py`:
+  `7ae96b3ef0d68f73ab07a4ced9274b9203face556ca6223b5272c8ca9a26f91d`;
+  HEAD-base `3c6e590e`.
+- Limite: decisões pela API em fixture controlada. Durante os seis avanços de
+  pesquisa, a fixture declara uma janela até o próximo upkeep diário da coluna;
+  depois a upkeep real consome suas rações durante os três dias de treino. Não
+  prova provider real, surgimento natural ou integração de `hold`/`press` com
+  pesquisa. Fecha somente a ligação `field_drill` → aplicação militar de campo;
+  M3 segue aberto.
+- M3 continua aberto: E298 fecha somente a conservação pública limitada;
+  provider real, ocorrência natural e calibração em horizonte longo não foram
+  provados.
+
+## E296 — roubo de tecnologia habilita produção material local — 29/09/2026
+
+- Em cenário preparado, Escarlia mantém uma linha de carvão operante e
+  observável. Antes de obter `metallurgy`, Auren tenta aplicar fornos eficientes;
+  o owner rejeita por falta de conhecimento sem alterar o snapshot. Com agente,
+  sighting, observação datada e operação-fonte válidos, Auren escolhe a
+  affordance atual de roubo e recebe somente o fato canônico da técnica.
+- A linha própria de ferro já opera pela receita-base. Depois do roubo, o menu
+  libera `efficient-furnaces`; decisão por ID e receipt do owner iniciam a obra.
+  Construção consome madeira, ferramentas e folha; ao concluir, troca a receita.
+  A produção seguinte usa `efficient_ironworking`, aumenta o estoque de ferro e
+  aponta ao receipt de conclusão. Não há alteração da linha-fonte.
+- Verificação: `CWS_DATA_DIR=/tmp/cws-e296-final .venv/bin/pytest -q
+  --tb=short tests/test_medieval_technology_theft.py` — **7 passed in 1.83s**.
+  Limite: fixture controlada e escolhas via API, não provider real ou roubo
+  emergindo naturalmente. Isto fecha apenas esta ligação de aplicação; M3 segue
+  aberto para as tecnologias e cadeias restantes.
+- Próximo recorte: fechar uma capacidade nominal ainda sem consumidor/prova,
+  priorizando a lista explícita de M3; não abrir outro marco até M3 avançar.
+
+## E295 — migração real leva conhecimento até aplicação produtiva — 29/09/2026
+
+- Fechado um recorte verificável do M3: um especialista com conhecimento
+  institucional prévio migra pelo owner de migração e rotas/relatórios datados
+  para Salgueiro; a chegada material habilita sua affordance de instrução. A
+  instituição de destino decide patrocinar, paga o aprendiz e só aprende a
+  técnica após o prazo. A instituição de origem mantém seu conhecimento.
+- Com conhecimento local, local capaz, insumos, trabalhadores e tesouro, a
+  affordance de irrigação aparece. A escolha do ator registra somente o ID; o
+  owner revalida termos e a construção consome madeira, ferramentas e trabalho
+  pago. A instalação troca para `irrigated_harvest`; a produção seguinte gera
+  mais alimento e aponta ao receipt que concluiu a obra.
+- O teste usa cenário preparado e API para escolhas, mas a migração, instrução,
+  aprendizagem, obra e produção são executadas pelos owners existentes. Não é
+  emergência natural, provider real ou fechamento de toda tecnologia/difusão.
+- Verificação: `CWS_DATA_DIR=/tmp/cws-e295-focused .venv/bin/pytest -q
+  --tb=short tests/test_medieval_apprenticeship.py
+  tests/test_medieval_migration.py::test_arrival_transfers_observed_social_pressure_without_erasing_its_cause`
+  — **10 passed in 2.69s**; `git diff --check` passou.
+- Próximo recorte: ligar roubo de conhecimento a aplicação material, ou fechar
+  uma tecnologia nominal ainda sem consumidor/prova. M3 segue aberto; M4–M8
+  também.
+
+## E294 — composição final do M2, campanha, criatura, sociedade e retirada bilateral — 29/09/2026
+
+- A trajetória integrada derivada de E139 executa o cenário preparado sem
+  decisões ou resultados injetados após `start_day`. No ramo da criatura, o
+  fechamento da rota atrasa carga; a informação local alimenta a revisão do QG
+  e do comandante, a coluna não captura Portovelho e a falta alimentar/saúde
+  termina pior que no controle com rota aberta. No controle, o mesmo plano e a
+  mesma coluna chegam à operação, ocupam a cidade, estabelecem guarnição com
+  ao menos três dias de folha paga e depois o ocupante propõe cessar-fogo. Escarlia
+  aceita; as duas instituições cumprem obrigações e cada coluna inicia sua
+  retirada por decisão própria. Ocupação termina sem alterar o administrador.
+- O provider stub escolhe por papel, rótulos das opções correntes e duração
+  factual da guarnição; não lê IDs nem contador. `garrison_policy` e a revisão
+  de contato agora apresentam `started_day/days_active` da duty canônica; o
+  recibo da guarnição entra nas causas da consulta do ator. O limiar usado pelo
+  cenário é três dias, alinhado ao mínimo de manutenção já coberto em E291.
+- A integração também encontrou um lifecycle válido que a validação rejeitava:
+  uma coluna pode abandonar preparo e decidir preparar de novo, preservando o
+  mesmo ID da posição e dois fatos imutáveis de início. `Society.validate`
+  passa a verificar a preparação mais recente que ancora a posição atual,
+  mantendo as tentativas anteriores no ledger.
+- O save de ambos os ramos recarrega com snapshot idêntico. No controle, `why()`
+  navega da retirada da defensora à decisão e ao cumprimento do commitment. A
+  auditoria causal dos dois saves retorna `ok=true`.
+- Regressão de campanha, cerco, contato, comando, conhecimento de rota,
+  suprimento, guarnição e força: **98 testes passaram em 74.33s** no namespace
+  isolado `/tmp/cws-e294-final-confirm`, usando os dez módulos
+  `test_medieval_campaign_creature_interference`, `test_medieval_siege_campaign`,
+  `test_medieval_force_contact`, `test_medieval_force_contact_sighting`,
+  `test_medieval_strategy_response`, `test_medieval_force_command`,
+  `test_medieval_route_knowledge`, `test_medieval_campaign_supply`,
+  `test_medieval_garrison_policy` e `test_medieval_force`. Depois foram
+  reforçadas asserções para exigir escolhas pós-início de política e ator
+  `character`; o teste integrado voltou a passar (`1 passed in 14.32s`).
+  `git diff --check` passou após essa alteração.
+- Limite: fixture controlada e provider stub, não emergência natural, provider
+  real ou prova de horizonte longo. M2 fecha a vertical controlada contratada;
+  M1 ainda não tem Gate B natural, e M3–M8 seguem abertos.
+
+## E293 — retirada encerra guarnição ativa atomicamente — 28/09/2026
+
+- Base: HEAD `3c6e590e`; SHA-256 do diff de código/teste desta borda:
+  `ca4923c13a0be5cffb4940f6d241d113f71a7a699eb6b9f3539e7001d2203f10`.
+- Um cenário preparado reproduziu a borda de campanha: após brecha e ocupação,
+  a mesma coluna atacante inicia uma guarnição ativa; ambas as partes aceitam
+  retirada mútua, mas o executor antes tentava mover o destacamento deixando a
+  guarnição ativa. `Society.validate` rejeitava corretamente esse estado
+  inconsistente. O owner de retirada agora encerra a duty ativa usando a decisão
+  corrente dentro do mesmo candidato, revoga o investimento, limpa ocupação ao
+  iniciar movimento e inclui o receipt de retirada da guarnição na causalidade
+  do encerramento do cerco. A defensora colapsada continua presente até decidir
+  e executar sua própria saída após a rota ser liberada.
+- O teste confirma: garrison atacante `withdrawn`, garrison defensora continua
+  `collapsed`, ambas as obrigações cumpridas, cada evento de movimento causado
+  por sua decisão própria, administrador preservado e ocupação limpa apenas
+  pela saída física. Save/load, comparação do snapshot e auditoria causal passam.
+- Verificação focada, namespace isolado `/tmp/cws-e293-existing`:
+  `CWS_DATA_DIR=/tmp/cws-e293-existing PYTHONPATH=. .venv/bin/python -m pytest
+  -q --tb=short --show-capture=no tests/test_medieval_siege_campaign.py
+  tests/test_medieval_force_contact.py tests/test_medieval_force_contact_sighting.py
+  tests/test_medieval_campaign_creature_interference.py
+  tests/test_medieval_strategy_response.py tests/test_medieval_force_command.py
+  tests/test_medieval_route_knowledge.py tests/test_medieval_campaign_supply.py
+  tests/test_medieval_garrison_policy.py tests/test_medieval_force.py` —
+  `98 passed in 64.71s`; `git diff --check` passou.
+- Limite: fixture preparada com decisões API explícitas para exercitar essa
+  combinação de owners. E292 prova o menu de provider stub para trégua; E293
+  não é provider real nem ocorrência natural e não fecha o cenário M2 integrado.
+
+## E292 — cessar-fogo mútuo no turno atual de contato — 28/09/2026
+
+- Base: HEAD `3c6e590e`; diff WIP cumulativo dos arquivos de campanha/contato e
+  testes focalizados: SHA-256 `3f27927bbbbf3efa3bca3744496c5fb8744a0f2f21e19b8c037ae449961b40f7`.
+- O turno físico agora recompõe opções de propor/aceitar cessar-fogo e cumprir
+  ou reparar retirada bilateral junto às demais escolhas de contato. Início,
+  progresso, brecha, proposta, aceite e cumprimento reabrem revisões datadas
+  para os participantes presentes. A proposta fica aberta por três dias; o
+  prazo material fica depois da janela e da duração de retirada. A mesma
+  obrigação pode ser oferecida por instituição após breach, e uma guarnição
+  colapsada não apaga a coluna defensora que ainda está fisicamente presente.
+- No teste integrado pelo `MedievalSimulator`, o stub escolhe somente rótulos
+  das opções atuais e usa a fase recebida no contexto do ator: Auren propõe,
+  Escarlia aceita, a brecha ocorre, Auren cumpre primeiro e remove o
+  investimento pelo owner; só então a coluna defensora ainda presente cumpre
+  sua própria retirada. O evento de cada movimento aponta à decisão de seu
+  próprio ator. O assentamento fica sem ocupante, mas continua administrado por
+  Escarlia. Nenhuma decisão material é injetada após o início da campanha.
+- O caminho de retirada do atacante aceita relatório de destino observado nos
+  últimos 30 dias (e ainda revalida rota e capacidade no owner), em vez de
+  exigir que um relatório local seja do mesmo dia; sem isso, o menu do turno
+  atual ficava vazio no dia seguinte à observação legítima.
+- Verificação reproduzível, namespace isolado
+  `/tmp/cws-e292-existing`:
+  `CWS_DATA_DIR=/tmp/cws-e292-existing PYTHONPATH=. .venv/bin/python -m pytest
+  -q --tb=short --show-capture=no tests/test_medieval_siege_campaign.py
+  tests/test_medieval_force_contact.py tests/test_medieval_force_contact_sighting.py
+  tests/test_medieval_campaign_creature_interference.py
+  tests/test_medieval_strategy_response.py tests/test_medieval_force_command.py
+  tests/test_medieval_route_knowledge.py tests/test_medieval_campaign_supply.py
+  tests/test_medieval_garrison_policy.py tests/test_medieval_force.py` —
+  `97 passed in 63.10s`. O teste integrado também salva/recarrega o mundo,
+  compara snapshots e passa `tools.medieval_causal_audit.audit`; `git diff
+  --check` passou.
+- Limite: cenário de campanha preparado e provider stub, não uma campanha
+  emergindo naturalmente nem provider real. E292 fecha esta fatia bilateral,
+  não o M2 completo; persistem as lacunas de campanha natural e composição
+  multissistema já anotadas abaixo.
+
+## E291 — ocupação reabre decisão de guarnição e manutenção material — 28/09/2026
+
+- Fingerprint-base: HEAD `3c6e590e` (E287–E291 continuam WIP sem commit); SHA-256
+  do teste de campanha:
+  `8a954cc11b772be951952eb59dba086ff2ab567b0f7d4540a3c0055db5e9a985`.
+- Depois da ocupação canônica de E290, o owner agenda uma nova revisão do
+  destacamento para o dia seguinte. O provider stub escolhe da opção corrente
+  uma guarnição de ocupação separada; `establish_garrison` revalida comando,
+  ocupante, provisões e tesouro. A mesma coluna permanece presente e registra
+  pelo menos três `garrison_maintained` com débito do tesouro e crédito salarial
+  correspondente. Quando as rações efetivamente chegam a zero, a guarnição
+  encerra e o owner registra a remoção do ocupante (`garrison_lapsed`, dia 57).
+  O ramo sem rota operacional não ocupa nem cria essa guarnição.
+- Verificações: teste focal → `1 passed in 7.70s`; regressões de campanha,
+  cerco, guarnição, força, suprimento, rotas e estratégia → `97 passed in
+  65.27s`. Save/load e auditoria causal rodam no final dos dois ramos. Dados
+  isolados em `/tmp/cws-m2-e291-integrated` e `/tmp/cws-m2-e291-final`;
+  `git diff --check` passou após a atualização documental.
+- Limite: são três recibos diários antes do esgotamento, não prova de sustentação
+  por vários meses. Não cobre saída política bilateral nem uma campanha natural;
+  M2 permanece aberto.
+
+## E290 — operação de cerco e decisão de ocupação no cenário de E289 — 28/09/2026
+
+- Fingerprint-base: HEAD `3c6e590e` (WIP não commitado); SHA-256 do diff do
+  teste de campanha após E290:
+  `fd6b8c05ddd8d5933b214cc77eab9636930e1f3449d7ceb2d16163d0da2683b6`.
+- Continuação controlada de E289: depois do contato, a mesma coluna recebe
+  turnos reabertos por postura/preparo e por carregamento de provisões. O
+  comandante observa somente rotas adjacentes ao assentamento e a decisão usa
+  recibos de observação recentes. A coluna prepara posição, investe, inicia o
+  cerco, rompe a defesa e escolhe ocupar a partir do menu atual; o owner registra
+  a mudança material de `occupier_id`. No ramo bloqueado, a estrada fechada impede
+  investimento/cerco/ocupação; no controle pareado sem bloqueio, a cadeia chega
+  à ocupação. Não há decisão nem resultado injetado pela fixture após o início.
+- Verificações: teste focal E290 → `1 passed in 6.64s`; módulo inteiro
+  `tests/test_medieval_campaign_creature_interference.py` → `3 passed in 13.30s`;
+  regressões diretamente afetadas (`strategy_response`, `force_command`,
+  `route_knowledge`, `campaign_supply`, `siege_campaign`,
+  `persistent_campaign_chain`) → `83 passed in 46.55s`. Os dois ramos do focal
+  passaram por save/load equivalente e auditoria causal. `git diff --check`
+  passou antes desta atualização documental. Dados isolados em
+  `/tmp/cws-m2-e290-resume`, `/tmp/cws-m2-e290-module` e
+  `/tmp/cws-m2-e290-regressions`.
+- Limite: cenário inicial preparado e provider stub; não prova emergência
+  natural nem provider real. Não inclui guarnição pós-vitória mantida por vários
+  ciclos, saída política bilateral, nem fecha M2. A captura foi observada como
+  transição canônica no momento em que o owner a aplicou; este recorte não mede
+  sua sustentação posterior.
+
+## E289 — coluna alcança defesa física sob interferência do drake — 28/09/2026
+
+- Fingerprint: HEAD `3c6e590e`; SHA-256 do diff de
+  `tests/test_medieval_campaign_creature_interference.py`:
+  `346a9fde32f1227006a0d6310ce067269fbf6678bc39778f75aab3ae05c15349`.
+- O novo teste prepara em Portovelho uma coorte de soldados já existente, uma
+  coluna defensora e estoque/tesouro declarados como premissa do cenário; a
+  obrigação de guarnição é aberta depois por `garrison_options` e pelo owner
+  `establish_garrison`, com decisão válida e revalidação. Não altera headcount.
+- Depois da linha de início, o engine/provider stub escolhe só opções correntes
+  por papel e rótulo: demanda/restrição do drake, resposta política, mobilização,
+  reroute pela leitura atual e nomeação de comandante. A mesma coluna encontra
+  a guarnição no destino; o aviso de contato aponta causalmente para a chegada.
+  No controle pareado, sem a restrição do drake, a chegada ocorre antes.
+- A guarnição continua ativa e registra ao menos três pagamentos reais de
+  manutenção. Os dois ramos passam por save/load equivalente e auditoria causal.
+  Verificação final após afirmar conservação de população: cadeia adjacente
+  `tests/test_medieval_campaign_creature_interference.py`,
+  `tests/test_medieval_persistent_campaign_chain.py` e
+  `tests/test_medieval_garrison_policy.py` → `11 passed in 18.81s`;
+  `git diff --check` passou. Dados temporários isolados em
+  `/tmp/cws-m2-e289-focused-20260928`.
+- Limite: prova cenário preparado e stub, não combate/cerco/captura, guarnição
+  ocupante após vitória ou saída política bilateral na mesma trajetória. M2
+  continua aberto.
+
+## E288 — recorte controlado de interferência da criatura na campanha — 28/09/2026
+
+- Revalidado no checkout com HEAD `3c6e590e` e WIP E287 preservado: o teste
+  `tests/test_medieval_campaign_creature_interference.py::test_prepared_crisis_runs_actor_choices_without_post_start_injection`
+  passou (`1 passed in 3.33s`), com `CWS_DATA_DIR` isolado em
+  `/tmp/cws-m2-e288-20260928`.
+- A fixture prepara demanda do drake, ocupação observada, plano defensivo,
+  compra física e comandante antes da linha de início. Depois dela, o
+  `MedievalSimulator` e o provider stub selecionam apenas entre opções atuais;
+  o stub lê papel do ator e rótulos canônicos, sem escolher por ID/prefixo ou
+  contador. A restrição fecha uma rota; a mesma coluna é retida, a carga atrasa,
+  comandante e QG fazem revisões independentes e o efeito chega à subsistência
+  civil. O clone sem restrição progride mais pela rota.
+- O cenário também preserva relações causais consultáveis por `why()`, save/load
+  equivalente e auditoria causal sem erros. Esta é evidência de cenário
+  preparado e provider stub, não ocorrência natural nem provider real.
+- Limite: ainda não continua a mesma coluna por operação ofensiva, ocupação
+  mantida com guarnição efetivamente paga em ciclos sucessivos e saída bilateral.
+  Portanto não fecha M2; essa composição continua sendo a próxima lacuna do
+  marco.
+
+## E287 — efetivo de campanha sem criação de população na fixture — 28/09/2026
+
+- Fingerprint de base: HEAD `3c6e590e`; SHA-256 do diff de
+  `tests/test_medieval_persistent_campaign_chain.py`:
+  `9233f826d5fe8d3872a55fb1f76d0b7f363c49658a8c91805ddc87ba22c6fd9c`.
+- `_start_siege` precisava de 60 soldados em Campomanso, mas a coorte militar
+  local existente tinha 20. Antes, a fixture substituía o número sem causa,
+  acrescentando implicitamente 40 pessoas. Agora transfere 40 da maior coorte
+  civil local da mesma raça: um receipt de premissa da fixture registra a
+  redução civil e o aumento militar; o helper verifica headcount total
+  inalterado. Não altera a regra de recrutamento em runtime.
+- Verificação isolada:
+  `CWS_DATA_DIR=/tmp/cws-m2-e287-20260928 PYTHONPATH=.
+  .venv/bin/python -m pytest -q tests/test_medieval_persistent_campaign_chain.py
+  tests/test_medieval_garrison_policy.py` → `8 passed in 7.09s`;
+  `git diff --check` passou.
+- Uma inspeção exploratória inicial sem `CWS_DATA_DIR` tentou abrir o log padrão
+  em diretório read-only e falhou antes de construir o mundo; não alterou dados.
+  A verificação reproduzível acima usou namespace temporário isolado.
+- Limite: premissa preparada e teste focal, não recrutamento autônomo, chegada
+  de carga, operação militar, guarnição paga por vários ciclos ou saída bilateral
+  na mesma trajetória. A aceitação integrada de M2 continua aberta.
+- Próximo recorte: unir os owners de objetivo/autorização, campanha, interferência
+  material de criatura/logística, manutenção de guarnição e saída bilateral em
+  um cenário autônomo controlado e contrafactual; não inferir isso dos testes
+  separados existentes.
+
+## E286 — reconciliação documental M0 no checkpoint atual — 28/09/2026
+
+- Estado observado antes do recorte: branch `codex/medieval-remote`, HEAD
+  `3c6e590e` (`test: conserve troops in medieval campaign fixtures`), worktree
+  limpo. `git status -sb` reportou 31 commits à frente de
+  `github-personal/codex/medieval-remote`, a referência de tracking local.
+  Não houve `fetch`; isso não prova a posição atual do repositório remoto.
+- A trilha local recente contém `e6ac8d37` (checkpoint WIP M1), `ebc1324a`
+  (fixtures auditáveis E284) e `3c6e590e` (conservação populacional E285).
+  E284 e E285 permanecem limitados às evidências já descritas abaixo; não
+  satisfazem o aceite integrado de M2.
+- Reconciliados o cabeçalho/estado do `medieval-completion-contract.md` e a
+  síntese da `medieval-closure-matrix.md`: E282 fecha somente o cenário
+  preparado de M1; E283 continua cancelado; M2 é a próxima frente; Gate B natural
+  permanece para M8. O diário passa a indexar E284–E286.
+- Reproduzível por inspeção local: `git status -sb`, `git branch -vv`,
+  `git log -8 --oneline --decorate`, `git diff --check`; branch e hash registrados
+  acima. `git diff --check` passou depois das alterações documentais.
+- Limite: E286 é reconciliação documental e fotografia de referências locais,
+  não mudança de código, fetch/push, prova de estado remoto, teste de runtime ou
+  aceite de M2. Nenhuma suíte foi executada por não haver mudança de código.
+- Resultado: M0 documental reconciliado; worktree permaneceu sem código alterado.
+  Próxima frente única: M2, conforme o checkbox integrado ainda aberto na matriz.
+
 ## E281 — renda recorrente não cobre todas as coortes — 28/09/2026
 
 - Reconciliação: o contrato e a matriz agora referenciam E280 como último
@@ -9825,6 +10626,35 @@ M1 fecha apenas para o cenário preparado; provider real, escolha independente
 sistêmica, emergência natural, outros seeds e Gate B natural permanecem sem
 prova para M8. Nenhum save-fonte foi alterado; sem commit, push ou deploy.
 
+## E306 — carga de cerco atravessa rota interrompida — 29/09/2026
+
+O teste controlado `test_ordnance_freight_route_interruption_has_paired_campaign_effects`
+despacha artilharia por Freight, deixa a carga partir, e permite que a outra
+instituição interrompa a rota por affordance atual. No vencimento, `cargo_delayed`
+referencia a interdição, preserva uma peça em trânsito, mantém entrega em zero e
+não oferece bombardeio. Após decisão de levantar a interdição, a carga chega ao
+mesmo estoque de bagagem; a entrega referencia a causa corrente da rota e a peça
+participa depois do cerco. A auditoria `validate_history` passa.
+
+O teste encontrou e corrigiu uma lacuna real: a entrega final do parcel em fase
+`traveling` registrava a história do parcel/ordem e o estoque de origem, mas não
+os eventos correntes da rota que permitiam a passagem. `_unload` agora recebe e
+anexa essas causas; etapas já em `unloading` continuam herdando a cadeia pelo
+evento anterior do parcel.
+
+A permanência da coluna defensora por 30 dias está explicitamente registrada
+como premissa factual da fixture para que a interdição dure durante o frete.
+Esta prova usa estoque de equipamento-premissa, não repete produção paga de E304
+no mesmo ramo, não demonstra ocorrência natural e não fecha E300.
+
+Verificação focal: `CWS_DATA_DIR=/tmp/cws-medieval-e306-test
+.venv/bin/python -m pytest -q tests/test_medieval_campaign_ordnance.py
+tests/test_medieval_logistics.py tests/test_medieval_route_interdiction.py` —
+`21 passed in 6.59s`; `git diff --check` passou. Ruff não está instalado no
+`.venv`; o `pytest` do Python global tampouco serve (não tem `omegaconf`).
+Nenhum provider real foi chamado. O WIP continua local, sem commit, push, merge
+ou deploy; a referência remota não foi verificada.
+
 ## E284 — seleção contextual de E139 e raízes das fixtures de campanha — 28/09/2026
 
 Fingerprint de base: HEAD `e6ac8d374e8d0726c2567e18f54b5ada7e097dce`; SHA-256
@@ -9869,3 +10699,1745 @@ As trajetórias da campanha do módulo continuam executando auditoria causal nos
 seus saves finais. Isto fecha somente conservação de pessoas na premissa da
 guarnição; operação, abastecimento e saída política ainda não foram compostos
 na mesma trajetória autônoma exigida pelo M2.
+
+## E307 — bagagem acompanha retirada e sobrevive à dissolução — 29/09/2026
+
+O teste `test_siege_baggage_moves_with_withdrawing_column_and_survives_disbandment`
+usa as affordances correntes de campanha para a retirada, deixa o owner levantar
+a pressão de rota e avança a mesma coluna por seus ticks físicos. A bagagem
+carregando uma peça e três pólvoras muda de localização no receipt da chegada,
+cuja causalidade inclui o evento que reabriu a rota. Depois da decisão explícita
+de dissolver a força, o estoque permanece pertencendo a Auren no assentamento
+final; peça e pólvora continuam lá, sem perda nem duplicação. Save/load preserva
+o snapshot e `validate_history` passa.
+
+O código de marcha foi ajustado para incluir `_route_causes` no evento
+`detachment_marched`/`detachment_arrived`, além dos deltas da própria coluna e
+da bagagem. Antes, a rota era validada materialmente mas não aparecia como causa
+do movimento bem-sucedido. O teste é preparado: tropas, materiais e presença
+inicial são premissas explícitas; não é campanha natural.
+
+Verificação focal: `CWS_DATA_DIR=/tmp/cws-medieval-e306-test
+.venv/bin/python -m pytest -q tests/test_medieval_campaign_ordnance.py
+tests/test_medieval_logistics.py tests/test_medieval_route_interdiction.py
+tests/test_medieval_siege_campaign.py` — `44 passed in 21.05s`; `git diff --check`
+passou. O Ruff não está instalado no `.venv`. WIP segue local; sem commit, push,
+merge/deploy ou consulta à referência remota.
+
+## E308 — contrafactual pareado de logística de pólvora — 29/09/2026
+
+O teste `test_ordnance_freight_route_interruption_has_paired_campaign_effects`
+cria o mesmo estado preparado com duas remessas (uma peça e três pólvoras) já
+em trânsito e clona o mundo antes da intervenção. No controle, as duas cargas
+chegam nos vencimentos originais; o ator investe o assentamento, inicia o cerco
+e dispara, reduzindo a endurance em dois. No ramo de intervenção, uma coluna
+defensora preparada escolhe interditar a rota depois da partida. As duas cargas
+geram `cargo_delayed`, permanecem em trânsito e não são entregues. Naquele prazo,
+o investimento e o cerco não recebem affordance válida; portanto, nenhum disparo
+altera a endurance. A diferença vem da disponibilidade física da rota, não de
+um resultado escrito pela fixture.
+
+O ramo interditado é salvo/carregado antes de levantar o bloqueio. Snapshot,
+parcelas, quantidades e ordem ficam iguais; a passagem continua fechada. Depois
+de decisão independente de levantamento, ambas as cargas chegam, o assentamento
+pode ser investido e a campanha consegue disparar. Os dois históricos passam
+`validate_history`. A prova é fixture controlada com tropas, posições e estoques
+preparados, não emergência natural.
+
+`provider_available()` retornou `False`; nenhuma consulta externa foi feita.
+O teste específico passou `1 passed`; a regressão consolidada
+`CWS_DATA_DIR=/tmp/cws-medieval-e308-test .venv/bin/python -m pytest -q
+tests/test_medieval_campaign_ordnance.py tests/test_medieval_logistics.py
+tests/test_medieval_route_interdiction.py tests/test_medieval_siege_campaign.py`
+passou `44 passed in 21.91s`. A prova E304 de produção paga foi revalidada no
+mesmo checkout separadamente: `1 passed`. `git diff --check` passou. E300 está
+aceito apenas para a vertical pólvora/artilharia; M3 continua aberto. Nenhum
+commit/push/merge/deploy ou consulta ao remoto foi feito.
+
+## E309 — inventário das capacidades M3 — 29/09/2026
+
+Cruzei as linhas nomeadas de M3 com owners, catálogo e módulos de teste, sem
+abrir outra vertical. Os grupos focalizados passaram: indústria, preservação,
+barreiras, treinamento e difusão (`38 passed`); diplomacia, espionagem, suborno,
+sabotagem, tarifas, embargo, suprimento/comando e transporte (`96 passed`);
+alfândega, contratos, ajuda institucional e memória (`72 passed`); migração e
+ensino aplicado (`10 passed`). O resultado não certifica cada combinação nem
+ocorrência natural. A fixture de paliçada usa `learn_technology` diretamente
+após decisão genérica; portanto, não prova pesquisa paga nem aquisição
+bilateral de `defensive_barriers`.
+
+## E310 — memória de breach altera decisão posterior — 29/09/2026
+
+Dois testes focalizados exercitam a política diplomática com a composição nativa
+de prompt, interceptando somente a resposta do provider para não haver egress.
+Depois de uma oferta de ensino aceita e quebrada, a memória direcional conhecida
+pelo destinatário foi incluída no contexto da proposta equivalente posterior:
+no ramo informado o provider mock rejeita, e o controle sem essa memória aceita.
+O receipt de interpretação não carrega delta material; os owners aplicam as
+decisões. Outro teste oferece remediação de pagamento e renegociação após breach,
+seleciona `NO_ACTION` e confirma estado sem mutação. Isso encontrou um erro de
+formatação em `_choice` para opções sem `.action`, corrigido em
+`src/sim/medieval/diplomacy_policy.py`.
+
+Verificação: os dois testes E310 passaram (`2 passed`); regressão
+`tests/test_medieval_diplomacy_policy.py tests/test_medieval_diplomacy.py
+tests/test_medieval_institutional_memory.py tests/test_medieval_industry.py`
+passou `62 passed`; `git diff --check` limpo. Provider mock local, nenhum
+egress, e não prova comportamento OAuth/Luna.
+
+## E311 — aquisição e obra paga de barreira — 29/09/2026
+
+Auren é o proprietário do único site-base com `military_training`;
+`defensive_barriers` exige `fortification`, então a pesquisa dessa capacidade
+não aparecia a Escarlia. Em vez de alterar mapa ou catálogo, preparei
+explicitamente `field_drill` → `siegecraft` → `fortification` como conhecimento
+prévio da fixture para Auren. A partir daí, o fluxo canônico ofereceu
+`defensive_barriers`: Auren escolheu patrocinar e a pesquisadora escolheu aceitar
+separadamente. Seis ciclos mensais consumiram seis ferramentas, pagaram folha e
+geraram descoberta por pesquisa. Essa descoberta habilitou a affordance de obra
+paga em Pedra Clara; a autorização da obra cita o evento de pesquisa. A obra
+concluiu, criou site de propriedade/manutenção de Auren com capability
+`defensive_barrier`, e save/load round-trip preservou o mundo.
+
+O teste `test_paid_research_acquisition_unlocks_paid_barrier_construction`
+passou. A regressão focal `tests/test_medieval_defensive_barrier.py
+tests/test_medieval_research.py tests/test_medieval_industry.py` passou
+`38 passed`; `git diff --check` passou. Os pré-requisitos são premissa de
+cenário, não pesquisa executada; o efeito de combate continua coberto por testes
+separados, e não houve provider/egress. M3 segue aberto. Próximo: E312 escolher
+uma capacidade existente com cadeia tecnológica mais completa exercitável sem
+mascarar premissas como pesquisa.
+
+## E312 — aço e vapor selecionados por affordances atuais — 29/09/2026
+
+No teste integrado `test_complete_steel_and_steam_chain_consumes_machines_and_needs_fuel`,
+substituí as decisões de payload completo por decisões `selected_affordance_id`
+recompostas por `research_options`. A instituição patrocina metalurgia, aço e
+engenharia a vapor pelo menu; o pesquisador aceita cada trabalho separadamente.
+Os três projetos completam e registram `channel=research`; em seguida a mesma
+trajetória constrói/usa fornos, produz aço e motores, consome as máquinas na
+modernização e bomba, esgota combustível e demonstra a limitação material. A
+conservação de recursos e o round-trip do save permanecem no teste.
+
+Verificação: teste integrado específico passou; regressão
+`tests/test_medieval_industry.py tests/test_medieval_research.py
+tests/test_medieval_defensive_barrier.py` passou `38 passed`; `git diff --check`
+limpo. Estado de partida, recurso e instalação são preparados; não é emergência
+natural nem provider real. Base HEAD `3c6e590e`; SHA-256 de
+`tests/test_medieval_industry.py`:
+`52dca9d537148961d126a2bd9eef108e2e8da94b42b67807f10c8826ec28b807`.
+Ao fechar E312, o próximo item definido era E313: inspecionar e avançar uma
+ligação restante de M3 sem abrir nova vertical; E313 está registrado abaixo.
+
+## E313 — transferência produtiva no menu institucional normal — 29/09/2026
+
+`productive_site_conveyance` já possuía owner bilateral e prova de execução,
+mas não era registrado em `monthly_adapters`/`monthly_actors`. Adicionei um
+adapter fino que reusa os options e executor existentes. O seller decide a
+oferta por ID no menu composto; como polities são consultadas antes de
+organizações, o comprador recebe depois uma consulta de resposta restrita às
+propostas novas do mesmo boundary. A aceitação independente passa pelo owner,
+que recompõe o binding; não há broker ou planner persistente. Um teste integrado
+com provider mock exercita a seleção do seller e buyer, owner/maintainer, e
+bindings; a transferência não move estoques nem contas.
+
+A regressão descobriu falha real no owner de pesquisa: `_offer_was_declined`
+procurava uma recusa em eventos `research_authorized`, embora ela seja um evento
+autoral separado. Agora procura uma decisão `ACTOR_DECISION` com ator e ID de
+oferta exatos; isso fecha a proposta após `NO_ACTION` sem reapresentá-la.
+
+Verificação: `tests/test_medieval_productive_conveyance.py
+tests/test_medieval_research.py tests/test_medieval_industry.py
+tests/test_medieval_technology_sale.py
+tests/test_medieval_knowledge_verticals_fail_closed.py
+tests/test_medieval_institutional_aid_policy.py` — `73 passed`;
+`git diff --check` limpo. Provedor interceptado localmente; sem egress nem
+validação OAuth/Luna. Base HEAD `3c6e590e`; hashes por arquivo registrados na
+matriz. A parte do menu ficou fechada em E313; a inspeção então planejada em
+E314 está concluída abaixo. M3 continua aberto.
+
+## E314 — observabilidade material e causa de embargo — 29/09/2026
+
+O teste da API pública ativa prova o fluxo de transferência pelo Observatório:
+após a aceitação, `/api/v2/query/observatory` reflete owner e maintainer do site,
+além dos bindings atuais de estoque/folha da instalação; `/api/v2/query/causal`
+retorna a oferta e aceitação independentes e os quatro deltas correspondentes.
+Não foi criada projeção especial nem UI paralela. A Crônica existente já mostra
+causas, deltas e evidência estruturada para eventos genéricos.
+
+O cruzamento de `why()` para tarifa, embargo e alfândega encontrou uma falha
+causal: `customs_refused` não apontava para a política que devolveu a carga.
+O recibo agora liga ao `embargo_policy_event_id`; decisões posteriores de
+embargo também encadeiam a transição de política precedente. A consulta causal
+passou a navegar declaração → recusa, e a mesma leitura preserva tarifa cobrada,
+classificação de contrabando e detecção de evasão. Revogação posterior também
+mantém link à declaração que substitui (`2 passed` no par focado). Não se amplia o dossier:
+ele continua refletindo fatos recebidos e decisões próprias, sem inferir
+conhecimento a partir da visão omnisciente do Dao.
+
+Durante a regressão, dois asserts legados no teste de observatório falharam por
+suposições já vencidas no WIP: única pesquisa inicial `irrigation` e save schema
+79. Foram substituídos por validação de projeto existente/IDs válidos e load do
+schema corrente, sem alterar simulação ou persistência.
+
+Verificação: os módulos Python de observatório, transferência, tarifas, embargo
+e customs passaram `71 passed`; `web/src/medieval/__tests__/chronicle.test.ts`
+passou `4 passed`; `git diff --check` limpo. Um `pnpm` direto não pôde ser usado
+porque não está instalado; o Vitest local presente em `web/node_modules` executou
+o teste. Fixture preparada e provider não consultado; sem smoke natural ou gate
+de longo prazo. E315, a reconciliação das ligações M3, está registrada abaixo.
+
+## E315 — reconciliação das ligações M3 — 29/09/2026
+
+Cruzei as cinco linhas abertas do M3 com owners, caminhos de decisão/conhecimento,
+efeitos materiais e evidências: conservação alimentar, aço/vapor, pólvora/
+artilharia, barreiras, treino/doutrina, ensino/venda/roubo/migração, persuasão,
+espionagem, suborno, sabotagem/investigação/acusação, commitments/memória e
+tarifas/embargo/customs/transferência. Não encontrei uma capacidade sem owner,
+mas isso é inventário, não conclusão do marco; vários recortes usam fixtures
+preparadas e não provam emergência natural.
+
+Executei 19 casos focados representativos. Eles passam por pesquisa/obra/operação
+de conservação, minerais→pólvora/artilharia, aço→vapor/uso de combustível,
+pesquisa e construção de barreira, pesquisa/treino→combate, ensino/venda/roubo/
+migração→aplicação, breach conhecido→resposta posterior, negociação/persuasão,
+espionagem, suborno, sabotagem, investigação e acusação sem culpa automática.
+O comando executado foi:
+
+```bash
+CWS_DATA_DIR=/tmp/cws-medieval-e315 .venv/bin/python -m pytest -q \
+  tests/test_medieval_food_preservation.py::test_researched_smokehouse_reduces_loss_and_repair_restores_protection \
+  tests/test_medieval_industry.py::test_paid_mineral_separation_feeds_gunpowder_research_and_two_real_lines \
+  tests/test_medieval_industry.py::test_complete_steel_and_steam_chain_consumes_machines_and_needs_fuel \
+  tests/test_medieval_defensive_barrier.py::test_paid_research_acquisition_unlocks_paid_barrier_construction \
+  tests/test_medieval_force_training.py::test_paid_field_drill_research_and_training_reach_a_material_field_battle \
+  tests/test_medieval_technology_training_chain.py::test_bilateral_teaching_needs_local_training_before_field_effect \
+  tests/test_medieval_technology_training_chain.py::test_paid_technique_sale_needs_local_training_before_field_effect \
+  tests/test_medieval_apprenticeship.py::test_real_migration_carries_technique_into_paid_irrigation_application \
+  tests/test_medieval_technology_theft.py::test_stolen_metallurgy_unlocks_a_paid_local_production_upgrade \
+  tests/test_medieval_technology_sale.py::test_paid_knowledge_unlocks_a_material_production_project \
+  tests/test_medieval_diplomacy_policy.py::test_known_breach_memory_changes_a_later_provider_response \
+  tests/test_medieval_diplomacy_policy.py::test_offer_counteroffer_acceptance_payment_teaching_are_distinct_steps \
+  tests/test_medieval_diplomacy_policy.py::test_persuasion_is_a_causal_attempt_not_an_automatic_acceptance \
+  tests/test_medieval_diplomacy_policy.py::test_notified_counterparty_can_persuade_without_accepting_or_changing_terms \
+  tests/test_medieval_espionage.py::test_espionage_success_brings_home_its_own_local_observation_and_survives_save \
+  tests/test_medieval_bribery.py::test_bribery_acceptance_is_independent_and_payment_is_later \
+  tests/test_medieval_sabotage.py::test_foreign_prepared_force_spends_tools_damages_only_integrity_and_victim_receipt_has_no_author \
+  tests/test_medieval_sabotage.py::test_creature_damage_offers_owner_a_canonical_investigation \
+  tests/test_medieval_sabotage.py::test_attributed_finding_can_be_deliberately_accused_without_creating_guilt_or_retaliation
+```
+
+Resultado: `19 passed in 7.67s`. Em conjunto com o histórico E300–E314, isso
+permite reconciliar as capacidades, mas não prova todas na mesma trajetória.
+A lacuna executável identificada foi E316: tarifa e customs têm adapters
+registrados e turnos familiares testados, porém ainda falta provar opções e
+seleção pelo menu mensal completo. M3 permanece aberto; provider usado aqui é
+stub/local e os cenários são controlados.
+
+## E316 — tarifa e customs no menu institucional mensal — 29/09/2026
+
+Comprovei que as duas famílias entram no fluxo institucional mensal composto,
+não apenas em seus adapters isolados. No caso fiscal, o ator `auren` estava
+elegível; a affordance corrente de tarifa zero foi enumerada, escolhida pelo ID
+exato por provider mock e executada como mudança material ligada a uma decisão
+`ACTOR_DECISION`. No caso aduaneiro, carga comum apresentada expôs a opção legal
+de tentativa de evasão; a seleção pelo mesmo fluxo criou detecção e atualizou o
+estado canônico do aviso. A tentativa inicial de usar carga proibida foi
+descartada: contrabando não pode escolher evasão; o menu oferece retorno ao
+estoque de origem ou apreensão pelo operador. Os testes existentes cobrem
+classificação, retorno e apreensão explicitamente. Nenhuma regra do owner foi
+relaxada para fazer o teste passar.
+
+Novos testes: `tests/test_medieval_tariffs.py::test_export_tariff_is_selected_from_the_full_monthly_institutional_menu` e
+`tests/test_medieval_customs.py::test_customs_evasion_is_an_actor_choice_in_the_full_monthly_menu`.
+Execução focal dos cinco módulos observatório, transferência, tarifas, embargo
+e customs: `72 passed in 34.77s`; os dois testes novos isolados: `2 passed`;
+`git diff --check` limpo. Um primeiro comando `pytest` fora do `.venv` falhou
+por dependência ausente; o `.venv` inicialmente falhou ao tentar escrever logs
+em home somente leitura, então ambos foram executados com
+`CWS_DATA_DIR=/tmp/cws-testdata-e316`.
+
+Limites: provider mock sem egress; fixture controlada; teste prova escolha e
+execução do owner, não ocorrência natural nem estabilidade de longo prazo. M3
+continua aberto. Nenhum commit, push, merge ou deploy.
+
+Checkpoint local recuperável do WIP após os testes E316 (base HEAD
+`3c6e590e`): `/tmp/cws-medieval-e316-20260929.patch` — SHA-256
+`af3e9a48ddfd3380537f9385226da1e945f3c78807600c6a5dabe2a5298a4711` — e
+`/tmp/cws-medieval-e316-untracked-20260929.tar.gz` — SHA-256
+`c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`.
+O patch guarda diffs rastreados; o tar contém os arquivos não rastreados.
+
+## E317 — escolha causal de embargo no turno mensal — 29/09/2026
+
+O teste E316 já havia comprovado tarifa e customs no menu composto, e o embargo
+aparecia como opção corrente, mas o teste de caminho completo ainda exercitava
+o owner por chamada direta. Ao adicionar a seleção pelo turno mensal, encontrei
+que `execute_embargo` revalidava corretamente a decisão, porém emitia a mudança
+de política sem declarar autoria (`causal_origin` padrão determinístico e sem
+payload). O owner agora publica a transição como `ACTOR_DECISION`, incluindo
+`decision_event_id`, `actor_ref` e `selected_affordance_id`; o finalizer/event
+validator aplica o mesmo contrato de autoria que os outros estados materiais.
+
+O teste usa o menu mensal composto e mock local para selecionar a affordance
+corrente de embargo para Escarlia. A política entra em vigor; depois uma carga
+real do alvo chega ao posto, é recusada sem perda física, e o `causal_view` da
+recusa navega até a declaração do embargo. Isso demonstra escolha, execução e
+efeito material encadeados, não apenas presença no catálogo.
+
+Verificação: teste E317 focado `1 passed`; regressão dos módulos de
+observatório, transferência, tarifa, embargo e customs `73 passed in 45.93s`;
+após reforçar asserções de autoria/payload, o teste E317 voltou a passar;
+`git diff --check` limpo. Provider mock, cenário preparado, sem egress, sem
+smoke longo e sem ocorrência natural. M3 permanece aberto.
+
+Próximo recorte M3/E318: escolher, entre as capacidades nomeadas ainda abertas,
+uma ligação entre decisão normal, owner e efeito material não coberta; não
+reabrir vertentes concluídas nem tratar inventário como aceite.
+
+Checkpoint local E317 (WIP rastreado + arquivos não rastreados; base HEAD
+`3c6e590e`): `/tmp/cws-medieval-e317-final-20260929.patch`, SHA-256
+`0abb8214c4a7dd18858f262e3f9f809c88dfa770962d71f954ca67f4fd7385ee`; o arquivo
+`/tmp/cws-medieval-e317-final-untracked-20260929.tar.gz` tem SHA-256
+`c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`.
+
+## E318 — escolha de logística de campanha pelo menu mensal — 29/09/2026
+
+A cadeia de `field_logistics` já tinha evidência material direta: sem
+conhecimento ela não oferece treino; depois de conhecimento e treino-base, o
+treino pago de três dias, com ferramentas e rações, aumenta a capacidade física
+da bagagem da coluna. O elo faltante era o ator escolher esse treino pelo menu
+institucional composto, sem injetar decisão API.
+
+Adaptei o teste existente para executar o turno mensal normal com provider mock.
+Como o ID canônico incorpora `stock:campomanso`, a fronteira LLM apresenta um
+token `choice:N`; a resposta é mapeada de volta pelo engine para a affordance
+corrente. O teste verifica o token opaco, a decisão `provider`, o consumo de
+ferramentas, a passagem dos três dias abastecidos, a conclusão do treino e o
+aumento da bagagem; save/load e auditoria causal seguem no mesmo caso.
+
+Verificação: `tests/test_medieval_force_training.py` +
+`tests/test_medieval_campaign_supply.py`: `15 passed in 9.63s`; o teste E318
+isolado também passou antes da regressão; `git diff --check` limpo. É fixture
+preparada com provider mock, não ocorrência natural ou integração com provider
+real. M3 segue aberto.
+
+Próximo recorte M3/E319: escolher outra ligação material aberta entre
+capacidade nomeada, decisão e consequência. Não usar esse recorte isolado para
+declarar a linha de logística nem o marco M3 inteiros concluídos.
+
+Checkpoint local E318 do WIP rastreado e não rastreado (base HEAD `3c6e590e`):
+`/tmp/cws-medieval-e318-final-20260929.patch`, SHA-256
+`5f5b13e41c699fe0a44d5c6461774c4bc8be2cebd5fe11a6abbe22b283d8a7e5`; arquivos
+não rastreados: `/tmp/cws-medieval-e318-final-untracked-20260929.tar.gz`, SHA-256
+`c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`.
+
+## E319 — apreensão de contrabando pelo menu normal — 29/09/2026
+
+Fechei a última lacuna conhecida na linha comercial M3: o menu de alfândega
+continha apreensão, mas a evidência anterior chamava o owner diretamente. A
+prova agora parte de uma carga real de armas em trânsito, classificada como
+contrabando ao chegar ao posto, e deixa o operador escolher a affordance de
+apreensão no menu institucional mensal completo. O provider recebe o rótulo
+legal da única opção elegível; não recebe ID privado do estoque. O owner transfere
+a quantidade apreendida para o estoque civil local, resolve a mesma carga e
+atualiza aviso/recibo.
+
+O teste detectou dois defeitos no caminho: `_label` tentava ler `.action` de
+`CustomsSeizureOption`, que não tem esse campo; e o receipt material não
+declarava autoria nem affordance selecionada. Corrigi o roteamento do rótulo e
+o receipt. A transição é `ACTOR_DECISION`, liga decisão, ator e ID canônico,
+e os `cause_ids` não incluem diretamente o receipt `LLM_INTERPRETATION`; a
+interpretação continua ligada à decisão, não à mutação.
+
+Verificação: novo teste composto em
+`tests/test_medieval_customs.py::test_checkpoint_owner_chooses_contraband_seizure_in_monthly_menu`;
+regressão dos cinco módulos observatório, transferência, tarifa, embargo e
+customs: `73 passed in 36.09s`; `git diff --check` limpo. Mock local e cenário
+preparado, sem egress, provider real ou smoke longo. M3 ainda não está fechado.
+
+Próximo recorte M3/E320: revisar os cinco aceites do marco um por um contra
+provas atuais e contrato; só avançar para M4 se todos estiverem satisfeitos.
+Se houver requisito sem evidência, definir o menor fechamento restante.
+
+Checkpoint local E319 (patch do WIP rastreado + arquivo tar dos não rastreados;
+base HEAD `3c6e590e`): `/tmp/cws-medieval-e319-20260929.patch`, SHA-256
+`e8011064c0f1ed416d2b14dfe778c1e888d1384b55fe800105fccebc597070ec`; tar
+`/tmp/cws-medieval-e319-untracked-20260929.tar.gz`, SHA-256
+`c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`.
+
+## E320 — reconciliação dos aceites M3 — 29/09/2026
+
+Revisados os cinco aceites de M3 contra o contrato e a evidência já presente no
+checkout: (1) tecnologia, produção, pesquisa/aplicação, treino e barreiras;
+(2) difusão por ensino, venda, roubo e migração; (3) persuasão, espionagem,
+suborno, sabotagem, investigação e acusação; (4) breach, notificação, reparação,
+memória e decisão posterior; (5) tarifa, embargo, contrabando e transferência
+produtiva nos menus. O grupo focal passou `27 passed`; casos específicos de
+breach/memória/remediação passaram `7 passed`. Evidências anteriores E313–E319
+completam os menus de tarifa, embargo, apreensão e transferência produtiva.
+
+M3 fecha apenas no aceite contratado: todas as capacidades nomeadas têm
+consumidor e prova focal. Os testes são controlados e usam provider mock quando
+exercitam menu; não demonstram ocorrência natural, provider real ou composição
+integrada dos marcos M1/M2/M4–M8. Nenhum teste longo foi executado.
+
+## E321 — reconciliação documental e checkpoint — 29/09/2026
+
+Antes das edições, confirmei branch `codex/medieval-remote`, HEAD `3c6e590e`,
+51 caminhos locais modificados/não rastreados no status (WIP herdado preservado,
+sem atribuí-lo integralmente a este goal) e criei snapshot recuperável:
+`/tmp/cws-medieval-e320-pre-m0-20260929.patch`, SHA-256
+`a17106faad9f1f57e23cc6ec29b0d2b6a62687c96659fb3a97e92d2afb26e0cc`, mais
+`/tmp/cws-medieval-e320-pre-m0-untracked-20260929.tar.gz`, SHA-256
+`c87c26cb537aa02f841150dcb3dfe88ffae57ebb721fff83f300f07d714b05b1`.
+
+O snapshot foi criado antes da reconciliação documental. Atualizei o estado
+vigente para E321/M4-E322, marquei M3/E320 na matriz, registrei M0/E321 e
+corrigi a duplicidade que apontava E321 simultaneamente para M0 e M4.
+`git diff --check` passou depois da reconciliação. Sem commit, push, merge ou
+deploy.
+
+## E322 — auditoria da identidade de povos — 29/09/2026
+
+Inspecionei `src/classes/society/models.py`, `state.py`, `demography.py`,
+`serialization.py`, `src/run/medieval_society.py`, owners de migração, força e
+transição de trabalho, DTOs de `src/server/medieval/contracts.py`/`queries.py`,
+configuração `society.json` e apresentação em `web/src/medieval`.
+
+Os quatro valores são um `Literal` validado em coortes e personagens. Geração
+aloca cada povo em cada assentamento, fecha arredondamento sem alterar população
+total e distribui ocupação por assentamento, não por povo. Nascimentos retêm o
+povo em `BirthCohort`; a transição dependente→trabalhador é datada e só move
+quem sobreviveu. Migração, transição de trabalho e força apontam à coorte de
+origem; `transfer_people` carrega `group.people`, atualiza personagem nomeado e
+não duplica população. Society schema 21 serializa os registros com validação
+estrita; os DTOs carregam os campos de identidade e a UI traduz os quatro nomes
+para Humano, Elfo, Anão e Orc. `Character` separa `people`, `skills` e
+`personality`; composição institucional usa IDs de membros, sem regra por povo.
+
+Verificação focada no checkout de E322:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-testdata-e321 .venv/bin/pytest -q tests/test_medieval_society.py tests/test_medieval_demography.py tests/test_medieval_migration.py::test_known_pressure_moves_household_with_its_own_cash_and_rations tests/test_medieval_workforce_transitions.py::test_cross_settlement_completion_both_relocates_and_reclassifies tests/test_medieval_workforce_transitions.py::test_cross_settlement_transition_survives_save_load_and_resolves tests/test_medieval_force.py::test_a_supplied_force_marches_and_occupies_without_taking_administration tests/test_medieval_persistence.py::test_save_restores_society_map_agenda_rng_and_causal_history
+```
+
+Resultado: `17 passed in 7.23s`.
+
+Gap concreto: a única lei física identificada é maturação uniforme em
+`MATURITY_DAYS = 15 * 360`; não há catálogo fisiológico, consumidor que
+diferencie povos nem explicação correspondente na UI. O catálogo de mundo só
+declara pesos demográficos. Não achei lore que sustente valores diferentes.
+Também encontrei uma correlação acidental no worldgen: em seed 73 cada
+organização tinha membros de um único povo, porque a atribuição por índice
+coincidia com o ciclo de povos. Isso foi separado em E323.a.
+Logo E322 conclui a auditoria de identidade, não M4. A escolha de idade de
+maturação por povo foi solicitada antes de implementar esse efeito secular.
+Nenhuma raça ganhou bônus, moralidade, profissão ou religião.
+
+## E323.a — composição institucional mista — 29/09/2026
+
+O teste de worldgen confirmou que a atribuição original `i % len(organizations)`
+fazia todas as organizações da seed 73 mono-povo, embora cada assentamento
+contivesse as quatro populações. Troquei a atribuição por uma permutação
+determinística, separada do RNG que cria nomes/atributos e sem ler `people`,
+seguida de distribuição round-robin entre organizações. Isto remove o viés de
+índice sem conceder poder, profissão ou lealdade por povo.
+
+Verificação:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-testdata-e323 .venv/bin/pytest -q tests/test_medieval_society.py
+```
+
+Resultado: `10 passed`; regressão de sociedade,
+demografia, uma chegada de migração, conclusão/save-load de workforce,
+recrutamento/força e save/load causal → `17 passed in 7.33s`. `git diff --check`
+passou antes desta entrada documental. A prova usa seed 73 e geração preparada;
+não implica que todas as instituições de toda seed sejam mistas ou que existam
+decisões de filiação institucional. Não fecha a diferença física nem a UI de
+explicação, portanto M4 continua aberto.
+
+Próximo recorte M4/E323.b: aguardar/definir valores fisiológicos e então ligar
+um único catálogo à maturação de coortes e sua apresentação PT-BR; verificar
+agenda/save-load e a consequência material de disponibilidade para trabalho.
+
+## E323.a-ui — integrantes no dossier institucional — 29/09/2026
+
+O inspector de organização agora torna visíveis os integrantes nomeados como
+links para seus dossiers de personagem e exibe o povo em português. Organizações
+sem integrantes nomeados mostram um estado vazio traduzido. Isso melhora a
+observabilidade da convivência entre povos, mas não inventa associação, não
+altera filiação e não fecha a prova de acesso a trabalho ou aprendizado.
+
+Verificação focada: `npm test -- dossier.test.ts` → `5 passed`; `npm run
+type-check` passou. O teste do dossier monta uma organização com membros humano
+e élfico e confirma ambos os rótulos PT-BR. A seleção do integrante continua
+usando o link já existente no inspector; nenhuma alteração de estado canônico.
+
+Próximo recorte continua M4/E323.b, bloqueado apenas para a implementação da
+diferença fisiológica até definição de valores de lore. Nenhum valor foi
+presumido nem aplicado.
+
+## E324.a — preservação das quatro identidades em ocupação e migração — 29/09/2026
+
+Adicionei uma prova parametrizada para Humano, Elfo, Anão e Orc com a mesma
+sequência no owner Society: uma pessoa muda de ocupação dentro de Pedra Clara e
+depois muda de assentamento mantendo a ocupação. Cada etapa preserva `people`,
+contagem total e invariantes do estado. Isso demonstra que o owner de população
+aceita as quatro identidades sem regras especiais nem bônus raciais.
+
+Comando: `CWS_DATA_DIR=/tmp/cws-e324a PYTHONPATH=. .venv/bin/pytest -q
+tests/test_medieval_society.py` → `14 passed in 1.84s`. É um teste do contrato
+canônico de Society, não uma prova de menus de affordance, decisões de grupo,
+aprendizagem ou política migratória para cada povo. A mudança ocorreu somente
+na fixture de teste em memória; nenhum save de jogo ou regra produtiva foi
+alterado por esse teste.
+
+Próximo: M4/E323.b permanece pendente da decisão de lore sobre valores físicos.
+Após isso, ligar a diferença escolhida a coortes, consequência material,
+persistência e UI. M4 ainda não está fechado; não avancei para M5.
+
+## E324.b — migração material para os quatro povos — 29/09/2026
+
+Ampliei o cenário controlado já existente de migração para parametrizar Humano,
+Elfo, Anão e Orc. Em cada caso, o grupo recebe pressão conhecida e escolhe pelo
+fallback a affordance de migração vigente; o owner cobra dinheiro e provisões,
+reserva a coorte, atravessa save/load, conclui a jornada e preserva `people` no
+assentamento de destino. Assim, a prova verifica decisão material e não somente
+a transferência de baixo nível do E324.a. A mesma trajetória foi aplicada aos
+quatro valores, sem regra ou efeito específico por povo.
+
+Comando: `CWS_DATA_DIR=/tmp/cws-e324b PYTHONPATH=. .venv/bin/pytest -q
+tests/test_medieval_migration.py -k known_pressure_moves_each_people` →
+`4 passed, 20 deselected in 3.25s`. É uma fixture pressionada com política de
+fallback, não provider real ou ocorrência natural; cobre migração, não emprego
+ou aprendizagem.
+
+Próximo recorte: fechar outra superfície de participação já existente (acesso
+a aprendizado/decisões) sem inferir elegibilidade por povo. A propriedade
+fisiológica segue pendente de lore explícita; manter M4 aberto.
+
+## E323.b — maturação fisiológica por povo — 29/09/2026
+
+O usuário autorizou estes valores engine-owned, sem bônus de força, moralidade,
+profissão, lealdade ou fé: humano 15 anos, elfo 25, anão 20, orc 12; ano de 360
+dias. `BirthCohort` agora persiste a duração e o dia de maturação, e valida ambos
+contra povo e nascimento. O receipt `settlement_births` publica os dois deltas;
+a agenda madura só a parte sobrevivente da coorte e a move materialmente de
+`dependent` para `farmer`. A causa navega ao nascimento original. Sociedade e
+save subiram para schemas 22 e 81, rejeitando versões antigas, sem migração.
+API/Inspector explicitam “Entrada no trabalho: N anos”.
+
+Verificação: `tests/test_medieval_demography.py` passou dentro da regressão
+focada; caso de API passou (`1 passed`); dossier passou (`6 passed`) e
+`npm run type-check` passou. O teste acelerado demonstra que apenas o orc
+amadurece no primeiro prazo e que o delta corresponde aos sobreviventes; os
+valores de produção são também assertados literalmente. Nenhum save de jogador
+foi reescrito.
+
+## E324.c — escolha de instrução paga por cada povo — 29/09/2026
+
+O cenário de aprendizagem existente agora percorre a seleção da affordance e o
+pagamento de instrução para especialista humano, élfico, anão e orc com a mesma
+habilidade/configuração. `4 passed`. Limite importante: os personagens da
+fixture são colocados no assentamento com uma chegada preparada; esta prova não
+substitui a migração material/save-load de E324.b, nem prova elegibilidade geral
+para trabalho ou recrutamento. Isso continua sendo E324.d, registrado antes de
+começar a próxima fatia.
+
+Regressão desta retomada: sociedade, demografia, persistência e migração passaram
+`63 passed, 1 deselected`; a exclusão foi isolada e reproduzida: o ledger do
+teste de migração no boundary espera comida 76317 enquanto o estado termina em
+76014. O mesmo teste falhava na execução anterior; sem baseline limpo não afirmo
+que seja preexistente. O conjunto completo não está verde. `git diff --check`
+passou. O type-check frontend terminou com exit 0. WIP continua local, sem
+commit/push/merge/deploy.
+
+E324.d também concluiu a mesma escolha de oferta remunerada para cada povo. Um
+stub local do provider seleciona somente o ID canônico oferecido; o owner paga
+estipêndio, agenda a transição e, no prazo, transfere a coorte para artesãos
+mantendo identidade. O teste parametrizado passou `4 passed`; a regressão
+combinada de workforce, Society e demografia passou `59 passed`. É cenário
+controlado com opções reais da engine, não consulta OAuth/Luna ou simulação
+espontânea. A matriz/contrato foram atualizados para M4 fechado e M5 como próxima
+frente.
+
+## E325 — auditoria read-only de magia existente — 29/09/2026
+
+`Skills` declara elemental, proteção, restauração e evocação. O código medieval
+tem operações materiais de restauração local/remota (Blueprints de 10 dias,
+reagentes/cristais, assistentes pagos, recuperação) e wards/contramedidas (6–9
+dias de execução, termos de 30–60 dias, custos materiais e resistências
+engine-owned). O owner `rites.py` exige praticante qualificado, patrocínio,
+estoque/assistentes, alvo/alcance atual e decisão; `resolve_rites` encerra no
+boundary datado. Wards resistem a perigos registrados, inclusive drake/enchente/
+serpente, sem prosa como regra.
+
+Não encontrei blueprint, affordance ou owner medieval para `elemental_magic` nem
+`evocation_magic`; são campos de skill, não capacidades jogáveis. Isso é a lacuna
+real de M5. Verificação focal do código já existente:
+`tests/test_medieval_rites.py`, `test_medieval_rite_reach.py`,
+`test_medieval_character_rite_policy.py` e
+`test_medieval_creature_magic_interaction.py` → `26 passed in 9.18s`. E326 ficou
+pré-registrado: um efeito elemental limitado em estado material existente,
+declarando lei/custo/alcance/duração/recuperação e contramedida antes de alterar
+estado. Evocação e a cadeia de ameaça ritual continuam abertas; nenhuma mudança
+de código foi feita em E325.
+
+## E326 — rito elemental material sobre passagem existente — 29/09/2026
+
+Base: branch `codex/medieval-remote`, HEAD `3c6e590e`, WIP herdado preservado.
+Ao concluir, 73 caminhos locais estavam modificados/novos; esse total não é
+autoria desta fatia. O checkbox E326 foi registrado antes da implementação.
+
+Lei implementada: `rite-of-earth-shaping`, `kind=earth_shaping`, escola
+`elemental`; residente com `elemental_magic >= 35`, passagem de montanha local,
+proprietário e mantenedor explícito iguais, `0 < integrity < 1`, site habilitado.
+No mapa corrente isso permite o mantenedor Auren na Passagem Negra, sem dispatch
+por nome de reino/sítio. Custo: quatro reagentes, um cristal, dois artesãos
+disponíveis pagos em duas moedas cada; seis dias de trabalho e três de recuperação.
+O efeito é `min(1, integrity + 0.10)` no Map, mantendo todos os outros flags.
+Rota deriva sua capacidade desse sítio; nenhuma rota ou capacidade nova é criada.
+
+Conhecimento/decisão: residentes nomeados fisicamente locais recebem sua própria
+observação datada de integridade/operabilidade, sem estoques ou contas. Só um
+praticante que viu o dano pode oferecer esse trabalho. O mantenedor precisa de
+seu próprio relatório atual, com receipt válido e leitura concordando com o
+sítio; patrocínio é outra decisão. IDs incluem os eventos observados e são
+recompostos. Os menus de personagem usam todos os ritos atualmente válidos,
+mesmo que tenham fontes diferentes; a agenda é wake-up, não autorização durável.
+O contexto institucional mostra os termos do trabalho e sua própria observação.
+
+Execução: patrocínio usa `execute_material`, sem candidato/planner novo; Research
+agenda a conclusão, Economy consome e paga, Map muda integridade. A conclusão
+revalida praticante, autoridade, sítio, dano/observação e meios. Reparo convencional
+e rito elemental não podem ficar simultaneamente abertos sobre o mesmo sítio.
+O caminho existente de negação de assembleia pode interromper essa operação:
+perde os reagentes comprometidos, registra recuperação/pressão, sem integridade
+ou folha produzidas. A evidência dessa intervenção é preparada (coluna local
+alimentada a partir de estoque), não demonstra recrutamento ou marcha.
+
+Persistência: save schema 82 e Research schema 4 rejeitam formas antigas sem
+reescrever dados. Research valida alvo/duração, causa de observação do patrocinador
+e receipt limitado da integridade; o validator Map confere sua causa material.
+`RiteBlueprintMetadata.school` e UI PT-BR mostram `Elemental`.
+
+Arquivos: `src/classes/research/{models,state}.py`,
+`src/classes/governance/knowledge.py`, `src/sim/medieval/{rites,
+character_rite_policy,route_intelligence,infrastructure,persistence}.py`,
+`static/game_configs/medieval/research.json`,
+`tests/test_medieval_{elemental_rite,creature_magic_interaction,persistence}.py`,
+`web/src/types/medieval-api.ts`, `web/src/medieval/i18n.ts` e instrução de schema
+no `AGENTS.md`. O diff desses arquivos também contém trabalho herdado; não atribuir
+todo o diff a E326.
+
+Comando focal:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-e326-tests .venv/bin/python -m pytest \
+  tests/test_medieval_elemental_rite.py tests/test_medieval_rites.py \
+  tests/test_medieval_rite_reach.py tests/test_medieval_character_rite_policy.py \
+  tests/test_medieval_creature_magic_interaction.py tests/test_medieval_persistence.py \
+  tests/test_medieval_infrastructure.py tests/test_medieval_knowledge_verticals_fail_closed.py -q
+```
+
+Resultado: `94 passed in 37.33s`. Casos novos cobrem insumos/folha/população,
+melhora física da rota, recuperação, save/load, causas, ID inventado,
+observação ausente/antiga, estoque insuficiente, concorrência com reparo,
+rollback após falha tardia, dois turnos independentes de provider stub e
+contrafactuais interdição/negação militar. Depois de explicitar a retirada da
+comida da coluna-premissa no último teste, apenas esse caso foi repetido:
+`test_prepared_local_force_can_independently_interrupt_the_elemental_work`
+→ `1 passed in 0.88s`. Nenhuma mudança de código material ocorreu após a bateria.
+`npm run type-check` em `web` e `git diff --check` passaram.
+
+Falhas intermediárias corrigidas: import circular do validator (import agora
+local), fixture sem artesãos (duas pessoas existentes foram realocadas como
+premissa), stub escolhendo ID original em menu com aliases e fixture de contexto
+usando forma antiga. Não adicionados fallbacks de compatibilidade. O primeiro
+pytest sem namespace isolado tentou abrir logs fora do sandbox e falhou antes
+de coletar testes; a execução válida usa `CWS_DATA_DIR` em `/tmp`.
+
+Fingerprint corrente: SHA-256 agregado do output de `sha256sum` dos 14 arquivos
+de código/config/test/UI listados acima (na ordem models, state, knowledge, rites,
+character_rite_policy, route_intelligence, infrastructure, persistence, research.json,
+elemental_rite, creature_magic_interaction, persistence test, API types, i18n):
+`7bd5093a32c9317f33c4b3ea6c7ebf630d2840a33d035cc7e0657e607dcfbc82`.
+Checkpoint recuperável depois do código e reconciliação do plano, antes desta
+entrada final de evidência: `/tmp/cws-medieval-e326-final-20260929.patch`, SHA-256
+`3d75f2ba68298ea8d2fcd75d321f259d33704629e810b4815280ce2662845ef5`, e
+`/tmp/cws-medieval-e326-final-untracked-20260929.tar.gz`, SHA-256
+`95ed5e35823bbada5a1dfdc65e9ba1c050d77549564f6553baf9a02fb7602fdc`.
+
+Limites: configuração, qualificação e pressão são preparadas; decisões passam
+por API ou provider stub local. Não houve consulta OAuth/Luna, uso de Laya,
+ocorrência natural, navegador, commit, push ou deploy nesta retomada. A falha de
+ledger de migração registrada em E324 segue aberta e não foi reexecutada aqui.
+E326 está fechado; M5 continua aberto. Próximo recorte E327 é a manifestação
+evocada temporária, com origem/custo/duração/efeito/encerramento reais e
+contramedida; M6 religião, M7 produto/composição e M8 gates continuam pendentes.
+
+## E327 — evocação temporária com consumidor físico — 29/09/2026
+
+Branch `codex/medieval-remote`, HEAD `3c6e590e`; WIP anterior preservado.
+A lei foi registrada na matriz antes de implementar. Research possui
+`Manifestation`, distinta de ward, morador ou estoque. Um residente habilitado
+oferece `rite-of-evoked-bulwark` com observação própria; proprietário do sítio
+aquático patrocina independentemente com seu relatório datado. Quatro dias,
+seis reagentes, dois cristais, dois artesãos pagos a duas moedas e recuperação
+de dois dias produzem anteparo por até 12 dias. Um golpe real de drake/serpente
+consome a manifestação, reduzindo metade do dano, limitado a 0,05; sem golpe,
+agenda registra expiração. Relatórios observam presença e desaparecimento.
+Narrativa não produz efeito; enumeração não gasta a manifestação.
+
+O contrafactual drake executou dano de 0,05 com anteparo versus 0,10 sem ele,
+com origem do rito no impacto. Save/load cobre presença, consumo e expiração.
+Negação por coluna preparada interrompe no dia de conclusão, sem manifestação
+ou folha. Esse caso revelou colisão de situações: agora interrupções precedem
+conclusões e apenas o rito interrompido nesse mesmo lote ignora sua conclusão
+já removida da agenda. Não foi acrescentado fallback para situações inválidas.
+
+Arquivos: `src/classes/research/{models,state}.py`, governança models/knowledge,
+`src/sim/medieval/{evocation,rites,dated,creatures,route_intelligence,
+character_rite_policy,persistence}.py`, `src/systems/material_hazard_impacts.py`,
+DTO/query research, catálogo research.json e UI de pesquisa/types/mappers.
+Testes: `test_medieval_evocation.py`, persistência e `research.test.ts`.
+Schemas: save 83, Research 5, Knowledge 11; sem migração de dados reais.
+
+Comando focal:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-e327-tests .venv/bin/python -m pytest \
+  tests/test_medieval_evocation.py tests/test_medieval_elemental_rite.py \
+  tests/test_medieval_rites.py tests/test_medieval_rite_reach.py \
+  tests/test_medieval_character_rite_policy.py \
+  tests/test_medieval_creature_magic_interaction.py tests/test_medieval_creatures.py \
+  tests/test_medieval_persistence.py -q
+```
+
+Resultado: `72 passed in 19.85s`. UI: em web,
+`npm test -- --run src/medieval/__tests__/research.test.ts`, `5 passed`;
+`npm run type-check` e `git diff --check` passaram. Testes incluem decisões
+datadas independentes com stub, custos reais, ID inventado, observação ausente,
+insumos insuficientes, conservação, contrafactual, expiração e contramedida.
+
+Fingerprint dos 24 arquivos de código/teste E327 (ordem: models/state research,
+models/knowledge governança, evocation/rites/dated/creatures/route_intelligence/
+character_rite_policy/persistence, material_hazard_impacts, contracts/queries,
+research.json, evocation/persistence tests, medieval-api.ts, i18n, useResearch,
+ResearchPanel, mappers, world.json, research.test.ts), via
+`sha256sum <arquivos nessa ordem> | sha256sum`:
+`883841d601b192f337c42067b5d8780c7d907933edb7a738893f3a9cb8fa5e2f`.
+
+Checkpoint após código/AGENTS, antes desta reconciliação documental:
+`/tmp/cws-medieval-e327-final-20260929.patch`, SHA-256
+`e7f25d99f293a9c9941205711636916caa07cb1189693e94158fae08120552e8`;
+`/tmp/cws-medieval-e327-final-untracked-20260929.tar.gz`, SHA-256
+`661a021541ccf81259f6351f88b5d801968165a62094e22d5ab509cc3a58921b`.
+
+Limites: qualificação, insumos e coluna são premissas preparadas; não se provou
+recrutamento/marcha nessa contramedida. Provider é stub, sem egress. Sem Laya,
+navegador, smoke longo, commit, push ou deploy. A falha de ledger de migração
+registrada em E324 continua aberta e não foi reexecutada aqui. E327 fechado;
+M5 segue aberto para E328 (revisão/composição de criaturas), M6–M8 pendentes.
+
+## E328 — fechamento finito de magia e criaturas — 29/09/2026
+
+Base HEAD `3c6e590e`, WIP preservado; revisão sem nova mecânica material.
+Os cinco aceites M5 foram confrontados com catálogo, owners e testes exercitados
+no E327, não apenas com a existência de campos Skills:
+
+| Aceite | Evidência executada |
+| --- | --- |
+| Quatro capacidades utilizáveis | restauração paga em rites; ward material em creature_magic/reach; elemental E326 reexecutado; evocação E327 |
+| Técnica, custos, alcance, duração, recuperação e observação | catálogos e validação Research, rites/reach/character policy/elemental/evocation; insuficiência/stale/ausência bloqueiam |
+| Restauração/proteção/elemental/evocação não são renomes | saúde, resistência finita, integridade local e manifestação finita com primeiro impacto/expiração são consumidores distintos |
+| Detecção e intervenção independente | rites e turno institucional de negação, política de personagem com patrocínio posterior, contrafactuais elemental/evocation (incluindo mesmo dia) |
+| Criaturas, memória e resposta | drake tributo/restrição/recuo e carga atrasada; ecologia das duas espécies; dano civil datado; ward/anteparo; teste adicional de tributo da serpente |
+
+Os quatro primeiros grupos e a base de criaturas fazem parte dos `72 passed`
+E327. A lacuna de prova específica da resposta institucional à serpente foi
+fechada em `test_serpent_request_and_independent_institutional_tribute_preserve_memory`.
+Há carga bilateral real que a serpente percebe; pedido não fecha a rota nem
+obriga pagamento. Auren escolhe separadamente seu ID atual, seu estoque perde
+o alimento entregue, a demanda fica satisfeita, a criatura lembra o recibo e
+não recebe opção de restringir a passagem por aquela demanda satisfeita.
+História auditada e save/load preservam o resultado.
+
+Comando:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-e328-tests .venv/bin/python -m pytest \
+  tests/test_medieval_creatures.py::test_serpent_request_and_independent_institutional_tribute_preserve_memory -q
+```
+
+Resultado: `1 passed in 1.06s`; `git diff --check` passou antes da atualização
+documental. SHA-256 de `tests/test_medieval_creatures.py`:
+`7092b2e8b1b44f244c8763829badd7bb8887930dad0bb84b4e1ed5dc9701258c`.
+O cenário é preparado e decisões são API; não é provider real nem emergência
+natural. Reutiliza owners existentes; não houve recurso criado para resolver
+resultado. M5 fechado por esses recortes, sem alegação de todas as combinações.
+M7 ainda exige cenário composto/UI/navegador; M8 provider e seeds finais.
+
+Próximo recorte único M6/E329: identidade religiosa, duas tradições, adesão e
+resposta com decisões próprias. Sem commit, push, merge ou deploy.
+
+## E329 — convite local e adesão independente — 29/09/2026
+
+Branch `codex/medieval-remote`, HEAD `3c6e590e`, WIP preservado. Inventário:
+Aurora/Coro eram organizações com membros/interesses, não havia adesão distinta
+nem convite conhecido pelo destinatário. A lei foi registrada na matriz antes
+de codar. O glossário separa tradição, invitation e adesão. A implementação
+mantém os owners existentes: doctrine em Organization, convites em Knowledge e
+adherences em Society. Não adiciona tesouro, cosmologia, magia ou outro planner.
+
+Instituição religiosa com autoridade diplomática, membro local disponível e
+relatório próprio de até seis dias recebe affordances de convite a destinatários
+presentes. A decisão gera entrega local privada, válida por sete dias; nenhuma
+fé é atribuída. O destinatário decide por um ID recomposto, com presença e prazo
+revalidados. Outra tradição pode ser escolhida por outro convite; o fato anterior
+continua como causa/história. Não muda membership, recursos, força, habilidades,
+população ou autoridade. Orientação coletiva não presume fé pessoal de nomeados.
+
+Owner direto usa execute_material. Validação exige receipt do convite, decisão
+exata do ofertante, seu relatório histórico e publisher; adesão exige decisão
+do destinatário, convite efetivo conhecido e termo válido. Save schema 84,
+Society 23 e Knowledge 12 rejeitam formatos anteriores sem migrar dados reais.
+API society expõe adesões; Inspector diferencia membership, adesão escolhida,
+doutrina declarada e fato físico, com botão para o receipt causal.
+
+Arquivos: `src/classes/society/{models,religion,state,serialization,__init__}.py`,
+`src/classes/governance/{models,knowledge}.py`, `src/sim/medieval/{religion,
+persistence}.py`, catálogo society.json, DTO/query society, tipos/mappers/
+useInspection/Inspector/i18n e fixtures UI. Testes novos `test_medieval_religion.py`
+e `web/src/medieval/__tests__/religion.test.ts`; teste de persistência atualizado.
+
+Comando focal:
+
+```sh
+CWS_DATA_DIR=/tmp/cws-e329-tests .venv/bin/python -m pytest \
+  tests/test_medieval_religion.py tests/test_medieval_society.py \
+  tests/test_medieval_persistence.py -q
+```
+
+Resultado: `47 passed in 8.44s`. Após incluir a projeção society no primeiro
+teste, ele foi repetido: `1 passed in 1.13s`. UI em web:
+`npm test -- --run src/medieval/__tests__/religion.test.ts src/medieval/__tests__/dossier.test.ts`,
+`7 passed`; `npm run type-check` passou. `git diff --check` passou após remover
+uma linha vazia extra. O endurecimento posterior do mapper exige doctrine como
+array corrente; verificação final desse limite registrada na continuação.
+
+SHA-256 do núcleo exercitado:
+`src/sim/medieval/religion.py`: `bcf0b9f1f4546fad891d04ff7ddac166ab1743c49551b887b701545c69328ef2`;
+`src/classes/society/religion.py`: `4f2b4d4b031a1c231306c8012f0a01f17f32e7b2b0b7244cd32f7c3d6f44cbf9`;
+`tests/test_medieval_religion.py`: `73f4756cbfdc78cf0418938b944328a99afcfb224dc76b1b4eb32c7be38926a4`.
+
+Checkpoint antes da reconciliação documental/endurecimento do mapper e correção
+de whitespace: `/tmp/cws-medieval-e329-20260929.patch`, SHA-256
+`d85b119413cc80bc20ef6219388582b3fcdecbcdaa9b4e4c9703384c3c8d4f67`, e
+`/tmp/cws-medieval-e329-untracked-20260929.tar.gz`, SHA-256
+`e7fa41f64a9bdea80390449aa385a7837091caa6d01e84b518be0eb32dea60c1`.
+
+Limites: membros/office holders locais e coexistência são premissas preparadas;
+decisões são API. Sem egress, provider stub/real, ocorrência natural, Laya,
+navegador, smoke longo, commit/push/merge/deploy. Convite/adesão ainda não estão
+no menu normal nem influenciam o prompt posterior; isso é E330, não capacidade
+declarada entregue. Falha conhecida de ledger de migração continua pendente.
+M6 aberto, M7/M8 pendentes.
+
+Verificação final E329 do mapper com doctrine obrigatório: type-check passou;
+religion/dossier UI repetidos, `7 passed`. `git diff --check` passou; 95 caminhos
+modificados/novos no worktree (incluem WIP herdado, não autoria só de E329).
+
+## E330 — Adesão religiosa nos turnos compartilhados — 29/09/2026
+
+HEAD `3c6e590e`, branch `codex/medieval-remote`, WIP herdado preservado.
+Checkbox M6/E330 registrado antes da implementação. O pedido mais recente
+retirou a pausa; goal continua ativo, M6–M8 não concluídos.
+
+`religion_policy.py` apenas adapta os owners E329 e agenda uma oportunidade:
+instituição escolhe convite entre alternativas mensais; em AI-enabled, o
+destinatário decide amanhã. Personagem usa `character_rite_offer_review` já
+existente; coorte usa um wake-up no turno institucional diário compartilhado,
+com opções de trabalho, alimentação, empréstimo, migração e ação cívica atuais.
+Não existe segundo planner, decisão automática ou sorteio de conversão. O
+dispatcher dated reconhece o wake-up sem executar adesão. Scheduler sem IA não
+cria consultas, e política offline não aceita convite por conta do destinatário.
+
+`religious_context` projeta só adesão própria e convites recebidos, com doutrina
+pública declarada (configuração authored imutável nesta V1), nunca fé de outro
+residente, inventário estrangeiro ou conhecimento por membership. Dossiê comum
+e turno individual recebem esse contexto; decisões que o veem ligam a adesão
+anterior como fonte. Crença não cria skill, recurso, população ou lei física.
+Owners seguem recompondo opções dentro de execute_material. Save 84 permanece;
+nenhum novo registro persistente além de situações da agenda existente.
+
+Provas preparadas com stub JSON no limite do provider:
+
+- Convite pelo adapter do menu mensal (instituição incluida em monthly_actors),
+  save/load com resposta pendente, destinatário escolhe no dia seguinte.
+- Personagem e coorte aceitam independentemente ou escolhem NO_ACTION; uma
+  consulta por destinatário, autores e decisões separados, matéria conservada.
+- Dossiê não expõe adesão de outro personagem. Stub declarado condicionado à
+  doutrina/adesão anterior recusa troca; ramo sem adesão prévia aceita Coro.
+  Isso prova disponibilidade e vínculo causal do contexto, não raciocínio de IA.
+- Validação Society/Knowledge/histórico passa; interpretações não têm deltas.
+
+Comando: `CWS_DATA_DIR=/tmp/cws-e330-tests .venv/bin/python -m pytest
+tests/test_medieval_religion_policy.py tests/test_medieval_religion.py
+tests/test_medieval_character_rite_policy.py
+tests/test_medieval_institutional_decision_turn.py
+tests/test_medieval_institutional_agenda.py
+tests/test_medieval_daily_institutional_turn.py
+tests/test_medieval_actor_dossier.py -q` — **58 passed in 17.00s**.
+Depois de acrescentar o contrafactual pareado e condicionar o stub à doutrina,
+religion_policy repetido: **5 passed in 2.84s**. `git diff --check` passou.
+A primeira verificação encontrou lambdas diferentes para o mesmo family context;
+substituídas por uma função compartilhada, sem ignorar a validação existente.
+
+Fingerprints SHA-256 finais:
+
+- `src/sim/medieval/religion.py`: `cf150e787d048cf0c50739d35f972e23f4df8caf46d71a56b3196ecfe807acf9`
+- `src/sim/medieval/religion_policy.py`: `2c4589c36ec1d2d29a7f162d5734f0fe2d5d02059e51fc1cbd5b27e2c539eb2d`
+- `src/sim/medieval/institutional_agenda.py`: `a1c44bb583600b69c0ae5b864fd83102f39fb323d3e51567ee114dfea7db2edc`
+- `src/sim/medieval/institutional_decision_turn.py`: `ec6d7403a3e9cf087c85977c72f4b84fea84764d748148935d4e0ada8b1dd078`
+- `src/sim/medieval/character_rite_policy.py`: `a858bd089c3ef47b12213490f468c0d66c93bd128eae7f3a1fa34bbb03680453`
+- `src/sim/medieval/actor_dossier.py`: `ae91dbf6584943ab5749d7ed026ec307e1ab52c51096a3a58ebf19240233fe02`
+- `tests/test_medieval_religion_policy.py`: `bdaac3ec30c890e7ce2bc3c1f5d99f5f2f9788ab0d4676f4aa3da4fb9802934d`
+
+Limites: esta prova chama os turnos reais sobre cenário preparado, mas não é
+uma trajetória natural do simulator completo nem provider real. Não houve
+consulta externa, Laya, navegador, build frontend, smoke longo, commit, push,
+merge ou deploy. Falha conhecida de ledger de migração segue pendente. Não
+revalidar E329 UI como se tivesse sido executada novamente neste recorte.
+Próximo: M6/E331, assembleia observada → permitir/negar → resposta social própria
+com os mecanismos já existentes. Primeiro inventariar informação e fontes de
+interrupção, sem criar perseguição/revolta obrigatória ou nova cosmologia.
+
+## E331 — Interferência religiosa e resposta social independente — 29/09/2026
+
+Checkbox preregistrado; HEAD `3c6e590e`, branch `codex/medieval-remote`, WIP
+preservado. Sem pausa, commit, push, merge ou deploy. Uma frente M6, não nova
+vertical: nenhuma instituição, população, física, escola ou registry adicional.
+
+Inventário encontrou negação militar observada, interrupção Research com perda
+real de reagentes e pressão Economy de +60 já existentes. A lacuna era informação
+local atualizada/explicável e prova da resposta. `apply_rite_persecution_pressure`
+agora renova só reports de observadores locais que já existiam e continuam
+presentes, citando a pressão. Não cria observer, bulletin ou decisão.
+`actor_dossier.observed_assembly_interference` lê os receipts reais ligados ao
+próprio report direto, expondo apenas força/local/site/data/fontes públicas;
+bulletin recebido não revela contrato, caster, blueprint, estoque ou motivo.
+
+Dois ramos pareados de cenário pressionado em
+`tests/test_medieval_religious_social_response.py`: mesma doença/tensão prévia,
+rito de Aurora e soldados já existentes sustentam uma coluna-premissa local.
+Preparação e negação são decisões API explícitas; interrupção datada é material.
+A tensão passa 620→680, habilitando greve limitada no mecanismo cívico existente.
+O grupo só reserva participantes quando seu próprio stub seleciona o ID atual;
+NO_ACTION deixa todos disponíveis e nenhum protesto. Governo é consultado
+separadamente e levanta a negação. Isso não reverte perda de reagentes nem muda
+o rito interrompido para concluído. Stock só perde os inputs previstos; dinheiro
+e população mantidos. Save/load final e validate_history passaram nos dois ramos.
+
+Comando: `CWS_DATA_DIR=/tmp/cws-e331-tests .venv/bin/python -m pytest
+tests/test_medieval_religious_social_response.py tests/test_medieval_rites.py
+tests/test_medieval_civic_protest.py tests/test_medieval_actor_dossier.py
+tests/test_medieval_religion_policy.py -q` — **39 passed in 13.37s**.
+`git diff --check` passou. O primeiro setup tentou adicionar uma coorte de soldados
+já existente; corrigido para usar os soldados canônicos, sem criar pessoas.
+
+SHA-256 de código/prova:
+
+- `src/sim/medieval/economy.py`: `fb9f8b7b0ce6a96edc679174401c34243b39a28322f625a14178486bcfeb178c`
+- `src/sim/medieval/actor_dossier.py`: `1962b408125c3aeb7dd5161f52e31f11b03a2ad1280837f1edfc3a67fd9b46e4`
+- `tests/test_medieval_religious_social_response.py`: `2ae5405c9ab61434e78ccb101d69f59ace4cd432aaeefb3ed224deb38126a59e`
+
+Limites: menus compartilhados reais chamados explicitamente sobre o cenário,
+não passo mensal espontâneo ou campanhas naturais. Stub, sem provider real,
+egress, Laya, navegador, frontend ou smoke longo. Não afirmar que população
+protesta por qualquer rito ou que a escolha do governo decorreu do protesto:
+ele tinha opção material de levantar a própria negação, escolhida separadamente.
+Resposta cívica é permitida por pressão, nunca imposta. Falha de ledger de
+migração permanece aberta. M6/E332 reconcilia os aceites de ensino/participação/
+patrocínio e produto antes de declarar M6 fechado; M7/M8 seguem abertos.
+
+## E332 — Ensino religioso, execução observável e fechamento M6 — 29/09/2026
+
+HEAD `3c6e590e`, branch `codex/medieval-remote`, WIP preservado. E332 registrado
+antes de alterações. Cinco requisitos M6 reconciliados com escopo explícito:
+
+1. Identidade/adesão separada de povo, membership e conhecimento: E329 owners
+   Society/Knowledge com fonte/data, menus próprios e NO_ACTION de E330.
+2. Aurora/Coro coexistem; doutrina é declaração recebida, não lei. E330 provou
+   contexto/diferença posterior por stub condicionado, não raciocínio de IA real.
+3. Pregação é convite local com doutrina e decisão própria; destinatário aceita
+   separadamente. Participação do oficiante e patrocínio de Aurora foram
+   revalidados por test_medieval_character_rite_policy; trabalho auxiliar pago
+   não declara a fé dos auxiliares. Ensino técnico pela ordem usa teaching e
+   diplomacy existentes: Escarlia pesquisa, duas decisões API transmitem sua
+   técnica a Aurora, que depois oferece a Auren pelo ID atual no menu comum.
+   Negociação, contraproposta/aceite, pagamento, consentimento da professora
+   institucional e aceite do aluno têm seis consultas stub separadas ao longo
+   de quatro dias. Sem conhecimento próprio não havia técnica a ensinar; só
+   consentimento da professora não ensina o aluno. Nenhuma adesão, bem ou
+   capacidade produtiva é criada por ensino. Dinheiro transferido é conservado.
+4. Interferência/observação/resposta cívica e opção de liberar: E331 pareado,
+   sem protesto automático nem reversão de recursos consumidos.
+5. UI não trata agir/interpretar o Dao como fato físico. Doutrina/adesão têm
+   fontes próprias. ResearchView passou a exigir rites/wards reais (antes apenas
+   catálogo/manifestações): execução pendente, interrompida/falhada e concluída
+   ficam distintas; protege vigente versus expirada pela data. Navegação aponta
+   decisões de oficiante/patrocinador e receipt do owner, nunca milagre narrativo.
+
+Mudança de produto: contratos e query ResearchView, tipos TS, mapper (sem fallback
+para payload antigo), fixture, useResearch/ResearchPanel e textos PT-BR.
+Nenhum novo estado da simulação ou schema de save: save 84 permanece. API spec e
+AGENTS alinhados. Prova direta da query mostra rite officiating→completed com
+receipt real; componentes usam fixture sintética, não sessão de navegador.
+
+Comando Python: `CWS_DATA_DIR=/tmp/cws-e332-tests .venv/bin/python -m pytest
+tests/test_medieval_religious_teaching.py tests/test_medieval_character_rite_policy.py
+tests/test_medieval_religion.py tests/test_medieval_religion_policy.py
+tests/test_medieval_religious_social_response.py tests/test_medieval_rites.py
+tests/test_medieval_research.py -q` — **48 passed in 14.62s**.
+Frontend, cwd web: `npm run test -- src/medieval/__tests__/religion.test.ts
+src/medieval/__tests__/research.test.ts` — **7 passed**, e `npm run type-check`
+passou. `git diff --check` passou. Save/load e validate_history no ensino passaram.
+
+A primeira seleção stub não reconheceu o token público de pagamento que protege
+o account ID; corrigida para escolher o token oferecido pelo label canônico,
+sem expor ID privado. O teste também deixou uma revisão diplomática vencida ao
+avançar datas manualmente; passou a despachar pop_due/resolve_dated normalmente,
+sem relaxar a rejeição de saves com pendência atual/passada.
+
+SHA-256 do recorte:
+
+- `tests/test_medieval_religious_teaching.py`: `35d9c28d6df62f7411135fc1b5f1081fde2e5268747c505f54c4bc6dbe666d86`
+- `src/server/medieval/contracts.py`: `07283ec165b1b62f90df77179b2262c5edd833331444220a032a0ea743fec5f5`
+- `src/server/medieval/queries.py`: `d7d50e3d17859b304cf2ed1ce199fd113fe5de42eaeb006072ffac78b09a7f2f`
+- `web/src/medieval/components/ResearchPanel.vue`: `acbe9be67c2c53c2586d6e34d4236a78048b481f9634bc84505217589f5585db`
+- `web/src/medieval/composables/useResearch.ts`: `7bc76e2d7238ee223e4fa21f712dfc47d5f62bf017cd5fa769545fb190379522`
+- `web/src/medieval/__tests__/religion.test.ts`: `081353a99e51006d9492a4db40b16d406db5abbb957db51bc8b229028e2bd5be`
+- `web/src/medieval/i18n.ts`: `43c1ae5ffaaa8f2f4971e5d28fcfb40563152d3658b78b44a9ee814b2875f90f`
+- `web/src/medieval/mappers.ts`: `eb71701a0bf06411d35549047cb2d1a36abb6c9cd83444fbd123b29519eed595`
+- `web/src/types/medieval-api.ts`: `91313a1bdaa1337d37f3daa15db06ffa3c46c021d5cc9d43f06ece66352ce7b9`
+
+Conclusão: M6 fechado somente no escopo controlado contratado; sem provider real,
+egress, Laya, navegador, build, smoke natural/longo, commit/push/merge/deploy.
+Não generaliza ensino de toda religião, perseguição, magia ou cosmologia.
+Falha conhecida do ledger de migração segue aberta. Próximo M7/E333: dossiês,
+traces e navegação real do personagem à informação/decisão/custo/efeito; depois
+composição M1–M6 e verificação no navegador. M8 exige checkout congelado e gates
+no fingerprint final, não aproveita estes testes como prova dos 3.600 dias.
+
+M0/E332 snapshot local antes desta anotação final: diretório
+`/tmp/cws-e332-checkpoint-BBa3yR`, `worktree.patch` SHA-256
+`87ef50b2eb464672c8c705744e5ac179684706e871c302d15e8e67bac82a9394` e
+`untracked.tar.gz` `cc3d77a4711f52a9954696a43f8f4a47e6a3616a623c9416dd893f8d13bcb72a`.
+`git apply --reverse --check` passou (sem aplicar/modificar); listagem do tar
+confirmou os 17 untracked. 102 caminhos modificados/novos no worktree, não todos
+de autoria desta sessão. Nenhum backup antigo removido/alterado, publicação ou
+commit realizado. O snapshot não inclui apenas esta anotação de hashes/check.
+
+## E333.1 — Dossiê da escolha religiosa e fonte causal — 29/09/2026
+
+M7/E333 preregistrado; HEAD `3c6e590e`, branch `codex/medieval-remote`, WIP
+preservado. Este passo não fecha E333 agregado nem M7. Queries/Inspector/i18n,
+test_medieval_dossier e dossier.test.ts alterados; nenhum estado/scheduler/owner
+material novo, nenhuma consulta provider ou mudança de save.
+
+Auditoria: o dossiê já incluía convites pelo filtro recipient_ref de Knowledge,
+mas não adesão Society e omitira o payload das próprias decisões. Agora inclui
+somente adesão com actor_ref exato e fonte; datas reais de convite/adesão/report
+aparecem quando não existe learned_day específico. Fatos próprios contêm a
+decisão gravada (action/selected_affordance_id/NO_ACTION), não intenção inferida
+da prosa. Uma decisão estrangeira comunicada nunca vira decisão/pensamento do
+destinatário. Inspector apresenta categorias religiosas, instituição/data/fonte
+e ID escolhido. PT-BR de categorias/descrições; IDs/action handles são evidência
+estruturada, não texto gerado de motivação.
+
+Prova sobre mundo preparado E329 com convite e adesão reais via owners: query
+retorna fonte/data/decisão própria; why da adesão contém convite e decisão do
+destinatário. Dossiê não recebe decisão privada do emissor nem outro personagem
+recebe adesão/convite/decisão. UI navega do histórico à fonte e mostra ID real.
+
+`CWS_DATA_DIR=/tmp/cws-e333-tests .venv/bin/python -m pytest
+tests/test_medieval_dossier.py tests/test_medieval_religion.py -q`:
+**13 passed in 3.69s**. Cwd web: `npm run test --
+src/medieval/__tests__/dossier.test.ts src/medieval/__tests__/religion.test.ts`:
+**8 passed**; `npm run type-check` e `git diff --check` passaram.
+
+SHA-256:
+
+- `src/server/medieval/queries.py`: `9217d587371fc60371fb7367f028ae244febc8872a3b29453045d1ff2b846d70`
+- `web/src/medieval/components/Inspector.vue`: `04f9bcb73cf146fe2682bd6684c6a0b8605cbad8ab4cb3a0398c0ca99b1084c0`
+- `web/src/medieval/i18n.ts`: `83e398b610e4d85c3f130a104bcf6e2cc06ba407e237f2d6d7dddfd9542ed19c`
+- `tests/test_medieval_dossier.py`: `c5512fe9c332ca91ba3250e7f4f9874f11d97f6b4e6c381767d11b8aaed9872d`
+- `web/src/medieval/__tests__/dossier.test.ts`: `a1e999fcbdf2311ffad8a2eca6e96f3f4b00487754bc2465205141955b24bae5`
+
+Limites: cenário prepared/owner/API e testes de componente, sem provider real,
+Laya, navegador, build, mundo natural, smoke longo ou publicação. Ritos/wards
+continuam investigáveis na query ResearchView E332, mas o dossiê pessoal ainda
+não resume a atividade/resultado. E333.2 deve fazê-lo sem expor ao oficiante
+os saldos/estoques privados da instituição. Costs completos seguem Dao/why;
+não duplicar conhecimento nem adicionar justificativa retrospectiva. Falha do
+ledger de migração conhecida continua aberta para os gates finais.
+
+## E333.2 — Participação e resultado do rito no dossiê — 29/09/2026
+
+Recorte preregistrado como subitem E333.2. HEAD `3c6e590e`, branch
+`codex/medieval-remote`, WIP preservado. Nenhuma mutação material, state,
+scheduler, schema ou consulta provider nova. API de dossiê/Inspector/textos e
+provas focadas alterados.
+
+`actor_dossier` projeta `ritual_activity` apenas quando o ator é patrocinador
+ou oficiante nomeado. Mostra papel, estágio, início/prazo, fonte e receita
+material prevista, pública no catálogo; não declara esses custos pagos antes
+da execução. O participante não recebe stock_id/account_id nem seus deltas
+privados no known_fact associado. Mantém estado da própria participação,
+recuperação e efeito público local (rito/site/ward/manifestation/saúde local).
+Não revela métrica de saúde de alvo ranged remoto. Receipt posterior à morte
+não vira conhecimento do falecido. Sponsor mantém contrato/recibo próprio;
+consulta why do Dao mantém todas as deltas e causas reais sem ensinar o ator.
+
+Prova preparada, owners reais: Aurora autoriza/oficiante oferece, query mostra
+officiating; resolve_dated consome reagentes/paga trabalho e conclui; dossiê
+passa a completed com receipt real. Personagem não recebe estoque/conta nem
+decisão privada do sponsor; sponsor e why têm evidência completa. Estranho não
+recebe a atividade. Componente mostra PT-BR, materiais previstos e fonte.
+Sem justificativa retrospectiva como pensamento e sem novo planner de magia.
+
+`CWS_DATA_DIR=/tmp/cws-e333-tests .venv/bin/python -m pytest
+tests/test_medieval_dossier.py tests/test_medieval_rites.py -q`:
+**11 passed in 3.35s**. Cwd web: `npm run test --
+src/medieval/__tests__/dossier.test.ts src/medieval/__tests__/religion.test.ts`:
+**9 passed**; `npm run type-check` e `git diff --check` passaram.
+
+SHA-256:
+
+- `src/server/medieval/queries.py`: `3242910a3c7e9ae824b26014217a869e58685d4c9b18a3cf3b750d10c5b21c48`
+- `tests/test_medieval_dossier.py`: `79b17d5cddec3bba649d23de4c35e2b0db47431f02cddca01b541988fdea35a0`
+- `web/src/medieval/components/Inspector.vue`: `22b9974d1becd33efea309aadd3e56e1b570d27f3a710ac21dd1937d99c3001b`
+- `web/src/medieval/i18n.ts`: `029c651c47e3eb077320d6112b590fc907a6a7fe4eef407452eea5bf793d2613`
+- `web/src/medieval/__tests__/dossier.test.ts`: `ef7bb1506338b935bb5d2b5d25c38bd81c180b5f6f42ef50aaf0225d5eab5098`
+
+E333 agregado fechado para cadeia religiosa/mágica do dossiê. M7 continua
+aberto: revisar cargos/objetivos/atividades das demais cadeias existentes,
+Atlas/Crônica e browser/retomada composta; não confundir este recorte com
+fechamento de toda UX. Sem navegador, provider real, Laya, egress, build,
+smoke natural/longo, commit/push/merge/deploy. M8 e falha conhecida do ledger
+de migração continuam pendentes. Próximo M7/E334 já registrado.
+
+## E334.a — cargos, atividade e histórico investigável — 29/09/2026
+
+HEAD local `3c6e590e`, branch `codex/medieval-remote`, WIP herdado preservado.
+Mudanças deste recorte são projeções/query e UI, não novas ações, schema ou leis:
+
+- `current_activity`: prática/estudo/viagem do personagem consultado, decisão-fonte,
+  início, progresso, habilidade/trajeto e prazo registrado. Nenhum ganho antecipado.
+- `authority_office`: cargos do próprio titular/instituição, escopos e vigência
+  com término exclusivo, conforme owner; titular morto não sustenta autoridade.
+  Modelo não possui receipt de nomeação: fonte/data de aprendizado continuam
+  ausentes. Não inventamos evento nem pensamento para preencher essa lacuna.
+- `field_command`: somente comandante nomeado recebe seu próprio vínculo,
+  doutrina e receipt. Não recebe objetivos/planos privados da instituição.
+- Objetivos/planos próprios ganham descrição PT-BR de recurso/local/reserva,
+  estado/revisão/impedimento. São intenção/avaliação, não execução automática.
+- Histórico do personagem mostra todos os fatos carregados pelas páginas da API;
+  removido corte fixo de dez que escondia os registros anteriores. Teste carrega
+  onze recentes e uma página antiga, mantendo os doze acessíveis.
+- Filtro de cargos militares no Inspector também respeita término exclusivo.
+
+Provas executadas:
+
+```text
+CWS_DATA_DIR=/tmp/cws-e334-tests .venv/bin/python -m pytest tests/test_medieval_dossier.py tests/test_medieval_engine.py -q
+21 passed in 10.66s
+cd web: npm run test -- src/medieval/__tests__/dossier.test.ts
+8 passed (1.94s)
+cd web: npm run type-check
+exit 0
+git diff --check
+exit 0
+```
+
+Python usa atividade real pelo executor existente e nomeação real de comandante
+em cenário preparado, com isolamento de personagem estranho e planos privados.
+Teste UI usa DTO controlado: não equivale a navegador ou emergência natural.
+Query não alterou eventos/atividade. Nenhum save real foi migrado ou sobrescrito.
+
+Fingerprints SHA-256:
+
+- queries.py: `136bcb5933d61304254cd4639b42b1517b337d48fecf41370d65c52561f2b7f6`
+- tests/test_medieval_dossier.py: `3ccb9495ef86dbcc7c3cc61d84e042a6581f83c2ed2ebfc21bb387d8850f3800`
+- Inspector.vue: `1d718c022ed369c9543c701c5e5087ec64a028a07c318ba554af3df937b6a4cd`
+- i18n.ts: `f7189415a66805cfc55e9c69759ed172572df279742382c94f1b28c7d0807f5e`
+- dossier.test.ts: `ecd1782fa88e23e175b45df748f980aa1f0b81c29ab91e576d0e2f0330bf6ad3`
+
+`df -h /tmp` informou filesystem de 218G, 207G usados, só 149M disponíveis,
+100% de uso. Não iniciamos backup duplicado, save grande ou smoke longo.
+Próximo E334.b: conferir espaço e preparar browser isolado com Atlas/Crônica,
+dossiê/why, pausa/avanço/save/load e retomada. Playwright skill lida integralmente;
+npx disponível. Navegador ainda não executado neste recorte. M7/M8 abertos;
+sem provider real, Laya, egress, build, smoke longo, commit/push/merge/deploy.
+
+## E334.b1 — navegador, persistência e retomada material — 29/09/2026
+
+Checkout HEAD `3c6e590e` com WIP E334.a. Dados reais não acessados. Runtime
+exclusivamente loopback `127.0.0.1:8764`, `CWS_DATA_DIR=/tmp/cws-e334-browser`.
+O skill Playwright foi usado para preparação/pré-requisitos; wrapper indicado
+depende de playwright-cli ausente no cache de @playwright/mcp. Reutilizamos o
+harness Playwright já versionado e biblioteca local, sem instalação ou consulta
+externa. Exceção de sandbox necessária para bind/Chromium local, concedida.
+
+Comandos e resultados:
+
+```text
+cd web: npm run build
+type-check + Vite passaram; 755 módulos, Vite 5.12s.
+Aviso de chunk >500 kB preservado, não tratado como falha nem ignorado.
+CWS_DATA_DIR=/tmp/cws-e334-browser .venv/bin/python -m uvicorn src.server.main:app --host 127.0.0.1 --port 8764
+CWS_SMOKE_BASE_URL=http://127.0.0.1:8764 CWS_SMOKE_SKIP_WEBSERVER=1 ./node_modules/.bin/playwright test e2e/character-dossier.spec.ts e2e/save-load-runtime.spec.ts --workers=1 --output=../output/playwright/e334-runtime
+2 passed (9.1s): navegador real, API real, mundos offline com 2 personagens.
+node output/playwright/e334-ritual-browser.mjs
+ok=true, day=10, rite=rite:event:110, pageErrors=[]
+git diff --check: exit 0
+```
+
+Os smokes existentes criam mundos no namespace isolado: personagem/dossiê →
+receipt na Crônica; save nomeado → avanço → load → continuar → pausar. Não usam
+mock HTTP. O rito raro foi preparado por `ailing_world()` + `started()` de
+`tests/test_medieval_rites.py`, passando pelos executores de oferta/patrocínio
+reais, e salvo com `save_world` em
+`/tmp/cws-e334-browser/saves/medieval/ritual-pending.mws`.
+
+Preparação reproduzível (Python do venv, com CWS_DATA_DIR isolado):
+
+```python
+from pathlib import Path
+from tests.test_medieval_rites import ailing_world, started
+from src.sim.medieval.persistence import save_world
+world, healer = ailing_world()
+_, rite = started(world, healer)
+save_world(world, Path('/tmp/cws-e334-browser/saves/medieval/ritual-pending.mws'))
+```
+
+Navegador carrega arquivo pelo modal real, dia 0, seleciona Fenn Valverde
+(`character:005`), mostra Oficiante/materiais previstos e navega à fonte.
+Avanço normal do runtime conclui o rito no dia 10; dossiê muda para execução
+concluída e why mostra delta health. Depois recarrega o mesmo save pendente,
+confere estado/officiating/dia 0, continua pelo relógio automático e pausa
+após a mesma conclusão no dia 10. Nenhuma escolha foi injetada depois do load;
+isto prova operação/persistência/retomada, não escolha espontânea do rito ou
+provider real. Primeiro harness tentou fechar modal já fechado automaticamente;
+timeout corrigido esperando hidden, sem alteração de produto.
+
+Artefatos:
+
+- `output/playwright/e334-ritual-browser.mjs` SHA-256
+  `2c4cb7ed3a5bd967c1d5eae96a040f80073bd38e707aadf17309103074879672`.
+- `output/playwright/e334-ritual-completed.png` (533 KiB), SHA-256
+  `46ef577a6dee5bcff49edb8a9aeecb58c22a670a48fac8a82a0b02e450cb6773`.
+- `web/dist-medieval/index.html` SHA-256
+  `de4774f1cec48349ece7f167ea68ff771a1b7dc368357800d3050a148b9cb38e`.
+- bundle principal `index-C-ecKgQg.js` SHA-256
+  `04977248d74b4319c530b044f2809a143672ae21f43bd7808f6b86a3947d310d`.
+
+Servidor de teste encerrado com shutdown completo (handle 39801 exit 0);
+goal continua ativo. Namespace/saves de teste preservados, sem exclusão. Disco
+ao final ~140 MiB livres. E334.b continua parcial: falta Atlas/local → rito
+→ oficiante/dossiê/why e composição geral M1–M6. M7/M8 abertos. Sem provider,
+Laya, publicação, smoke longo, commit/push/merge/deploy. Próximo E334.b2.
+
+## E334.b2 — Atlas/local → rito → personagem → why — 29/09/2026
+
+WIP preservado no HEAD `3c6e590e`. Implementado `RiteExecutions.vue`, cartão
+compartilhado de execuções canônicas, reutilizado em Pesquisa e Inspector.
+Povoado filtra settlement_id; instalação filtra site_id. Cartão conserva os
+três links de evidência (escolha do oficiante, escolha do patrocinador, receipt)
+e adiciona navegação para oficiante, patrocinador e local. Usamos emit/select
+existente; não há novo estado, regra, affordance ou comando material. Crença,
+patrocínio e resultado permanecem separados, sem ensinar os atores pela UI.
+
+Teste UI existente de religião foi ampliado, sem nova suíte: navega Pesquisa
+→ local, confirma três execuções naquele site, zero em outro site, três no
+povoado correto e então oficiante/dossiê. Mantém proteção vigente/expirada e
+receipt atual. Os testes de pesquisa e dossiê existentes também passaram.
+
+```text
+cd web: npm run test -- src/medieval/__tests__/religion.test.ts src/medieval/__tests__/research.test.ts src/medieval/__tests__/dossier.test.ts
+15 passed (1.95s)
+cd web: npm run build
+type-check + Vite passaram, 757 módulos, 4.96s; aviso chunk >500 kB permanece.
+CWS_DATA_DIR=/tmp/cws-e334-browser .venv/bin/python -m uvicorn src.server.main:app --host 127.0.0.1 --port 8764
+node output/playwright/e334-atlas-ritual-browser.mjs
+ok=true, flow=Atlas → Pedraclara → Hospício → Oficiante → Dossiê → Why, day=0, errors=[]
+git diff --check: exit 0
+```
+
+Navegador Chromium real, sem mock HTTP, com snapshot visual antes de agir:
+carrega `ritual-pending` pelo modal, clica fisicamente uma célula de Pedraclara
+no canvas do Atlas (transformação pública existente), abre o Hospício e encontra
+o rito ainda sem efeito confirmado. Botão “Acompanhar oficiante” seleciona Fenn
+Valverde, carrega o próprio dossiê e abre receipt/causas pela Crônica. Zero
+page errors. Mesma fixture preparada de E334.b1; não é emergência natural nem
+provider. Não reexecutamos todo o backend: mudou somente composição visual.
+
+Fingerprints SHA-256:
+
+- RiteExecutions.vue: `633c99e97d11eeceed124204e2fbb7d522c9cc999c47465c0d0082a019dd48d9`
+- ResearchPanel.vue: `2aff2cb9a6270dc74f780b75fd72ecf6ba4b1278f32dab8c42b04a58cfc9b79b`
+- Inspector.vue: `dc3e2ae0993d16c28bde3337f7ec440ab7e38ea43fec97d54a1cff7cc0ac95ba`
+- i18n.ts: `d545db4a0c8771a8848deccc3d76f8b34b745820faec051a6aa7abc1502a3f5a`
+- religion.test.ts: `56bb693fffb6511f818c2453183f2d569cf83c111cd828f379d7c72d6dddb7fa`
+- output/playwright/e334-atlas-ritual-browser.mjs: `9d80704d9e56ede30cab529773b9a4c4e29e1387770360124593cb177486cd21`
+- output/playwright/e334-atlas-ritual.png: `bd545887cdc01925158a9d81420c92c3903d7c76d24351d7c9888056caf0f444`
+- dist-medieval/index.html: `51a1db148ffe5a72d048369379523fcd8d2fa40bfa8a70027c9a534cadd70129`
+- bundle index-DEf_OSe8.js: `2fef9142790f8284d75426ca1ea99208f80601a3ae08addd908e84a54e88b04b`
+
+E334 encerrado no seu recorte UI/browser, sem declarar M7 inteiro. Runtime
+isolado finalizou shutdown limpo (handle 24644 exit 0); goal permanece ativo.
+Disco ~138 MiB livres. Próximo M7/E335, já registrado na matriz: composição
+M1–M6 com recursos reais disputados e decisões próprias. Gates M8, provider
+novo, adaptação natural e publicação permanecem abertos. Sem exclusão de
+artefatos, consulta externa, commit/push/merge/deploy nesta continuação.
+
+## E335.a — Campanha composta com povos, adesão e disputa ritual — 29/09/2026
+
+HEAD `3c6e590e`, WIP preservado. Reutilizada a trajetória controlada existente
+`test_blocked_campaign_reaches_prepared_garrison_without_post_start_injection`.
+Antes da linha inicial, cenário transfere um residente anão existente para
+Pedraclara, declara qualificações/pressão como premissas, posiciona presença
+institucional e redistribui reagentes/cristais existentes entre Aurora/Coro.
+Dois oficiantes distintos oferecem restauração local; patrocínios reais usam
+o mesmo estoque com seis reagentes e dois cristais. Contrato não reserva bens.
+Convite à coorte orc não produz fé: somente sua escolha independente, em agenda
+posterior ao início, registra adesão. Os quatro povos permanecem no mundo.
+
+Depois do início, os dois ramos avançam exclusivamente com `MedievalSimulator`
+e política controlada do provider stub, escolhendo opções atuais por ator e
+descrição, nunca executores/injeções materiais no roteiro. Permanecem as decisões
+política/QG/comandante, demanda de criatura, transporte físico, cerco/efeito civil,
+guarnição e solução bilateral contrafactual. Um rito consome quatro reagentes,
+um cristal e trabalho pago; o concorrente falha sem efeito nem consumo duplicado.
+
+Correção causal delimitada em `rites._fail`: falta de meios referencia receipts
+canônicos dos recursos efetivamente insuficientes, dinheiro quando insuficiente
+e trabalho local quando indisponível. Reutiliza disponibilidade do resolver;
+não atribui o bloqueio a recursos que continuam suficientes. Nenhuma mecânica,
+custo, schema ou resultado foi inventado/alterado para garantir atividade.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e335-tests .venv/bin/python -m pytest tests/test_medieval_rites.py tests/test_medieval_elemental_rite.py tests/test_medieval_evocation.py tests/test_medieval_campaign_creature_interference.py::test_blocked_campaign_reaches_prepared_garrison_without_post_start_injection -q --tb=short
+23 passed in 20.56s
+```
+
+Ambos os ramos chegam ao dia 90; save/load compara snapshots completos e
+auditoria canônica exige `ok=true`. Falha ritual aponta explicitamente ao receipt
+do rito concorrente. Arquivos reproduzíveis em
+`/tmp/pytest-of-matheus/pytest-1010/test_blocked_campaign_reaches_0/`:
+`campaign-garrison-blocked.mws`, `campaign-garrison-control.mws`.
+Cópias pequenas para navegação isolada em `/tmp/cws-e334-browser/saves/medieval/`
+com IDs `composed-blocked`/`composed-control`; não são saves reais do usuário.
+
+SHA-256: rites.py `c8d6c68cf2e5d94b46cc69f5de5b70c0872eb86efef1d875b9241770f7ae6b1c`;
+teste integrado `155fbb04183d2140e8d30d3e48852c63145e6cf416bb082ca9bf79188c77c76b`.
+Limites: cenário preparado, adesão decidida por stub; não provider real, política
+offline/natural ou gate longo. Não cobre cada operação de magia/catálogo no mesmo
+mundo; capacidades raras seguem as provas M5/M6. M7/M8 abertos. Disco ~129 MiB,
+sem exclusão de artefatos, novas vertentes, publicação ou execução em mundo real.
+Próximo E335.b: investigação pelo navegador de campanha/rota e disputa ritual.
+
+## E335.b — Investigação real dos dois ramos compostos — 29/09/2026
+
+Somente roteiro ad-hoc `output/playwright/e335-composed-browser.mjs`, sem nova
+suíte nem código UI. Reutilizados build/type-check E334.b2 intactos e Chromium
+local instalado: wrapper npx não disponibiliza playwright-cli neste ambiente;
+nenhum pacote baixado. Skill Playwright orientou snapshot antes das interações,
+DOM atual, navegador real e artefato em output/playwright. API sem mocks, servidor
+loopback com namespace `/tmp/cws-e334-browser`, sem provider/segredos/egress.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e334-browser .venv/bin/python -m uvicorn src.server.main:app --host 127.0.0.1 --port 8764
+node output/playwright/e335-composed-browser.mjs
+ok=true, day=90, failed=rite:event:281, completed=rite:event:277, errors=[]
+git diff --check: exit 0
+```
+
+Fluxos por controles reais: load do ramo bloqueado → Atlas/Pedraclara → rito
+falho → why → rito concorrente concluído → deltas reagentes/cristais; acompanhar
+oficiante anão → dossiê ritual próprio. Atlas/Portovelho → rota fluvial zero →
+relatório datado → causa. Governos/Valedouro → mandato → mesma coluna histórica
+→ evento final: presença cessou por falta de provisões, não vitória inventada.
+Load do controle → Diplomacia → compromisso de retirada → execução material
+com causas. Os dois acordantes continuam com termos/execuções independentes.
+
+As primeiras tentativas falharam por expectativas erradas do roteiro (texto
+"saúde restaurada"/"Coluna atribuída"/"Execução material" e tentativa de achar
+coluna vinculada num plano já encerrado). Corrigimos o harness usando DOM/textos
+reais e caminho existente pelo compromisso; nenhum resultado nem UI alterado
+para satisfazer expectativa. Última execução exit 0, zero page errors. Servidor
+handle 98364 encerrou shutdown completo exit 0. Encerrar runtime de teste não
+pausa goal; pedido atual é continuar, sem nova pausa.
+
+Roteiro SHA-256 `d59cddd81db243aeeb2ddb84860adac5556270478cfacec8159a1c193da120e1`.
+Disco ~115 MiB livres; sem screenshots/saves grandes adicionais ou remoções.
+M7/E335 permanece aberto: esta trajetória não demonstra aplicação tecnológica
+nem adaptação econômica sustentada completas. Próximo E335.c registrado antes
+de agir; reutilizar ligações M1/M3, sem nova vertical. Gates M8, consultas reais,
+smokes naturais, commit/push/merge/deploy continuam não executados neste recorte.
+
+## E335.c — Tecnologia e resposta econômica na trajetória composta — 29/09/2026
+
+HEAD `3c6e590e`, WIP preservado; mudou somente o teste integrado existente e
+roteiro ad-hoc de navegador. A guarnição preparada recebe uma ferramenta
+transferida do estoque existente de Escarlia e conhecimento prévio declarado
+como premissa. Conhecimento sozinho não altera força. A decisão atual inicia
+instrução: consome ferramenta, exige três dias abastecidos e só então concede
+o efeito limitado àquela coluna. Nos dois ramos, conclusão posterior ao início
+referencia conhecimento, processo e presença física. Não é prova nova de
+pesquisa paga, cuja cadeia mantém o aceite M3; não houve nova lei/material owner.
+
+A fixture de cargo removia toda produção. Conservamos somente um campo ordinário
+de Pedraclara, com os bindings/receita/capacidade do mapa inicial, registrado
+como premissa explícita: zero comida, salário ou colheita adicionados. A cadeia
+civil do mesmo mundo continua nas agendas normais até o dia 240. Auren seleciona
+construção em seu menu e depois fundação; materiais, caixa, trabalho e comissão
+pertencem aos owners. A linha paga artesãos; compra alimentar posterior aponta
+à folha atual. Ritos e obra usam disponibilidade canônica compartilhada, sem
+reserva mágica pelo compromisso. Mantidas as provas contrafactuais de rota,
+campanha, sociedade, cessar-fogo, adesão e competição ritual. A comparação civil
+militar é feita no fechamento comum original, antes da continuação econômica.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e335-tests .venv/bin/python -m pytest tests/test_medieval_campaign_creature_interference.py::test_blocked_campaign_reaches_prepared_garrison_without_post_start_injection -q --tb=short
+1 passed in 51.94s
+```
+
+Mesmos dois mundos por 240 dias; snapshots completos comparados após save/load,
+auditoria exige ok=true. Saves de `/tmp/pytest-of-matheus/pytest-1012/
+test_blocked_campaign_reaches_0/`; cópias para browser isolado com IDs
+`composed-integrated-blocked` e `composed-integrated-control`, preservando as
+cópias dia 90 anteriores. A mudança de fingerprint não apaga/atualiza o passado.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e334-browser .venv/bin/python -m uvicorn src.server.main:app --host 127.0.0.1 --port 8764
+node output/playwright/e335-livelihood-browser.mjs
+ok=true, day=240, errors=[]
+```
+
+Navegador Chromium real: load → Finanças → folha Oficina de Pedraclara → why,
+nos dois ramos. 20 trabalhadores, bruto 40, tributo 4, líquido 36; saldo familiar
+e consumo pago de rações navegáveis. Primeira tentativa do harness buscava
+"compra"; o texto canônico é "famílias consumiram ... rações por ... moedas".
+Corrigimos somente a expectativa do roteiro, não engine/UI/resultado. A skill
+Playwright orientou snapshots e seletores atuais; reutilizado pacote local,
+sem baixar ferramentas ou criar suíte nova. Servidor 60485 shutdown completo,
+exit 0; não pausa goal. Build UI anterior intacto, não reconstruído sem mudança.
+
+Fingerprints SHA-256:
+- teste integrado: `7b7f4a0ad6a359d2184bc62fbc82b0fc6c001f729043ac3394d91c250f09275c`;
+- browser: `c7f4ee143b89e4d416a7c97628391dbfe73446460662025425cd040c01f47047`.
+
+Regressão focal adicional dos owners intactos:
+`CWS_DATA_DIR=/tmp/cws-e335-tests .venv/bin/python -m pytest tests/test_medieval_force_training.py tests/test_medieval_technology_training_chain.py -q --tb=short`
+→ `7 passed in 2.25s`. `git diff --check` passou.
+
+M7 fechado no escopo controlado E333–E335: investigação sem logs de
+desenvolvimento, controles, escolhas/fontes/efeitos e composição M1–M6.
+Não significa pesquisa paga repetida neste cenário, equilíbrio econômico,
+emergência natural, IA real ou cada capacidade rara usada na mesma partida.
+M8 aberto. Próximo E336 registrado na matriz: checkpoint, fingerprints,
+regressões/gates e saldo de consultas. Nenhuma publicação nesta continuação.
+
+Preflight read-only encontrou cerca de 121 MiB livres e quatro diretórios
+temporários de smokes antigos: `/tmp/cws-v1-final-e196` 596 MiB, e197 723 MiB,
+e198 762 MiB e e199 723 MiB. Solicitada autorização assíncrona para arquivar
+em `/VPS Backups/`, verificar e só então remover esses alvos exatos (~2,7 GiB).
+Nenhum deles foi removido, alterado ou publicado. Código e saves reais preservados.
+
+## E336.a — Checkpoint M7 e conservação do armazenamento — 29/09/2026
+
+Preservado WIP antes da investigação M8, HEAD `3c6e590e`, 105 caminhos:
+`/tmp/cws-e336-checkpoint-lWKBOj/worktree.patch` SHA-256
+`e133160c033f23b293c373c58e54c0e8b3afe79ba7b4f9cf633f21c67b1e0ef8`;
+`untracked.tar.gz` SHA-256
+`39a1ee384dc70d668cb24bd586135197725e076e273854729fafc9d1938ee754`.
+Reverse apply --check passou sem aplicar. Snapshot antecede a correção abaixo
+e estas anotações, não representa código final nem commit/push.
+
+Reproduzida falha conhecida em migração cruzando o mês: alimento observado
+76014, ledger esperava 76317. Diagnóstico enumera todos os deltas de alimento
+dos eventos excluídos por RESOURCE_EFFECTS; oito `public_food_storage_loss`
+somam exatamente -303. Não há coluna militar nesse cenário nem recurso oculto.
+Owner já emitia perda física explícita e causada; o verificador omitira o tipo
+introduzido pela conservação pública. Incluído esse tipo em
+`tools/medieval_autonomy_smoke.py`, sem alterar produção/perdas/migração/recursos.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python -m pytest tests/test_medieval_migration.py::test_migration_provision_crossing_a_month_is_visible_to_resource_ledger -q --tb=short
+ANTES: 1 failed in 1.70s, food 76014 != 76317
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python -m pytest tests/test_medieval_migration.py::test_migration_provision_crossing_a_month_is_visible_to_resource_ledger tests/test_medieval_food_preservation.py -q --tb=short
+DEPOIS: 2 passed in 3.68s
+git diff --check: exit 0
+```
+
+Ferramenta SHA-256 `1897a2a8f1d11391b0524b80c719d5ea18b5988762221259e15cfd02f30d1b2a`.
+Digest de código/testes/tools/static/UI antes do ajuste:
+`e68f72f6fcb8262d01fed958e59287a8856fc60a070a46b7165851dd57bbfd41`.
+Esse digest está superado: não usar para validar checkout pós-ajuste. Regra
+de digest permanece a registrada em E196, sem copiar saves/nodes_modules.
+
+Revisão inicial do orçamento provider achou corpus E195 (10+1 chamadas) e
+mês E204 (limite configurado 20, 15 receipts persistidos, abort no próximo
+turno), em checkouts anteriores. Receipt não é contagem completa de tentativas;
+autorizações antigas não foram tratadas como saldo infinito. Não houve consulta
+real nesta continuação. E336.b segue aberto para inventário/regressão e saldo,
+antes dos gates finais. Disco e backup continuam sem operação destrutiva.
+
+## E336.b1 — Inventário do candidato e instrumento do gate — 29/09/2026
+
+Executado `tools.medieval_material_inventory.report` sobre
+`/tmp/cws-e334-browser/saves/medieval/composed-integrated-blocked.mws`, sem
+alterar o save. 238 callsites candidatos, 232 tipos estáticos, 44 wrappers;
+86 tipos materiais e 203 grupos de delta observados, 179 com fonte nominal
+estática. `causal_audit_ok=true`. Os 11 nomes observados sem correspondência
+nominal são nove premissas explícitas da fixture e `detachment_lapsed` /
+`detachment_commander_released`, resolvidos em wrappers dinâmicos já mapeados.
+Seis pontos dinâmicos permanecem delimitados em civic_protest/commitments/
+force/force_command/rites/siege_campaign. 157 nomes candidatos não aparecem
+nessa trajetória: não exercitados, não aprovação/falha inferida por enumeração.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python -m pytest tests/test_medieval_release_gate.py -q --tb=short
+4 passed in 6.26s
+git diff --check: exit 0
+```
+
+Esses quatro testes verificam checkpoints naturais curtos com conservação e
+save/load, orçamento que rejeita mês lento/amostras incompletas, intervalo
+inválido e exigência de checkpoints anuais para final_v1. Não são o gate de
+3.600 dias nem certificação de todos os owners.
+
+Digest pós-correção do verificador (comando E196):
+`ef1c476eb046cc048fd523e28fcaee450ae51e5f5282c2c5fce334aaca47b389`.
+Repetido e igual; nenhuma mudança de código posterior nesta continuação.
+É candidato, ainda não checkout final aprovado. Ferramentas disponíveis não
+incluem Laya/MetaGame/herdr; nenhuma consulta ou revisão por esses runtimes
+foi alegada. Disco ~127 MiB; autorização para backup/remoção continua pendente.
+E336.b2 e M8 continuam abertos: regressão das famílias alteradas, saldo provider,
+três seeds e gates operacionais, publicação conforme autoridade vigente.
+
+## E336.b2-UI — Regressão medieval e build — 29/09/2026
+
+```text
+cd web: npm run test
+ANTES: 88 passed, 1 failed (tariffs.test.ts)
+cd web: npm run build
+type-check + Vite passaram; 757 módulos, 4.94s, chunk >500 kB permanece
+cd web: npm run test
+DEPOIS: 89 passed / 17 módulos, 5.17s
+git diff --check: exit 0
+```
+
+Falha inicial era seleção frágil do harness: `.stock-card` escolhia a primeira
+projeção de renda de Brumafria, não a política fiscal. O conteúdo fiscal e botão
+de proveniência estavam presentes. O teste agora localiza export-policy-source
+e seu cartão, conserva a asserção 12,5%, semântica de tarifa de venda (não
+passagem) e o clique que abre `event:export-policy`. Só alterado teste, nenhuma
+regra fiscal, componente ou contrato. Não omitimos a falha inicial do relatório.
+
+Teste SHA-256 `dcdd955a5f5284d7a19d25c7ad0569bd32cbaf11cec17bcf4b0703dc76e870b0`.
+Digest candidato após corrigir o teste:
+`fba252bd5f2fc0d5ad8644041f533e167370a74931e8028c520a72851ca79017`.
+Digest ef1c de E336.b1 está superado somente por essa mudança de teste.
+E336.b2 backend e gates M8 permanecem abertos. Não inferir suíte Python
+completa verde dos 89 testes UI. Sem consultas reais, remoção de arquivos,
+commit/push/merge/deploy; goal continua ativo, sem pedido novo de pausa.
+
+## E336.b2-backend-A — Regressão das famílias materiais — 29/09/2026
+
+Executados 17 módulos: material_execution, engine, persistence, demography,
+migration, migration_knowledge, research, industry, rites, elemental_rite,
+evocation, food_preservation, religion, religion_policy,
+religious_social_response, religious_teaching e actor_dossier.
+Resultado: **162 passed em 60.69s**, com CWS_DATA_DIR isolado em
+`/tmp/cws-e336-tests`. As falhas históricas de indústria não se reproduziram
+nessa execução; nenhum ajuste especulativo foi feito para elas.
+
+Grupo B de bilateralidade, campanhas e API em andamento: duas falhas de
+mercado sinalizadas, ainda aguardando os traces finais antes do diagnóstico.
+Isso não é aprovação da regressão backend inteira nem do gate longo.
+Fingerprint de código permanece o candidato fba252 de E336.b2-UI.
+Usuário revogou a necessidade de pausa; goal continua ativo. Disco chegou
+a aproximadamente 71 MiB livres; não foram removidos backups ou saves.
+
+## E336.b2-backend-B — Bilateralidade, campanha e API — 29/09/2026
+
+Grupo B de 15 módulos: markets, knowledge_verticals_fail_closed, diplomacy,
+diplomacy_policy, family_loans, institutional_aid, institutional_aid_policy,
+institutional_memory, institutional_agenda, institutional_decision_turn,
+institutional_action_cap, siege_campaign, campaign_ordnance, force_training
+e api. Resultado inicial: **194 passed, 2 failed em 400.28s**. Inclui o ciclo
+público de criação, avanço de um ano e retomada; não é gate de dez anos.
+
+Falhas reproduzidas e isoladas sem alterar física ou saves reais:
+
+- A expectativa de oferta 30.000 ignorava `public_food_storage_loss` anterior
+  à cotação. Receipt event:12: reserva 2.000, excedente exposto 28.000,
+  perda 140; mercado observa corretamente 29.860.
+- `tools/medieval_trade_smoke.assert_conservation` ignorava deterioração.
+  No dia 30: initial_food=26.700, stock+cargo=17.922, consumed=8.700,
+  storage_loss=78. A diferença era exatamente o delta da perda canônica.
+
+Corrigidos apenas a expectativa em `tests/test_medieval_markets.py` e o ledger
+do smoke preparado, que agora soma estoque + carga + consumo + deterioração.
+Nenhuma criação/restituição de alimento, mudança de preços ou desligamento de
+perdas para satisfazer testes. Regressão posterior de markets e
+food_preservation: **17 passed em 16.74s**. Grupo B inteiro não foi repetido:
+os 194 resultados permanecem do kernel inalterado; as duas falhas foram
+reexercitadas junto à sua família. A tentativa inicial do diagnóstico sem
+CWS_DATA_DIR falhou por escrita de log fora do sandbox; repetido com diretório
+isolado, sem modificar dados reais.
+
+Fingerprint candidato após esses dois ajustes de verificação:
+`cdc5b98efc8a916a1ec7f9fa8f6f946684f558379ddbe7dbbd73eeaf04618d9c`.
+Substitui fba252; não modifica a mecânica M0–M7. E336.b2 fechado nesse recorte;
+M8 continua aberto para provider atual, três seeds/3.600 dias, orçamentos e
+entrega. Sem consultas reais, commit/push/merge/deploy ou remoção de backups.
+
+## E336.b3 — Prévia atual e corpus real parcial — 29/09/2026
+
+Novo diagnóstico `tools/medieval_completion_provider_probe.py` reaproveita
+turnos nativos e fixtures existentes: fé sem adesão anterior, fé com adesão
+própria prévia, iniciativa elemental, evocação e menu institucional do save
+composto dia 240. Qualificação/materiais das fixtures são premissas declaradas,
+não emergência natural. Perfil codex_cli/gpt-6-luna somente em memória;
+nenhum segredo/perfil persistido. Opções são recompostas e o owner continua
+responsável pela mudança. Sem flag de egress o diagnóstico só faz preview
+mock NO_ACTION, explicitamente distinto de consulta real.
+
+```text
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python tools/medieval_completion_provider_probe.py --source /tmp/cws-e334-browser/saves/medieval/composed-integrated-blocked.mws
+preview complete=true; 0 chamadas reais; opções 1/1/2/2/41; fonte intacta
+mesmo comando com --allow-provider-egress
+complete=false; 3 invocações do boundary; duas decisões de adesão válidas;
+terceiro caso elemental: ProviderDecisionRequired; sem continuar os demais
+```
+
+Ambas as decisões reais selecionaram a adesão ao convite do Coro; a segunda
+mudou uma fé previamente escolhida. Não exigimos recusa/coerência subjetiva
+como resultado predeterminado. Receipts de interpretação têm zero deltas;
+cada owner emitiu uma transição de adesão em memória, validada pela história e
+snapshot. O save fonte manteve SHA-256
+`6b7a2f3d83b69fc3badd81facd962e390839c258d3e4e07c9866c71e2ee2c671`.
+Falha inicial de preview por perfil sem base_url foi corrigida antes do egress.
+
+**Limite de orçamento identificado:** E260 registra 15/20 consultas históricas.
+O diagnóstico inicialmente contou invocações de call_llm_json, mas essa função
+permite três retries de parsing por padrão. Os três boundary calls desta rodada
+não provam três tentativas de transporte. Não inferir saldo de duas consultas,
+nem consumir nova autorização. O diagnóstico agora força max_retries=0 antes
+de qualquer egress futuro e registra somente classes na cadeia de falha, sem
+mensagem/prompts/segredos. O corpus segue incompleto; não há novo egress após
+essa correção, nem explicação confirmada da terceira falha além da classe.
+
+Durante a rodada o disco chegou a zero bytes livres, impedindo iniciar o
+sandbox. Não é prova de que esse foi o erro interno do provider. A cópia
+temporária produzida pelo teste público
+`pytest-1018/test_public_lifecycle_creates_0/saves/auto-92922f6011b4477cb1fb20b62db89efe.mws`
+foi removida somente após cmp e SHA-256 confirmarem identidade com o arquivo
+`um-ano.mws`, preservado no mesmo diretório (hash
+`27feab159e6c32d0985a1fce56cb2c3cac30a4e605e0f5fa04e15824bfe73470`).
+Recuperação da cópia é possível a partir desse arquivo idêntico; ~4,4 MiB
+livres após limpar apenas essa redundância dos meus testes. Backups E196–E199,
+mundos reais, save composto e código permanecem intactos. Autorização para
+externalizar/remover aqueles quatro diretórios continua pendente.
+
+M8/E336.b3 aberto. Não rodar seeds longas nesse disco, não declarar corpus
+real completo e não repetir consultas com saldo incerto. Goal ativo, sem pausa.
+
+Fingerprint após guard do diagnóstico:
+`c13f4e0ce9fb377a389ae66ad97927ead894da89c2408776d41ba377429684d3`.
+Somente ferramenta de validação nova; nenhuma lei/owner M0–M7 alterado.
+`git diff --check` passou; nenhum commit, push, merge ou deploy.
+
+## E336.c — Backup local preparado sem ocupar o disco principal — 29/09/2026
+
+Dropbox metadata confirmou, read-only, o arquivo histórico
+`/VPS Backups/cws-resume-year3-to6-20260923.tar.gz`, 98.621.855 bytes,
+server_modified 2026-09-23T12:00:59Z. O arquivo local de mesmo nome não existe
+mais em /tmp. Metadata/tamanho não verificam novamente o conteúdo remoto nem
+abrangem os diretórios E196–E199; não houve download, upload ou exclusão por
+essa consulta. A skill inspect-dropbox-file foi usada somente para inspeção.
+
+Alternativa local verificada: /dev/shm tem tmpfs independente, 7,8 GiB,
+com RAM disponível inicial ~9,7 GiB. rclone está instalado, mas sem config/
+remotes; não configuramos tokens nem usamos um destino presumido. Preparado
+archive dos quatro diretórios de testes em diretório temporário dedicado:
+
+`/dev/shm/cws-e336-backup.xPjaha/cws-v1-final-e196-e199-20260929.tar.gz`
+
+```text
+tar -C /tmp -I 'gzip -1' -cf <archive> cws-v1-final-e196 cws-v1-final-e197 cws-v1-final-e198 cws-v1-final-e199
+sha256sum <archive>
+952de40e2681d276898b23ea1575430c9da074256fe35644c95489660c47d557
+tar --compare -zf <archive> -C /tmp
+exit 0, nenhuma divergência
+stat: 1.882.079.288 bytes
+```
+
+É uma cópia temporária em RAM, não um novo checkpoint durável: desaparece ao
+reiniciar. Os quatro originais continuam intactos (596/723/762/723 MiB) e
+são a fonte preservada. O arquivo só foi preparado/comparado localmente;
+autorização pendente de upload/remoção não foi inferida desta preparação.
+O disco principal permanece insuficiente (~2,3 MiB), portanto nenhum gate
+longo foi iniciado. E336.c fecha apenas preparação/verificação local; externo,
+limpeza e M8 continuam abertos. Nenhuma consulta provider adicional ou mudança
+do kernel; fingerprint c13f4e permanece. Sem commit/push/merge/deploy.
+
+## E336.d — Checklist coerente com a evidência já aceita — 29/09/2026
+
+Auditoria das caixas do contrato identificou uma caixa M1 ainda aberta, embora
+o mesmo contrato (topo e conclusão E282) já declarasse aceite no cenário
+preparado. Reconciliada com o contrafactual registrado: seis ciclos, falta em
+Campomanso 791→0, health 658→854, dinheiro 76.000 conservado e diferença zero
+nos demais assentamentos frente ao controle NO_ACTION. O cenário ainda retém
+as decisões dos outros atores, e é pior que o fallback sistêmico; isso permanece
+explicitado e não foi convertido em prova de prosperidade/adoção natural.
+Gate B natural continua em M8. Nenhuma nova simulação foi alegada para M1.
+
+Caixa UI/regressão apropriada/browser de M8 marcada com as provas E334–E335 e
+E336.b2: UI 89 testes + build/type-check, navegabilidade e save/load/retomada
+reais, grupos backend A/B com falhas iniciais conservadas e revalidação focada.
+Não é suíte legada inteira verde; mudanças posteriores foram ferramentas de
+validação, testes e docs, não componentes/owners desses fluxos.
+
+M8 ainda requer fingerprint final, corpus real limitado completo, três seeds
+por 3.600 dias/orçamentos e entrega operacional. E336.c possui 138 membros no
+archive, tar --compare exit 0; apenas cópia tmpfs com originais preservados.
+Sem upload, remoção dos quatro diretórios, novas consultas, commit/push/deploy.
+
+## E336.e — Checkpoint Git revisável do avanço acumulado — 29/09/2026
+
+Antes de stage: 90 arquivos rastreados alterados e 26 não rastreados individuais
+identificados; índice vazio. Código/configuração ficcional/testes/UI/specs e
+quatro scripts de navegador foram conferidos e staged; screenshots e
+`.last-run.json` do runner ficaram preservados, sem exclusão nem inclusão no
+commit. Nenhum segredo/configuração de provider ou save real entrou no índice.
+
+`git diff --cached --check` passou. Criado commit local `5b4b5227`
+(`wip: checkpoint medieval integration through M7`): 109 arquivos,
+7.198 inserções/314 remoções. Esse volume é o avanço acumulado E286–E336, não
+implementação desta continuação. Preserva o HEAD anterior `3c6e590e` e todo
+histórico; não houve reset, rebase, push, merge ou deploy. A documentação de
+contrato/checklist/diário acompanha em commit separado. Não foi rodado gate
+longo, nova consulta provider ou nova suíte para chamar esse checkpoint de
+release. Código permanece c13f4e; M8 aberto e critérios não relaxados.
+
+Também corrigidas superfícies documentais: topo do diário estava em E334.b2,
+crosswalk da matriz ainda chamava M4–M6 de abertos, embora seus checklists e
+contrato já registrassem os aceites controlados. Atualizados com as referências
+existentes, preservando limites de fixture/provider/natural e histórico.
