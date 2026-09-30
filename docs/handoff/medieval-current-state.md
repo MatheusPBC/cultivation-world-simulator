@@ -502,6 +502,43 @@ progresso stderr `progress.log`; relatório final só é evidência após térmi
 terminal confirmado e leitura integral de seus checks. Seed73 iniciou;
 seeds101/137 ainda não são resultados verificados. Sem push/merge/deploy.
 
+## E352 — Cobertura econômica da política offline — 30/09/2026
+
+Revisão somente leitura no código congelado `c531cdad`, fingerprint completo
+`95543bab9dcf23403354d786475cc18376175c0c207d5711f98cd1545b660f46`.
+Comandos reproduzíveis: `rg -n 'family_loan_adapters|employment_staffing_adapters|production_priority_adapters' src/sim/medieval`
+e leitura dos módulos abaixo. Sem testes, carregamento de saves, novas chamadas
+provider ou alteração de runtime; E351 permaneceu ativo no handle8401.
+
+- `institutional_agenda.py:monthly_adapters` compõe empréstimo familiar,
+  staffing, prioridade produtiva, emprego, provisões domésticas e relief; os
+  adapters civis incluem construção/fundação. O turno composto em
+  `institutional_decision_turn.py:review_institutional_decision_turn_with_provider`
+  retorna sem selecionar quando `ai_enabled=false`.
+- `engine.py` liga fallbacks explícitos de emprego permanente, transição de
+  trabalho, provisões domésticas, relief e outras políticas existentes. Não há
+  seleção offline equivalente para empréstimo, staffing ou prioridade produtiva.
+  Disponibilidade no menu da IA não significa escolha no smoke routine-rules.
+- `investment.py:review_investment` expande linhas existentes sob pressão de
+  capacidade/armazenamento e meios suficientes; ignora blueprints de fundação ou
+  concessão de capability. Não é construção offline de uma oficina nova.
+- `relief_policy.py:review_relief_fallback` escolhe no máximo uma opção local
+  urgente por polity, com relatório atual e shortfall >=20. Provisões domésticas
+  do fallback preparam migração; não substituem o consumo alimentar mensal.
+
+Limites: esse mapa é prova de código, não recomposição das opções de uma seed.
+Caixa zero de Auren e poupança agrícola de Brumafria não podem ser combinados:
+os owners e localidades são distintos. Um empréstimo exige pedido/aviso próprios,
+relatório datado, elegibilidade e saldo emprestável da coorte local; a soma de
+poupanças não demonstra que uma opção estava válida ou foi recusada.
+
+Próximo aceite econômico continua aberto: examinar receipts naturais de produção,
+folha, compra/consumo, auxílio, transições e mortalidade por local/coorte em seis
+ciclos, depois do gate para não competir com sua medição. A diferença de cobertura
+offline/provider não fecha adaptação, não justifica piora estrutural e não autoriza
+novo fallback, dinheiro artificial ou mais consultas externas. E351 segue a
+medição integral nas três seeds; nenhum gate foi reiniciado nesta revisão.
+
 ### Estado herdado do checkpoint E336.g
 
 As pendências/autorização/disco abaixo são histórico; a situação vigente está

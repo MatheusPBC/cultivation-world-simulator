@@ -511,6 +511,15 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     fingerprint95543bab. E348 limitado p95 34.6118s/84 permite testar o
     candidato, mas não garante sucesso. Sem provider real/fixture/cota de
     drama, alteração de fonte, relaxamento de limites ou extrapolação de p95.
+  - [x] E352: preparar a revisão de adaptação natural por leitura dos caminhos
+    econômicos e das políticas atuais: quais respostas entram no menu provider
+    e quais são escolhidas pelo fallback offline; distinguir capacidade ausente,
+    meios insuficientes e escolha de política. Sem carregar saves/rodar testes em
+    paralelo, alterar runtime ou consultar provider durante E351. Leitura estática
+    não fecha Gate B; a conclusão exige receipts da trajetória e efeito por coorte.
+    Mapa verificado no diário: turno composto não seleciona com ai_enabled=false;
+    empréstimo/staffing/prioridade são adapters sem fallback equivalente; emprego,
+    transição, relief e expansão existente têm políticas offline delimitadas.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
