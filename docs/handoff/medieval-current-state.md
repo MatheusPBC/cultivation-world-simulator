@@ -11,8 +11,9 @@
   passaram. E349 confirmou equivalência tardia, com ganho mensal pequeno.
   E350 descartou o observador como gargalo. E351 terminou exit0 no código
   congelado: três seeds×3600, conservação, persistência, auditorias e budgets
-  passaram. Isso não aprova adaptação econômica natural; E353 revisará os
-  receipts e efeitos por coorte, sem nova vertical nem alteração dos saves.
+  passaram. E353 reconciliou uma janela econômica natural, mas não demonstrou
+  adaptação sustentada; E354 rastreará uma resposta efetivamente escolhida e
+  a mesma coorte por seis ciclos, sem nova vertical nem alteração dos saves.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -572,6 +573,49 @@ ciclos, depois do gate para não competir com sua medição. A diferença de cob
 offline/provider não fecha adaptação, não justifica piora estrutural e não autoriza
 novo fallback, dinheiro artificial ou mais consultas externas. E351 segue a
 medição integral nas três seeds; nenhum gate foi reiniciado nesta revisão.
+
+## E353 — Recibos naturais reconciliados, adaptação não aprovada — 30/09/2026
+
+Base documental `c0ed5ae1`; código/fingerprint continuam c531cdad/95543bab.
+Leitura do save final E351 seed73; fonte SHA1a2ec8ef inalterada antes/depois.
+Janela1440<dia<=1620, Campomanso. Sem avanço, provider, teste ou save novo.
+Comando de diagnóstico: `CWS_DATA_DIR=/tmp/cws-e351-final-data .venv/bin/python
+.tmp_codex/e351-final-TxnsDs/analyze_campomanso_1440_1620.py --source
+.tmp_codex/e351-final-TxnsDs/natural-73.mws --output CAMINHO_NOVO.json`.
+O script recusa sobrescrita. Relatório preservado `campomanso-1440-1620-v2.json`,
+SHA `fc2da195d6cce826da38284f67c25ffaaf02fbace6c649dcd1e1e3aa65f6bbb4`;
+script atual SHA `f2ae85e739128cc937f90e120f0f53f53c87f6333039031774cc784dfcc57896`
+inclui uma projeção adicional de reconciliação; não prometer o mesmo hash de
+JSON em nova execução. V1 permanece preservado mas foi rejeitado: whitelist
+omitia salários/perdas/fretes e misturava estoques públicos/domésticos.
+
+V2 contém480 eventos contextuais, não480 eventos materiais locais. A revisão
+principal selecionou deltas pelos IDs exatos de stock/conta e grupos dos
+receipts de subsistência; referências textuais do filtro contextual não provam
+localidade histórica de pessoas. Nenhuma população passada foi inferida do
+estado atual. Estoque público:13949→4016, delta-9933, sem lacuna na sequência
+before/after. Componentes: produção+2400, entrega+5, compras-7466, fretes-4123,
+deterioração-292, relief-457. `event:57117`/dia1442 envia294 para Cinzaverde
+com decisão própria; outras remessas abastecem Pedra Clara. Saída de estoque
+não é desaparecimento de matéria; carga e destinos conservam seus owners.
+
+Os salários agrícolas somam14064, imposto1392 e compras10291: contas farmers
+sobem2381 (anão488, elfo124, humano1082, orc687), reconciliando456→2837.
+Artisan anão recebe2 e compra4, saldo2→0; saldo sozinho não prova privação
+nova. Há24 `permanent_employment_settled` para contratos agrícolas existentes,
+não24 novas contratações. Deltas de tesouro nos eventos selecionados não são
+seu saldo global: Auren também paga/recebe em outros locais.
+
+Dia1470: produção24 lotes (`event:57585`), subsistência457 faltantes e saúde
+812→779; relief457 (`event:58360`) dá779→799 e abastece pantries. Dia1500
+essas457 são consumidas; falta0 e saúde819. Depois falta5 nos quatro ciclos,
+saúde cai1/ciclo até815; déficit residual é dos grupos soldados/dependente.
+Produção é zero em1500–1620, limitada exclusivamente por payroll_funds, apesar
+de trabalho, site e armazenamento disponíveis (`event:59293` e sucessores).
+Não há delta local de morte/migração nesta seleção histórica. Existem salários
+e compras reais, mas não foi provada resposta estrutural nova nem reposição do
+estoque; queda do déficit não aprova GateB. Próximo E354 procura uma escolha
+natural de emprego/transição e acompanha a mesma coorte, não repete o gate.
 
 ### Estado herdado do checkpoint E336.g
 

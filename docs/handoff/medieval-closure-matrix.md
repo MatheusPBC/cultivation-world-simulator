@@ -525,10 +525,22 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Mapa verificado no diário: turno composto não seleciona com ai_enabled=false;
     empréstimo/staffing/prioridade são adapters sem fallback equivalente; emprego,
     transição, relief e expansão existente têm políticas offline delimitadas.
-  - [ ] E353: revisar uma cadeia econômica natural de seis ciclos pelos
+  - [x] E353: revisar uma cadeia econômica natural de seis ciclos pelos
     receipts do E351 e efeitos por coorte; distinguir emprego/renda/compra,
     relief, morte/migração e gasto de estoque. Não concluir adaptação por
     queda de falta agregada; manter saves originais intactos e provider desligado.
+    Campomanso1440→1620: extração v1 rejeitada por whitelist incompleta;
+    v2 reconciliou estoque público13949→4016 sem lacunas e salários/tributos/
+    compras agrícolas456→2837. Relief457 vira consumo doméstico no ciclo
+    seguinte; produção24 lotes em1470 e zero nos outros cinco ciclos por caixa.
+    Diagnóstico concluído, adaptação sustentada NÃO aprovada. Diário conserva
+    comando/hashes/receipts e distingue deltas locais de saldo global do tesouro.
+  - [ ] E354: identificar nos receipts naturais preservados uma contratação
+    ou transição efetivamente escolhida após pressão conhecida; rastrear a
+    mesma coorte por seis ciclos, renda e acesso alimentar, sem confundir
+    acordos iniciais com resposta nova ou demanda reduzida por mortes/migração.
+    Se não houver candidato verificável, registrar a lacuna de escolha/política
+    antes de qualquer alteração; sem novo smoke longo ou provider.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

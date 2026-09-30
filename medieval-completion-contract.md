@@ -634,8 +634,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E353, revisão causal da adaptação econômica
-natural por coorte e seis ciclos nos receipts preservados de E351. O gate
+Próximo trabalho imediato: M8/E354, rastrear uma resposta natural efetivamente
+escolhida e a mesma coorte por seis ciclos nos receipts preservados de E351.
+E353 reconciliou Campomanso1440→1620: salários reais e auxílio reduzem falta,
+mas a produção fica em zero por caixa e o estoque cai; GateB não aprovado. O gate
 técnico73/101/137×3600 passou no código congelado95543bab; não o repetir sem
 mudança que invalide a prova. E350 encerrou hipótese
 de observador caro, sem mudança especulativa. E349
