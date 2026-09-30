@@ -232,12 +232,17 @@ def _copy_transaction_value(value, *, share_values=False):
     if hasattr(value, "__pydantic_fields__") and hasattr(value, "__dict__"):
         if share_values:
             # Frozen scalar SocietyValue models are replaced by owners rather
-            # than mutated in place.  Knowledge registries contain only these
+            # than mutated in place. Knowledge registries contain only these
             # scalar observation/notice values, so sharing them avoids
             # re-walking the historical index on every transaction.
             return value
         result = copy.copy(value)
         for key, item in value.__dict__.items():
             object.__setattr__(result, key, _copy_transaction_value(item, share_values=share_values))
+        for attribute in ("__pydantic_extra__", "__pydantic_private__"):
+            payload = getattr(value, attribute, None)
+            if payload is not None:
+                object.__setattr__(result, attribute, _copy_transaction_value(
+                    payload, share_values=share_values))
         return result
     return value

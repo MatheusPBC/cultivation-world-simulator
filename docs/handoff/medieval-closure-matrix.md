@@ -368,11 +368,33 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     - [x] Provider: três tentativas sem retries; elemental/evocação selecionaram
       ofertas atuais (2 opções cada), composição selecionou relief entre 41
       opções. Receipts sem deltas; owners geraram 11 eventos materiais apenas
-      no fork composto. Hash do save original preservado. Upload ainda aberto.
+      no fork composto. Hash do save original preservado. Upload multipart
+      e manifesto verificados; remoção somente dos quatro diretórios autorizados.
   - [ ] E337: após backup e preflight, executar `medieval_release_gate.py`
     com seeds 73/101/137, 3600 dias, checkpoints anuais e `--final-v1`, no
     fingerprint congelado 1c2e7f. Registrar cada seed, auditorias, conservação,
     retomada e budgets sem relaxá-los; offline não conta como provider real.
+    Gate reprovado por orçamento no candidato 1c2e7f: até mês 94 já havia sete
+    amostras acima de 35s; portanto o p95 de 120 amostras necessariamente excede
+    o teto. Processo encerrado após checkpoint anual 2880 seguro, exit 143;
+    não considerar execução incompleta como gate final nem relaxar limites.
+  - [ ] E338: perfilar um horizonte de 30 dias em cópia de memória do checkpoint
+    natural 2880, sem provider/reescrita do save. Reutilizar o profiler existente,
+    identificar o maior custo antes de alterar fonte e provar equivalência da
+    otimização com testes focados. Novo candidato exige novas três seeds completas.
+    - [x] Medir baseline: 43.400713s instrumentados; cópia 11.663214s.
+    - [x] Auditar fonte preservada: 125.148 eventos, `ok=true`, exit 0.
+    - [x] Regressão focada: 67 testes de cópia/engine/material/persistência.
+    - [x] Comparar snapshot/RNG/história completa em dois experimentos de
+      30 dias; ambos idênticos, saves originais intactos.
+    - [x] Rejeitar frozen-leaf sharing: benchmark alternado de cinco amostras
+      por variante mostrou CPU 0.093646s → 0.103338s por cópia (regressão).
+    - [ ] Provar ganho no candidato restante e custo mensal aceitável antes
+      de repetir as três seeds; equivalência dos experimentos não fecha budget.
+    - [x] Retirar também o fast path de primitivos sem ganho comprovado.
+      Fonte restante apenas isola payloads extras/privados; cinco testes passaram.
+    - [x] Medir custos agregados sem cProfile por valor: mês 34.38s, cópia
+      7.22s, relações 5.74s, economia 4.47s; fonte preservada.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

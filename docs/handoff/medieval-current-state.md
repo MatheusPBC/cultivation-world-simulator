@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E337 em execução — 30/09/2026
+## Situação vigente — E337 reprovado / E338 diagnóstico — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -11,9 +11,18 @@
   SHA-256 completo intacto. Apenas E196–E199 removidos, recuperáveis pelo backup;
   cerca de 2.7 GiB liberados. Disco após limpeza: 9.0 GiB livres. Variações
   externas de espaço não foram atribuídas a essa limpeza.
-- E337 em execução: seeds 73/101/137, 3600 dias, checkpoints 360, `--final-v1`,
-  fingerprint 1c2e7f. Diretório `/tmp/cws-v1-final-e337.SdyTOb`; resultados ainda
-  pendentes. Runtime congelado, sem nova feature nem relaxamento de budgets.
+- E337 reprovou por orçamento mensal: oito das primeiras 98 amostras >35s
+  tornam o p95 final de 120 amostras necessariamente >35s. Encerrado somente o
+  benchmark após checkpoint 2880 seguro (último progresso dia 2940), exit 143.
+  Seeds 101/137 não executadas; gate completo continua devido, não aprovado.
+- E338 em execução: auditoria do checkpoint 2880 passou (`ok=true`, 125.148
+  eventos); 67 testes focados de cópia/engine/execução material/persistência
+  passaram nos experimentos; cinco testes de cópia passaram na fonte restante.
+  As duas otimizações de cópia foram rejeitadas por ausência de ganho medido.
+  Fonte restante apenas isola payloads privados/extras; medição agregada dos
+  custos reais terminou, sem reiniciar o gate longo.
+  Save original preservado em `/tmp/cws-v1-final-e337.SdyTOb`.
+  A alteração de fonte invalida o fingerprint 1c2e7f como candidato novo.
 
 ### Estado herdado do checkpoint E336.g
 
@@ -124,6 +133,106 @@ média era 315.38 e havia 979 mortes por privação: adaptação ainda exige an�
 da trajetória completa, mesmo com ações materiais reais. Cinco checkpoints
 anuais gravados até dia 1800; auditoria histórica final e budgets ainda pendentes.
 O gate não foi aprovado e o processo continua vivo no handle original.
+
+### E337 — Resultado terminal por orçamento, não aprovação parcial
+
+Oito amostras acima de 35s: meses 74=35.6237, 86=36.8426, 87=37.7292,
+88=35.3473, 91=36.9700, 92=37.6001, 93=42.8313 e 95=37.7060.
+Mesmo que todos os meses restantes fossem rápidos, o p95 dos 120 meses seria
+superior a 35s. Mantido o budget, candidato reprovado; não completar as outras
+seeds desse candidato reprovado para depois descartar os resultados.
+O processo foi encerrado por SIGTERM após gravar checkpoint 2880 e avançar
+mais um mês; confirmação do handle terminal: exit 143. Não é pausa do goal.
+O último progresso emitido chegou ao dia 2940, população 8024, falta 3113,
+saúde média 175.75, unrest 707.75, mortes por privação 2906.
+Oito checkpoints anuais preservados, último de 32.927.744 bytes.
+`gate.json` vazio porque o relatório agregado só sai após as três seeds.
+Auditoria final/retomada/budget completo não executados; não inferir aprovação.
+
+GNU time: 35:19.29 de parede, 2090.52s CPU usuário, 98% CPU, RSS máximo
+1.620.116 KiB. RAM não excedeu o teto observado até aqui; não é budget final.
+O arquivo do time declara `Command terminated by signal 15`; seu campo final
+`Exit status: 0` não significa gate aprovado (handle retornou 143).
+
+### E338 — Perfil de horizonte em memória iniciado
+
+```sh
+CWS_DATA_DIR=/tmp/cws-v1-final-e337.SdyTOb/data .venv/bin/python tools/medieval_checkpoint_horizon_profile.py /tmp/cws-v1-final-e337.SdyTOb/natural-73.checkpoint-day-02880.mws --days 30 --profile-limit 40 > /tmp/cws-v1-final-e337.SdyTOb/e338-profile.json 2> /tmp/cws-v1-final-e337.SdyTOb/e338-profile.stderr.log
+```
+
+Ferramenta existente; sem alteração de fonte, save sucessor ou provider.
+Verifica hash do checkpoint antes/depois. Perfil é diagnóstico instrumentado,
+não amostra válida do budget. Resultado exit 0: 43.400713s, 22 jumps,
+125.148 → 126.201 eventos (dia 2880 → 2910), fonte intacta. Cópia transacional
+consumiu 11.663214s cumulativos (3.057.006 chamadas do helper); validação de
+relações 6.170128s e economia 6.024299s. Nenhuma validação foi removida.
+
+Experimento: compartilhar apenas modelos frozen com campos escalares reais,
+sem containers, atributos extras ou privados (inclusive payload vazio).
+Todos os payloads mutáveis seguem isolados; teste negativo muta a cópia e
+confirma fonte intacta. 67 testes passaram em 20.77s, nas quatro famílias
+`history_performance`, `engine`, `material_execution`, `persistence`.
+
+Perfil posterior (`e338-profile-after.json`, exit 0) registrou 53.578416s e
+15.036465s na cópia: não demonstrou ganho. Havia testes concorrentes durante
+parte da medição; isso não autoriza descartar o resultado nem alegar melhoria.
+Comparação sequencial sem profiler em execução, por diagnóstico temporário
+`/tmp/cws-e338-copy-equivalence.py`: compara snapshot, RNG e histórico completo
+após os mesmos 30 dias, com provider desabilitado e sem save sucessor.
+
+Primeira comparação sem profiler terminou exit 0 (`e338-equivalence.json`):
+baseline 27.713610s, frozen-leaf 25.300363s (8.7% menor nessa amostra).
+Snapshot, RNG e histórico completo idênticos; 126.201 eventos no dia 2910.
+Snapshot SHA-256 `8fcb1ae89d6c3ba6fa25630ef7ebeb7d80b503edc612751e1d4fd668651a11f5`;
+histórico `ced80f6860c76b868e8b82a5beab6fb0d78eccb8c00f9e69751bfab2692084d5`;
+fonte original `a8b157e8f60aa410392295c8200f57e2d8f15136d74bb9240ee3b209707a5917`
+intacta. Uma amostra não certifica o p95 final nem ganho universal.
+Segundo experimento restrito: retorno antecipado de escalares built-in exatos
+no helper (containers/modelos continuam isolados). Comparação sequencial
+`e338-equivalence-scalars.json` terminou exit 0: baseline 35.853680s,
+otimizado 37.403186s; snapshot/RNG/história idênticos aos hashes acima e
+checkpoint original intacto. Não demonstrou ganho de parede. A variação entre
+rodadas impede tratar a primeira melhoria isolada como conclusão de desempenho.
+Antes de repetir o gate longo, medir somente cópia com amostras alternadas e
+tempo de CPU/parede; não relaxar limites nem alegar melhoria não demonstrada.
+
+Benchmark isolado alternado terminou exit 0 (`e338-copy-benchmark.json`):
+cinco amostras por implementação, baseline fixado em `d27cbc35`, um save
+carregado, warmup de ambas, GC fora da medição. CPU mediana 0.093646s antes
+vs 0.103338s depois; parede 0.095262s vs 0.103342s. Fonte intacta. O experimento
+de compartilhar frozen-leaves foi rejeitado por regressão, apesar da equivalência
+semântica: não manter uma suposta otimização com ganho não demonstrado.
+Retirar esse compartilhamento e medir separadamente o retorno de primitivos;
+isolamento de payload privado/extra é correção de segurança, não ganho alegado.
+
+Variante só com retorno de primitivos também não provou ganho: cinco amostras
+alternadas, CPU mediana baseline 0.100047s vs candidato 0.103546s; parede
+0.100054s vs 0.103667s. Saída bruta preservada em
+`/tmp/cws-e338-copy-benchmark-primitive-only.json`. Retorno antecipado retirado.
+Na fonte permaneceram somente cinco linhas que isolam payloads privados/extras
+na cópia recursiva, com testes negativos; cinco testes focados passaram após
+a retirada dos experimentos. Nenhuma otimização de desempenho foi aceita.
+
+Próximo diagnóstico em execução: `/tmp/cws-e338-coarse-profile.py`, 30 dias só
+em memória, medindo tempo de CPU/parede apenas na entrada das funções de cópia
+e validações agregadas. Evita o overhead do cProfile nos milhões de valores
+escalares. Resultado em `e338-coarse-profile.json`; sem provider/save sucessor.
+
+Medição agregada terminou exit 0: mês de 34.379881s parede / 32.866822s CPU,
+32 cópias transacionais somam 7.217168s parede / 6.720257s CPU;
+28 validações de relações 5.743664s / 5.573841s;
+40 validações de economia 4.467549s / 4.265305s;
+26 de conhecimento 1.287275s / 1.240998s; 45 de pesquisa 0.040610s / 0.039639s.
+São tempos cumulativos por função, não parcelas necessariamente disjuntas.
+Dia 2910, 126.201 eventos; fonte SHA-256 intacta. Uma amostra de 34.38s não
+aprova o p95 de 120 meses. E338 permanece aberto: discriminar quais partes da
+cópia custam mais durante o horizonte antes de aceitar outra mudança; depois
+provar ganho/equivalência e só então repetir as três seeds completas.
+
+Auditoria separada (`e338-source-audit.json`, exit 0): `ok=true`, 125.148
+eventos, zero causas quebradas, erros de autoria, Story-material ou
+interpretação-material. Prova somente o histórico exercitado desse checkpoint,
+não o gate de três seeds nem recuperação econômica.
 
 ## Histórico de checkpoints — E334.b2 e anteriores
 

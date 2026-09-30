@@ -132,6 +132,80 @@ def test_transaction_copy_isolates_registry_values_and_config_budget():
     assert world.config.institutional_actions_consumed == {}
 
 
+def test_transaction_copy_isolates_pydantic_values_and_mutable_payloads():
+    from pydantic import BaseModel, ConfigDict, PrivateAttr
+
+    from src.classes.core.medieval_world import _copy_transaction_value
+
+    class FrozenScalar(BaseModel):
+        model_config = ConfigDict(frozen=True)
+        value: int
+
+    class FrozenNested(BaseModel):
+        model_config = ConfigDict(frozen=True)
+        values: list[int]
+
+    class MutableScalar(BaseModel):
+        value: int
+
+    class FrozenPrivate(BaseModel):
+        model_config = ConfigDict(frozen=True)
+        value: int
+        _payload: list[int] = PrivateAttr(default_factory=lambda: [3])
+
+    class FrozenEmptyPrivate(BaseModel):
+        model_config = ConfigDict(frozen=True)
+        value: int
+        _payload: dict[str, int] = PrivateAttr(default_factory=dict)
+
+    class FrozenExtra(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="allow")
+        value: int
+
+    class FrozenEmptyExtra(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="allow")
+        value: int
+
+    scalar = FrozenScalar(value=3)
+    nested = FrozenNested(values=[3])
+    mutable = MutableScalar(value=3)
+    private = FrozenPrivate(value=3)
+    extra = FrozenExtra(value=3, payload=[3])
+    empty_private = FrozenEmptyPrivate(value=3)
+    empty_extra = FrozenEmptyExtra(value=3, payload={})
+
+    scalar_copy = _copy_transaction_value(scalar)
+    assert scalar_copy is not scalar
+    assert scalar_copy.value == scalar.value
+    nested_copy = _copy_transaction_value(nested)
+    assert nested_copy is not nested
+    assert nested_copy.values is not nested.values
+    nested_copy.values.append(4)
+    assert nested.values == [3]
+    mutable_copy = _copy_transaction_value(mutable)
+    assert mutable_copy is not mutable
+    private_copy = _copy_transaction_value(private)
+    assert private_copy is not private
+    assert private_copy._payload is not private._payload
+    private_copy._payload.append(4)
+    assert private._payload == [3]
+    extra_copy = _copy_transaction_value(extra)
+    assert extra_copy is not extra
+    assert extra_copy.payload is not extra.payload
+    extra_copy.payload.append(4)
+    assert extra.payload == [3]
+    empty_private_copy = _copy_transaction_value(empty_private)
+    assert empty_private_copy is not empty_private
+    assert empty_private_copy._payload is not empty_private._payload
+    empty_private_copy._payload["candidate"] = 4
+    assert empty_private._payload == {}
+    empty_extra_copy = _copy_transaction_value(empty_extra)
+    assert empty_extra_copy is not empty_extra
+    assert empty_extra_copy.payload is not empty_extra.payload
+    empty_extra_copy.payload["candidate"] = 4
+    assert empty_extra.payload == {}
+
+
 def test_transaction_copy_shares_frozen_knowledge_values_but_not_registries():
     from src.classes.governance.models import KnowledgeReport
     from src.classes.mechanical_language import EntityRef
