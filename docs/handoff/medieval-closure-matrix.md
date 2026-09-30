@@ -778,12 +778,19 @@ Atualizada em 29/09/2026. No início de E286, o checkout estava limpo em `3c6e59
   isso fecha somente o aceite preparado de M1. Zero egress; validações e 42
   testes focados passaram no checkout atual. O gate natural de M8 segue aberto.
   Ver E282 no diário e a revalidação focal desta execução.
-- [ ] Registrar e revisar individualmente E244–E255 no diário versionado; os
-  artefatos existem localmente, mas seu histórico detalhado não foi sincronizado.
+- [x] Registrar e revisar o conjunto recuperável E244–E255 no diário versionado
+  (`E266`, também reconciliado no M0 acima): dez saves foram auditados.
+  E244/E246/E250 não conservaram output reproduzível e permanecem histórico
+  não verificado. A classificação encerra esta pendência documental, não
+  reconstitui decisões originais nem garante que os artefatos ainda existam.
 - [ ] Gate B natural: demonstrar capacidade adaptativa e rastrear a cadeia
   econômica completa no checkout estabilizado.
 - [ ] Gate C natural integrado: observar política/QG/comandante e consequência
   econômica/social reagindo a interferência ambiental sem decisão injetada.
+  Observação natural ainda não comprovada. O aceite contratual de M2 está
+  fechado pelo cenário autônomo controlado E294, com composição E335; este
+  registro histórico não impõe guerra ou drama às três seeds naturais de M8.
+  Manter separados capacidade controlada, emergência natural e provider real.
 - [ ] Gate D final: três seeds naturais por 3.600 dias no checkout final, com
   checkpoints, conservação, save/load/continuação, auditoria e budgets.
 
