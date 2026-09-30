@@ -387,6 +387,28 @@ sem recuperar fonte tardia; E348 reconstrói seed73 até2520 com journal e
 checkpoints em diretório ignorado do repo. M8 permanece aberto; sem consultas
 reais, push, merge, deploy ou relaxamento de budget.
 
+## E348 — Reconstrução natural tardia em execução — 30/09/2026
+
+Código congelado `c531cdad`, fingerprint95543bab (E347). Preflight:
+~13GiB livres, RAM disponível6.5GiB, load3.43/4.54/3.43, swap500KiB usada.
+Não atribuir mudança de espaço a limpeza nossa. Diretório novo, ignorado:
+`.tmp_codex/e348-natural-ul8iI0`, sem sobrescrita de artefatos anteriores.
+
+Comando iniciado: `CWS_DATA_DIR=$REPO/.tmp_codex/e348-natural-ul8iI0/data
+.venv/bin/python tools/medieval_autonomy_smoke.py --seed 73 --days 2520
+--checkpoint-days 720 --progress-jsonl
+$REPO/.tmp_codex/e348-natural-ul8iI0/progress.jsonl --output
+$REPO/.tmp_codex/e348-natural-ul8iI0/seed73-day2520.mws`, com `$REPO` igual a
+`/home/matheus/Documentos/vscode/baseDev/cultivation-world-causal-kernel`.
+Stdout/stderr em `run.log`; handle72120, ainda sem exit terminal. Journal
+confirma avanço natural inicial, não conclusão. Política persistida
+`routine-rules`, AI desabilitada, sem stub/provider/injeção de decisão.
+
+Alvo é recuperar save tardio para medir o patch, não provar três seeds3600
+nem declarar budget aprovado. Checkpoints verificam save/load/conservação;
+auditoria histórica completa e comparação tardia continuam devidas. Não
+alterar fonte durante esta execução nem iniciar outra seed concorrente.
+
 ### Estado herdado do checkpoint E336.g
 
 As pendências/autorização/disco abaixo são histórico; a situação vigente está
