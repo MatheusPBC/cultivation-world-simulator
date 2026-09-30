@@ -737,6 +737,27 @@ as cidades, estabilidade longa ou provider real. E356 fechado; E357 registrado
 antes da execução: três seeds×3600 no candidato atual, sem novos ajustes durante
 o gate e sem relaxar budgets. Publicação/deploy ainda não executados.
 
+## E357 — Gate final atualizado iniciado, ainda sem resultado — 30/09/2026
+
+Checkpoint local7fb0ec41; código material60efe86c; fingerprint41aeba02
+repetido imediatamente antes/depois do início. Sem alteração de código/testes,
+provider ou simulação concorrente. Diretório novo, nenhuma evidência substituída:
+
+```bash
+CWS_DATA_DIR=/tmp/cws-e357-final .venv/bin/python tools/medieval_release_gate.py \
+  --seeds 73,101,137 --days 3600 --checkpoint-days 360 --final-v1 \
+  --output-dir .tmp_codex/e357-final-ii49zB \
+  > .tmp_codex/e357-final-ii49zB/report.json \
+  2> .tmp_codex/e357-final-ii49zB/progress.log
+```
+
+Processo em andamento no handle78289. Seed73 iniciou e publicou métricas
+mensais; ainda sem exit/relatório final, nenhuma aprovação inferida. Não iniciar
+outro gate nem repetir o comando enquanto esse handle estiver ativo. Três seeds
+sequenciais; checkpoints anuais, conservação, auditorias, save/load/continuação
+e budgets originais. E356 encerrou diagnóstico focal; E357 só fecha com resultado
+real. Nenhum push/merge/deploy realizado nesta continuação.
+
 ## E354.a — Mortalidade de coortes alimentadas confirmada — 30/09/2026
 
 Base3015b718, runtimec531cdad/fingerprint95543bab. Leitura direta do save
