@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E347 verificado no recorte / M8 ainda aberto — 30/09/2026
+## Situação vigente — E351 técnico aprovado / adaptação natural e entrega abertas — 30/09/2026
 
 - E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
   models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
@@ -9,8 +9,10 @@
   registros versionados preservados. E348 recuperou a fonte tardia exata em
   `.tmp_codex/` (SHA igual ao histórico), conservação/save-load/continuação
   passaram. E349 confirmou equivalência tardia, com ganho mensal pequeno.
-  E350 descartou o observador como gargalo. E351 executa o gate integral no
-  código congelado; ainda não há resultado das três seeds3600.
+  E350 descartou o observador como gargalo. E351 terminou exit0 no código
+  congelado: três seeds×3600, conservação, persistência, auditorias e budgets
+  passaram. Isso não aprova adaptação econômica natural; E353 revisará os
+  receipts e efeitos por coorte, sem nova vertical nem alteração dos saves.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -482,7 +484,7 @@ para alterar observador; encerra a hipótese em vez de micro-otimizá-lo.
 Código continua95543bab, p95 limitado E34834.6118s/84, não gate aprovado.
 Próximo E351 é o gate integral, em vez de mais sondas sintéticas locais.
 
-## E351 — Gate integral em execução — 30/09/2026
+## E351 — Gate integral técnico aprovado — 30/09/2026
 
 Código `c531cdad`/fingerprint95543bab inalterado após E349/E350; documentos
 posteriores não mudam runtime/testes/ferramentas. Diretório novo ignorado
@@ -499,8 +501,40 @@ conservação, save/load/continuação e20why por seed. Nenhum resultado antecip
 nem conversão de E348 em gate de3600 dias. Comando iniciado após checkpoint
 documental `b11f77c4`; handle8401 confirmado ativo. Stdout final `gate.json`,
 progresso stderr `progress.log`; relatório final só é evidência após término
-terminal confirmado e leitura integral de seus checks. Seed73 iniciou;
-seeds101/137 ainda não são resultados verificados. Sem push/merge/deploy.
+terminal confirmado e leitura integral de seus checks. Handle8401 terminou
+exit0; relatório `ok=true`, `natural_ok=true`, sem execução pressionada ou
+comparação econômica. Fingerprint completo permaneceu
+`95543bab9dcf23403354d786475cc18376175c0c207d5711f98cd1545b660f46`.
+
+| Seed | Eventos / materiais | Run s | RSS bytes | Save bytes | Save / load s | P95 mês / why s |
+|---|---|---|---|---|---|---|
+| 73 | 155622 / 124006 | 2651.34 | 2049564672 | 40853504 | 25.6528 / 22.3523 | 29.4579 / 0.1971 |
+| 101 | 155531 / 121322 | 2319.34 | 2121015296 | 41103360 | 26.3444 / 21.6644 | 27.4409 / 0.2028 |
+| 137 | 165890 / 129515 | 2454.88 | 2211643392 | 43163648 | 27.6968 / 24.3970 | 31.6937 / 0.2237 |
+
+Cada seed tem120 amostras mensais,20 consultas why verificadas,10 checkpoints
+anuais auditados com conservação e save/load equivalentes. Saves finais no
+dia3600; continuação equivalente até3601. Todos os checks de budget passaram,
+sem alterar limites. Auditorias finais e de checkpoints passaram; nos finais,
+zero causas quebradas, erros de autoria/fonte/raízes, eventos materiais sem
+raiz, Story material ou interpretação material. IA real:0 chamadas; política
+`routine-rules`, sem `gov_profile`. `pressured_ok=true` é vacuidade do ramo não
+executado, não prova adicional de cenário pressionado.
+
+SHA-256 relatório `gate.json`:
+`a4a6a690722134c4421907cf98afff67c47271cb3f43cece74de64cbb088adbe`.
+Saves finais73/101/137, respectivamente:
+`1a2ec8ef73fb5258a626033ff18dfc24fd9ab65b44a0856bdcd3bd3e19887ef4`,
+`568d1db6645972750fc78755fc60632c570a13e90da991832a3d9cbc5cabb537`,
+`0aae0d9296e0837042416a4dd01e998f20a1c9be9e444e3f4b64eedb5cdf471a`.
+
+Limite econômico: mortes por privação4121/3567/3553, população6809/7374/7388,
+saúde média123.50/168.12/91.62. O gate automatizado não exige capacidade
+adaptativa por coorte: sua aprovação não fecha GateB nem M8. E352 mostra opções
+provider sem política offline equivalente. Próximo E353: revisar receipts de
+produção/folha/emprego/compra/relief/consumo/morte e deslocamento por seis ciclos,
+separando resposta material de redução de demanda por morte/migração ou gasto
+de estoque acumulado. Sem push/merge/deploy.
 
 ## E352 — Cobertura econômica da política offline — 30/09/2026
 

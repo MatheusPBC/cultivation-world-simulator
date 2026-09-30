@@ -506,11 +506,16 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     step26.4690s, história/dia/fonte idênticos ao E349. GC somou4.8007s dentro
     do custo medido (gen2:2.9574s/3coletas), não custo adicional somável.
     Observador não explica meses35–39s; rejeitada mudança especulativa nele.
-  - [ ] E351: executar gate final natural73/101/137×3600, sequencial,
+  - [x] E351: executar gate final natural73/101/137×3600, sequencial,
     checkpoints360 e auditorias/why/budgets congelados, código c531cdad/
     fingerprint95543bab. E348 limitado p95 34.6118s/84 permite testar o
     candidato, mas não garante sucesso. Sem provider real/fixture/cota de
     drama, alteração de fonte, relaxamento de limites ou extrapolação de p95.
+    Handle8401 exit0; relatório SHA a4a6a690, `ok=true`;30 checkpoints auditados,
+    três continuações equivalentes3601,120 meses/20why por seed, todos os
+    budgets passaram. P95 mensal29.4579/27.4409/31.6937s. Diário conserva
+    métricas/hashes completos. Prova técnica offline, não adaptação natural,
+    provider real em horizonte longo ou entrega operacional.
   - [x] E352: preparar a revisão de adaptação natural por leitura dos caminhos
     econômicos e das políticas atuais: quais respostas entram no menu provider
     e quais são escolhidas pelo fallback offline; distinguir capacidade ausente,
@@ -520,6 +525,10 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Mapa verificado no diário: turno composto não seleciona com ai_enabled=false;
     empréstimo/staffing/prioridade são adapters sem fallback equivalente; emprego,
     transição, relief e expansão existente têm políticas offline delimitadas.
+  - [ ] E353: revisar uma cadeia econômica natural de seis ciclos pelos
+    receipts do E351 e efeitos por coorte; distinguir emprego/renda/compra,
+    relief, morte/migração e gasto de estoque. Não concluir adaptação por
+    queda de falta agregada; manter saves originais intactos e provider desligado.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
@@ -800,8 +809,10 @@ Atualizada em 29/09/2026. No início de E286, o checkout estava limpo em `3c6e59
   fechado pelo cenário autônomo controlado E294, com composição E335; este
   registro histórico não impõe guerra ou drama às três seeds naturais de M8.
   Manter separados capacidade controlada, emergência natural e provider real.
-- [ ] Gate D final: três seeds naturais por 3.600 dias no checkout final, com
+- [x] Gate D final: três seeds naturais por 3.600 dias no checkout final, com
   checkpoints, conservação, save/load/continuação, auditoria e budgets.
+  E351 exit0 no fingerprint95543bab; aprovação técnica não fecha GateB natural
+  nem revisão/entrega de M8.
 
 - [x] Economia pós-V1: empréstimo familiar voluntário com autoria do pedido,
   aviso local e escolha do grupo, transferência sem criação de dinheiro,

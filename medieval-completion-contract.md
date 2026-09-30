@@ -14,9 +14,10 @@ tardia: E348 reconstruiu fonte2520 idêntica ao SHA histórico; conservação,
 save/load e continuação passaram, mas houve quatro meses >35s/84 observados.
 E349 confirmou história/estado/datas/fontes iguais: cópia reduziu ~1.05s CPU,
 mês completo só~0.54s. E350 descartou observador como gargalo (~0.0873s),
-sem outro patch. E351 executa gate integral no código congelado, sem garantir
-aprovação a partir do p95 limitado E34834.6118s/84.
-Gate natural final e entrega continuam pendentes.
+sem outro patch. E351 terminou exit0 no código congelado: três seeds×3600,
+conservação, save/load/continuação, auditorias e budgets passaram, com relatório
+SHA a4a6a690. Adaptação econômica natural e entrega continuam pendentes;
+o resultado técnico não certifica uma economia capaz de se recuperar.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
 read-only E325 mapeou a base mágica existente; E326 fechou a operação elemental
@@ -584,8 +585,12 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   (elemental, evocação, composição); somam-se às duas adesões de E336.b3.
   Receipts LLM sem deltas, save original intacto. São decisões em forks
   preparados, não provider real durante dez anos nem emergência natural.
-- [ ] Três seeds naturais por 3.600 dias no mesmo checkout, sequenciais, com
+- [x] Três seeds naturais por 3.600 dias no mesmo checkout, sequenciais, com
   checkpoints, conservação, auditoria, save/load e continuação.
+  E351 exit0: seeds73/101/137,30 checkpoints anuais auditados,120 amostras
+  mensais/20why por seed, continuação equivalente3601, todos os budgets
+  originais passaram no fingerprint95543bab. P95 mensal29.4579/27.4409/31.6937s.
+  Sem provider real; mortes4121/3567/3553. GateB natural continua aberto.
 - [x] Build/type-check, regressão medieval apropriada e navegador; relatar
   falhas/exclusões legadas sem declarar suíte inteira verde.
   E334–E335: navegador/Atlas/dossiê/why e lifecycle/save/load/retomada.
@@ -629,8 +634,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E351, gate natural73/101/137×3600 dias no código
-congelado95543bab, checkpoints360 e budgets originais. E350 encerrou hipótese
+Próximo trabalho imediato: M8/E353, revisão causal da adaptação econômica
+natural por coorte e seis ciclos nos receipts preservados de E351. O gate
+técnico73/101/137×3600 passou no código congelado95543bab; não o repetir sem
+mudança que invalide a prova. E350 encerrou hipótese
 de observador caro, sem mudança especulativa. E349
 confirmou equivalência tardia com ganho mensal pequeno. E347
 preserva isolamento e equivale no mundo inicial, não fecha o gate. E346 fechou um subscan com74 testes e
@@ -642,7 +649,8 @@ E340 passou conservação/save-load/audit, mas seu p95 limitado reprovou o teto.
 E339 removeu ciclos de Knowledge com 80 testes e equivalência comprovados.
 Experimentos E338 sem ganho foram retirados; E339 não altera política de GC,
 leis materiais ou retenção histórica. Comparar estado/história e custo real.
-Não relaxar o budget; repetir as três seeds completas no novo candidato.
+Não relaxar o budget. E351 concluiu as três seeds completas nesse novo
+candidato; a próxima prova é econômica, não outra repetição técnica intacta.
 E336.h (corpus e backup verificado) preservado; nenhuma nova física neste diagnóstico.
 E330–E335.c constam
 concluídos apenas nos recortes/evidências da matriz, não como gate natural.
