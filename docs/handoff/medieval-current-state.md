@@ -204,6 +204,11 @@ CWS_DATA_DIR=/tmp/cws-v1-final-e343.PJuJih/data /usr/bin/time -v -o /tmp/cws-v1-
 
 stdout `gate.json`, stderr `gate.stderr.log`; evidência por seed/checkpoint
 será registrada sem promover resultados parciais a aprovação integral.
+Código preservado no commit local `a90d10ad`, fingerprint repetido e igual
+após commit. Handle de execução `4017` confirmado vivo por polling; primeira
+seed chegou ao dia 720 (26.257 eventos, mês 7.0934s, elapsed 109.12s), com
+checkpoint 360 de ~4.5MiB preservado. Dados intermediários não aprovam budgets
+finais ou auditorias que ainda não terminaram. Seeds 101/137 ainda não iniciadas.
 
 ### Estado herdado do checkpoint E336.g
 
