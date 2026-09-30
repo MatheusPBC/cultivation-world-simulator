@@ -585,6 +585,11 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   47 testes e equivalência natural inicial0→30 comprovam o recorte de cópia;
   ganho sintético não aprova performance tardia. E348 reconstrói fonte tardia
   nesse mesmo código, sem substituir o gate integral de três seeds.
+  Candidato vigente E360: commit de código/empacotamento `e5089542`, fingerprint
+  `22e14698cba5f522dc6f357b718259fee8a582da65ca6ea9e294ad0a5e718c83`.
+  E359 revalidou mortalidade/demografia/economia/auditoria (36 testes);
+  E358 validou build, navegador real, 19 contratos e Docker com save/load após
+  restart. E360 em execução sequencial; não aprova o gate por antecipação.
 - [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
