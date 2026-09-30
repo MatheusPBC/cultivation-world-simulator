@@ -275,6 +275,17 @@ class RelationsState(RegistrySerialization):
                 continue
             for cause_event_id in {link.cause_event_id for link in event.causal_links}:
                 aid_requests_by_cause_decision.setdefault(cause_event_id, []).append(event)
+        freight_orders_by_material = None
+
+        def freight_candidates(material_id):
+            """Build a fresh receipt index lazily; lists preserve order/multiplicity."""
+            nonlocal freight_orders_by_material
+            if freight_orders_by_material is None:
+                freight_orders_by_material = {}
+                for order in world.economy.freight_orders.values():
+                    derived_material_id = f"event:{order.id.split(':', 1)[1]}"
+                    freight_orders_by_material.setdefault(derived_material_id, []).append(order)
+            return freight_orders_by_material.get(material_id, ())
         for recognition in self.authority_recognitions.values():
             validate_actor(world, recognition.recognizer_ref)
             claim = world.authority.claims.get(recognition.claim_id)
@@ -597,7 +608,7 @@ class RelationsState(RegistrySerialization):
                                  and decision.decision and decision.decision.get('action') in {
                                      'fulfill_institutional_aid', 'fulfill_resource_transfer'}
                                  and decision.decision.get('actor_ref') == clause.debtor_ref.to_dict()]
-                    freight = [order for order in world.economy.freight_orders.values()
+                    freight = [order for order in freight_candidates(material.id)
                                if (order.source_id == clause.source_stock_id
                                    and order.destination_id == clause.destination_stock_id
                                    and order.resource_id == clause.resource_id

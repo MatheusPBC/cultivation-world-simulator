@@ -1,12 +1,14 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, código congelado `a90d10ad` / fingerprint `bdffc189`,
+`codex/medieval-remote`, código verificado E346 / fingerprint `f3cef876`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
 por performance; E339/E342 preservaram estado/história/RNG e E340 reprovou custo.
-E343 reprovou novamente o budget mensal; E345 mediu validação/GC, E346 aborda relações.
+E343 reprovou novamente o budget mensal; E345 mediu validação/GC, E346 reduziu
+um subscan de relações mantendo estado/história/RNG. Ganho mensal pequeno;
+fingerprint atual f3cef876, próximo E347 discrimina custo de cópia.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -559,6 +561,10 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   E339 verificou cópia/isolamento (80 testes) e E342 proveniência incremental
   (96 testes focados e história natural idêntica). Os hashes anteriores são
   históricos; E343 não reutiliza E337 como gate aprovado.
+  E346 posterior altera somente busca local de fretes na validação, com74
+  testes focados e par natural equivalente. Fingerprint atual
+  `f3cef876adb4410a81678798ec85031c003d72bfbd677dc87e7cb497a5999e9f`;
+  nenhum gate natural integral aprovado para ele.
 - [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
@@ -611,9 +617,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E346, reduzir o custo medido de relações sem
-enfraquecer a integridade. E345 concluiu2520→2550 em22.90s isolado, relações
-5.42s CPU; isso não aprova performance em horizonte longo.
+Próximo trabalho imediato: M8/E347, discriminar cópia de relações sem ampliar
+o escopo ou enfraquecer isolamento. E346 fechou um subscan com74 testes e
+equivalência natural; CPU do mês24.39→24.19s, insuficiente para aprovar M8.
 E343 reprovou p95 (oito meses >35s entre97), encerrado com checkpoint2880
 preservado/auditado; não repetir gate sem corrigir custo dominante. E342
 mantém causas/snapshot/RNG idênticos, mas seu ganho não fechou o orçamento.

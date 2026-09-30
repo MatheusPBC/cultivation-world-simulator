@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E343 reprovado / E345 medido / E346 — 30/09/2026
+## Situação vigente — E346 verificado / M8 ainda aberto — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -289,6 +289,51 @@ abaixo de35s não substitui o gate longo reprovado nem identifica sozinho a
 origem de toda diferença para46.4317s da trajetória integral.
 E346 restringe o próximo trabalho à validação de relações: perfil interno
 read-only antes de patch; manter leitura fresca contra adulteração no ledger.
+
+Perfil interno preservado em `e345-relations-profile.json` no mesmo diretório:
+1.279 propostas, 181 obrigações, 381 memórias; o subscan de frete fulfilled
+examina653 ordens por obrigação. Benchmark local com resultados idênticos:
+CPU0.0158–0.0245s→0.0019–0.0037s usando índice efêmero por receipt, sem reduzir
+predicados ou esconder matches duplicados. Nenhuma remediação nesse checkpoint.
+`/tmp/cws-e345-query-profile.json`: 2520→2550,29.959s parede/29.038s CPU;
+event_index1809chamadas/0.8044s CPU, events_of_type1645/0.2082s e
+decisions_by_actor8/0.0411s. Índices de consulta não são o gargalo dominante;
+    não alterá-los no E346. Patch restrito ao subscan comprovado, teste negativo
+    de duplicidade e comparação do validador completo antes de aceitar ganho.
+
+## E346 — Fretes indexados só dentro da validação — 30/09/2026
+
+Base8b8e253c; patch `src/classes/governance/diplomacy.py`, negativo em
+`tests/test_medieval_institutional_aid.py`. Índice lazy efêmero por receipt,
+com listas que preservam ordem/multiplicidade, apenas fulfillment de recurso.
+Todos os predicados e a leitura fresca do ledger permanecem; remediação,
+schemas, decisões, owners materiais e GC não foram alterados.
+Fingerprint do novo código/testes:
+`f3cef876adb4410a81678798ec85031c003d72bfbd677dc87e7cb497a5999e9f`.
+
+Comandos focados: `CWS_DATA_DIR=/tmp/cws-e346-test2 .venv/bin/python -m pytest
+-q tests/test_medieval_institutional_aid.py`:27passed/10.44s, via agente.
+Verificação principal com `/tmp/cws-e346-focused-data`: history_performance,
+engine e material_execution:47passed/16.39s/exit0. Primeira tentativa sem
+namespace isolado falhou em conftest por log read-only (exit4), sem rodar testes;
+repetição isolada resolveu a configuração. Diff-check passou.
+
+Whole-validator benchmark `/tmp/cws-e346-relations-validate-benchmark.json`
+contra AST8b8e253c: CPU baseline0.1644/0.1495/0.1484s versus
+novo0.1693/0.1304/0.1239s. Primeira amostra nova é mais lenta; não atribuir
+todo ganho de mediana ao patch nem aplicar a razão ao mês inteiro.
+
+Par natural: `CWS_DATA_DIR=/tmp/cws-e346-equivalence-data .venv/bin/python
+/tmp/cws-e346-natural-equivalence.py`, exit0. Ambos carregam pelo loader atual;
+somente o avanço troca o validador inteiro pelo AST anterior. Sem provider,
+decisão injetada ou escrita do save;2520→2550,108.417→109.947 eventos.
+Snapshot/história integral/RNG/contagem idênticos; fonte SHA346f23f5… intacta.
+Relatório `/tmp/cws-v1-final-e343.PJuJih/e346-natural-equivalence.json`.
+CPU24.390827→24.188372s; parede24.412984→24.202050s. Ganho no mês pequeno;
+história hash4ee28762e4e87850e53b05f9d1bcdd8d4e6278e980c58e871092c5f99aa8e4e1.
+Nenhuma nova auditoria integral/gate longo, consulta real, push/merge/deploy.
+Próximo E347 discrimina custo de cópia, preservando isolamento e sem repetir
+experimentos genéricos rejeitados. M8 continua aberto, sem relaxar35s de p95.
 
 ### Estado herdado do checkpoint E336.g
 

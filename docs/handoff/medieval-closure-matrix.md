@@ -459,9 +459,22 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Relações 5.4198s CPU/36 chamadas; cópia 4.7548s/41; economia 2.8799s/44;
     conhecimento 1.1956s/34. GC geração2: 2.1415s, três coletas, zero coletados;
     thresholds inalterados. Custos se sobrepõem; não aprova o gate integral.
-  - [ ] E346: discriminar custo interno de Relations.validate e implementar
-    somente otimização medida que preserve varredura fresca e rejeição de
-    adulteração no meio do ledger. Sem novo framework ou mudança de física.
+  - [x] E346: índice local de fretes por receipt material dentro de uma
+    validação de relações; 181 termos fulfilled examinam repetidamente 653
+    ordens no checkpoint2520. Benchmark desse subscan preservou os matches,
+    CPU0.0158–0.0245→0.0019–0.0037s. Manter todos os predicados, multiplicidade,
+    varredura fresca do ledger e rejeição de adulteração; medir o validador
+    completo e testar duplicidade. Sem cache persistido ou mudança de física.
+    Queries event_index/type/actor somaram ~1.05s CPU no mês; não justificam
+    outra alteração neste recorte. Remediação não exercitada, fora do patch.
+    27 testes de aid e 47 de histórico/engine/execução material passaram.
+    Validador inteiro: mediana CPU0.1495→0.1304s; par natural2520→2550
+    preservou snapshot,109.947 eventos e RNG, fonte intacta; CPU24.3908→24.1884s.
+    Ganho mensal pequeno, não aprovação do gate. Fingerprint f3cef876adb4410a81678798ec85031c003d72bfbd677dc87e7cb497a5999e9f.
+  - [ ] E347: discriminar a cópia de Relations (4.75s CPU nas41 cópias E345)
+    com a fonte E346, antes de novo patch/gate. Preservar payloads privados e
+    extras, isolamento/RNG e rejeitar experimentos sem ganho; não repetir
+    otimizações genéricas E338 rejeitadas nem mudar GC/budgets/física.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

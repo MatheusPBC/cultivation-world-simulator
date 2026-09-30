@@ -557,6 +557,16 @@ def test_second_identical_aid_chain_keeps_first_fulfillment_receipt(tmp_path):
     assert world_snapshot(load_world(tmp_path / "two-chains.mws")) == world_snapshot(world)
 
 
+def test_fulfillment_rejects_duplicate_freight_orders_for_one_material_receipt():
+    world = prepared_world()
+    order, _ = _run_aid_chain(world)
+    duplicate = order.model_copy(update={"id": f"duplicate:{order.id.split(':', 1)[1]}"})
+    world.economy.freight_orders[duplicate.id] = duplicate
+
+    with pytest.raises(ValueError, match="fulfillment requires the negotiated freight receipt"):
+        world.relations.validate(world)
+
+
 @pytest.mark.parametrize("tamper", ["swap", "reuse", "missing_order", "material_decision", "final_decision"])
 def test_identical_aid_chains_reject_invalid_material_provenance(tamper):
     world = prepared_world()
