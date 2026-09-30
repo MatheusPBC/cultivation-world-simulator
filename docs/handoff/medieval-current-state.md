@@ -767,6 +767,21 @@ app Medieval só expõe `/api/health` e status em `/api/v2/query/status`.
 gera `dist-medieval`. Workflow docker-smoke e teste Docker ainda usam v1.
 Essas verificações não podem produzir entrega válida do Medieval atual.
 
+Revisão independente descartou um falso positivo do agente: arquivos antigos
+`web/src/api/modules/*` usam v1, mas não pertencem ao bundle conectado.
+Entrada index.html→main.ts→App.vue→medieval/ObserverApp.vue; API atual em
+medieval/api.ts usa v2. Não migrar módulos mortos ou ampliar a frente por esse
+achado. Os smokes e workflows ativos, porém, ainda executam contratos legados;
+test.yml também inclui corpus herdado e mock v1. Portar o caminho operacional
+ativo, mantendo a distinção entre regressão Medieval e suíte legada.
+
+Consulta read-only `git ls-remote github-personal` terminou exit0:
+main=f73c055ee541b7805fcb0a3fe7a40ca762752e63;
+codex/medieval-remote=b5b00304d746b548826ba17f6f4bec9f4a3c04c8.
+Esses objetos existem localmente e são ancestrais do HEAD644d009a:
+comparação0/70 e0/62 commits respectivamente. Não há divergência nessa leitura,
+mas repetir antes de publicar; não é push ou merge e não dispensa autorização.
+
 Servidor atual restringe Host/Origin a localhost; docs VPS recomendam IP privado
 direto, o que não satisfaz os guards. Preparar acesso via túnel SSH ao bind
 loopback, sem abrir wildcard ou remover proteção contra comandos remotos.
