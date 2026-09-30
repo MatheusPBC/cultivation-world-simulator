@@ -1,6 +1,24 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E336.g — 30/09/2026
+## Situação vigente — E336.h — 30/09/2026
+
+- As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
+  retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
+  byte a byte intacta; perfil temporário não persistido. Corpus limitado M8
+  aceito, sem implicar IA real em horizonte longo.
+- Backup confirmado: quatro partes + manifesto em `/VPS Backups/`, tamanhos
+  e content_hash remotos idênticos aos locais. Tar compare repetido exit 0,
+  SHA-256 completo intacto. Apenas E196–E199 removidos, recuperáveis pelo backup;
+  cerca de 2.7 GiB liberados. Disco após limpeza: 9.0 GiB livres. Variações
+  externas de espaço não foram atribuídas a essa limpeza.
+- E337 em execução: seeds 73/101/137, 3600 dias, checkpoints 360, `--final-v1`,
+  fingerprint 1c2e7f. Diretório `/tmp/cws-v1-final-e337.SdyTOb`; resultados ainda
+  pendentes. Runtime congelado, sem nova feature nem relaxamento de budgets.
+
+### Estado herdado do checkpoint E336.g
+
+As pendências/autorização/disco abaixo são histórico; a situação vigente está
+acima. E336.h encerra o corpus limitado, não o gate natural nem a entrega.
 
 - Checkpoint de código local `5b4b5227` preserva 109 arquivos da integração
   acumulada desde `3c6e590e`, incluindo os scripts reprodutíveis de navegador.
@@ -24,6 +42,79 @@
   sem mudança de código. Documentação preservada no commit local `2a3e3898`
   antes deste registro; fonte no commit `5b4b5227`. Corpus real e gate longo
   continuam abertos, nenhum resultado histórico stale virou prova atual.
+
+## E336.h — Corpus real atual e backup multipart — 30/09/2026
+
+Runtime `5b4b5227`; fingerprint `1c2e7f` sem alteração de código neste recorte.
+Comando executado:
+
+```text
+CWS_DATA_DIR=/tmp/cws-e336-tests .venv/bin/python tools/medieval_completion_provider_probe.py --source /tmp/cws-e334-browser/saves/medieval/composed-integrated-blocked.mws --cases elemental evocation composed --allow-provider-egress
+complete=true; real_attempts=3; source_unchanged=true; persisted=false
+```
+
+Elemental escolheu `rite-offer:character:006:polity:auren:rite-of-warding:passagem-negra:-:-:event:85`;
+evocação `rite-offer:character:007:organization:liga-das-barcas:rite-of-evoked-bulwark:docas-de-portovelho:-:-:event:204`;
+composição `relief-distribute:auren:campomanso:1080:event:9963:event:9685`.
+Menus 2/2/41; todos os receipts LLM sem deltas. Ofertas não executam o rito
+sozinhas; composição produziu 11 eventos materiais pelo owner no fork.
+Fonte SHA-256 `6b7a2f3d83b69fc3badd81facd962e390839c258d3e4e07c9866c71e2ee2c671`.
+Hashes dos prompts (texto bruto não emitido):
+`78ff0d2516455f5a95c4c192f29fe8b348bc388fb7c5e8d4eddea0db05ff1d87`,
+`72bad4945e14a37f037e23e332fa070c797cf0c65c36392223af19f8444b47e6`,
+`da6605e13810be7fb6f073dbf5705613976785f02bf00d53c0a21cd1bd0732d3`.
+Autorização nova de três tentativas consumida integralmente; nenhum retry.
+Somadas às duas adesões anteriores, fecham o corpus dos contratos novos.
+Não são simulação natural nem provider em dez anos. Próximo: concluir backup
+verificado e executar três seeds naturais com budgets congelados.
+
+Upload único falhou antes de publicar: limite de 512 MiB do conector.
+Divisão integral em tmpfs interrompida por pressão de memória; parte incompleta
+gerada removida, arquivo completo intacto. Preparação/envio sequencial das
+quatro partes de até 480 MiB usa `/tmp/cws-e336-dropbox-parts.Q4Kt7u`.
+Essa foi a preparação inicial; o resultado final abaixo a substitui.
+
+### Backup confirmado e limpeza autorizada
+
+Quatro envios retornaram completed, depois verificados por tamanho e
+content_hash remoto igual ao cálculo local. Backup completo SHA-256
+`952de40e2681d276898b23ea1575430c9da074256fe35644c95489660c47d557`,
+138 membros; `tar --compare` repetido em 30/09 saiu 0 sem divergências.
+Removidos somente os quatro diretórios autorizados E196–E199:
+2.936.693.295 bytes lógicos. Cópias temporárias das partes e arquivo RAM
+gerados pelo agente também descartados após verificação, não mundos reais.
+Disco antes/depois da remoção: 6.636.433.408 bytes livres → 9.0 GiB livres;
+o delta pode incluir atividade externa. Recuperação integral disponível em
+`/VPS Backups/cws-v1-final-e196-e199-20260929.tar.gz.part-01` até `part-04`.
+
+| Parte | Bytes | ID Dropbox | content_hash verificado |
+| --- | --- | --- | --- |
+| 01 | 503316480 | id:TP1NTM2oBmAAAAAAAAAIPw | 0f9556d1802104f5f82f1f088edcb90bb63593963be0c928f089e5d26f55034c |
+| 02 | 503316480 | id:TP1NTM2oBmAAAAAAAAAIQA | 1bc5da911c58600ff2b4715aeca586e61428bc6dd80df847832ac301821bd7f1 |
+| 03 | 503316480 | id:TP1NTM2oBmAAAAAAAAAIQQ | ce0b9f89c6abf4d420c2042b1f663d7b4c453bdc45a9356419225ddc7ff8adef |
+| 04 | 372129848 | id:TP1NTM2oBmAAAAAAAAAIQg | c36384ee3d0eccefd2c49733ea8852c2b5295b8a0e65da3688781b13accbad4b |
+
+Manifesto `/VPS Backups/cws-v1-final-e196-e199-20260929-restore.md`,
+id:TP1NTM2oBmAAAAAAAAAIQw, 2081 bytes; hash remoto
+`f69d50893a1cf8446d2b62a59b8a8ad1c6a1ba68fcca93957938a94d4c676407`
+igual ao local. Inclui união das partes, SHA-256 individuais/completo e
+extração somente para diretório vazio. Não publicamos links temporários.
+
+## E337 — Gate natural final iniciado — 30/09/2026
+
+Diretório novo `/tmp/cws-v1-final-e337.SdyTOb`; runtime 5b4b5227,
+fingerprint 1c2e7f, nenhuma mudança de física/atores desde o freeze.
+Linux 7.0.0-34-generic x86_64, seis CPUs lógicas, RAM total 16.643.338.240
+bytes; host compartilhado, aplicações externas e swap ativa. Execução offline
+routine-rules explícita, três seeds sequenciais; silêncio natural é válido.
+
+```sh
+CWS_DATA_DIR=/tmp/cws-v1-final-e337.SdyTOb/data /usr/bin/time -v -o /tmp/cws-v1-final-e337.SdyTOb/host-time.txt .venv/bin/python tools/medieval_release_gate.py --seeds 73,101,137 --days 3600 --checkpoint-days 360 --final-v1 --output-dir /tmp/cws-v1-final-e337.SdyTOb > /tmp/cws-v1-final-e337.SdyTOb/gate.json 2> /tmp/cws-v1-final-e337.SdyTOb/gate.stderr.log
+```
+
+Processo iniciado, não concluído. Budgets congelados mantidos; report,
+auditorias anuais, conservação, equivalência e retomada precisam terminar
+antes de marcar gate. Nenhuma nova consulta real nem alteração de save fonte.
 
 ## Histórico de checkpoints — E334.b2 e anteriores
 

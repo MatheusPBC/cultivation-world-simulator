@@ -1,8 +1,10 @@
 # Contrato de conclusão do Medieval
 
-29/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
+30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
 `codex/medieval-remote`, checkpoint de código local `5b4b5227` (E336.e),
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
+E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
+backup multipart em verificação. Gate natural e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
 read-only E325 mapeou a base mágica existente; E326 fechou a operação elemental
@@ -545,9 +547,13 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   4f1df5f0. Fingerprint do candidato incluindo ferramentas:
   `1c2e7f0a9f36c98ecf070460955af3f6bda31ccc149b158205409ad8d1b15b06`.
   Correção material posterior invalida a prova afetada e exige novo candidato.
-- [ ] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
+- [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
+  E336.h, 30/09: três novas tentativas autorizadas, sem retries, todas válidas
+  (elemental, evocação, composição); somam-se às duas adesões de E336.b3.
+  Receipts LLM sem deltas, save original intacto. São decisões em forks
+  preparados, não provider real durante dez anos nem emergência natural.
 - [ ] Três seeds naturais por 3.600 dias no mesmo checkout, sequenciais, com
   checkpoints, conservação, auditoria, save/load e continuação.
 - [x] Build/type-check, regressão medieval apropriada e navegador; relatar

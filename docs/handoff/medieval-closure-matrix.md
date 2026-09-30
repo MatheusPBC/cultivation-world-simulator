@@ -298,7 +298,7 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     migração e conservação alimentar antes de congelar novo fingerprint.
     Patch/untracked verificados em /tmp/cws-e336-checkpoint-lWKBOj. Falha
     76014 ≠ 76317 reproduzida; correção somente no verificador, 2 passed.
-  - [ ] E336.b: validar inventário de emissores/contratos e famílias alteradas
+  - [x] E336.b: validar inventário de emissores/contratos e famílias alteradas
     no candidato atual; conferir cobertura material do ledger e provas críticas
     sem declarar suíte legada verde. Gerar fingerprint após qualquer correção.
     - [x] E336.b1: cruzar inventário com o save composto dia 240 e revalidar
@@ -318,23 +318,27 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
           194 passed / 2 failed inicialmente; perdas físicas de armazenamento
           explicam ambas. Corrigidos somente teste/verificador; mercados e
           preservação revalidados: 17 passed. Sem provider real nem gate longo.
-    - [ ] E336.b3: prévia e corpus limitado dos contratos novos/composição:
+    - [x] E336.b3: prévia e corpus limitado dos contratos novos/composição:
       fé sem adesão anterior, fé com memória própria, iniciativa elemental,
       evocação e menu institucional do save integrado. Reusar os turnos nativos,
       fontes intactas e receipts sem deltas; prévia não conta como provider real.
       - [x] Prévia de cinco casos passou, opções 1/1/2/2/41, fonte intacta.
-      - [ ] Corpus real: duas adesões válidas em memória, terceiro caso falhou.
-        Budget precisa reconciliar retries: três chamadas do boundary não
-        provam três transportes. Guard corrigido para max_retries=0; sem novo
-        egress. Não presumir saldo restante da autorização E260 (15/20).
+      - [x] Corpus real: duas adesões anteriores e três novos casos válidos em
+        E336.h. A nova autorização permitiu exatamente três tentativas sem
+        retries. A falha histórica e a incerteza do transporte antigo continuam
+        registradas; não reutilizamos saldo presumido da autorização E260.
   - [x] E336.c: preparar/verificar backup local em tmpfs dos quatro diretórios
     de teste E196–E199; sem cópia adicional no disco principal e sem apagar
-    originais. Upload/remoção continuam dependentes da autorização pendente;
+    originais. Upload/remoção autorizados em E336.h, ainda não concluídos;
     metadata do backup remoto de 23/09 não cobre esses diretórios atuais.
     Archive SHA-256 952de40e2681d276898b23ea1575430c9da074256fe35644c95489660c47d557;
     tar --compare passou. Cópia tmpfs não é persistente nem backup externo.
-    - [ ] Upload autorizado e verificado, seguido de remoção somente dos quatro
+    - [x] Upload autorizado e verificado, seguido de remoção somente dos quatro
       originais identificados; só então preflight das três seeds finais.
+      E336.h: quatro partes + manifesto em `/VPS Backups/`, todos completed e
+      content_hash remoto idêntico ao local. `tar --compare` repetido exit 0;
+      hash completo intacto. Somente E196–E199 removidos (2.936.693.295 bytes
+      lógicos), recuperáveis pelo backup. Disco após limpeza: 9.0 GiB livres.
   - [x] E336.d: reconciliar caixa M1 com o aceite controlado explícito E282 e
     registrar UI/browser verificados em M8, sem converter essas provas em
     adoção natural, provider completo ou validação de dez anos.
@@ -355,6 +359,19 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     ferramenta, sem nova consulta ou alteração da engine congelada.
     5 testes passaram e preview dos três casos completo, 0 egress. Commit local
     4f1df5f0; fingerprint global 1c2e7f, runtime/src/static/UI sem alteração.
+  - [x] E336.h: executar as três novas consultas autorizadas ao Luna
+    (elemental, evocação e composição), sem retries; enviar o arquivo E196–E199
+    a `/VPS Backups/`, verificar a cópia remota e somente então remover os
+    quatro diretórios originais explicitamente autorizados. Registrar tentativas,
+    preservação do save, resultado do upload e espaço efetivamente recuperado.
+    - [x] Provider: três tentativas sem retries; elemental/evocação selecionaram
+      ofertas atuais (2 opções cada), composição selecionou relief entre 41
+      opções. Receipts sem deltas; owners geraram 11 eventos materiais apenas
+      no fork composto. Hash do save original preservado. Upload ainda aberto.
+  - [ ] E337: após backup e preflight, executar `medieval_release_gate.py`
+    com seeds 73/101/137, 3600 dias, checkpoints anuais e `--final-v1`, no
+    fingerprint congelado 1c2e7f. Registrar cada seed, auditorias, conservação,
+    retomada e budgets sem relaxá-los; offline não conta como provider real.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
