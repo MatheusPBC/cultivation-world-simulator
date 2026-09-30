@@ -565,9 +565,14 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   (96 testes focados e história natural idêntica). Os hashes anteriores são
   históricos; E343 não reutiliza E337 como gate aprovado.
   E346 posterior altera somente busca local de fretes na validação, com74
-  testes focados e par natural equivalente. Fingerprint atual
+  testes focados e par natural equivalente. Fingerprint histórico E346
   `f3cef876adb4410a81678798ec85031c003d72bfbd677dc87e7cb497a5999e9f`;
-  nenhum gate natural integral aprovado para ele.
+  nenhum gate natural integral aprovado para ele. Candidato posterior E347:
+  código `c531cdad`, fingerprint
+  `95543bab9dcf23403354d786475cc18376175c0c207d5711f98cd1545b660f46`.
+  47 testes e equivalência natural inicial0→30 comprovam o recorte de cópia;
+  ganho sintético não aprova performance tardia. E348 reconstrói fonte tardia
+  nesse mesmo código, sem substituir o gate integral de três seeds.
 - [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
