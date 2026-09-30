@@ -1,12 +1,17 @@
 """Deprivation and age are material laws: nobody chooses them, nothing is drawn."""
 
+import pytest
+
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
 from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force_command import appoint_detachment_commander, detachment_command_options
-from src.sim.medieval.mortality import LIFESPAN_DAYS
+import src.sim.medieval.mortality as mortality
+from src.sim.medieval.mortality import LIFESPAN_DAYS, _deprivation_deaths
+from src.sim.medieval.economy import consume_monthly
+from src.systems.time import WorldClock
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from tests.test_medieval_character_travel import garrison, lone_world
 
@@ -81,6 +86,9 @@ async def test_sustained_deprivation_kills_and_a_fed_cycle_stops_it(tmp_path):
         assert all(delta.owner_kind == "population_group" for delta in item.deltas)
         assert any(events_by_id[link.cause_event_id].event_type == "subsistence_resolved"
                    for link in item.causal_links), "a perda cita o recibo de subsistência do ciclo"
+        assert item.causal_payload["source_subsistence_event_id"]
+        assert all("exposed" in details and "deficit" in details and "loss" in details
+                   for details in item.causal_payload["losses_by_group"].values())
     lost = sum(int(delta.before) - int(delta.after) for item in deaths for delta in item.deltas)
     assert lost > 0 and people_total(world) == people - lost
     assert living_named(world) == named, "nenhum nomeado é consumido por uma perda agregada"
@@ -96,6 +104,127 @@ async def test_sustained_deprivation_kills_and_a_fed_cycle_stops_it(tmp_path):
     path = tmp_path / "mortality.mws"
     save_world(world, path)
     assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
+def test_deprivation_uses_same_receipt_unmet_groups_and_rejects_missing_receipt():
+    world = famine_world()
+    need = world.economy.needs[TARGET]
+    target_groups = [item for item in world.society.population.values()
+                     if item.settlement_id == TARGET and world.society.available_count(item.id) > 0]
+    unfed_group = max(target_groups, key=lambda item: item.count)
+    fed_group = next(item for item in target_groups if item.id != unfed_group.id)
+    stock = world.economy.stocks[need.stock_id]
+    available = {item.id: world.society.available_count(item.id) for item in target_groups}
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={"goods": {**stock.goods, "food": sum(available.values())}})
+    price = world.economy.markets[TARGET].prices["food"]
+    for item in target_groups:
+        account = world.economy.accounts[f"household:{item.id}"]
+        world.economy.accounts[account.id] = account.model_copy(
+            update={"balance": 0 if item.id == unfed_group.id else available[item.id] * price})
+    world.economy.needs[TARGET] = need.model_copy(update={"health": 0})
+    consume_monthly(world)
+    receipt = next(event for event in reversed(world.events)
+                   if event.event_type == "subsistence_resolved"
+                   and event.causal_payload["subsistence"]["settlement_id"] == TARGET)
+    payload = receipt.causal_payload["subsistence"]
+    assert {fed_group.id, unfed_group.id}.issubset(payload["household_group_ids"])
+    assert fed_group.id not in payload["unmet_by_group"]
+    assert payload["unmet_by_group"].get(unfed_group.id) == available[unfed_group.id]
+    assert payload["unmet_by_group"].get(fed_group.id, 0) == 0
+    removed = _deprivation_deaths(world)
+    assert removed.get(unfed_group.id, 0) == available[unfed_group.id] * 20 // 1000
+    assert all(delta.owner_id == unfed_group.id
+               for event in world.events if event.event_type == "deprivation_deaths"
+               for delta in event.deltas)
+    assert world.society.population[fed_group.id].count == fed_group.count
+    assert world.society.population[unfed_group.id].count == unfed_group.count - (
+        available[unfed_group.id] * 20 // 1000)
+
+    invalid = famine_world()
+    invalid_need = invalid.economy.needs[TARGET]
+    invalid.economy.needs[TARGET] = invalid_need.model_copy(update={"health": 0, "missing_food": 100})
+    before = world_snapshot(invalid)
+    with pytest.raises(ValueError, match="canonical subsistence receipt"):
+        _deprivation_deaths(invalid)
+    assert world_snapshot(invalid) == before
+
+
+def _real_floor_receipt_world():
+    world = famine_world()
+    need = world.economy.needs[TARGET]
+    groups = [item for item in world.society.population.values()
+              if item.settlement_id == TARGET and world.society.available_count(item.id) > 0]
+    unfed = max(groups, key=lambda item: item.count)
+    available = {item.id: world.society.available_count(item.id) for item in groups}
+    stock = world.economy.stocks[need.stock_id]
+    world.economy.stocks[stock.id] = stock.model_copy(
+        update={"goods": {**stock.goods, "food": sum(available.values())}})
+    price = world.economy.markets[TARGET].prices["food"]
+    for item in groups:
+        account = world.economy.accounts[f"household:{item.id}"]
+        world.economy.accounts[account.id] = account.model_copy(
+            update={"balance": 0 if item.id == unfed.id else available[item.id] * price})
+    world.economy.needs[TARGET] = need.model_copy(update={"health": 0})
+    consume_monthly(world)
+    receipt = next(event for event in reversed(world.events)
+                   if event.event_type == "subsistence_resolved"
+                   and event.causal_payload["subsistence"]["settlement_id"] == TARGET)
+    return world, receipt
+
+
+@pytest.mark.parametrize("variant", ("missing", "stale", "wrong_settlement", "aggregate_mismatch"))
+def test_deprivation_rejects_invalid_real_receipt_without_mutation(variant):
+    world, receipt = _real_floor_receipt_world()
+    need = world.economy.needs[TARGET]
+    if variant == "missing":
+        updated_payload = {}
+        updated_need = need
+    elif variant == "stale":
+        updated_payload = receipt.causal_payload
+        updated_need = need
+    else:
+        subsistence = dict(receipt.causal_payload["subsistence"])
+        if variant == "wrong_settlement":
+            subsistence["settlement_id"] = "other-settlement"
+        else:
+            subsistence["unmet_by_group"] = {
+                **subsistence["unmet_by_group"],
+                next(iter(subsistence["unmet_by_group"])): 1,
+            }
+        updated_payload = {"subsistence": subsistence}
+        updated_need = need
+    index = world.events.index(receipt)
+    world.events[index] = receipt.model_copy(update={"causal_payload": updated_payload})
+    world.economy.needs[TARGET] = updated_need
+    if variant == "stale":
+        world.clock = WorldClock(receipt.day + 30)
+    before = (
+        len(world.events),
+        world.economy.needs[TARGET].health,
+        world.economy.needs[TARGET].missing_food,
+        world.economy.needs[TARGET].last_event_id,
+        {group_id: group.count for group_id, group in world.society.population.items()},
+    )
+    with pytest.raises(ValueError):
+        _deprivation_deaths(world)
+    assert (
+        len(world.events),
+        world.economy.needs[TARGET].health,
+        world.economy.needs[TARGET].missing_food,
+        world.economy.needs[TARGET].last_event_id,
+        {group_id: group.count for group_id, group in world.society.population.items()},
+    ) == before
+
+
+def test_deprivation_cap_preserves_named_and_reserved_people(monkeypatch):
+    world, receipt = _real_floor_receipt_world()
+    world.economy.needs[TARGET] = world.economy.needs[TARGET].model_copy(update={"health": 0})
+    monkeypatch.setattr(type(world.society), "available_count", lambda self, group_id: 50)
+    monkeypatch.setattr(mortality, "_living_named", lambda world, group_id: 50)
+    before = world_snapshot(world)
+    assert _deprivation_deaths(world) == {}
+    assert world_snapshot(world) == before
 
 
 async def test_a_lifetime_ends_and_releases_only_the_person():
