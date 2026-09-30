@@ -282,7 +282,11 @@ def _copy_transaction_value(value, *, share_values=False):
             return value
         result = copy.copy(value)
         for key, item in value.__dict__.items():
-            object.__setattr__(result, key, _copy_transaction_value(item, share_values=share_values))
+            # Public scalar fields are already owned by the shallow model copy;
+            # only recurse into containers or Pydantic-like nested models.
+            if (isinstance(item, (dict, list, set, tuple, frozenset))
+                    or (hasattr(item, "__pydantic_fields__") and hasattr(item, "__dict__"))):
+                object.__setattr__(result, key, _copy_transaction_value(item, share_values=share_values))
         for attribute in ("__pydantic_extra__", "__pydantic_private__"):
             payload = getattr(value, attribute, None)
             if payload is not None:

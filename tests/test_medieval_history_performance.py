@@ -272,6 +272,10 @@ def test_transaction_copy_isolates_pydantic_values_and_mutable_payloads():
     scalar_copy = _copy_transaction_value(scalar)
     assert scalar_copy is not scalar
     assert scalar_copy.value == scalar.value
+    malformed_scalar = scalar.model_copy(update={"value": []})
+    malformed_copy = _copy_transaction_value(malformed_scalar)
+    assert malformed_copy.value == []
+    assert malformed_copy.value is not malformed_scalar.value
     nested_copy = _copy_transaction_value(nested)
     assert nested_copy is not nested
     assert nested_copy.values is not nested.values

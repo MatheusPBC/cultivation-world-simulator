@@ -471,10 +471,21 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Validador inteiro: mediana CPU0.1495→0.1304s; par natural2520→2550
     preservou snapshot,109.947 eventos e RNG, fonte intacta; CPU24.3908→24.1884s.
     Ganho mensal pequeno, não aprovação do gate. Fingerprint f3cef876adb4410a81678798ec85031c003d72bfbd677dc87e7cb497a5999e9f.
-  - [ ] E347: discriminar a cópia de Relations (4.75s CPU nas41 cópias E345)
+  - [x] E347: discriminar Relations dentro da cópia do mundo (4.75s CPU nas41 cópias E345)
     com a fonte E346, antes de novo patch/gate. Preservar payloads privados e
     extras, isolamento/RNG e rejeitar experimentos sem ganho; não repetir
     otimizações genéricas E338 rejeitadas nem mudar GC/budgets/física.
+    Saves/scripts antigos de `/tmp` indisponíveis nesta retomada: a nova prova
+    é sintética, não um replay tardio. Models continuam copiados; apenas evita
+    recursão/reatribuição de campos escalares já copiados pelo Pydantic.
+    47 testes focados passaram; seed73 natural inicial0→30 preservou estado
+    e819 eventos. Mediana sintética CPU0.027602→0.019482s, com outlier novo
+    0.053699s; não extrapolar para mês/gate. Fingerprint95543bab.
+  - [ ] E348: reconstruir seed73 offline natural até2520 dias, em diretório
+    ignorado persistente do repo, com checkpoints720dias e journal mensal;
+    recuperar uma fonte tardia para comparar cópia/avanço no candidato E347.
+    Não é gate final de três seeds, não injeta decisões, não usa provider real
+    e não substitui E343 reprovado. Nenhuma mudança de fonte durante a medição.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

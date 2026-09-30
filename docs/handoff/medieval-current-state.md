@@ -1,6 +1,13 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E346 verificado / M8 ainda aberto — 30/09/2026
+## Situação vigente — E347 verificado no recorte / M8 ainda aberto — 30/09/2026
+
+- E347 evita trabalho redundante na cópia de campos escalares, sem compartilhar
+  models nem enfraquecer isolamento. 47 testes e comparação natural inicial de
+  30 dias passaram. Ganho medido em Relations sintético, não gate tardio.
+  Saves/scripts históricos de `/tmp` indisponíveis nesta retomada; código e
+  registros versionados preservados. Próximo E348 reconstrói fonte tardia em
+  `.tmp_codex/`, sem inferir exclusão humana nem repetir consultas reais.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -334,6 +341,51 @@ história hash4ee28762e4e87850e53b05f9d1bcdd8d4e6278e980c58e871092c5f99aa8e4e1.
 Nenhuma nova auditoria integral/gate longo, consulta real, push/merge/deploy.
 Próximo E347 discrimina custo de cópia, preservando isolamento e sem repetir
 experimentos genéricos rejeitados. M8 continua aberto, sem relaxar35s de p95.
+
+## E347 — Cópia escalar sem compartilhar models — 30/09/2026
+
+Base `ae9172b4`; arquivos: `src/classes/core/medieval_world.py`, extensão do
+teste existente `tests/test_medieval_history_performance.py` e diagnóstico
+reproduzível `tools/medieval_transaction_copy_benchmark.py`. Fingerprint:
+`95543bab9dcf23403354d786475cc18376175c0c207d5711f98cd1545b660f46`.
+
+`copy.copy` já copia o dict público de cada model. O patch evita recursão e
+reatribuição só quando o valor não é container nem model Pydantic-like,
+preservando a detecção anterior, `share_values` de Knowledge, modelos
+independentes, tuples/listas/dicts/sets e privados/extras inclusive vazios.
+Lista inválida injetada com `model_copy` continua isolada antes da validação.
+Não muda owners, física, RNG, schemas, GC, conhecimento ou retenção.
+
+Comando via Luna: `CWS_DATA_DIR=/tmp/cws-e347-new-data .venv/bin/python -m pytest
+tests/test_medieval_history_performance.py tests/test_medieval_engine.py
+tests/test_medieval_material_execution.py`: **47 passed in18.59s**, exit0.
+Benchmark: `CWS_DATA_DIR=/tmp/cws-e347-new-data .venv/bin/python
+tools/medieval_transaction_copy_benchmark.py --output /tmp/cws-e347-new.json`,
+exit0. Cópia do relatório preservada em
+`.tmp_codex/e347-copy-bIXnOD/benchmark.json`. Baseline anterior retido no tool;
+1279 propostas/181 obrigações/381 memórias model-valid independentes, sem
+integridade cross-owner. Cinco amostras alternadas: CPU mediana baseline
+0.027602081s e protótipo0.019482377s; parede0.027611262→0.019482210s.
+Outlier novo0.053699171s supera todas as amostras antigas; ganho de mediana
+~29.4% neste cenário, não garantia de ganho mensal. Serialização das três
+variantes idêntica; isolamento público/aninhado/extra/privado passou.
+
+Verificação principal: duas criações naturais seed73 com
+`create_medieval_world(73, bootstrap_household_income=True)` e avanço normal
+por `MedievalSimulator.step()` até dia30, sem provider/decisão injetada. No
+baseline, troca temporária de `medieval_world._copy_transaction_container`
+pelo `_baseline_copy_container` do tool, restaurada em `finally`. Comparação
+`world_snapshot` e lista integral de eventos: iguais,819 eventos em ambos.
+CPU0.523465→0.473394s; parede0.525233→0.473487s, uma amostra por variante;
+não mede custo tardio nem aprova orçamento. Comando inline Python executado
+com `CWS_DATA_DIR=/tmp/cws-e347-equivalence`, terminal43553 exit0.
+
+E345/E346 seguem evidências históricas: seus saves/scripts/JSONs de `/tmp`
+não estão disponíveis no ambiente retomado. Não atribuir sua ausência a
+limpeza por nós/humano. Disco atual ~12GiB livres. Não repetir o gate longo
+sem recuperar fonte tardia; E348 reconstrói seed73 até2520 com journal e
+checkpoints em diretório ignorado do repo. M8 permanece aberto; sem consultas
+reais, push, merge, deploy ou relaxamento de budget.
 
 ### Estado herdado do checkpoint E336.g
 

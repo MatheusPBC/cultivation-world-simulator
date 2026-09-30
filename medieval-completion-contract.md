@@ -1,14 +1,17 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, código verificado E346 / fingerprint `f3cef876`,
+`codex/medieval-remote`, código verificado E347 / fingerprint `95543bab`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
 por performance; E339/E342 preservaram estado/história/RNG e E340 reprovou custo.
 E343 reprovou novamente o budget mensal; E345 mediu validação/GC, E346 reduziu
 um subscan de relações mantendo estado/história/RNG. Ganho mensal pequeno;
-fingerprint atual f3cef876, próximo E347 discrimina custo de cópia.
+E347 reduziu recursão escalar da cópia mantendo isolamento (47 testes e
+equivalência natural inicial de30 dias). Mediana sintética melhor, não prova
+tardia: saves históricos de `/tmp` indisponíveis nesta retomada; próximo E348
+reconstrói fonte tardia em diretório ignorado persistente do repo.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -617,8 +620,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E347, discriminar cópia de relações sem ampliar
-o escopo ou enfraquecer isolamento. E346 fechou um subscan com74 testes e
+Próximo trabalho imediato: M8/E348, reconstruir fonte natural tardia para
+medição do candidato E347, sem novo domínio ou alteração de física. E347
+preserva isolamento e equivale no mundo inicial, não fecha o gate. E346 fechou um subscan com74 testes e
 equivalência natural; CPU do mês24.39→24.19s, insuficiente para aprovar M8.
 E343 reprovou p95 (oito meses >35s entre97), encerrado com checkpoint2880
 preservado/auditado; não repetir gate sem corrigir custo dominante. E342
