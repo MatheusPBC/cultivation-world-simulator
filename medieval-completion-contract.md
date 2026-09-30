@@ -1,11 +1,12 @@
 # Contrato de conclusão do Medieval
 
 30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
-`codex/medieval-remote`, base local `6f2f913e`, correção E339 verificada,
+`codex/medieval-remote`, código congelado `a90d10ad` / fingerprint `bdffc189`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
-por performance; E339 preservou estado/história/RNG e E340 mede continuação tardia.
+por performance; E339/E342 preservaram estado/história/RNG e E340 reprovou custo.
+E343 executa o novo gate final natural, com código congelado e budgets originais.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -93,7 +94,11 @@ Conclusão exige todos os marcos abaixo. Não exige todas as combinações poss�
 de guerras, sociedades ou feitiços. Cada capacidade tem recorte explícito;
 nenhuma pendência obrigatória pode ser adiada silenciosamente para fechar gate.
 
-## Diagnóstico atual
+## Diagnóstico inicial do fechamento (histórico)
+
+As lacunas desta tabela motivaram M0–M7. O estado vigente e seus limites estão
+nos aceites dos marcos abaixo e na entrada mais recente do estado atual; não
+interpretar esta baseline como uma lista de implementações ainda ausentes.
 
 | Área | Base confirmada | Lacuna de fechamento |
 |---|---|---|
@@ -549,6 +554,11 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   4f1df5f0. Fingerprint do candidato incluindo ferramentas:
   `1c2e7f0a9f36c98ecf070460955af3f6bda31ccc149b158205409ad8d1b15b06`.
   Correção material posterior invalida a prova afetada e exige novo candidato.
+  Candidato atual E343: código `a90d10ad`, fingerprint completo
+  `bdffc18991756f621881ea12cc80ca1fe3136040814779695381711913f7eba9`.
+  E339 verificou cópia/isolamento (80 testes) e E342 proveniência incremental
+  (96 testes focados e história natural idêntica). Os hashes anteriores são
+  históricos; E343 não reutiliza E337 como gate aprovado.
 - [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.

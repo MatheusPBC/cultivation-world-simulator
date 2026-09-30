@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E342 verificado / E343 candidato congelado — 30/09/2026
+## Situação vigente — E343 em execução / revisão E344 — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -209,6 +209,30 @@ após commit. Handle de execução `4017` confirmado vivo por polling; primeira
 seed chegou ao dia 720 (26.257 eventos, mês 7.0934s, elapsed 109.12s), com
 checkpoint 360 de ~4.5MiB preservado. Dados intermediários não aprovam budgets
 finais ou auditorias que ainda não terminaram. Seeds 101/137 ainda não iniciadas.
+
+## E344 — Revisão do contrato antes da conclusão — 30/09/2026
+
+Read-only em paralelo ao run E343, sem nova execução de testes pesados ou
+alteração de código. Revisados contrato M0–M8, crosswalk das sete seções,
+recortes E320/E328/E336.b2/f, seleção em ai_decider, candidato em
+material_execution e snapshot/restore em persistence. Seleção só retém ID
+enumerado (incluindo alias enumerado) ou NO_ACTION; saída inválida levanta
+ProviderDecisionRequired. Comandos materiais validam owners/história antes de
+publicar candidate; snapshot explícito não serializa índices transitórios.
+
+Aceites controlados continuam: M1 E282; M2 E294; M3 E320; M4 E324.d;
+M5 E328; M6 E332; M7 E335. E336 backend A reexecutou magia/demografia/religião,
+B bilateralidade/campanha/API e C consumidores/criaturas. Mudanças E339/E342
+foram revalidadas no recorte afetado, sem alterar leis ou respostas do corpus
+real limitado E336.h. Isso não transforma mocks em provider ou fixture em
+emergência natural. Build/browser permanecem do mesmo frontend inalterado.
+
+E343 ainda precisa provar três sementes completas, conservação, história,
+retomada, custos e dados econômicos observados. Entrega exige autoridade e
+provas próprias de remoto/implantação; nada publicado nesta revisão. A baseline
+do diagnóstico no contrato e o hash antigo M8 foram identificados como históricos
+para não sugerirem lacunas já implementadas nem aceite no fingerprint anterior.
+E344 segue aberto até essas pendências serem efetivamente verificadas.
 
 ### Estado herdado do checkpoint E336.g
 
