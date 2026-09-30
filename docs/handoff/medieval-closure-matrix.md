@@ -14,7 +14,7 @@
 | 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | M3/E320 aceito pelos recortes materiais referenciados em seu checklist; E295–E318 conectam aquisição/aplicação, inclusive E300–E308 pólvora/artilharia. Catálogo sozinho não conta; generalização/naturalidade não são inferidas desses recortes. |
 | 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | M2/E294 e composição M7/E335 provam cenários controlados com autoridade/QG/comandante, interferência e consequência civil, sem escolha de ação pós-início pelo teste. Não extrapolar política stub para provider real ou emergência natural. |
 | 5. Magia, criaturas e ação individual | M4/M5/M6 | Society/Research owners e `rites`, `site_services`, `creature*`, `character_*`, `assembly_denial` | M4/E324.d, M5/E328 e M6/E332 aceitos em recortes controlados: trabalho dos quatro povos, elemental/evocação com custos e contramedidas, adesão independente e resposta social. Composição/navegabilidade E335; gates amplos continuam M8. |
-| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; E336 regressão apropriada e corpus real limitado fechado em E336.h. E199/E200 é histórico; E337 reprovado. Novo gate natural e custos em execução em M8/E343 após E339/E342. |
+| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; E336 regressão apropriada e corpus real limitado fechado em E336.h. E199/E200 é histórico; E337/E343 reprovaram performance. E345 medido; M8/E346 investiga custo sem relaxar os budgets. |
 
 - [x] M0 crosswalk: mapear as sete seções (0–6) do roadmap a M0–M8,
   owners/integradores e evidência/limites acima. Os requisitos internos têm
@@ -433,6 +433,12 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     checkpoints anuais, fingerprint bdffc18991756f621881ea12cc80ca1fe3136040814779695381711913f7eba9.
     Fonte congelada; nenhuma nova alteração durante execução. Conservação,
     auditoria, save/load/continuação e budgets originais precisam passar todos.
+    Reprovado: sete meses >35s até amostra96 tornam o p95 final impossível;
+    encerrado PID301700 após checkpoint2880/avanço2910 seguro, exit143.
+    Resultado terminal: 97 meses, oito lentos; seeds101/137 não executadas.
+    - [x] Preservar e auditar checkpoint2880: 125.148 eventos, audit ok/exit0,
+      SHA idêntico ao E337; sem causas quebradas ou narrativa material.
+    - [ ] Orçamentos e três sementes completos: não aprovados neste candidato.
   - [ ] E344: revisão final de conclusão contra o contrato, sem mudar fonte
     durante E343. Vincular requisitos M0–M7 aos recortes e regressões atuais,
     distinguir fixture/offline/provider/natural e fechar M8 apenas com relatório
@@ -446,6 +452,16 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
       transacionais/de consulta posteriores; não afirmar suíte legada inteira.
     - [ ] Resultados completos E343, adaptação observada e limites operacionais.
     - [ ] Entrega remota conforme autoridade vigente, backup e smoke implantado.
+  - [x] E345: medir o pico natural2520→2550, sem alterar fonte ou reescrever
+    checkpoint. Coarse CPU/parede por validação/cópia e GC, sem profiler recursivo,
+    para discriminar varreduras redundantes antes de uma correção finita.
+    Exit0: 22.9048s parede/22.8758s CPU, 108.417→109.947 eventos, fonte intacta.
+    Relações 5.4198s CPU/36 chamadas; cópia 4.7548s/41; economia 2.8799s/44;
+    conhecimento 1.1956s/34. GC geração2: 2.1415s, três coletas, zero coletados;
+    thresholds inalterados. Custos se sobrepõem; não aprova o gate integral.
+  - [ ] E346: discriminar custo interno de Relations.validate e implementar
+    somente otimização medida que preserve varredura fresca e rejeição de
+    adulteração no meio do ledger. Sem novo framework ou mudança de física.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

@@ -6,7 +6,7 @@ avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
 por performance; E339/E342 preservaram estado/história/RNG e E340 reprovou custo.
-E343 executa o novo gate final natural, com código congelado e budgets originais.
+E343 reprovou novamente o budget mensal; E345 mediu validação/GC, E346 aborda relações.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -611,9 +611,12 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E343, executar gate final no candidato congelado
-bdffc189 após E342. Busca de causas de rota otimizada, 96 testes e par natural
-com história/snapshot/RNG idênticos; mês 29.71s não aprova p95 integral.
+Próximo trabalho imediato: M8/E346, reduzir o custo medido de relações sem
+enfraquecer a integridade. E345 concluiu2520→2550 em22.90s isolado, relações
+5.42s CPU; isso não aprova performance em horizonte longo.
+E343 reprovou p95 (oito meses >35s entre97), encerrado com checkpoint2880
+preservado/auditado; não repetir gate sem corrigir custo dominante. E342
+mantém causas/snapshot/RNG idênticos, mas seu ganho não fechou o orçamento.
 E340 passou conservação/save-load/audit, mas seu p95 limitado reprovou o teto.
 E339 removeu ciclos de Knowledge com 80 testes e equivalência comprovados.
 Experimentos E338 sem ganho foram retirados; E339 não altera política de GC,

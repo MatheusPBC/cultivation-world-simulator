@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E343 em execução / revisão E344 — 30/09/2026
+## Situação vigente — E343 reprovado / E345 medido / E346 — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -38,6 +38,12 @@
   Três testes de equivalência/atualização/isolamento adicionados, 47 testes do
   recorte passaram, mais 49 de migração/persistência. Benchmark e comparação
   natural preservaram causas/snapshot/história/RNG; próximo gate integral E343.
+- E343 reprovou o budget: oito meses >35s entre 97 observados, após p95 final
+  tornar-se impossível com sete/96. Encerrado apenas o benchmark PID301700,
+  exit143, depois de preservar checkpoint2880 e observar avanço2910.
+  Seeds101/137 não executadas. Checkpoint auditado exit0/ok=true, 125.148 eventos,
+  hash byte a byte igual ao E337. E345 mediu o pico de validação/GC;
+  sem relaxamento de teto, novo gate ou publicação automática.
 
 ## E339 — Cópia por owner e ciclos de Knowledge — 30/09/2026
 
@@ -233,6 +239,56 @@ provas próprias de remoto/implantação; nada publicado nesta revisão. A basel
 do diagnóstico no contrato e o hash antigo M8 foram identificados como históricos
 para não sugerirem lacunas já implementadas nem aceite no fingerprint anterior.
 E344 segue aberto até essas pendências serem efetivamente verificadas.
+
+## E343 — Resultado reprovado preservado — 30/09/2026
+
+Fonte `bdffc189` permaneceu congelada. Até amostra96 houve sete meses acima de
+35s, logo mesmo 24 meses futuros rápidos não corrigiriam o p95 de120 amostras.
+Checkpoint2880 seguro foi seguido pelo progresso2910; o PID301700 foi conferido
+com comando exato antes de TERM. Handle4017 terminou com exit143. Não é pausa do
+goal nem cancelamento de outros processos. Ao encerrar: 97 amostras, oito >35s
+(2520:35.1947,2550:46.4317,2580:39.8844,2610:36.6356,2730:35.0084,
+2790:37.3779,2850:35.0014,2910:39.1509). Nenhuma seed101/137 executada.
+gate.json vazio porque agregado só sai após as três seeds; não simular relatório
+final. Checkpoints360…2880 e log integral preservados.
+
+GNU time: parede30:23.79, user1804.65s/system4.41s, CPU99%, RSS1620268KiB,
+zero major page faults. Campo `Exit status:0` da ferramenta time não substitui
+exit143 observado pelo handle; cabeçalho confirma sinal15. PSI CPU avg10~6.10
+no término: não atribuir os picos exclusivamente à pressão externa do host.
+Último estado2910: população8097, falta2919, saúde177, unrest704.88,
+mortes por privação2833. Não confundir causalidade íntegra com prosperidade.
+
+Auditoria atual do checkpoint2880 via `tools/medieval_causal_audit.py` terminou
+exit0, `ok=true`, 125.148 eventos, zero causas quebradas, erros de autoria/fonte,
+Story/interpretação com delta. Relatório `checkpoint-2880-audit.json` no run.
+SHA-256 `a8b157e8f60aa410392295c8200f57e2d8f15136d74bb9240ee3b209707a5917`,
+idêntico ao E337: prova forte de dados físicos/história/persistência preservados
+até essa fronteira, mas não aprovação de desempenho ou do horizonte completo.
+
+## E345 — Discriminar validação versus GC no pico — 30/09/2026
+
+Pré-registro e script temporário `/tmp/cws-e345-validation-profile.py`, base
+atual216f83e7, sem mudanças em source/testes do candidato. Fonte é o checkpoint
+2520 do E343; avanço30dias só em memória. Mede CPU/parede de cópia, relações,
+economia, conhecimento, infraestrutura e consultas de rota; callbacks GC mantêm
+thresholds e registram stack ativa. Custos cumulativos sobrepõem e não devem ser
+somados como parcelas independentes. Saída `e345-validation-profile.json` e stderr
+no diretório E343. Sem provider, reescrita de save, leis ou override de RNG.
+
+Resultado terminal exit0: 2520→2550, 108.417→109.947 eventos,
+22.904812s parede/22.875765s CPU. Fonte SHA-256 antes/depois
+`346f23f52907bb43cab3d794579363e29bf4d331e616844822eb3fe2d0cc2b69`.
+Relações: 36 validações/5.419779s CPU; cópia: 41/4.754761s;
+economia: 44/2.879855s; conhecimento: 34/1.195554s;
+infraestrutura: 30/1.284103s. Causas de rota: ~0.0478s no total,
+confirmando que não são mais o gargalo dominante nesse mês.
+GC geração2: três coletas/2.141489s CPU, zero coletados; thresholds
+`(700,10,10)` intactos. Valores inclusivos se sobrepõem. Este mês isolado
+abaixo de35s não substitui o gate longo reprovado nem identifica sozinho a
+origem de toda diferença para46.4317s da trajetória integral.
+E346 restringe o próximo trabalho à validação de relações: perfil interno
+read-only antes de patch; manter leitura fresca contra adulteração no ledger.
 
 ### Estado herdado do checkpoint E336.g
 
