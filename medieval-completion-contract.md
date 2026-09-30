@@ -13,8 +13,9 @@ equivalência natural inicial de30 dias). Mediana sintética melhor, não prova
 tardia: E348 reconstruiu fonte2520 idêntica ao SHA histórico; conservação,
 save/load e continuação passaram, mas houve quatro meses >35s/84 observados.
 E349 confirmou história/estado/datas/fontes iguais: cópia reduziu ~1.05s CPU,
-mês completo só~0.54s. E350 discrimina instrumentação/GC no mesmo save antes
-de novo patch ou gate; nenhuma mudança de fonte durante a medição.
+mês completo só~0.54s. E350 descartou observador como gargalo (~0.0873s),
+sem outro patch. E351 executa gate integral no código congelado, sem garantir
+aprovação a partir do p95 limitado E34834.6118s/84.
 Gate natural final e entrega continuam pendentes.
 M3 permanece fechado nos recortes controlados de E320.
 M4 fechou em E324.d com provas controladas para as quatro identidades; a auditoria
@@ -628,8 +629,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E350, discriminar step/observação/GC no save
-natural tardio recuperado E348, sem novo domínio ou alteração de física. E349
+Próximo trabalho imediato: M8/E351, gate natural73/101/137×3600 dias no código
+congelado95543bab, checkpoints360 e budgets originais. E350 encerrou hipótese
+de observador caro, sem mudança especulativa. E349
 confirmou equivalência tardia com ganho mensal pequeno. E347
 preserva isolamento e equivale no mundo inicial, não fecha o gate. E346 fechou um subscan com74 testes e
 equivalência natural; CPU do mês24.39→24.19s, insuficiente para aprovar M8.

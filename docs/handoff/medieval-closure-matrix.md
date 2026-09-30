@@ -497,11 +497,20 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Terminal23715 exit0: snapshot/história/datas iguais, fonte SHA intacta;
     CPU avanço26.3005→25.7562s, parede26.3683→25.8496s; CPU de41 cópias
     do mundo6.4594→5.4091s. Uma dupla, não p95. História109.947 eventos.
-  - [ ] E350: discriminar custo da instrumentação do smoke no mesmo save2520:
+  - [x] E350: discriminar custo da instrumentação do smoke no mesmo save2520:
     avanço normal, accounting de recursos/caixa e métricas mensais separados;
     medir GC passivamente, sem mudar thresholds, e conferir história igual
     ao E349. Diferença entre meses contínuos e forks carregados não prova
     sozinha que o observador é o culpado. Sem nova fonte/owner/physics patch.
+    Terminal15196 exit0: accounting+totais+métricas ~0.0873s CPU versus
+    step26.4690s, história/dia/fonte idênticos ao E349. GC somou4.8007s dentro
+    do custo medido (gen2:2.9574s/3coletas), não custo adicional somável.
+    Observador não explica meses35–39s; rejeitada mudança especulativa nele.
+  - [ ] E351: executar gate final natural73/101/137×3600, sequencial,
+    checkpoints360 e auditorias/why/budgets congelados, código c531cdad/
+    fingerprint95543bab. E348 limitado p95 34.6118s/84 permite testar o
+    candidato, mas não garante sucesso. Sem provider real/fixture/cota de
+    drama, alteração de fonte, relaxamento de limites ou extrapolação de p95.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

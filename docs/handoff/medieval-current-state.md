@@ -9,7 +9,8 @@
   registros versionados preservados. E348 recuperou a fonte tardia exata em
   `.tmp_codex/` (SHA igual ao histórico), conservação/save-load/continuação
   passaram. E349 confirmou equivalência tardia, com ganho mensal pequeno.
-  E350 discrimina custo observado do smoke; ainda não fecha o gate integral.
+  E350 descartou o observador como gargalo. E351 executa o gate integral no
+  código congelado; ainda não há resultado das três seeds3600.
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -455,6 +456,47 @@ E348 observou meses35–39s no avanço contínuo; E349 carregado levou25.85s.
 Próximo E350 separa step, checks de conservação/caixa, métricas mensais e GC
 no mesmo save, antes de atribuir diferença ao smoke/host/caches. Sem alterações
 de código enquanto mede; M8/3seeds3600/entrega continuam abertos.
+
+## E350 — Observação não explica o pico mensal — 30/09/2026
+
+Diagnóstico ignorado `probe_smoke_cost.py`, mesmo diretório E348, preparado
+por Luna e revisado antes de executar. Comando:
+`CWS_DATA_DIR=$REPO/.tmp_codex/e348-natural-ul8iI0/probe-data .venv/bin/python
+.tmp_codex/e348-natural-ul8iI0/probe_smoke_cost.py --source
+.tmp_codex/e348-natural-ul8iI0/seed73-day2520.mws --output
+.tmp_codex/e348-natural-ul8iI0/e350-smoke-cost.json`, stdout/stderr
+`e350-smoke-cost.log`; terminal15196 exit0. Mesma fonte/hash E349,AI false,
+zero provider/stub, checks de conservação reais reproduzidos do smoke.
+
+30 steps:26.468974s CPU/26.650027s parede. Accounting0.001581s CPU;
+totais/caixa0.008707s; uma métrica mensal0.077013s. Portanto ~0.0873s não
+explica a diferença para meses contínuos35–39s. Fonte intacta, dinheiro76.000
+conservado, recursos contabilizados, história/dia/contagem iguais ao E349.
+GC observado passivamente:1491 coletas gen0/0.882828s,136 gen1/0.960477s,
+3 gen2/2.957394s (8 coletados), zero uncollectable. Total4.800699s é sobreposto
+ao step e métricas, não somável como custo extra. Não mudou thresholds,
+habilitação de GC, política, owners, fontes ou callbacks de domínio.
+
+É uma amostra carregada, não prova da causa dos picos contínuos. Sem evidência
+para alterar observador; encerra a hipótese em vez de micro-otimizá-lo.
+Código continua95543bab, p95 limitado E34834.6118s/84, não gate aprovado.
+Próximo E351 é o gate integral, em vez de mais sondas sintéticas locais.
+
+## E351 — Gate integral preparado — 30/09/2026
+
+Código `c531cdad`/fingerprint95543bab inalterado após E349/E350; documentos
+posteriores não mudam runtime/testes/ferramentas. Diretório novo ignorado
+`.tmp_codex/e351-final-TxnsDs`. Preflight:13GiB livres,RAM disponível6.2GiB,
+swap1.5GiB usada,load3.91/5.07/5.74. Carga do host registrada como contexto,
+não justificativa para mudar35s nem atribuir automaticamente falhas ao host.
+Plano executável: `CWS_DATA_DIR=$REPO/.tmp_codex/e351-final-TxnsDs/data
+.venv/bin/python tools/medieval_release_gate.py --seeds 73,101,137 --days 3600
+--checkpoint-days 360 --final-v1 --output-dir
+$REPO/.tmp_codex/e351-final-TxnsDs`.
+Sem `--pressured`, `--economic`, provider real ou injeção de decisões. Três
+seeds sequenciais com todas as120 amostras/seed, auditorias de checkpoints,
+conservação, save/load/continuação e20why por seed. Nenhum resultado antecipado,
+nem conversão de E348 em gate de3600 dias.
 
 ### Estado herdado do checkpoint E336.g
 
