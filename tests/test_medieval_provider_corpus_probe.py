@@ -68,3 +68,34 @@ async def test_corpus_tracks_and_caps_provider_calls(monkeypatch, tmp_path, rout
     if not expected_complete:
         assert result["failed_case"] == "route_campaign"
         assert result["failure_type"] == "ValueError"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("allow_egress", [False, True])
+async def test_completion_probe_selected_cases_have_no_hidden_retries(monkeypatch, tmp_path, allow_egress):
+    from tools import medieval_completion_provider_probe as completion
+    from src.run.medieval_world import create_medieval_world
+    from src.sim.medieval.persistence import save_world
+    from src.config.settings_service import get_settings_service
+
+    source = tmp_path / "completion-source.mws"
+    save_world(create_medieval_world(73, bootstrap_household_income=True), source)
+    original = source.read_bytes()
+    original_profile = get_settings_service().get_llm_runtime_config()
+    calls = []
+
+    async def fake_client(prompt, *args, **kwargs):
+        calls.append(kwargs)
+        assert kwargs["max_retries"] == 0
+        return {"selected_id": "NO_ACTION"}
+
+    monkeypatch.setattr(completion.client, "call_llm_json", fake_client)
+    cases = ("elemental", "evocation", "composed")
+    result = await completion.run(source, allow_provider_egress=allow_egress, case_names=cases)
+    assert result["complete"]
+    assert tuple(item["case"] for item in result["cases"]) == cases
+    assert len(calls) == (3 if allow_egress else 0)
+    assert result["real_attempts"] == len(calls)
+    assert result["source_unchanged"] and source.read_bytes() == original
+    assert get_settings_service().get_llm_runtime_config() == original_profile
+    assert all(not item["receipt_has_deltas"] for item in result["cases"])

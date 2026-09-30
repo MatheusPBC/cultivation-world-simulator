@@ -30,7 +30,14 @@ from tests.test_medieval_evocation import prepare, CASTER
 from tests.test_medieval_religion import prepared, ORDER, CULT, invite, join
 
 
-async def run(source, *, allow_provider_egress=False):
+CASE_NAMES = ("faith_uncommitted", "faith_prior", "elemental", "evocation", "composed")
+
+
+async def run(source, *, allow_provider_egress=False, case_names=None):
+    selected_cases = CASE_NAMES if case_names is None else tuple(case_names)
+    if (not selected_cases or len(set(selected_cases)) != len(selected_cases)
+            or not set(selected_cases).issubset(CASE_NAMES)):
+        raise ValueError("select distinct known cases")
     source_hash = sha256(source.read_bytes()).hexdigest()
     worlds = []
     for prior in (False, True):
@@ -46,14 +53,15 @@ async def run(source, *, allow_provider_egress=False):
     worlds.append(("evocation", world, EntityRef("character", CASTER),
                    rite_offer_options(world, CASTER)[0].report_event_id))
     worlds.append(("composed", load_world(source), EntityRef("polity", "auren"), None))
+    worlds = [item for item in worlds if item[0] in selected_cases]
 
     attempts = []
     results = []
     original_call = client.call_llm_json
 
     async def tracked(prompt, *args, **kwargs):
-        if len(attempts) >= 5:
-            raise ValueError("five-attempt cap reached")
+        if len(attempts) >= len(selected_cases):
+            raise ValueError("selected-case attempt cap reached")
         payload = json.loads(prompt[prompt.index("{"):])
         attempts.append({"prompt_sha256": sha256(prompt.encode()).hexdigest(),
                          "offered_ids": [item["id"] for item in payload["choices"]],
@@ -108,7 +116,8 @@ async def run(source, *, allow_provider_egress=False):
             print(json.dumps({"case_finished": name, "attempts": len(attempts)}),
                   file=sys.stderr, flush=True)
     unchanged = sha256(source.read_bytes()).hexdigest() == source_hash
-    return {"complete": len(results) == 5 and all("failure_type" not in item for item in results) and unchanged,
+    return {"complete": len(results) == len(selected_cases) and all("failure_type" not in item for item in results) and unchanged,
+            "selected_cases": list(selected_cases),
             "mode": "real_provider" if allow_provider_egress else "preview_mock_no_action",
             "real_attempts": len(attempts) if allow_provider_egress else 0,
             "source_unchanged": unchanged, "source_sha256": source_hash,
@@ -120,7 +129,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--allow-provider-egress", action="store_true")
+    parser.add_argument("--cases", nargs="+", choices=CASE_NAMES, default=None)
     args = parser.parse_args()
-    result = asyncio.run(run(args.source, allow_provider_egress=args.allow_provider_egress))
+    result = asyncio.run(run(args.source, allow_provider_egress=args.allow_provider_egress,
+                             case_names=args.cases))
     print(json.dumps(result, ensure_ascii=False))
     raise SystemExit(0 if result["complete"] else 1)
