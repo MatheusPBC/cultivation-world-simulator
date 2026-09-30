@@ -10,7 +10,8 @@ from src.classes.governance.models import AuthorityOffice
 from src.classes.mechanical_language import EntityRef
 from src.sim.medieval.events import record_event
 from src.sim.medieval.economy import monthly_workforce, produce_monthly
-from src.sim.medieval.expansion import progress_expansions, start_expansion
+from src.sim.medieval.expansion import (expansion_options, progress_expansions,
+                                       start_expansion)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_site_reports
 from src.sim.medieval.technology_theft import execute_technology_theft, technology_theft_options
@@ -135,3 +136,97 @@ def test_stale_selection_cannot_mutate_knowledge():
     assert world.events == events_before
     assert world.knowledge.technologies == knowledge_before
     assert not world.knowledge.knows(OWNER, "metallurgy")
+
+
+def test_stolen_metallurgy_unlocks_a_paid_local_production_upgrade():
+    world, _agent = prepared_world()
+    # Auren has an authored local iron site and can start the base line, but
+    # lacks the technique needed to apply the efficient-furnace upgrade.
+    site = world.map.infrastructure_sites["passagem-negra"]
+    assert site.owner_ref == OWNER and "iron_production" in site.capability_ids
+    source = world.economy.facilities["works:minas-de-ferroalto"]
+    world.economy.facilities["works:passagem-negra-iron"] = source.model_copy(update={
+        "id": "works:passagem-negra-iron", "site_id": site.id, "stock_id": "stock:pontenegro",
+        "payroll_account_id": "treasury:auren", "max_batches": 20,
+        "last_batches": 0, "last_event_id": None})
+    for local_group in tuple(world.society.population.values()):
+        if local_group.settlement_id == "pontenegro" and local_group.occupation == "farmer":
+            world.society.population[local_group.id] = local_group.model_copy(update={"occupation": "artisan"})
+    stock = world.economy.stocks["stock:pontenegro"]
+    world.economy.stocks[stock.id] = stock.model_copy(update={
+        "goods": {**stock.goods, "wood": max(100, stock.goods.get("wood", 0)),
+                  "tools": max(20, stock.goods.get("tools", 0))}})
+    account = world.economy.accounts["treasury:auren"]
+    world.economy.accounts[account.id] = account.model_copy(update={
+        "balance": max(10_000, account.balance)})
+
+    facility_id = "works:passagem-negra-iron"
+    assert not world.knowledge.knows(OWNER, "metallurgy")
+    blocked_decision = record_event(
+        world, "expansion_decided", "Tentativa de aplicar a técnica antes de obtê-la.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision={"action": "expand", "actor_ref": OWNER.to_dict(),
+                  "facility_id": facility_id, "blueprint_id": "efficient-furnaces"})
+    before_blocked_application = world_snapshot(world)
+    with pytest.raises(ValueError, match="technical knowledge"):
+        start_expansion(world, facility_id, "efficient-furnaces",
+                        decision_event_id=blocked_decision.id)
+    assert world_snapshot(world) == before_blocked_application
+
+    theft_option = next(option for option in technology_theft_options(world, OWNER)
+                        if option.technology_id == "metallurgy")
+    finding = execute_technology_theft(world, OWNER, theft_option.id,
+                                       decide(world, theft_option).id)
+    assert finding.result == "success"
+    learned = next(item for item in world.knowledge.technologies.values()
+                   if item.owner_ref == OWNER and item.technology_id == "metallurgy")
+
+    # The source knowledge receipt is current at day 150.  The buyer's line
+    # then operates the next day without borrowing same-day payroll capacity.
+    world.clock = world.clock.advance(1)
+    produce_monthly(world)
+    facility = world.economy.facilities[facility_id]
+    assert facility.last_batches > 0
+    before_iron = world.economy.stocks["stock:pontenegro"].goods.get("iron", 0)
+    application = next(option for option in expansion_options(world, OWNER)
+                       if option.facility_id == facility_id
+                       and option.blueprint_id == "efficient-furnaces")
+    selection = record_event(
+        world, "expansion_decided", "Selecionar a aplicação de fornos eficientes.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=application.decision())
+    material_terms = {"action": "expand", "actor_ref": OWNER.to_dict(),
+                      "facility_id": facility_id, "blueprint_id": "efficient-furnaces"}
+    receipt = record_event(world, "expansion_authorized", "O owner revalidou a aplicação local.",
+                           fact_kind=FactKind.DECISION, decision=material_terms,
+                           cause_ids=(selection.id,))
+    project = start_expansion(world, facility_id, "efficient-furnaces",
+                              decision_event_id=receipt.id)
+    before_materials = dict(world.economy.stocks["stock:pontenegro"].goods)
+    before_cash = world.economy.accounts["treasury:auren"].balance
+    for day in (180, 210, 240, 270, 300):
+        world.clock = WorldClock(day)
+        progress_expansions(world, monthly_workforce(world))
+
+    assert world.economy.expansions[project.id].stage == "completed", project
+    facility = world.economy.facilities[facility_id]
+    assert facility.recipe_id == "efficient_ironworking"
+    stock = world.economy.stocks["stock:pontenegro"]
+    assert stock.goods["wood"] < before_materials["wood"]
+    assert stock.goods["tools"] < before_materials["tools"]
+    assert world.economy.accounts["treasury:auren"].balance < before_cash
+    completion = world.economy.expansions[project.id].last_event_id
+    started = world.event_index()[project.last_event_id]
+    assert learned.event_id in {link.cause_event_id for link in started.causal_links}
+
+    world.clock = WorldClock(330)
+    produce_monthly(world)
+    stock = world.economy.stocks["stock:pontenegro"]
+    assert stock.goods["iron"] - before_iron > 0
+    facility = world.economy.facilities[facility_id]
+    operation = world.event_index()[facility.last_event_id]
+    assert operation.event_type == "production_completed"
+    assert operation.causal_payload["production"]["recipe_id"] == "efficient_ironworking"
+    assert operation.causal_payload["production"]["batches"] > 0
+    assert completion in {link.cause_event_id for link in operation.causal_links}

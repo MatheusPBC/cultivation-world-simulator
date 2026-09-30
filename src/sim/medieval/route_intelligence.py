@@ -229,6 +229,54 @@ def observe_commander_junction_routes(world, detachment_id, source_event):
     return tuple(observed)
 
 
+def observe_force_position_routes(world, detachment, source_event):
+    """A prepared force records only passages adjacent to its current site."""
+    from src.classes.governance.knowledge import route_report_id
+
+    position = (world.society.force_positions.get(f"force-position:{detachment.id}")
+                if detachment is not None else None)
+    if (detachment is None or detachment.stage != "present" or position is None
+            or position.stage != "prepared" or source_event is None
+            or source_event.event_type not in {"force_position_prepared", "campaign_provisions_loaded"}):
+        return ()
+    settlement = world.society.settlements.get(detachment.location_id)
+    if settlement is None:
+        return ()
+    region_id = settlement.region_id
+    observed = []
+    for route in sorted(world.map.routes.values(), key=lambda item: item.id):
+        if region_id not in route.endpoint_region_ids:
+            continue
+        key = route_report_id(detachment.owner_ref, route.id)
+        previous = world.knowledge.route_reports.get(key)
+        capacity, travel_days, daily_flow_bulk = _runtime(world, route.id)
+        observation = route_observation(route.id, detachment.owner_ref, world.clock.absolute_day,
+                                        capacity, travel_days, daily_flow_bulk)
+        event = record_event(
+            world, "route_observed", _describe(world, route.id, travel_days),
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"kind": "field_force_position_route_observation",
+                            "actor_ref": detachment.owner_ref.to_dict(),
+                            "detachment_id": detachment.id,
+                            "position_id": position.id,
+                            "settlement_id": settlement.id,
+                            "source_event_type": source_event.event_type,
+                            "source_event_id": source_event.id},
+            deltas=(_delta("route_report", key, "observation",
+                           previous.observation() if previous else None, observation),),
+            cause_ids=_causes(source_event.id, detachment.last_event_id, position.last_event_id,
+                              *_route_causes(world, (route.id,))[route.id],
+                              previous.event_id if previous else None))
+        report = RouteReport(
+            id=key, recipient_ref=detachment.owner_ref, publisher_ref=detachment.owner_ref,
+            route_id=route.id, observed_day=world.clock.absolute_day,
+            operational_capacity=capacity, travel_days=travel_days,
+            daily_flow_bulk=daily_flow_bulk, channel="field_route_observation", event_id=event.id)
+        world.knowledge.route_reports[key] = report
+        observed.append(report)
+    return tuple(observed)
+
+
 def _observe_fiscal(world, checkpoint, route_id, day, causes):
     """Only the current, active checkpoint operator can originate this reading."""
     actor = checkpoint.operator_ref
@@ -427,11 +475,14 @@ def _local_site_observers(world, site):
     return observers
 
 
-def refresh_site_reports(world, *, site_ids=None):
+def refresh_site_reports(world, *, site_ids=None, source_event_ids=()):
     """Authorized owner/maintainer observers see a local site, never remotely."""
     day = world.clock.absolute_day
+    from .evocation import active_manifestation
     for site_id in sorted(world.map.infrastructure_sites if site_ids is None else site_ids):
         site = world.map.infrastructure_sites[site_id]
+        manifestation = active_manifestation(world, site_id)
+        manifestation_id = manifestation.id if manifestation else None
         actors = {actor for actor in (site.owner_ref, site.maintainer_ref) if actor is not None}
         actors |= _local_site_observers(world, site)
         # Residents can see a damaged local installation as an aggregate local
@@ -440,19 +491,28 @@ def refresh_site_reports(world, *, site_ids=None):
         actors |= {EntityRef("population_group", group.id) for group in world.society.population.values()
                    if world.society.available_count(group.id) > 0
                    and world.society.settlements[group.settlement_id].region_id in site.region_ids}
+        actors |= {EntityRef("character", character.id) for character in world.society.characters.values()
+                   if character.death_day is None
+                   and (group := world.society.population.get(character.population_group_id)) is not None
+                   and world.society.available_count(group.id) > 0
+                   and (settlement := world.society.settlements[group.settlement_id]).region_id in site.region_ids
+                   and character.location_id == settlement.id}
         for actor in sorted(actors, key=lambda ref: (ref.kind, ref.id)):
-            local_group = actor.kind == "population_group"
+            local_group = actor.kind in {"population_group", "character"}
             if ((not local_group and not can_actor_act_for(world, actor, actor, "supply"))
                     or (actor in {site.owner_ref, site.maintainer_ref} and not _present(world, actor, site))):
                 continue
             key = site_report_id(actor, site_id)
             previous = world.knowledge.site_reports.get(key)
             if (previous is not None and previous.observed_day == day and previous.integrity == site.integrity
-                    and previous.enabled == site.enabled and previous.service_suspended == site.service_suspended):
+                    and previous.enabled == site.enabled and previous.service_suspended == site.service_suspended
+                    and previous.manifestation_id == manifestation_id):
                 continue
-            observation = site_observation(site_id, actor, day, site.integrity, site.enabled, site.service_suspended)
+            observation = site_observation(site_id, actor, day, site.integrity, site.enabled,
+                                            site.service_suspended, manifestation_id)
             suffix = ", serviço suspenso." if site.service_suspended else ("." if site.enabled else ", instalação interditada.")
-            causes = _causes(site.last_event_id, previous.event_id if previous else None)
+            causes = _causes(site.last_event_id, previous.event_id if previous else None,
+                             manifestation.last_event_id if manifestation else None, *source_event_ids)
             causal_payload = None
             if not causes:
                 causal_payload = {"root_premise": {
@@ -474,6 +534,7 @@ def refresh_site_reports(world, *, site_ids=None):
             world.knowledge.site_reports[key] = SiteReport(
                 id=key, recipient_ref=actor, publisher_ref=actor, site_id=site_id, observed_day=day,
                 integrity=site.integrity, enabled=site.enabled, service_suspended=site.service_suspended,
+                manifestation_id=manifestation_id,
                 event_id=event.id, channel="local_site_report" if local_group else "administrative_site_report")
 
 

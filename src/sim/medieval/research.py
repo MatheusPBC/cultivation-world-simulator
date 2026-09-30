@@ -55,10 +55,12 @@ class ResearcherWorkOption:
 def _offer_was_declined(world, authorization_event_id, researcher_id):
     option_id = _research_option_id(authorization_event_id, researcher_id)
     actor = EntityRef("character", researcher_id).to_dict()
-    return any((event.decision or {}).get("actor_ref") == actor
+    return any(event.fact_kind == FactKind.DECISION
+               and event.causal_origin is CausalOrigin.ACTOR_DECISION
+               and (event.decision or {}).get("actor_ref") == actor
                and (event.decision or {}).get("action") == "no_action"
                and option_id in (event.decision or {}).get("declined_option_ids", ())
-               for event in world.events_of_type("research_authorized"))
+               for event in world.events)
 
 
 def _authorization_closed(world, event):

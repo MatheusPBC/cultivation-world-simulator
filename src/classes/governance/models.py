@@ -10,6 +10,26 @@ from src.classes.society.models import SocietyValue, Identity, Count
 Permille = Annotated[int, Field(strict=True, ge=0, le=1000)]
 
 
+class ReligiousInvitationNotice(SocietyValue):
+    id: Identity
+    recipient_ref: EntityRef
+    publisher_ref: EntityRef
+    settlement_id: Identity
+    emissary_id: Identity
+    offered_day: Count
+    expires_day: Count
+    report_event_id: Identity
+    event_id: Identity
+
+    @model_validator(mode="after")
+    def valid_local_invitation(self):
+        if self.publisher_ref.kind != "organization" or self.recipient_ref.kind not in {"character", "population_group"}:
+            raise ValueError("religious invitation requires an institution and resident recipient")
+        if self.expires_day != self.offered_day + 7:
+            raise ValueError("religious invitation lasts seven days")
+        return self
+
+
 class AuthorityOffice(SocietyValue):
     id: Identity
     institution_ref: EntityRef
@@ -362,11 +382,12 @@ class FamilyLoanNotice(SocietyValue):
                           sort_keys=True, ensure_ascii=False, allow_nan=False)
 
 
-def site_observation(site_id, publisher_ref, observed_day, integrity, enabled, service_suspended) -> str:
+def site_observation(site_id, publisher_ref, observed_day, integrity, enabled, service_suspended,
+                     manifestation_id=None) -> str:
     """Wire shape of one site observation, shared by receipts and validation."""
     return json.dumps({"site_id": site_id, "publisher": publisher_ref.to_dict(),
                        "observed_day": observed_day, "integrity": float(integrity), "enabled": bool(enabled),
-                       "service_suspended": bool(service_suspended)},
+                       "service_suspended": bool(service_suspended), "manifestation_id": manifestation_id},
                       sort_keys=True, ensure_ascii=False, allow_nan=False)
 
 
@@ -384,12 +405,13 @@ class SiteReport(SocietyValue):
     integrity: Annotated[float, Field(strict=True, ge=0, le=1, allow_inf_nan=False)]
     enabled: bool
     service_suspended: bool
+    manifestation_id: Identity | None = None
     channel: Literal["administrative_site_report", "local_site_report"] = "administrative_site_report"
     event_id: Identity
 
     def observation(self) -> str:
         return site_observation(self.site_id, self.publisher_ref, self.observed_day, self.integrity, self.enabled,
-                                self.service_suspended)
+                                self.service_suspended, self.manifestation_id)
 
 
 class InvestigationFinding(SocietyValue):

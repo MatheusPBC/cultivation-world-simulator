@@ -1,6 +1,8 @@
 """A narrow, persistent siege built from existing force and garrison owners."""
 
 from copy import deepcopy
+import asyncio
+import json
 
 import pytest
 
@@ -9,11 +11,14 @@ from src.classes.causal_origin import CausalOrigin
 from src.classes.mechanical_language import EntityRef
 from src.classes.society.force import Detachment, Garrison
 from src.run.medieval_world import create_medieval_world
+from src.sim.medieval import ai_decider
 from src.sim.medieval.dated import resolve_dated
+from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.economy import _delta
 from src.sim.medieval.events import record_event
 from src.sim.medieval.force import (disband_detachment, establish_garrison, force_options,
-                                    force_position_options, garrison_options, prepare_force_position)
+                                    detect_force_standoffs, force_position_options,
+                                    garrison_options, prepare_force_position)
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.route_intelligence import refresh_route_reports
 from src.sim.medieval.settlement_investment import (execute_settlement_investment_option,
@@ -63,8 +68,11 @@ def tick(world):
     resolve_dated(world, world.agenda.pop_due(world.clock.absolute_day))
 
 
-def _prepared_attacker(world, *, count=40, provisions=160):
-    group = next(item for item in world.society.population.values() if item.settlement_id == "campomanso")
+def _prepared_attacker(world, *, count=40, provisions=160, actor=ATTACKER, location=TARGET):
+    # The campaign fixture premise is a column already deployed here from its
+    # source cohort, which remains separate from the target's local garrison.
+    group = next(item for item in world.society.population.values()
+                 if item.settlement_id == "campomanso")
     soldier_id = f"pop:campomanso:{group.people}:soldier"
     world.society.population[soldier_id] = group.model_copy(
         update={"id": soldier_id, "occupation": "soldier", "count": count})
@@ -77,15 +85,18 @@ def _prepared_attacker(world, *, count=40, provisions=160):
                             {"kind": "population_group", "id": soldier_id}],
             "observed_day": world.clock.absolute_day,
         }},
-        deltas=(_delta("detachment", "detachment:test-siege-attacker", "stage", None, "present"),))
+        deltas=(_delta("detachment", f"detachment:test-siege-attacker:{actor.id}:{location}",
+                       "stage", None, "present"),))
     detachment = Detachment(
-        id="detachment:test-siege-attacker", owner_ref=ATTACKER, source_group_id=soldier_id, count=count,
-        location_id=TARGET, destination_id=TARGET, route_ids=(), route_index=0, provisions=provisions,
+        id=f"detachment:test-siege-attacker:{actor.id}:{location}", owner_ref=actor,
+        source_group_id=soldier_id, count=count,
+        location_id=location, destination_id=location, route_ids=(), route_index=0, provisions=provisions,
         stage="present", started_day=world.clock.absolute_day, due_day=world.clock.absolute_day + 30,
         decision_event_id=arrival.id, last_event_id=arrival.id)
     world.society.detachments[detachment.id] = detachment
-    position = force_position_options(world, ATTACKER, detachment_id=detachment.id)[0]
-    prepare_force_position(world, ATTACKER, position.id, decide(world, position).id)
+    position = next(item for item in force_position_options(world, actor, detachment_id=detachment.id)
+                    if item.anchor_site_id is None)
+    prepare_force_position(world, actor, position.id, decide(world, position).id)
     for _ in range(3):
         tick(world)
     world.agenda.cancel(detachment.id)
@@ -93,16 +104,19 @@ def _prepared_attacker(world, *, count=40, provisions=160):
         update={"due_day": world.clock.absolute_day + 1})
     world.society.detachments[detachment.id] = current
     world.agenda.schedule(ScheduledSituation(current.id, "force", current.due_day))
-    refresh_route_reports(world, route_ids=(ROAD, OTHER_EXIT))
+    location_region = world.society.settlements[location].region_id
+    route_ids = tuple(sorted(route.id for route in world.map.routes.values()
+                             if location_region in route.endpoint_region_ids))
+    refresh_route_reports(world, route_ids=route_ids)
     return current.id
 
 
-def _defending_garrison(world, *, count=20, provisions=160):
-    group = next(item for item in world.society.population.values() if item.settlement_id == TARGET)
-    soldier_id = f"pop:{TARGET}:{group.people}:soldier"
+def _defending_garrison(world, *, count=20, provisions=160, owner=DEFENDER, location=TARGET):
+    group = next(item for item in world.society.population.values() if item.settlement_id == location)
+    soldier_id = f"pop:{location}:{group.people}:soldier"
     world.society.population[soldier_id] = group.model_copy(
         update={"id": soldier_id, "occupation": "soldier", "count": count})
-    detachment_id = "detachment:test-siege-defender"
+    detachment_id = f"detachment:test-siege-defender:{owner.id}:{location}"
     arrival = record_event(
         world, "test_siege_defender_present", "Fixture factual de uma guarnição defensora presente.",
         fact_kind=FactKind.STATE_TRANSITION,
@@ -114,28 +128,28 @@ def _defending_garrison(world, *, count=20, provisions=160):
         }},
         deltas=(_delta("detachment", detachment_id, "stage", None, "present"),))
     detachment = Detachment(
-        id=detachment_id, owner_ref=DEFENDER, source_group_id=soldier_id, count=count,
-        location_id=TARGET, destination_id=TARGET, route_ids=(), route_index=0, provisions=provisions,
+        id=detachment_id, owner_ref=owner, source_group_id=soldier_id, count=count,
+        location_id=location, destination_id=location, route_ids=(), route_index=0, provisions=provisions,
         stage="present", started_day=world.clock.absolute_day, due_day=world.clock.absolute_day + 1,
         decision_event_id=arrival.id, last_event_id=arrival.id)
     world.society.detachments[detachment.id] = detachment
     world.agenda.schedule(ScheduledSituation(detachment.id, "force", detachment.due_day))
-    settlement = world.society.settlements[TARGET]
-    world.society.settlements[TARGET] = settlement.model_copy(update={"occupier_id": DEFENDER.id})
-    account = next(item for item in world.economy.accounts.values() if item.owner_ref == DEFENDER)
+    settlement = world.society.settlements[location]
+    world.society.settlements[location] = settlement.model_copy(update={"occupier_id": owner.id})
+    account = next(item for item in world.economy.accounts.values() if item.owner_ref == owner)
     garrison_id = f"garrison:{detachment.id}"
     decision = record_event(
         world, "garrison_decided", "Decisão defensiva do fixture.", fact_kind=FactKind.DECISION,
-        decision={"action": "establish_garrison", "actor_ref": DEFENDER.to_dict(),
+        decision={"action": "establish_garrison", "actor_ref": owner.to_dict(),
                   "selected_affordance_id": f"garrison:{detachment.id}:fixture"})
-    garrison = Garrison(id=garrison_id, detachment_id=detachment.id, settlement_id=TARGET,
+    garrison = Garrison(id=garrison_id, detachment_id=detachment.id, settlement_id=location,
                         account_id=account.id, decision_event_id=decision.id,
                         started_day=world.clock.absolute_day, last_event_id="pending")
     established = record_event(
         world, "garrison_established", "Fixture material de guarnição ativa.",
         fact_kind=FactKind.STATE_TRANSITION,
         deltas=(_delta("garrison", garrison.id, "stage", None, "active"),
-                _delta("garrison", garrison.id, "settlement_id", None, TARGET),
+                _delta("garrison", garrison.id, "settlement_id", None, location),
                 _delta("garrison", garrison.id, "detachment_id", None, detachment.id)),
         cause_ids=(decision.id, arrival.id))
     world.society.garrisons[garrison.id] = garrison.model_copy(update={"last_event_id": established.id})
@@ -143,7 +157,7 @@ def _defending_garrison(world, *, count=20, provisions=160):
 
 
 def siege_world(*, attacker_count=40, attacker_provisions=160, defender_count=20, defender_provisions=160,
-                defender_prepared=False):
+                defender_prepared=False, invest=True):
     world = create_medieval_world(211)
     refresh_settlement_reports(world)
     refresh_route_reports(world)
@@ -156,6 +170,8 @@ def siege_world(*, attacker_count=40, attacker_provisions=160, defender_count=20
         prepare_force_position(world, DEFENDER, position.id, decide(world, position).id)
         for _ in range(3):
             tick(world)
+    if not invest:
+        return world, attacker_id, garrison_id, None
     investment = next(item for item in settlement_investment_options(world, ATTACKER, detachment_id=attacker_id)
                       if item.kind == "invest")
     execute_settlement_investment_option(world, ATTACKER, investment.id, decide(world, investment).id)
@@ -504,6 +520,172 @@ def test_campaign_ceasefire_is_accepted_then_each_owner_fulfills_its_own_withdra
     assert all(clause.kind == "campaign_withdrawal" for clause in restored_proposal.clauses)
 
 
+def test_live_contact_turn_composes_mutual_ceasefire_and_independent_withdrawals(tmp_path, monkeypatch):
+    world, attacker_id, garrison_id, option = siege_world()
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 5000,
+    })
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    notices = detect_force_standoffs(world, attacker_id)
+    assert notices
+    assert {notice.recipient_ref for notice in world.knowledge.force_contact_notices.values()
+            if notice.settlement_id == TARGET} == {ATTACKER, DEFENDER}
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+
+    provider_choices = []
+
+    async def choose_from_current_menu(prompt, *args, **kwargs):
+        payload = json.loads(prompt[prompt.index("{"):])
+        actor = EntityRef(**payload["you_are"])
+        labels = [choice["label"] for choice in payload["choices"]]
+        campaign_context = payload.get("situation", {}).get("campaign_ceasefire_options", [])
+        reported_phase = campaign_context[0]["campaign_phase"] if campaign_context else None
+        wanted = None
+        if actor == ATTACKER:
+            wanted = next((label for label in labels if label == "Propor cessar-fogo mútuo."), None)
+        elif actor == DEFENDER:
+            wanted = next((label for label in labels if label == "Aceitar o cessar-fogo."), None)
+        if reported_phase in {"breached", "withdrawn"}:
+            if actor == ATTACKER and any(label.startswith("Cumprir a retirada material") for label in labels):
+                wanted = next(label for label in labels if label.startswith("Cumprir a retirada material"))
+            elif (actor == DEFENDER
+                  and world.society.detachments[attacker_id].stage == "marching"
+                  and any(label.startswith("Cumprir a retirada material") for label in labels)):
+                wanted = next(label for label in labels if label.startswith("Cumprir a retirada material"))
+        selected = next((choice["id"] for choice in payload["choices"]
+                         if choice["label"] == wanted), ai_decider.NO_ACTION)
+        provider_choices.append((actor, wanted, selected, tuple(labels), reported_phase))
+        return {"selected_id": selected}
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_from_current_menu)
+    engine = MedievalSimulator(world)
+    async def advance_until_ceasefire_completes():
+        for _ in range(12):
+            proposals = [item for item in world.relations.proposals.values()
+                         if item.proposal_kind == "campaign_ceasefire" and item.status == "accepted"]
+            obligations = [item for item in world.relations.obligations.values()
+                           if item.proposal_id in {proposal.id for proposal in proposals}]
+            if (proposals and len(obligations) == 2
+                    and all(item.status == "fulfilled" for item in obligations)):
+                return proposals
+            await engine.step()
+        pytest.fail(f"bilateral ceasefire did not finish; phase={world.society.siege_campaigns[campaign.id].phase}; "
+                    f"selected={[call[:3] for call in provider_choices if call[2] != ai_decider.NO_ACTION]}; "
+                    f"proposals={[(item.proposal_kind, item.status) for item in world.relations.proposals.values()]}; "
+                    f"recent={[event.event_type for event in world.events[-20:]]}")
+
+    proposals = asyncio.run(advance_until_ceasefire_completes())
+
+    proposal = proposals[0]
+    assert proposal.status == "accepted"
+    assert world.society.siege_campaigns[campaign.id].phase == "withdrawn"
+    assert world.society.garrisons[garrison_id].stage == "collapsed"
+    assert world.society.settlements[TARGET].occupier_id is None
+    assert world.society.settlements[TARGET].administrator_id == DEFENDER.id
+    defender_id = garrison_id.removeprefix("garrison:")
+    for detachment_id in (attacker_id, defender_id):
+        detachment = world.society.detachments[detachment_id]
+        assert detachment.stage in {"marching", "present"}
+        if detachment.stage == "present":
+            assert detachment.location_id != TARGET
+    decisions = [event for event in world.events if event.event_type == "force_standoff_decided"
+                 and event.decision is not None]
+    selected_actions = [event.decision.get("action") for event in decisions]
+    assert selected_actions.count("offer_campaign_ceasefire") == 1
+    assert selected_actions.count("respond_campaign_ceasefire") == 1
+    assert selected_actions.count("fulfill_campaign_ceasefire") == 2
+    fulfillment_phases = {call[0]: call[4] for call in provider_choices
+                          if call[1] is not None and call[1].startswith("Cumprir a retirada material")}
+    assert fulfillment_phases == {ATTACKER: "breached", DEFENDER: "withdrawn"}
+    withdrawals = [event for event in world.events if event.event_type == "detachment_withdrawal_started"]
+    assert {delta.owner_id for event in withdrawals for delta in event.deltas
+            if delta.aspect == "stage" and delta.after == "marching"} >= {attacker_id, defender_id}
+    breach_event = next(event for event in world.events if event.event_type == "siege_campaign_breached"
+                        and event.day <= world.clock.absolute_day)
+    assert all(breach_event.sequence < event.sequence for event in withdrawals)
+    fulfillment_decisions = {event.decision.get("actor_ref")["id"]: event.id for event in decisions
+                             if event.decision.get("action") == "fulfill_campaign_ceasefire"}
+    for detachment_id, actor_id in ((attacker_id, ATTACKER.id), (defender_id, DEFENDER.id)):
+        withdrawal = next(event for event in withdrawals if any(
+            delta.owner_id == detachment_id and delta.aspect == "stage" and delta.after == "marching"
+            for delta in event.deltas))
+        assert fulfillment_decisions[actor_id] in {
+            link.cause_event_id for link in withdrawal.causal_links
+        }
+    assert not any(event.event_type.startswith("fixture_") for event in world.events)
+
+    path = tmp_path / "live-contact-mutual-ceasefire.mws"
+    save_world(world, path)
+    restored = load_world(path)
+    assert world_snapshot(restored) == world_snapshot(world)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
+
+
+def test_campaign_ceasefire_withdraws_attacker_garrison_before_moving_its_force(tmp_path):
+    world, attacker_id, defender_garrison_id, option = siege_world()
+    campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
+    for _ in range(3):
+        tick(world)
+    assert world.society.siege_campaigns[campaign.id].phase == "breached"
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    occupation = next(item for item in siege_occupation_options(world, ATTACKER)
+                     if item.campaign_id == campaign.id)
+    occupy_after_siege_breach(world, ATTACKER, occupation.id, decide(world, occupation).id)
+    refresh_settlement_reports(world)
+    establish = next(item for item in garrison_options(world, ATTACKER)
+                     if item.detachment_id == attacker_id and item.kind == "garrison")
+    establish_garrison(world, ATTACKER, establish.id, decide(world, establish).id)
+    assert world.society.garrisons[f"garrison:{attacker_id}"].stage == "active"
+
+    offer = next(item for item in campaign_ceasefire_offer_options(world, ATTACKER)
+                 if item.campaign_id == campaign.id and item.kind == "mutual")
+    proposal = offer_campaign_ceasefire(world, ATTACKER, offer.id, decide(world, offer).id)
+    response = next(item for item in campaign_ceasefire_response_options(world, DEFENDER)
+                    if item.proposal_id == proposal.id and item.response == "accept")
+    respond_campaign_ceasefire(world, DEFENDER, response.id, decide(world, response).id)
+
+    attacker_exit = next(item for item in campaign_ceasefire_fulfillment_options(world, ATTACKER)
+                         if item.campaign_id == campaign.id)
+    attacker_obligation = fulfill_campaign_ceasefire(
+        world, ATTACKER, attacker_exit.id, decide(world, attacker_exit).id)
+    assert attacker_obligation.status == "fulfilled"
+    attacker_garrison = world.society.garrisons[f"garrison:{attacker_id}"]
+    assert attacker_garrison.stage == "withdrawn"
+    assert world.society.detachments[attacker_id].stage == "marching"
+    assert world.society.settlements[TARGET].occupier_id is None
+    assert world.society.settlements[TARGET].administrator_id == DEFENDER.id
+    ceasefire_decision = next(event for event in world.events if event.fact_kind == FactKind.DECISION
+                              and event.decision is not None
+                              and event.decision.get("selected_affordance_id") == attacker_exit.id)
+    garrison_exit = world.event_index()[attacker_garrison.last_event_id]
+    assert garrison_exit.causal_payload["decision_event_id"] == ceasefire_decision.id
+    assert garrison_exit.causal_payload["selected_affordance_id"] == attacker_exit.id
+    campaign_exit = world.event_index()[world.society.siege_campaigns[campaign.id].last_event_id]
+    assert garrison_exit.id in {link.cause_event_id for link in campaign_exit.causal_links}
+
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    defender_id = world.society.garrisons[defender_garrison_id].detachment_id
+    defender_exit = next(item for item in campaign_ceasefire_fulfillment_options(world, DEFENDER)
+                         if item.campaign_id == campaign.id)
+    defender_obligation = fulfill_campaign_ceasefire(
+        world, DEFENDER, defender_exit.id, decide(world, defender_exit).id)
+    assert defender_obligation.status == "fulfilled"
+    assert world.society.garrisons[defender_garrison_id].stage == "collapsed"
+    assert world.society.detachments[defender_id].stage == "marching"
+
+    path = tmp_path / "campaign-ceasefire-after-occupation.mws"
+    save_world(world, path)
+    restored = load_world(path)
+    assert world_snapshot(restored) == world_snapshot(world)
+    from tools.medieval_causal_audit import audit
+    assert audit(path)["ok"] is True
+
+
 def test_defender_can_initiate_a_ceasefire_when_its_own_exit_is_current(monkeypatch):
     world, _, garrison_id, option = siege_world()
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
@@ -572,7 +754,7 @@ def test_breached_campaign_can_still_withdraw_before_occupation():
                for delta in event.deltas)
 
 
-def test_breached_campaign_can_offer_unilateral_ceasefire_before_occupation():
+def test_breached_campaign_can_offer_mutual_ceasefire_before_occupation():
     world, attacker_id, _, option = siege_world()
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
     for _ in range(3):
@@ -584,7 +766,7 @@ def test_breached_campaign_can_offer_unilateral_ceasefire_before_occupation():
     refresh_settlement_reports(world)
     offers = campaign_ceasefire_offer_options(world, ATTACKER)
     assert any(item.campaign_id == campaign.id and item.kind == "unilateral_self" for item in offers)
-    assert not any(item.campaign_id == campaign.id and item.kind == "mutual" for item in offers)
+    assert any(item.campaign_id == campaign.id and item.kind == "mutual" for item in offers)
 
     offer = next(item for item in offers if item.campaign_id == campaign.id)
     proposal = offer_campaign_ceasefire(world, ATTACKER, offer.id, decide(world, offer).id)
@@ -602,13 +784,8 @@ def test_breached_campaign_can_offer_unilateral_ceasefire_before_occupation():
     assert world.society.settlements[TARGET].administrator_id == DEFENDER.id
 
 
-def test_defender_ceasefire_affordance_disappears_once_the_garrison_collapses():
-    """A collapsed garrison has no executable withdrawal for the ceasefire.
-
-    The affordance must vanish instead of being offered/fulfilled and
-    raising, and the stale disappearance must not mutate the campaign or the
-    garrison by itself.
-    """
+def test_collapsed_garrison_can_still_fulfill_ceasefire_by_withdrawing_its_force():
+    """A collapsed duty does not erase the defender's physically present force."""
     world, _, garrison_id, option = siege_world()
     campaign = begin_siege_campaign(world, ATTACKER, option.id, decide(world, option).id)
     refresh_route_reports(world)
@@ -628,20 +805,33 @@ def test_defender_ceasefire_affordance_disappears_once_the_garrison_collapses():
     assert world.society.siege_campaigns[campaign.id].phase == "breached"
     assert world.society.garrisons[garrison_id].stage == "collapsed"
 
-    # The defender's own withdrawal is no longer materially executable: no
-    # new offer and no fulfillment option for its already-accepted clause.
-    assert not any(item.campaign_id == campaign.id and item.actor_ref == DEFENDER
-                   for item in campaign_ceasefire_offer_options(world, DEFENDER))
-    assert campaign_ceasefire_fulfillment_options(world, DEFENDER) == ()
-
-    # The stale affordance disappearing did not mutate anything: the
-    # obligation stays active/unfulfilled and the campaign/garrison are the
-    # same collapsed facts observed above.
+    # The defender's exit becomes physically usable only after the attacker
+    # independently fulfills its own withdrawal and lifts the investment.
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    attacker_option = next(item for item in campaign_ceasefire_fulfillment_options(world, ATTACKER)
+                           if item.campaign_id == campaign.id)
+    attacker_result = fulfill_campaign_ceasefire(
+        world, ATTACKER, attacker_option.id, decide(world, attacker_option).id)
+    assert attacker_result.status == "fulfilled"
+    assert world.society.siege_campaigns[campaign.id].phase == "withdrawn"
+    refresh_route_reports(world)
+    refresh_settlement_reports(world)
+    # The duty collapsed, but the detachment remains present and can choose a
+    # valid exit to fulfill its accepted term.
+    options = campaign_ceasefire_fulfillment_options(world, DEFENDER)
+    assert any(item.campaign_id == campaign.id for item in options)
     obligation = next(item for item in world.relations.obligations.values()
                       if item.proposal_id == proposal.id and item.clause_index == 1)
     assert obligation.status == "active"
-    assert world.society.siege_campaigns[campaign.id].phase == "breached"
+    fulfillment = next(item for item in options if item.campaign_id == campaign.id)
+    result = fulfill_campaign_ceasefire(
+        world, DEFENDER, fulfillment.id, decide(world, fulfillment).id)
+    assert result.status == "fulfilled"
+    defender_id = garrison_id.removeprefix("garrison:")
+    assert world.society.detachments[defender_id].stage == "marching"
     assert world.society.garrisons[garrison_id].stage == "collapsed"
+    assert world.society.siege_campaigns[campaign.id].phase == "withdrawn"
 
 
 def test_breached_campaign_withdrawal_can_be_materially_remediated_without_erasing_breach(tmp_path):
@@ -657,8 +847,9 @@ def test_breached_campaign_withdrawal_can_be_materially_remediated_without_erasi
     respond_campaign_ceasefire(world, DEFENDER, response.id, decide(world, response).id)
 
     # The siege breaches first; neither party fulfills the promised exit by its
-    # deadline.  The attacker still has its own present, supplied column.
-    for _ in range(4):
+    # deadline. The attacker still has its own present, supplied column.
+    clause = proposal.clauses[0]
+    while world.clock.absolute_day <= clause.due_day:
         tick(world)
     obligation = world.relations.obligations[f"{proposal.id}:term:0"]
     assert obligation.status == "breached"

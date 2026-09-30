@@ -33,6 +33,7 @@ from .force_command import (APPOINT_ACTION, detachment_command_options,
 from .institutional_memory import institutional_views
 from .institutional_decision_turn import (DiscretionaryAdapter, _rotated,
                                           review_institutional_decision_turn_with_provider)
+from .travel import route_duration
 
 
 ADOPT_ACTION = "adopt_occupied_settlement_defense"
@@ -441,7 +442,20 @@ def defense_action_options(world, actor, plan_id):
     objective = world.strategy.objectives.get(plan.objective_id)
     if objective is None or objective.actor_ref != actor or _plan_status(world, objective)[0] is not None:
         return ()
-    return tuple(item for days in (10, 40) for item in raise_options(world, actor, days=days)
+    days_options = {10, 40}
+    # A sustained response must at least be able to reach its known objective
+    # with a short operating reserve. Fixed 10/40-day menus made distant
+    # objectives impossible even when the institution could fund the longer
+    # commitment; the force owner still revalidates the stock and people.
+    for candidate in raise_options(world, actor, days=10):
+        if candidate.destination_id != objective.settlement_id:
+            continue
+        travel_days = sum(route_duration(world, route_id) for route_id in candidate.route_ids)
+        required_days = travel_days + 10
+        if required_days > 40:
+            days_options.add(required_days)
+    return tuple(item for days in sorted(days_options)
+                 for item in raise_options(world, actor, days=days)
                  if item.destination_id == objective.settlement_id)
 
 

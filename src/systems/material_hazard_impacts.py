@@ -353,7 +353,8 @@ def creature_site_damage_magnitude(world: Any, species: str, site_id: str) -> fl
     if definition is None:
         return None
     capabilities = tuple(site.capability_ids) + ward_resistance_capabilities(world, site)
-    return definition.magnitude(1.0, capabilities)
+    from src.sim.medieval.evocation import intercepted_damage
+    return intercepted_damage(world, site_id, definition.magnitude(1.0, capabilities))
 
 
 def drake_population_damage_magnitude(world: Any, group_id: str) -> float | None:

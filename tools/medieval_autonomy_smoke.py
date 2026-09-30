@@ -171,6 +171,9 @@ RESOURCE_EFFECTS = {"production_completed", "production_limited", "subsistence_r
                     "household_purchase_completed", "household_rations_consumed", "household_provisions_purchased",
                     "migration_started", "migration_arrived", "migration_returned", "migration_rations_consumed",
                     "expansion_progressed", "research_progressed", "repair_progressed",
+                    # Food protection limits spoilage; the remaining physical
+                    # loss is a caused stock delta, not unexplained deletion.
+                    "public_food_storage_loss",
                     # Relief gives real food away for free: it leaves the granary and is
                     # never credited anywhere else, exactly like a ration consumed.
                     "relief_distributed"}

@@ -6,7 +6,9 @@ same engine-owned option from that receipt.  Persisting another copy would
 create a second source of truth for the exact site, bindings, and terms.
 """
 
+import asyncio
 import copy
+import json
 
 import pytest
 
@@ -26,6 +28,10 @@ from src.sim.medieval.productive_conveyance import (
     propose_site_conveyance,
     record_conveyance_acceptance,
 )
+from src.sim.medieval import ai_decider
+from src.sim.medieval.institutional_agenda import monthly_actors, monthly_adapters
+from src.sim.medieval.institutional_decision_turn import _by_id
+from src.sim.medieval.productive_conveyance_policy import productive_conveyance_actors
 
 
 SELLER = EntityRef("organization", "oficios-da-serra")
@@ -77,6 +83,59 @@ def test_buyer_reconstitutes_the_exact_seller_offer_without_a_knowledge_notice()
         "selected_affordance_id": acceptance_option.id,
     }
     assert not hasattr(world.knowledge, "productive_site_conveyances")
+
+
+def test_conveyance_is_in_the_normal_turn_and_buyer_answers_a_fresh_offer(monkeypatch):
+    world = create_medieval_world(73)
+    seller_option = next(option for option in productive_site_conveyance_options(world, SELLER)
+                         if option.buyer_ref == BUYER)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 1000,
+    })
+    assert SELLER in productive_conveyance_actors(world)
+    assert SELLER in monthly_actors(world)
+    adapters = monthly_adapters()
+    assert "productive_site_conveyance" in {adapter.name for adapter in adapters}
+    assert seller_option.id in _by_id(world, SELLER, adapters)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    selected = []
+
+    async def answer(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        choice = next((item for item in payload["choices"]
+                       if item["label"].startswith("Oferecer a oficina")), None)
+        if choice is not None:
+            selected.append((payload["you_are"]["id"], choice["id"]))
+            return {"selected_id": choice["id"]}
+        choice = next((item for item in payload["choices"]
+                       if item["label"].startswith("Aceitar a oficina")), None)
+        if choice is not None:
+            selected.append((payload["you_are"]["id"], choice["id"]))
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", answer)
+    from src.sim.medieval.institutional_agenda import review_monthly_institutional_turn
+
+    asyncio.run(review_monthly_institutional_turn(world))
+
+    assert any(actor_id == SELLER.id and option_id == seller_option.id
+               for actor_id, option_id in selected)
+    assert world.map.infrastructure_sites[seller_option.site_id].owner_ref == BUYER
+    proposal = next(event for event in world.events
+                    if event.fact_kind is FactKind.DECISION
+                    and event.causal_origin is CausalOrigin.ACTOR_DECISION
+                    and (event.decision or {}).get("action") == "propose_productive_site_conveyance")
+    acceptance = next(event for event in world.events
+                      if event.fact_kind is FactKind.DECISION
+                      and event.causal_origin is CausalOrigin.ACTOR_DECISION
+                      and (event.decision or {}).get("action") == "accept_productive_site_conveyance")
+    receipt = next(event for event in world.events
+                   if event.event_type == "productive_site_conveyed")
+    assert proposal.id in {link.cause_event_id for link in acceptance.causal_links}
+    assert {proposal.id, acceptance.id} <= {
+        link.cause_event_id for link in receipt.causal_links
+    }
 
 
 def test_a_site_with_a_second_production_line_cannot_be_conveyed():

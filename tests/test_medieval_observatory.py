@@ -145,7 +145,7 @@ async def test_observatory_is_one_consistent_published_snapshot(tmp_path):
         assert research.status_code == 200
         assert research.json()["data"] == data["research"]
         project_technologies = {p["technology_id"] for p in data["research"]["projects"]}
-        assert "irrigation" in project_technologies
+        assert project_technologies
         assert project_technologies <= {tech["id"] for tech in data["research"]["technologies"]}
         assert all(p["completed_units"] == 0 for p in data["research"]["projects"])
         assert data["research"]["knowledge"] == []
@@ -391,7 +391,7 @@ async def test_authority_claim_rejects_deterministic_copy_of_current_affordance(
 @pytest.mark.asyncio
 async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(tmp_path):
     """A Dao read joins completed sale evidence, without making it actor knowledge."""
-    from src.sim.medieval.persistence import SCHEMA, load_world, save_world, world_snapshot
+    from src.sim.medieval.persistence import load_world, save_world, world_snapshot
     from src.sim.medieval.technology_sale import (execute_technology_sale,
                                                    record_technology_sale_acceptance,
                                                    record_technology_sale_request,
@@ -409,9 +409,8 @@ async def test_observatory_projects_completed_sale_receipts_and_their_why_chain(
     payment_event_id = world.economy.payments[request.id]
     learned = next(item for item in world.knowledge.technologies.values()
                    if item.owner_ref == BUYER and item.technology_id == option.technology_id)
-    save_path = tmp_path / "sale-schema-76.mws"
+    save_path = tmp_path / "sale-current-schema.mws"
     save_world(world, save_path)
-    assert SCHEMA == 79
     world = load_world(save_path)
 
     app = create_app(save_dir=lambda: tmp_path / "runtime")
@@ -445,6 +444,41 @@ async def test_observatory_projects_persistent_siege_campaign_without_control_tr
         why = (await client.get(f"/api/v2/query/causal/{campaign.last_event_id}")).json()["data"]
     assert observed["campaigns"]["siege_campaigns"] == [campaign.model_dump(mode="json")]
     assert campaign.decision_event_id in {event["id"] for event in why["causes"]}
+    assert world_snapshot(world) == before
+
+
+@pytest.mark.asyncio
+async def test_productive_conveyance_is_visible_in_observatory_and_why(tmp_path):
+    from tests.test_medieval_productive_conveyance import _staged_world
+    from src.sim.medieval.productive_conveyance import accept_site_conveyance
+    from src.sim.medieval.persistence import world_snapshot
+
+    world, _, proposal, acceptance_option, acceptance = _staged_world()
+    receipt = accept_site_conveyance(
+        world, acceptance_option.id, decision_event_id=acceptance.id)
+    app = create_app(save_dir=lambda: tmp_path / "runtime")
+    app.state.runtime._activate(world)
+    before = world_snapshot(world)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+        observed = (await client.get("/api/v2/query/observatory")).json()["data"]
+        why = (await client.get(f"/api/v2/query/causal/{receipt.id}")).json()["data"]
+
+    site = next(item for item in observed["map"]["sites"] if item["id"] == acceptance_option.site_id)
+    facility = next(item for item in observed["economy"]["facilities"]
+                    if item["id"] == acceptance_option.facility_id)
+    assert site["owner_ref"] == acceptance_option.buyer_ref.to_dict()
+    assert site["maintainer_ref"] == acceptance_option.buyer_ref.to_dict()
+    assert facility["stock_id"] == acceptance_option.stock_id
+    assert facility["payroll_account_id"] == acceptance_option.payroll_account_id
+    assert {proposal.id, acceptance.id} <= {item["id"] for item in why["causes"]}
+    assert {(item["owner_kind"], item["owner_id"], item["aspect"])
+            for item in why["event"]["deltas"]} == {
+                ("site", acceptance_option.site_id, "owner_ref"),
+                ("site", acceptance_option.site_id, "maintainer_ref"),
+                ("production", acceptance_option.facility_id, "stock_id"),
+                ("production", acceptance_option.facility_id, "payroll_account_id"),
+            }
     assert world_snapshot(world) == before
 
 

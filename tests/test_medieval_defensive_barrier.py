@@ -15,7 +15,9 @@ from src.sim.medieval.infrastructure import (damage_site, execute_repair_authori
                                              progress_repairs, repair_authorization_options)
 from src.sim.medieval.economy import monthly_workforce
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
-from src.sim.medieval.research import learn_technology
+from src.sim.medieval.research import (accept_research_work, learn_technology,
+                                       progress_research, researcher_work_options)
+from src.sim.medieval.research_policy import execute_research_option, research_options
 from src.sim.medieval.route_intelligence import refresh_route_reports, refresh_site_reports
 from src.sim.medieval.settlement_intelligence import refresh_settlement_reports
 from src.sim.medieval.settlement_investment import (execute_settlement_investment_option,
@@ -72,6 +74,97 @@ def _build_barrier(world):
             for resource in materials_before} == {"wood": 24, "stone": 12, "tools": 6}
     assert world.economy.accounts[option.account_id].balance < balance_before
     return site
+
+
+def test_paid_research_acquisition_unlocks_paid_barrier_construction(tmp_path):
+    """Research is real; only its prerequisite chain is a declared fixture premise."""
+    actor = ATTACKER  # Auren owns the only military-training research site.
+    world = create_medieval_world(73)
+    premise = {
+        "root_premise": {
+            "kind": "scenario_bootstrap", "domain": "prior_military_knowledge",
+            "source_refs": [{"kind": "scenario", "id": "paid_barrier_research"},
+                            {"kind": "polity", "id": actor.id}],
+            "observed_day": world.clock.absolute_day,
+        }
+    }
+    source = record_event(
+        world, "fixture_prior_military_knowledge",
+        "Cenário preparado: Auren já conhece a cadeia de exercício, cerco e fortificação.",
+        fact_kind=FactKind.OCCURRENCE, causal_origin=CausalOrigin.EXTERNAL_EVENT,
+        causal_payload=premise,
+    )
+    previous_knowledge_event = source.id
+    for technology_id in ("field_drill", "siegecraft", "fortification"):
+        learn_technology(world, actor, technology_id, "research",
+                         (previous_knowledge_event,),
+                         causal_payload=premise if technology_id == "field_drill" else None)
+        previous_knowledge_event = next(
+            item.event_id for item in world.knowledge.technologies.values()
+            if item.owner_ref == actor and item.technology_id == technology_id)
+
+    option = next(item for item in research_options(world, actor)
+                  if item.technology_id == "defensive_barriers")
+    stock_before = world.economy.stocks[option.stock_id].goods["tools"]
+    balance_before = world.economy.accounts[option.account_id].balance
+    sponsor = record_event(
+        world, "research_option_decided", "Auren financia a pesquisa de barreiras.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=option.decision(),
+    )
+    execute_research_option(world, actor, option.id, sponsor.id)
+
+    world.clock = WorldClock(sponsor.day + 1)
+    world.agenda.cancel(
+        f"character-rite-offer-review:{option.researcher_id}:{sponsor.id}")
+    work = next(item for item in researcher_work_options(world, option.researcher_id)
+                if item.technology_id == "defensive_barriers")
+    researcher_decision = record_event(
+        world, "research_work_decided", "A pesquisadora aceita o trabalho de pesquisa.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=work.decision(),
+    )
+    project = accept_research_work(world, option.researcher_id, work.id,
+                                   researcher_decision.id)
+    for day in range(30, 181, 30):
+        world.clock = WorldClock(day)
+        progress_research(world, monthly_workforce(world))
+    assert world.research.projects[project.id].stage == "completed"
+    learned = world.knowledge.technologies[
+        f"technology:{actor.kind}:{actor.id}:defensive_barriers"]
+    assert learned.channel == "research"
+    assert world.economy.stocks[option.stock_id].goods["tools"] == stock_before - 6
+    assert world.economy.accounts[option.account_id].balance < balance_before
+
+    construction = next(item for item in site_construction_options(world, actor)
+                        if item.settlement_id == "pedraclara"
+                        and item.blueprint_id == "defensive-palisade-construction")
+    choice = record_event(
+        world, "site_construction_selected", "Auren escolhe construir uma paliçada.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=construction.decision(),
+    )
+    authorization = record_event(
+        world, "site_construction_authorized", "Autorizar a construção da paliçada.",
+        fact_kind=FactKind.DECISION, decision=_construction_terms(construction),
+        cause_ids=(choice.id,),
+    )
+    project = start_site_construction(world, construction,
+                                      decision_event_id=authorization.id)
+    started = world.event_index()[project.last_event_id]
+    assert learned.event_id in {link.cause_event_id for link in started.causal_links}
+    for day in (210, 240):
+        world.clock = WorldClock(day)
+        progress_expansions(world, {group.id: group.count
+                                    for group in world.society.population.values()})
+    site = world.map.infrastructure_sites[construction.new_site_id]
+    assert site.owner_ref == site.maintainer_ref == actor
+    assert site.capability_ids == ("defensive_barrier",)
+    assert world.economy.accounts[construction.account_id].balance < balance_before
+
+    path = tmp_path / "paid-barrier-research.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
 
 
 def test_built_barrier_resists_siege_until_a_material_impact_disables_it(tmp_path):

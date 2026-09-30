@@ -1,5 +1,23 @@
 # Ubiquitous Language
 
+## Medieval world — religious affiliation
+
+**Religious tradition**:
+A religious institution's declared body of beliefs and commitments; it is not
+evidence that those beliefs describe the world's physical laws.
+_Avoid_: Magical capability, confirmed divine truth.
+
+**Religious adherence**:
+A character's or population cohort's deliberate affiliation with a religious
+tradition. A cohort's collective affiliation does not decide named residents'
+personal beliefs, and organizational membership alone is not adherence.
+_Avoid_: Race, institutional membership, automatic conversion.
+
+**Religious invitation**:
+A local institution's explicit offer to a present recipient to affiliate with
+its tradition. Receiving the invitation is knowledge, not consent or belief.
+_Avoid_: Conversion, forced affiliation.
+
 ## Medieval world — population and movement
 
 **Residence**:

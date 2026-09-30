@@ -72,6 +72,109 @@ def test_provider_diplomacy_situation_contains_memory_view_without_foreign_terms
         "project_capacity", "logistics_capacity"}
 
 
+@pytest.mark.asyncio
+async def test_known_breach_memory_changes_a_later_provider_response(monkeypatch):
+    """The same live offer receives a different response only when its breach is known."""
+    import json
+    from src.classes.governance.diplomacy import offer_intent
+    from src.sim.medieval.commitments import resolve_diplomacy
+    from src.sim.medieval.diplomacy_context import diplomatic_context
+    from src.sim.medieval.diplomacy import offer_proposal
+    from src.sim.medieval.institutional_memory import institutional_view
+    from src.sim.medieval.events import record_event
+    from src.systems.calendar_agenda import ScheduledSituation
+    from src.systems.time import WorldClock
+    from tests.test_medieval_diplomacy import offer, pay, respond
+
+    world = _provider_world(world_with_knowledge(), calls=20)
+    useful_buyer(world)
+
+    original = offer(world, amount=80)
+    respond(world, original)
+    pay(world, f"{original.id}:term:0")
+    world.clock = WorldClock(106)
+    teaching_term_id = f"{original.id}:term:1"
+    resolve_diplomacy(world, [ScheduledSituation(teaching_term_id, "diplomacy", 106)])
+    breach_id = world.relations.obligations[teaching_term_id].breach_event_id
+    assert breach_id
+    assert institutional_view(world, BUYER, SELLER) < 0
+
+    informed = world
+    uninformed = _provider_world(world_with_knowledge(), calls=20)
+    useful_buyer(uninformed)
+    uninformed.clock = WorldClock(106)
+
+    def offer_followup(target):
+        terms = tuple(clause.model_copy(update={"due_day": due_day})
+                      for clause, due_day in zip(clauses(40), (160, 165), strict=True))
+        new_intent = offer_intent(SELLER, BUYER, terms, 155, None)
+        authored = record_event(
+            target, "diplomatic_decision", "Propor um novo acordo de ensino.",
+            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+            causal_payload={"decision_source": {"kind": "api"}}, decision=new_intent)
+        proposal = offer_proposal(target, SELLER, BUYER, terms, 155, decision_event_id=authored.id)
+        target.clock = WorldClock(107)
+        return proposal
+
+    informed_offer = offer_followup(informed)
+    uninformed_offer = offer_followup(uninformed)
+    informed_views = diplomatic_context(informed, BUYER).institutional_views
+    uninformed_views = diplomatic_context(uninformed, BUYER).institutional_views
+    assert any(subject == SELLER and value < 0 and breach_id in evidence
+               for subject, value, evidence in informed_views)
+    assert not any(breach_id in evidence for _, _, evidence in uninformed_views)
+
+    def decide_from_context(prompt):
+        payload = json.loads(prompt[prompt.index("{"):])
+        actor = EntityRef(**payload["you_are"])
+        if actor != BUYER:
+            return ai_decider.NO_ACTION
+        view = next((item["value"] for item in payload["situation"]["known_institutional_views"]
+                     if item["counterparty"] == SELLER.to_dict()), 0)
+        response = "reject" if view < 0 else "accept"
+        option = next(item for item in payload["choices"]
+                      if item["id"].endswith(f":{response}"))
+        return option["id"]
+
+    _provider(monkeypatch, decide_from_context)
+    from src.sim.medieval.diplomacy_policy import review_diplomacy_with_provider
+
+    await review_diplomacy_with_provider(informed)
+    await review_diplomacy_with_provider(uninformed)
+
+    assert informed.relations.proposals[informed_offer.id].status == "rejected"
+    assert uninformed.relations.proposals[uninformed_offer.id].status == "accepted"
+    assert any(event.causal_origin is CausalOrigin.LLM_INTERPRETATION
+               and event.causal_payload["selection"]["actor_ref"] == BUYER.to_dict()
+               for event in informed.events)
+
+
+@pytest.mark.asyncio
+async def test_provider_turn_can_present_breach_recourse_without_material_action(monkeypatch):
+    from src.sim.medieval.commitments import resolve_diplomacy
+    from src.sim.medieval.diplomacy_policy import (_payment_remediation_options,
+                                                   _renegotiation_options,
+                                                   review_diplomacy_with_provider)
+    from src.systems.calendar_agenda import ScheduledSituation
+    from src.systems.time import WorldClock
+    from tests.test_medieval_diplomacy import offer, respond
+
+    world = _provider_world(world_with_knowledge(), calls=20)
+    proposal = offer(world, amount=10)
+    respond(world, proposal)
+    obligation_id = f"{proposal.id}:term:0"
+    world.clock = WorldClock(101)
+    resolve_diplomacy(world, [ScheduledSituation(obligation_id, "diplomacy", 101)])
+    assert _payment_remediation_options(world, BUYER)
+    assert _renegotiation_options(world, SELLER)
+
+    _provider(monkeypatch, lambda _prompt: ai_decider.NO_ACTION)
+    await review_diplomacy_with_provider(world)
+
+    assert world.relations.obligations[obligation_id].status == "breached"
+    assert not world.economy.payments
+
+
 def test_diplomatic_context_exposes_only_recipient_private_findings():
     from src.classes.governance.models import EspionageFinding, TechnologyTheftFinding
     from src.sim.medieval.diplomacy_context import diplomatic_context

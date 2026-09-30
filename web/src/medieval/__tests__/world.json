@@ -639,6 +639,7 @@
       {
         "id": "casa-alvor",
         "name": "Casa Alvor",
+        "doctrine": [],
         "kind": "noble_house",
         "seat_id": "pedraclara",
         "member_ids": [
@@ -653,6 +654,7 @@
       {
         "id": "casa-espinho",
         "name": "Casa Espinho",
+        "doctrine": [],
         "kind": "noble_house",
         "seat_id": "pontenegro",
         "member_ids": [
@@ -667,6 +669,7 @@
       {
         "id": "circulo-do-veu",
         "name": "Círculo do Véu",
+        "doctrine": [],
         "kind": "arcane_tower",
         "seat_id": "salgueiro",
         "member_ids": [
@@ -680,6 +683,7 @@
       {
         "id": "coro-das-cinzas",
         "name": "Coro das Cinzas",
+        "doctrine": ["preservar conhecimento ritual", "honrar os mortos", "interpretar o Dao pela transformação"],
         "kind": "cult",
         "seat_id": "cinzaverde",
         "member_ids": [
@@ -694,6 +698,7 @@
       {
         "id": "liga-das-barcas",
         "name": "Liga das Barcas",
+        "doctrine": [],
         "kind": "merchant_guild",
         "seat_id": "portovelho",
         "member_ids": [
@@ -709,6 +714,7 @@
       {
         "id": "oficios-da-serra",
         "name": "Companhia dos Ofícios da Serra",
+        "doctrine": [],
         "kind": "merchant_guild",
         "seat_id": "ferroalto",
         "member_ids": [
@@ -723,6 +729,7 @@
       {
         "id": "ordem-da-aurora",
         "name": "Ordem da Aurora",
+        "doctrine": ["amparar os vulneráveis", "partilhar cuidado", "interpretar o Dao pela compaixão"],
         "kind": "religious_order",
         "seat_id": "pedraclara",
         "member_ids": [
@@ -737,6 +744,7 @@
       {
         "id": "torre-do-ambar",
         "name": "Torre do Âmbar",
+        "doctrine": [],
         "kind": "arcane_tower",
         "seat_id": "ferroalto",
         "member_ids": [
@@ -999,7 +1007,8 @@
     "civic_protests": [],
     "civic_movements": [],
     "civic_strikes": [],
-    "civic_amnesties": []
+    "civic_amnesties": [],
+    "religious_adherences": []
   },
   "economy": {
     "expansion_blueprints": [
@@ -4691,7 +4700,10 @@
     ],
     "projects": [],
     "knowledge": [],
-    "rite_blueprints": []
+    "rite_blueprints": [],
+    "manifestations": [],
+    "rites": [],
+    "wards": []
   },
   "diplomacy": { "proposals": [], "obligations": [], "notices": [], "aid_notices": [], "memories": [], "aid_readings": [], "strategic_evidence": [] },
   "creatures": { "creatures": [], "demands": [], "tribute_notices": [], "damaged_sites": [] },

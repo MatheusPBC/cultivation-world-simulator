@@ -32,11 +32,12 @@ def _causes(world, option):
 def _label(option):
     if isinstance(option, CustomsPaymentOption):
         return "Pagar a taxa civil da carga declarada."
+    if isinstance(option, CustomsSeizureOption):
+        return "Apreender o contrabando detectado para o estoque civil local."
     return {
         "declare_customs_manifest": "Declarar a carga e aceitar a taxa civil calculada.",
         "attempt_customs_fee_evasion": "Tentar passar sem declarar a carga comum.",
         "return_contraband_cargo": "Retornar o contrabando ao estoque de origem pela rota disponível.",
-        "seize_contraband_cargo": "Apreender o contrabando detectado para o estoque civil local.",
     }.get(option.action, "Escolher uma resolução alfandegária possível.")
 
 

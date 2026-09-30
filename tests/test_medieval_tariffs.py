@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from src.classes.causal_origin import CausalOrigin
@@ -9,12 +11,51 @@ from src.run.medieval_world import create_medieval_world
 from src.sim.medieval.events import record_event
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.intelligence import refresh_reports, refresh_trade_reports
+from src.sim.medieval import ai_decider
 from src.sim.medieval.markets import purchase
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
 from src.sim.medieval.tariffs import export_fee, export_quote, review_export_tariffs, set_export_tariff, tariff_options
 
 
 SOURCE, DESTINATION = "stock:campomanso", "stock:portovelho"
+
+
+@pytest.mark.asyncio
+async def test_export_tariff_is_selected_from_the_full_monthly_institutional_menu(monkeypatch):
+    from src.sim.medieval.institutional_agenda import (monthly_actors, monthly_adapters,
+                                                        review_monthly_institutional_turn)
+    from src.sim.medieval.institutional_decision_turn import _by_id
+
+    world = tariff_world()
+    actor = EntityRef("polity", "auren")
+    option = next(item for item in tariff_options(world, actor.id)
+                  if item.export_rate_permille == 0)
+    world.config = world.config.model_copy(update={
+        "ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 1000,
+    })
+    adapters = monthly_adapters()
+    assert "export_tariff" in {adapter.name for adapter in adapters}
+    assert actor in monthly_actors(world)
+    assert option.id in _by_id(world, actor, adapters)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    selected = []
+
+    async def choose_current_tariff(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        choice = next((item for item in payload["choices"] if item["id"] == option.id), None)
+        if payload["you_are"]["id"] == actor.id and choice is not None:
+            selected.append(choice["id"])
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_current_tariff)
+    await review_monthly_institutional_turn(world)
+
+    assert selected == [option.id]
+    assert world.authority.tax_policies[actor.id].export_rate_permille == 0
+    receipt = next(item for item in world.events if item.event_type == "export_tariff_changed"
+                   and item.causal_payload.get("selected_affordance_id") == option.id)
+    assert receipt.causal_origin is CausalOrigin.ACTOR_DECISION
 
 
 def tariff_world():
@@ -89,6 +130,11 @@ async def test_export_quote_collects_once_without_losing_the_seller_alias_or_del
     receipt = next(event for event in world.events if event.event_type == "export_tariff_collected")
     deltas = [delta for delta in receipt.deltas if delta.owner_kind == "account" and delta.owner_id == source_treasury.id]
     assert len(deltas) == 1 and order.quantity == values["quantity"]
+    from src.server.medieval.queries import causal_view
+    why = causal_view(world, receipt.id)
+    assert values["export_policy_event_id"] in {item.id for item in why.causes}
+    assert any(delta.owner_kind == "account" and delta.owner_id == source_treasury.id
+               for delta in why.event.deltas)
     before = world_snapshot(world)
     with pytest.raises(ValueError, match="executed"):
         purchase(world, *decisions)

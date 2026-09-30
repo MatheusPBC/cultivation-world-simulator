@@ -131,7 +131,7 @@ def _record_parcel(world, parcel, updated, event_type, content, *, extra_deltas=
     return event
 
 
-def _unload(world, parcel):
+def _unload(world, parcel, *, cause_ids=()):
     economy = world.economy
     order = economy.freight_orders[parcel.order_id]
     stock = economy.stocks[order.destination_id]
@@ -147,7 +147,8 @@ def _unload(world, parcel):
                   _delta("freight", order.id, "delivered_quantity", order.delivered_quantity, order.delivered_quantity + amount))
     event = _record_parcel(world, parcel, updated, "cargo_delivered" if amount else "cargo_delayed",
                             f"Entrega: {amount} unidades descarregadas; {remaining} aguardando espaço.",
-                            extra_deltas=deltas, cause_ids=_causes(stock.last_event_ids.get(order.resource_id)))
+                            extra_deltas=deltas,
+                            cause_ids=_causes(stock.last_event_ids.get(order.resource_id), *cause_ids))
     if amount:
         economy.stocks[stock.id] = stock.model_copy(update={
             "goods": {**stock.goods, order.resource_id: stock.goods.get(order.resource_id, 0) + amount},
@@ -179,7 +180,7 @@ def _resolve_parcel(world, parcel, route_causes):
             return
     if parcel.stage == "traveling":
         if parcel.route_index == len(order.route_ids) - 1:
-            _unload(world, parcel)
+            _unload(world, parcel, cause_ids=causes)
         else:
             updated = parcel.model_copy(update={"route_index": parcel.route_index + 1, "stage": "waiting", "due_day": day + 1})
             _record_parcel(world, parcel, updated, "cargo_waypoint_reached", "Carga chegou ao próximo trecho.", cause_ids=causes)

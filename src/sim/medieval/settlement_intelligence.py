@@ -316,7 +316,7 @@ def refresh_settlement_reports(world):
     observe_rites(world)
 
 
-def refresh_existing_local_settlement_reports(world, settlement_id):
+def refresh_existing_local_settlement_reports(world, settlement_id, *, cause_event_ids=()):
     """Refresh a changed local status without creating new observers.
 
     Some public flags (such as a civic demand underway) are readable only by
@@ -332,4 +332,4 @@ def refresh_existing_local_settlement_reports(world, settlement_id):
         if (report.settlement_id == settlement_id and report.recipient_ref == report.publisher_ref
                 and report.channel == "local_settlement_report"
                 and _present_observer(world, report.recipient_ref, settlement_id)):
-            _observe(world, report.recipient_ref, settlement_id)
+            _observe(world, report.recipient_ref, settlement_id, presence_causes=cause_event_ids)

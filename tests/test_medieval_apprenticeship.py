@@ -6,6 +6,7 @@ import json
 import pytest
 
 from src.classes.causal_origin import CausalOrigin
+from src.classes.economy.models import Stock
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
@@ -19,6 +20,9 @@ from src.sim.medieval.institutional_decision_turn import review_institutional_de
 from src.sim.medieval.economy import _delta, monthly_workforce
 from src.sim.medieval.events import record_event
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
+from src.sim.medieval.intelligence import refresh_reports
+from src.sim.medieval.migration import resolve_migrations, start_migration
+from src.sim.medieval.migration_policy import migration_options
 from src.sim.medieval.research import progress_research, start_research
 from src.systems.time import WorldClock
 
@@ -39,10 +43,15 @@ def specialist_of(world, settlement_id):
                 if character.death_day is None and character.location_id == settlement_id)
 
 
-def trained_specialist_world():
+def trained_specialist_world(people="elf"):
     """Auren completes irrigation with a local specialist; Valedouro knows nothing."""
     world = create_medieval_world(73)
-    lead = specialist_of(world, "campomanso")
+    lead = next(character for character in sorted(world.society.characters.values(), key=lambda c: c.id)
+                if character.people == people)
+    if lead.location_id != "campomanso":
+        group = world.society.population[lead.population_group_id]
+        world.society.transfer_people(group.id, "campomanso", group.occupation, 1, (lead.id,))
+        lead = world.society.characters[lead.id]
     world.society.characters[lead.id] = lead.model_copy(
         update={"skills": lead.skills.model_copy(update={"craftsmanship": 40})})
     terms = {"technology_id": TECHNOLOGY, "site_id": "campos-do-lume", "stock_id": "stock:campomanso",
@@ -65,10 +74,10 @@ def trained_specialist_world():
     return world, world.society.characters[lead.id]
 
 
-def hosting_world():
+def hosting_world(people="elf"):
     """Prepared complex: Valedouro keeps a real farm at Salgueiro, and the
     specialist physically relocates there with a recorded material fact."""
-    world, lead = trained_specialist_world()
+    world, lead = trained_specialist_world(people)
     site = world.map.infrastructure_sites["bosques-de-salgueiro"]
     world.map.infrastructure_sites[site.id] = replace(
         site, capability_ids=(*site.capability_ids, "food_production", "water_management"))
@@ -109,11 +118,28 @@ def contracted(world, specialist):
 
 
 def expand(world, facility_id="works:salgueiro-farm", blueprint_id="irrigation-works"):
-    from src.sim.medieval.expansion import start_expansion
-    decision = record_event(world, "expansion_decided", "Autorizar obra.", fact_kind=FactKind.DECISION,
-                            decision={"action": "expand", "actor_ref": HOST.to_dict(),
-                                      "facility_id": facility_id, "blueprint_id": blueprint_id})
-    return start_expansion(world, facility_id, blueprint_id, decision_event_id=decision.id)
+    from src.sim.medieval.expansion import expansion_options, start_expansion
+    actor = world.economy.stocks[world.economy.facilities[facility_id].stock_id].owner_ref
+    option = next((item for item in expansion_options(world, actor)
+                   if item.facility_id == facility_id and item.blueprint_id == blueprint_id), None)
+    if option is None:
+        # Negative probes deliberately reach the owner's earlier knowledge gate.
+        decision = record_event(
+            world, "expansion_decided", "Tentativa sem affordance material vigente.",
+            fact_kind=FactKind.DECISION,
+            decision={"action": "expand", "actor_ref": actor.to_dict(),
+                      "facility_id": facility_id, "blueprint_id": blueprint_id})
+        return start_expansion(world, facility_id, blueprint_id, decision_event_id=decision.id)
+    selected = record_event(world, "expansion_decided", "Selecionar aplicação material disponível.",
+                            fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+                            causal_payload={"decision_source": {"kind": "api"}},
+                            decision=option.decision())
+    material_terms = {"action": "expand", "actor_ref": actor.to_dict(),
+                      "facility_id": facility_id, "blueprint_id": blueprint_id}
+    receipt = record_event(world, "expansion_authorized", "O owner revalidou os termos da aplicação.",
+                           fact_kind=FactKind.DECISION, decision=material_terms,
+                           cause_ids=(selected.id,))
+    return start_expansion(world, facility_id, blueprint_id, decision_event_id=receipt.id)
 
 
 def _select_apprenticeship(monkeypatch, action_label=None, *, no_action=False):
@@ -204,8 +230,9 @@ async def test_host_sponsors_pending_specialist_offer_in_shared_monthly_menu(mon
     assert not world.knowledge.knows(HOST, TECHNOLOGY)
 
 
-def test_a_migrated_specialist_instructs_for_real_wages_before_any_technique_exists(tmp_path):
-    world, specialist = hosting_world()
+@pytest.mark.parametrize("people", ("human", "elf", "dwarf", "orc"))
+def test_each_people_can_choose_paid_specialist_instruction(tmp_path, people):
+    world, specialist = hosting_world(people)
     with pytest.raises(ValueError, match="knowledge"):
         expand(world)
 
@@ -234,8 +261,7 @@ def test_a_migrated_specialist_instructs_for_real_wages_before_any_technique_exi
     assert {key: item.recipe_id for key, item in world.economy.facilities.items()} == recipes
 
     # The technique only makes the work possible; capacity still needs the work.
-    project = expand(world)
-    assert project.stage == "waiting" and project.completed_units == 0
+    # Learning records capability but never installs it by itself.
     assert world.economy.facilities["works:salgueiro-farm"].recipe_id == recipes["works:salgueiro-farm"]
     path = tmp_path / "apprenticeship.mws"
     save_world(world, path)
@@ -330,3 +356,123 @@ def test_migrated_artisan_can_carry_source_institution_knowledge_without_researc
     offer = record_apprenticeship_offer(world, artisan.id, option.id,
                                         decision_source={"kind": "api"})
     assert {link.cause_event_id for link in offer.causal_links} == set(option.source_event_ids)
+
+
+def test_real_migration_carries_technique_into_paid_irrigation_application():
+    """A prepared crisis uses the migration owner, not a fabricated arrival receipt."""
+    world, specialist = trained_specialist_world()
+    site = world.map.infrastructure_sites["bosques-de-salgueiro"]
+    world.map.infrastructure_sites[site.id] = replace(
+        site, capability_ids=(*site.capability_ids, "food_production", "water_management"))
+    source_farm = world.economy.facilities["works:campos-do-lume"]
+    world.economy.facilities["works:salgueiro-farm"] = source_farm.model_copy(update={
+        "id": "works:salgueiro-farm", "site_id": site.id, "stock_id": "stock:salgueiro",
+        "payroll_account_id": "treasury:valedouro", "last_event_id": None, "last_batches": 0,
+        "last_limitations": (), "max_batches": 50})
+
+    group = world.society.population[specialist.population_group_id]
+    need = world.economy.needs[group.settlement_id]
+    world.economy.needs[need.id] = need.model_copy(update={"health": 600, "missing_food": 50})
+    pantry_id = f"household-stock:{group.id}"
+    world.economy.stocks[pantry_id] = Stock(
+        id=pantry_id, owner_ref=EntityRef("population_group", group.id),
+        location_id=group.settlement_id, capacity=10_000, goods={"food": 1_000})
+    refresh_reports(world)
+
+    migration = next(option for option in migration_options(world, group.id)
+                     if option.destination_id == "salgueiro")
+    report_causes = {world.knowledge.settlement_reports[migration.source_report_id].event_id,
+                     world.knowledge.settlement_reports[migration.destination_report_id].event_id,
+                     *(world.knowledge.route_reports[item].event_id for item in migration.route_report_ids)}
+    migration_decision = record_event(
+        world, "migration_decided", "O grupo escolhe migrar para Salgueiro com sua especialista.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=migration.decision(),
+        cause_ids=tuple(sorted(report_causes)))
+    journey = start_migration(world, migration.id, decision_event_id=migration_decision.id,
+                              character_ids=(specialist.id,))
+    while journey.id in world.society.migrations:
+        active_journey = world.society.migrations[journey.id]
+        world.clock = WorldClock(active_journey.due_day)
+        due = tuple(item for item in world.agenda.pop_due(world.clock.absolute_day)
+                    if item.id == journey.id)
+        assert due
+        resolve_migrations(world, due)
+    arrival = next((event for event in world.events if event.event_type == "migration_arrived"
+                    and any(delta.owner_id == journey.id for delta in event.deltas)), None)
+    assert arrival is not None, (world.clock.absolute_day, journey.id,
+                                 world.society.migrations.get(journey.id),
+                                 [event.event_type for event in world.events[-8:]])
+    assert world.society.characters[specialist.id].location_id == "salgueiro"
+    assert any(link.cause_event_id == journey.last_event_id for link in arrival.causal_links)
+    from src.sim.medieval.economy import produce_monthly
+    world.clock = WorldClock(120)
+    produce_monthly(world)
+
+    offer_option = next(option for option in specialist_offer_options(world, specialist.id)
+                        if option.technology_id == TECHNOLOGY)
+    assert arrival.id in offer_option.source_event_ids
+    offer = record_apprenticeship_offer(world, specialist.id, offer_option.id,
+                                        decision_source={"kind": "api"})
+    sponsor_option = next(option for option in apprenticeship_sponsor_options(world, HOST)
+                          if option.offer_event_id == offer.id)
+    sponsor_decision = decide(world, sponsor_option)
+    contract = sponsor_apprenticeship(world, HOST, sponsor_option.id, sponsor_decision.id)
+    assert not world.knowledge.knows(HOST, TECHNOLOGY)
+    world.clock = world.clock.advance(30)
+    resolve_apprenticeships(world, world.agenda.pop_due(world.clock.absolute_day))
+    learned = next(item for item in world.knowledge.technologies.values()
+                   if item.owner_ref == HOST and item.technology_id == TECHNOLOGY)
+    assert world.research.apprenticeships[contract.id].stage == "completed"
+    assert learned.channel == "apprenticeship"
+    assert arrival.id in {link.cause_event_id for link in offer.causal_links}
+    assert {offer.id, sponsor_decision.id} <= {
+        link.cause_event_id for event in world.events if event.id == learned.event_id
+        for link in event.causal_links
+    }
+
+    # The destination applies the learned technique through a real, paid work
+    # project; no irrigation effect is granted by migration or instruction.
+    stock = world.economy.stocks["stock:salgueiro"]
+    world.economy.stocks[stock.id] = stock.model_copy(update={
+        "goods": {**stock.goods, "wood": max(stock.goods.get("wood", 0), 30),
+                  "tools": max(stock.goods.get("tools", 0), 15)}})
+    account = world.economy.accounts["treasury:valedouro"]
+    world.economy.accounts[account.id] = account.model_copy(update={"balance": max(account.balance, 10_000)})
+    # The prepared destination has local builders; preserve ample farmers to
+    # operate the upgraded field while construction uses its authored labor.
+    builder_group = next(item for item in world.society.population.values()
+                         if item.settlement_id == "salgueiro" and item.occupation == "farmer"
+                         and not any(character.population_group_id == item.id
+                                     for character in world.society.characters.values()))
+    world.society.population[builder_group.id] = builder_group.model_copy(update={"occupation": "artisan"})
+    from src.sim.medieval.expansion import expansion_options
+    application = next(option for option in expansion_options(world, HOST)
+                       if option.facility_id == "works:salgueiro-farm"
+                       and option.blueprint_id == "irrigation-works")
+    project = expand(world, facility_id=application.facility_id,
+                     blueprint_id=application.blueprint_id)
+    from src.sim.medieval.expansion import progress_expansions
+    construction_stock = world.economy.stocks["stock:salgueiro"]
+    construction_balance = world.economy.accounts["treasury:valedouro"].balance
+    construction_wood = construction_stock.goods["wood"]
+    construction_tools = construction_stock.goods["tools"]
+    for day in (180, 210):
+        world.clock = WorldClock(day)
+        available = {item.id: item.count for item in world.society.population.values()}
+        progress_expansions(world, available)
+    facility = world.economy.facilities["works:salgueiro-farm"]
+    assert world.economy.expansions[project.id].stage == "completed"
+    assert facility.recipe_id == "irrigated_harvest"
+    assert world.economy.stocks["stock:salgueiro"].goods["wood"] < construction_wood
+    assert world.economy.stocks["stock:salgueiro"].goods["tools"] < construction_tools
+    assert world.economy.accounts["treasury:valedouro"].balance < construction_balance
+    before_food = world.economy.stocks["stock:salgueiro"].goods.get("food", 0)
+    world.clock = WorldClock(240)
+    produce_monthly(world)
+    assert world.economy.stocks["stock:salgueiro"].goods["food"] > before_food
+    production = next(event for event in reversed(world.events)
+                      if event.event_type == "production_completed" and event.day == 240
+                      and event.causal_payload.get("production", {}).get("facility_id") == facility.id)
+    assert any(link.cause_event_id == facility.last_event_id
+               for link in production.causal_links)

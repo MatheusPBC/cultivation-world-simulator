@@ -90,6 +90,7 @@ async def test_declaring_and_lifting_is_one_dated_policy_transition():
                 if item.target_id == TARGET and item.kind == "declare"]
     lifted = declare(world, kind="lift")
     assert lifted.event_type == "trade_embargo_lifted"
+    assert declared.id in {link.cause_event_id for link in lifted.causal_links}
     assert embargoes_of(world, OPERATOR) == ()
     world.authority.validate(world)
 
@@ -131,7 +132,7 @@ async def test_the_closure_requires_authority_a_staffed_own_post_and_a_real_coun
 
 async def test_only_the_named_counterparty_is_refused_and_goods_are_conserved():
     world = await prepared_world()
-    declare(world)
+    declared = declare(world)
     food_before = total_food(world)
 
     # Escarlia owns stock:ferroalto; the refusal must hit only its cargo.
@@ -144,6 +145,11 @@ async def test_only_the_named_counterparty_is_refused_and_goods_are_conserved():
     assert notice.state == "refused" and notice.fee is None and notice.manifest_id is None
     refusal = next(item for item in world.events if item.id == notice.state_event_id)
     assert refusal.event_type == "customs_refused"
+    from src.server.medieval.queries import causal_view
+    why = causal_view(world, refusal.id)
+    assert declared.id in {item.id for item in why.causes}
+    assert any(delta.owner_kind == "customs_notice" and delta.aspect == "state"
+               and delta.after == "refused" for delta in why.event.deltas)
     assert total_food(world) == food_before, "a carga voltou; nada foi criado nem destruído"
     assert not any(parcel.order_id == order.id for parcel in world.economy.parcels.values())
     world.economy.validate(world)
@@ -255,6 +261,60 @@ async def test_the_measure_reaches_the_single_composed_institutional_menu():
     # It is registered exactly once: a second registration would make the same
     # affordance answerable twice in one turn.
     assert [adapter.name for adapter in adapters].count("trade_embargo") == 1
+
+
+async def test_embargo_is_chosen_in_monthly_menu_and_causes_later_cargo_refusal(monkeypatch):
+    from src.sim.medieval.institutional_agenda import (
+        monthly_actors, monthly_adapters, review_monthly_institutional_turn,
+    )
+    from src.sim.medieval.institutional_decision_turn import _by_id
+
+    world = await prepared_world()
+    world.config = world.config.model_copy(
+        update={"ai_enabled": True, "ai_calls_per_step": 256, "ai_max_calls": 1000})
+    adapters = monthly_adapters()
+    assert "trade_embargo" in {adapter.name for adapter in adapters}
+    assert OPERATOR in monthly_actors(world)
+    options = _by_id(world, OPERATOR, adapters)
+    option = next(candidate for _, candidate in options.values()
+                  if getattr(candidate, "target_id", None) == TARGET
+                  and getattr(candidate, "kind", None) == "declare")
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    selected = []
+
+    async def choose_current_embargo(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        choice = next((item for item in payload["choices"] if item["id"] == option.id), None)
+        if payload["you_are"]["id"] == OPERATOR.id and choice is not None:
+            selected.append(choice["id"])
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_current_embargo)
+    await review_monthly_institutional_turn(world)
+
+    assert selected == [option.id]
+    assert embargoes_of(world, OPERATOR) == (TARGET,)
+    declared = next(item for item in world.events
+                    if item.event_type == "trade_embargo_declared"
+                    and (item.causal_payload or {}).get("selected_affordance_id") == option.id)
+    assert declared.causal_payload == {
+        "decision_event_id": next(item.id for item in world.events
+                                   if item.fact_kind is FactKind.DECISION
+                                   and item.decision == option.decision()),
+        "actor_ref": OPERATOR.to_dict(),
+        "selected_affordance_id": option.id,
+    }
+    assert declared.causal_origin is CausalOrigin.ACTOR_DECISION
+
+    order = ship(world)
+    await MedievalSimulator(world).step()
+    notice = next(item for item in world.knowledge.customs_notices.values()
+                  if item.order_id == order.id)
+    assert notice.state == "refused"
+    refusal = next(item for item in world.events if item.id == notice.state_event_id)
+    from src.server.medieval.queries import causal_view
+    assert declared.id in {item.id for item in causal_view(world, refusal.id).causes}
 
 
 async def test_a_stale_choice_through_the_composed_menu_fails_closed(monkeypatch):

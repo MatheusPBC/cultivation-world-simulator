@@ -20,6 +20,7 @@ from .rites import record_rite_offer, rite_offer_options, rite_sponsor_options, 
 from .apprenticeship import (record_apprenticeship_offer, specialist_offer_options)
 from .research import (accept_research_work, lapse_stale_research_offers,
                        researcher_work_options)
+from .religion import adherence_options, religious_context, accept_religious_adherence
 
 
 OFFER_REVIEW_KIND = "character_rite_offer_review"
@@ -69,13 +70,15 @@ def schedule_character_rite_offers(world):
         rite_options = rite_offer_options(world, character_id)
         learning_options = _undecided_learning_offers(world, character_id)
         research_options = researcher_work_options(world, character_id)
-        if not rite_options and not learning_options and not research_options:
+        faith_options = adherence_options(world, EntityRef("character", character_id))
+        if not rite_options and not learning_options and not research_options and not faith_options:
             continue
         # The agenda key is only a wake-up cause. At execution the menu is
         # always recomposed, so a stale report cannot preserve an old option.
         cause_id = (rite_options[0].report_event_id if rite_options
                     else learning_options[0].source_event_ids[0] if learning_options
-                    else research_options[0].authorization_event_id)
+                    else research_options[0].authorization_event_id if research_options
+                    else world.knowledge.religious_invitation_notices[faith_options[0].invitation_id].event_id)
         situation_id = _offer_review_id(character_id, cause_id)
         if world.agenda.get(situation_id) is None:
             world.agenda.schedule(ScheduledSituation(situation_id, OFFER_REVIEW_KIND, due_day))
@@ -149,9 +152,19 @@ def _undecided_learning_offers(world, character_id):
 def _sponsor_situation(world, sponsor, option):
     """The sponsor sees its own report and a local offer, never foreign means."""
     report = world.knowledge.settlement_report(sponsor, option.settlement_id)
+    blueprint = world.research.rite_blueprints[option.blueprint_id]
+    site_report = (world.knowledge.site_report(sponsor, option.site_id)
+                   if blueprint.kind in {"earth_shaping", "evocation"} else None)
     return {
         "you_are": sponsor.to_dict(),
-        "local_offer": {"settlement_id": option.settlement_id, "kind": "restorative_rite"},
+        "local_offer": {"settlement_id": option.settlement_id, "kind": blueprint.kind,
+                        "technique": blueprint.name, "cost": blueprint.cost, "days": blueprint.days,
+                        "paid_assistants": blueprint.assistants,
+                        "wage_per_assistant": blueprint.wage_per_worker},
+        "site_observation": ({"site_id": site_report.site_id, "observed_day": site_report.observed_day,
+                              "integrity": site_report.integrity, "enabled": site_report.enabled,
+                              "manifestation_id": site_report.manifestation_id}
+                             if site_report else None),
         "local_observation": {
             "settlement_id": report.settlement_id,
             "observed_day": report.observed_day,
@@ -196,21 +209,30 @@ async def _offer_turn(world, situation):
     if character is None:
         return False
     lapse_stale_research_offers(world, character_id)
-    rite_options = tuple(option for option in rite_offer_options(world, character_id)
-                         if option.report_event_id == source_event_id)
+    rite_options = rite_offer_options(world, character_id)
     learning_options = _undecided_learning_offers(world, character_id)
     research_options = researcher_work_options(world, character_id)
-    if not rite_options and not learning_options and not research_options:
+    faith_options = adherence_options(world, EntityRef("character", character_id))
+    if not rite_options and not learning_options and not research_options and not faith_options:
         return False
     report = (world.knowledge.settlement_report(EntityRef("character", character_id), rite_options[0].settlement_id)
               if rite_options else None)
     actor = EntityRef("character", character_id)
     situation_data = (_character_situation(world, character, report) if report is not None
                       else _character_self_situation(world, character, learning_options))
+    situation_data["religious_identity"] = religious_context(world, actor)
     situation_data["learning_opportunities"] = [
         {"technology_id": option.technology_id, "host": option.host_ref.to_dict(),
          "settlement_id": option.settlement_id}
         for option in learning_options
+    ]
+    situation_data["site_observations"] = [
+        {"site_id": observation.site_id, "observed_day": observation.observed_day,
+         "integrity": observation.integrity, "enabled": observation.enabled,
+         "manifestation_id": observation.manifestation_id}
+        for option in rite_options
+        if world.research.rite_blueprints[option.blueprint_id].kind in {"earth_shaping", "evocation"}
+        and (observation := world.knowledge.site_report(actor, option.site_id)) is not None
     ]
     situation_data["research_offers"] = [
         {"technology": world.research.technologies[option.technology_id].name,
@@ -220,7 +242,8 @@ async def _offer_turn(world, situation):
          "wage_per_worker_per_unit": world.research.technologies[option.technology_id].wage_per_worker}
         for option in research_options
     ]
-    choices = ([{"id": option.id, "label": "Oferecer conduzir um rito restaurador local."}
+    choices = ([{"id": option.id, "label": (
+        f"Oferecer {world.research.rite_blueprints[option.blueprint_id].name} em {option.settlement_id}.")}
                 for option in rite_options]
                + [{"id": option.id, "label": (
                    f"Oferecer instrução de {world.research.technologies[option.technology_id].name} "
@@ -231,11 +254,17 @@ async def _offer_turn(world, situation):
                    f"em {world.map.infrastructure_sites[option.site_id].name}, por "
                    f"{world.research.technologies[option.technology_id].wage_per_worker} moedas por trabalhador/unidade, "
                    f"patrocinada por {option.owner_ref.id}.")}
-                  for option in research_options])
+                  for option in research_options]
+               + [{"id": option.id, "label": f"Escolher adesão ao convite {option.invitation_id}; não concede poder físico."}
+                  for option in faith_options])
     causes = tuple(sorted({cause for option in rite_options for cause in (option.report_event_id,)}
                           | {cause for option in learning_options for cause in option.source_event_ids}
                           | {cause for option in research_options
-                             for cause in (option.authorization_event_id, option.sponsor_decision_id)}))
+                             for cause in (option.authorization_event_id, option.sponsor_decision_id)}
+                          | {world.knowledge.religious_invitation_notices[option.invitation_id].event_id
+                             for option in faith_options}
+                          | ({situation_data["religious_identity"]["own_affiliation"]["event_id"]}
+                             if situation_data["religious_identity"]["own_affiliation"] else set())))
     selected, interpretation_ids = await _select(
         world, actor, situation_data, choices, causes=causes,
     )
@@ -247,8 +276,19 @@ async def _offer_turn(world, situation):
         return False
     if selected is None:
         return False
-    fresh_rites = {item.id: item for item in rite_offer_options(world, character_id)
-                   if item.report_event_id == source_event_id}
+    fresh_faith = {item.id: item for item in adherence_options(world, actor)}
+    option = fresh_faith.get(selected)
+    if option is not None:
+        notice = world.knowledge.religious_invitation_notices[option.invitation_id]
+        decision = _decision(world, option, "religious_adherence_decided",
+                             "A pessoa escolheu livremente uma adesão religiosa.",
+                             causes=(*interpretation_ids, notice.event_id))
+        try:
+            accept_religious_adherence(world, actor, option.id, decision.id)
+        except ValueError as exc:
+            raise _stale(actor) from exc
+        return True
+    fresh_rites = {item.id: item for item in rite_offer_options(world, character_id)}
     fresh_learning = {item.id: item for item in _undecided_learning_offers(world, character_id)}
     option = fresh_rites.get(selected)
     if option is not None:
@@ -303,7 +343,9 @@ async def _sponsor_turn(world, situation):
                 continue
             selected, interpretation_ids = await _select(
                 world, sponsor, _sponsor_situation(world, sponsor, options[0]),
-                [{"id": option.id, "label": "Patrocinar o rito restaurador local."} for option in options],
+                [{"id": option.id, "label": (
+                    f"Patrocinar {world.research.rite_blueprints[option.blueprint_id].name}.")}
+                 for option in options],
                 causes=(offer_event.id, report.event_id),
             )
             if selected == ai_decider.NO_ACTION:

@@ -9,6 +9,7 @@ need a mock AI provider just to make the granary give its own food away.
 """
 
 from src.classes.event import FactKind
+from src.classes.causal_origin import CausalOrigin
 from src.sim.medieval.events import record_event
 from src.sim.medieval.intelligence import refresh_reports
 from src.sim.medieval.relief import distribute_relief, relief_settlement_options
@@ -33,7 +34,9 @@ def relieve_settlement(world, settlement_id, *, full=True):
     report = world.knowledge.settlement_reports[option.report_id]
     decision = record_event(
         world, "relief_distribution_decided", "Decisão de teste: distribuir ajuda alimentar do próprio celeiro.",
-        fact_kind=FactKind.DECISION, decision=option.decision(), cause_ids=(report.event_id,))
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}},
+        decision=option.decision(), cause_ids=(report.event_id,))
     return distribute_relief(world, option.id, decision_event_id=decision.id)
 
 

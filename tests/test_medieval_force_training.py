@@ -1,5 +1,7 @@
 """Institutional knowledge trains a real column only through material work."""
 
+import json
+
 import pytest
 
 from src.classes.event import FactKind
@@ -16,6 +18,7 @@ from src.sim.medieval.field_engagement import (field_engagement_offer_options,
                                                join_field_engagement)
 from src.sim.medieval.force import detect_force_standoffs
 from src.sim.medieval.force_training import start_training, training_adapters, training_options
+from src.sim.medieval import ai_decider
 from src.sim.medieval.campaign_supply import (_bag_capacity, _provision_capacity,
                                               campaign_stock_id, ensure_campaign_stock)
 from src.sim.medieval.institutional_agenda import monthly_adapters
@@ -141,7 +144,8 @@ def test_siegecraft_requires_separate_instruction_after_field_drill():
     assert field_strength(world, world.society.detachments[column_id])[0] == baseline + 2 * column.count
 
 
-def test_field_logistics_equips_existing_bag_only_after_own_dated_training(tmp_path):
+@pytest.mark.asyncio
+async def test_field_logistics_is_chosen_in_monthly_menu_before_equipping_existing_bag(tmp_path, monkeypatch):
     world, column_id = world_with_column()
     column = world.society.detachments[column_id]
     bag = ensure_campaign_stock(world, column)
@@ -162,7 +166,47 @@ def test_field_logistics_equips_existing_bag_only_after_own_dated_training(tmp_p
     logistics = next(item for item in training_options(world, OWNER)
                      if item.technology_id == "field_logistics")
     before_tools = world.economy.stocks[logistics.stock_id].goods["tools"]
-    training = start_training(world, OWNER, logistics.id, decide(world, logistics).id)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 256,
+                                                    "ai_max_calls": 1000})
+    from src.sim.medieval.institutional_agenda import (monthly_actors, monthly_adapters,
+                                                        review_monthly_institutional_turn)
+    from src.sim.medieval.institutional_decision_turn import _by_id
+
+    adapters = monthly_adapters()
+    assert OWNER in monthly_actors(world)
+    current = _by_id(world, OWNER, adapters)
+    assert logistics.id in current
+    training_adapter = next(item for item in adapters if item.name == "detachment_training")
+    logistics_label = training_adapter.label_fn(logistics)
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    selected = []
+    provider_ids = []
+
+    async def choose_field_logistics(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        choice = next((item for item in payload["choices"] if item["label"] == logistics_label), None)
+        if payload["you_are"]["id"] == OWNER.id and choice is not None:
+            # The provider sees an opaque alias because the canonical ID embeds
+            # a private stock identifier; the engine resolves it back to the
+            # current logistics affordance.
+            selected.append(logistics.id)
+            provider_ids.append(choice["id"])
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_field_logistics)
+    await review_monthly_institutional_turn(world)
+    assert selected == [logistics.id]
+    assert len(provider_ids) == 1 and provider_ids[0].startswith("choice:")
+    assert provider_ids[0] != logistics.id
+    decision = next(item for item in world.events
+                    if item.fact_kind is FactKind.DECISION
+                    and item.decision == logistics.decision())
+    assert decision.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert decision.causal_payload["decision_source"]["kind"] == "provider"
+    training = next(item for item in world.society.detachment_trainings.values()
+                    if item.technology_id == "field_logistics")
+    assert world.economy.stocks[logistics.stock_id].goods["tools"] == before_tools - logistics.tool_cost
     assert world.economy.stocks[logistics.stock_id].goods["tools"] == before_tools - logistics.tool_cost
     for _ in range(2):
         tick(world)
@@ -183,14 +227,80 @@ def test_field_logistics_equips_existing_bag_only_after_own_dated_training(tmp_p
     assert audit(path)["ok"] is True
 
 
-def test_field_battle_cites_the_column_training_instead_of_institutional_knowledge(tmp_path):
+def test_paid_field_drill_research_and_training_reach_a_material_field_battle(tmp_path):
     world, column_id = world_with_column()
-    learn(world, "field_drill")
-    option = training_options(world, OWNER)[0]
+    # The prepared column remains stationary while the research subsystem is
+    # advanced by monthly owner calls; its next real daily upkeep resumes on
+    # day 181, leaving the three-day training window fully supplied.
+    column = world.society.detachments[column_id]
+    upkeep_window = record_event(
+        world, "fixture_research_window", "A coluna preparada permanece no local durante a janela de pesquisa.",
+        fact_kind=FactKind.STATE_TRANSITION,
+        deltas=(_delta("detachment", column.id, "due_day", column.due_day, 181),),
+        cause_ids=(column.last_event_id,),
+        causal_payload={"root_premise": {
+            "kind": "scenario_bootstrap", "domain": "test_research_and_training_window",
+            "source_refs": [{"kind": "scenario", "id": "field_drill_composition"}],
+            "observed_day": world.clock.absolute_day,
+        }})
+    world.society.detachments[column.id] = column.model_copy(
+        update={"due_day": 181, "last_event_id": upkeep_window.id})
+    world.agenda.cancel(column_id)
+    world.agenda.schedule(ScheduledSituation(column_id, "force", 181))
+    from src.sim.medieval.economy import monthly_workforce
+    from src.sim.medieval.research import (progress_research, researcher_work_options,
+                                           start_research)
+    from src.sim.medieval.research_policy import execute_research_option, research_options
+    from src.systems.time import WorldClock
+
+    research = next(item for item in research_options(world, OWNER)
+                    if item.technology_id == "field_drill")
+    research_stock_before = world.economy.stocks[research.stock_id].goods["tools"]
+    research_funds_before = world.economy.accounts[research.account_id].balance
+    sponsor_decision = record_event(
+        world, "research_option_decided", "A instituição financiou o exercício de campo.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=research.decision())
+    execute_research_option(world, OWNER, research.id, sponsor_decision.id)
+    world.agenda.cancel(f"character-rite-offer-review:{research.researcher_id}:{sponsor_decision.id}")
+    world.clock = WorldClock(1)
+    work_option = researcher_work_options(world, research.researcher_id)[0]
+    researcher_decision = record_event(
+        world, "researcher_work_accepted", "A pesquisadora aceitou trabalho remunerado.",
+        fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={"decision_source": {"kind": "api"}}, decision=work_option.decision(),
+        cause_ids=(sponsor_decision.id,))
+    project = start_research(
+        world, technology_id=work_option.technology_id, site_id=work_option.site_id,
+        stock_id=work_option.stock_id, account_id=work_option.account_id,
+        researcher_id=work_option.researcher_id,
+        sponsor_decision_id=work_option.sponsor_decision_id,
+        researcher_decision_id=researcher_decision.id)
+    assert not world.knowledge.knows(OWNER, "field_drill")
+    for day in (30, 60, 90, 120, 150, 180):
+        world.clock = WorldClock(day)
+        progress_research(world, monthly_workforce(world))
+    knowledge = next(item for item in world.knowledge.technologies.values()
+                     if item.owner_ref == OWNER and item.technology_id == "field_drill")
+    assert knowledge.channel == "research"
+    assert world.research.projects[project.id].stage == "completed"
+    assert world.economy.stocks[research.stock_id].goods["tools"] < research_stock_before
+    assert world.economy.accounts[research.account_id].balance < research_funds_before
+
+    baseline = field_strength(world, world.society.detachments[column_id])[0]
+    option = next(item for item in training_options(world, OWNER, detachment_id=column_id)
+                  if item.technology_id == "field_drill")
+    training_stock_before = world.economy.stocks[option.stock_id].goods["tools"]
+    rations_before = world.society.detachments[column_id].provisions
     training = start_training(world, OWNER, option.id, decide(world, option).id)
+    assert world.economy.stocks[option.stock_id].goods["tools"] == training_stock_before - option.tool_cost
+    assert field_strength(world, world.society.detachments[column_id])[0] == baseline
     for _ in range(3):
         tick(world)
     completed = world.society.detachment_trainings[training.id].last_event_id
+    trained_strength = field_strength(world, world.society.detachments[column_id])[0]
+    assert trained_strength == baseline + world.society.detachments[column_id].count
+    assert world.society.detachments[column_id].provisions == rations_before - 3 * world.society.detachments[column_id].count
 
     resident = next(item for item in world.society.population.values()
                     if item.settlement_id == "ferroalto" and item.occupation == "soldier")
@@ -218,6 +328,7 @@ def test_field_battle_cites_the_column_training_instead_of_institutional_knowled
     battle = next(event for event in reversed(world.events)
                   if event.event_type == "field_engagement_resolved")
     assert completed in {link.cause_event_id for link in battle.causal_links}
+    assert knowledge.event_id in {link.cause_event_id for link in battle.causal_links}
     path = tmp_path / "trained-battle.mws"
     save_world(world, path)
     from tools.medieval_causal_audit import audit

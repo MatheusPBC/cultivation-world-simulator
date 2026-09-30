@@ -7,10 +7,12 @@ from .state import SocietyState
 from .workforce import WorkforceTransition
 from .force import Detachment, ForceStandoff, Garrison, SiegeCampaign
 from .control import TerritorialControl
+from .religion import ReligiousAdherence
 
 __all__ = [
     "Character", "Organization", "Personality", "Polity", "PopulationGroup", "CivicProtest", "CivicMovement", "CivicStrike", "CivicAmnesty",
     "Settlement", "Skills", "SocietyState", "WorkforceTransition", "Detachment", "ForceStandoff", "Garrison",
     "SiegeCampaign",
     "TerritorialControl",
+    "ReligiousAdherence",
 ]

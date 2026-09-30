@@ -55,11 +55,12 @@ class TechnicalKnowledge(SocietyValue):
 
 
 class RiteBlueprint(SocietyValue):
-    """One authored restorative rite. There is no spell language here.
+    """An authored material working, with no free-form spell language.
 
     Every term is material and engine-owned: where it may be performed, who is
     qualified, what it consumes, who is paid, how long it takes and the bounded
-    relief it may give. It creates no goods, money, people or capacity.
+    effect it may give. Earth shaping restores an existing pass's integrity;
+    it creates no goods, money, people or new routes.
     """
     id: Identity
     name: Identity
@@ -74,14 +75,33 @@ class RiteBlueprint(SocietyValue):
     health_gain_permille: int = Field(strict=True, ge=0, le=200)
     # Reach is one existing, currently usable route segment, never a plan.
     reach: Literal['local', 'adjacent'] = 'local'
-    kind: Literal['restoration', 'ward'] = 'restoration'
+    kind: Literal['restoration', 'ward', 'earth_shaping', 'evocation'] = 'restoration'
     ward_days: int = Field(strict=True, ge=0, le=360, default=0)
     resistance_capability_id: Identity | None = None
+    site_kind: Literal['mountain_pass'] | None = None
+    integrity_gain_permille: int = Field(strict=True, ge=0, le=100, default=0)
+    manifestation_days: int = Field(strict=True, ge=0, le=12, default=0)
 
     @model_validator(mode='after')
     def valid_rite(self):
         if self.skill not in Skills.model_fields or not self.inputs:
             raise ValueError('rite requires a known skill and real materials')
+        if self.kind == 'evocation':
+            if (self.skill != 'evocation_magic' or self.reach != 'local' or self.manifestation_days != 12
+                    or self.health_gain_permille or self.ward_days or self.resistance_capability_id
+                    or self.site_kind or self.integrity_gain_permille):
+                raise ValueError('evocation manifests one temporary local bulwark, never a ward or healing')
+            return self
+        if self.manifestation_days:
+            raise ValueError('only evocation creates a temporary manifestation')
+        if self.kind == 'earth_shaping':
+            if (self.skill != 'elemental_magic' or self.reach != 'local'
+                    or self.site_kind != 'mountain_pass' or self.integrity_gain_permille != 100
+                    or self.health_gain_permille or self.ward_days or self.resistance_capability_id):
+                raise ValueError('earth shaping locally restores at most one tenth of a mountain pass')
+            return self
+        if self.site_kind is not None or self.integrity_gain_permille:
+            raise ValueError('only earth shaping changes infrastructure integrity')
         if self.kind == 'ward':
             if (self.reach != 'local' or self.ward_days <= 0 or self.health_gain_permille
                     or not self.resistance_capability_id):
@@ -91,13 +111,17 @@ class RiteBlueprint(SocietyValue):
         return self
 
     @property
-    def school(self) -> Literal['restoration', 'protection', 'countermeasure']:
+    def school(self) -> Literal['restoration', 'protection', 'countermeasure', 'elemental', 'evocation']:
         """Engine-owned school; authored kind remains the canonical source.
 
         Countermeasure profiles are still wards materially, but are exposed as
         a distinct school so observers can distinguish a standing barrier from
         a hazard-specific response without introducing a spell registry.
         """
+        if self.kind == 'earth_shaping':
+            return 'elemental'
+        if self.kind == 'evocation':
+            return 'evocation'
         if self.kind != 'ward':
             return 'restoration'
         return 'protection' if self.resistance_capability_id == 'standing_ward' else 'countermeasure'
@@ -115,7 +139,7 @@ class RiteBlueprint(SocietyValue):
     @property
     def duration_days(self) -> Positive:
         """The one applicable duration: working time or ward term."""
-        return self.ward_days if self.kind == 'ward' else self.days
+        return self.ward_days if self.kind == 'ward' else self.manifestation_days if self.kind == 'evocation' else self.days
 
 
 class RiteBlueprintMetadata(SocietyValue):
@@ -125,7 +149,7 @@ class RiteBlueprintMetadata(SocietyValue):
     Every value is derived from :class:`RiteBlueprint` by the engine.
     """
     id: Identity
-    school: Literal['restoration', 'protection', 'countermeasure']
+    school: Literal['restoration', 'protection', 'countermeasure', 'elemental', 'evocation']
     cost: dict[Identity, Positive]
     range: Literal['local', 'adjacent']
     duration_days: Positive
@@ -218,6 +242,28 @@ class Ward(SocietyValue):
     def valid_term(self):
         if self.id != f'ward:{self.rite_id}' or self.until_day <= self.started_day:
             raise ValueError('a ward requires its own rite and a real term')
+        return self
+
+
+class Manifestation(SocietyValue):
+    """One non-sentient, temporary bulwark anchored by a paid evocation.
+
+    It is no person, soldier or stock. One intercepted material impact spends
+    it; otherwise the dated term ends it. Research owns only this lifetime.
+    """
+    id: Identity
+    rite_id: Identity
+    sponsor_ref: EntityRef
+    site_id: Identity
+    started_day: Count
+    until_day: Count
+    stage: Literal['active', 'spent', 'expired'] = 'active'
+    last_event_id: Identity
+
+    @model_validator(mode='after')
+    def valid_manifestation(self):
+        if self.id != f'manifestation:{self.rite_id}' or self.until_day <= self.started_day:
+            raise ValueError('manifestation requires its originating rite and a finite term')
         return self
 
 

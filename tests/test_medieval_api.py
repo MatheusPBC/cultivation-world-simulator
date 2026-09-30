@@ -81,6 +81,15 @@ async def test_world_required_and_input_errors_have_stable_non_success_responses
     assert not (await query(client, "status"))["ready"]
 
 
+async def test_society_query_exposes_work_entry_age_by_people(client):
+    await command(client, "create", {"seed": 73})
+    society = await query(client, "society")
+    maturity_by_people = {group["people"]: group["maturity_years"]
+                          for group in society["population_groups"]
+                          if group["settlement_id"] == "campomanso"}
+    assert maturity_by_people == {"human": 15, "elf": 25, "dwarf": 20, "orc": 12}
+
+
 async def test_public_month_exposes_paid_food_and_its_two_decisions(client):
     await command(client, "create", {"seed": 73, "character_count": 12})
     initial_population = (await query(client, "world"))["population"]

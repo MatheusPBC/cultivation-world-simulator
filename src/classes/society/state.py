@@ -17,6 +17,7 @@ from .strike import CivicStrike
 from .amnesty import CivicAmnesty
 from .demography import BirthCohort
 from .workforce import WorkforceTransition
+from .religion import ReligiousAdherence
 from .serialization import REGISTRIES, SocietySerialization
 
 
@@ -50,6 +51,7 @@ class SocietyState(SocietySerialization):
     # Dated batches of new residents; they hold no claim over the people who
     # may have left or died before they reach working age.
     birth_cohorts: dict[str, BirthCohort] = field(default_factory=dict)
+    religious_adherences: dict[str, ReligiousAdherence] = field(default_factory=dict)
 
     @property
     def total_population(self) -> int:
@@ -118,6 +120,15 @@ class SocietyState(SocietySerialization):
             if any(member not in self.characters for member in organization.member_ids):
                 raise ValueError("unknown organization member")
         named_counts: dict[str, int] = {}
+        for adherence in self.religious_adherences.values():
+            organization = self.organizations.get(adherence.organization_id)
+            actors = self.characters if adherence.actor_ref.kind == "character" else self.population
+            if (organization is None or organization.kind not in {"religious_order", "cult"}
+                    or not organization.doctrine or adherence.actor_ref.id not in actors):
+                raise ValueError("religious adherence requires an actual tradition and resident")
+            if world is not None:
+                from src.sim.medieval.religion import validate_adherence
+                validate_adherence(world, adherence)
         for character in self.characters.values():
             if character.location_id not in self.settlements:
                 raise ValueError("unknown character location")
@@ -555,7 +566,8 @@ class SocietyState(SocietySerialization):
                             for delta in event.deltas) for event in linked)):
                     raise ValueError("fortified siege lacks its prepared position and knowledge causes")
             if campaign.phase == "sieging":
-                if (final.event_type not in {"siege_campaign_started", "siege_campaign_progressed"}
+                if (final.event_type not in {"siege_campaign_started", "siege_campaign_progressed",
+                                             "siege_artillery_fired"}
                         or scheduled is None or scheduled.kind != "siege_campaign"
                         or scheduled.due_day != campaign.next_progress_day
                         or campaign.next_progress_day <= world.clock.absolute_day):
@@ -700,9 +712,14 @@ class SocietyState(SocietySerialization):
                       and any(delta.owner_kind == "force_position" and delta.owner_id == position.id
                               and delta.aspect == "stage" and delta.before == "None" and delta.after == "preparing"
                               for delta in event.deltas)]
-            if len(starts) != 1:
-                raise ValueError("force position lacks its preparation fact")
-            start = starts[0]
+            if not starts:
+                raise ValueError(f"force position {position.id} lacks its preparation fact")
+            # A column may abandon an earlier preparation and later choose to
+            # prepare again. The stable position identity is reused, while
+            # each attempt remains immutable history; the current state must
+            # be anchored to its most recent start, not to a globally unique
+            # start event.
+            start = max(starts, key=lambda event: event.sequence)
             decisions = [events.get(link.cause_event_id) for link in start.causal_links]
             if (start.day != position.started_day
                     or not any(event is not None and event.fact_kind == FactKind.DECISION

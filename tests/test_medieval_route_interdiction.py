@@ -86,9 +86,11 @@ def queue_real_food(world):
                        if item.owner_ref == OWNER and item.location_id == TARGET)
     decision = record_event(
         world, "freight_decided", "Frete interno canônico para testar atraso físico.", fact_kind=FactKind.DECISION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
         decision={"action": "freight", "source_id": source.id, "destination_id": destination.id,
                   "resource_id": "food", "quantity": 1, "route_ids": [ROAD],
                   "actor_ref": OWNER.to_dict()},
+        causal_payload={"decision_source": {"kind": "api"}},
     )
     return queue_freight(world, source.id, destination.id, "food", 1, (ROAD,), decision_event_id=decision.id)
 

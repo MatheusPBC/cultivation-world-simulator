@@ -116,8 +116,15 @@ def execute_embargo(world, option, *, decision_event_id):
          if option.kind == "declare" else
          "A administração voltou a aceitar a carga dessa contraparte em seu próprio posto."),
         fact_kind=FactKind.STATE_TRANSITION,
+        causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision_event_id,
+            "actor_ref": option.actor_ref.to_dict(),
+            "selected_affordance_id": option.id,
+        },
         deltas=(_delta("tax_policy", policy.id, "embargoed_ids", ",".join(before), ",".join(after)),),
-        cause_ids=_causes(decision_event_id, checkpoint.last_event_id))
+        cause_ids=_causes(decision_event_id, checkpoint.last_event_id,
+                          policy.embargo_policy_event_id, policy.last_event_id))
     world.authority.tax_policies[policy.id] = policy.model_copy(update={
         "embargoed_ids": after, "embargo_policy_event_id": event.id, "last_event_id": event.id})
     return event

@@ -5,6 +5,7 @@ from src.classes.economy.models import MoneyAccount
 from src.classes.event import FactKind
 from src.classes.mechanical_language import EntityRef
 from src.run.medieval_world import create_medieval_world
+from src.classes.society.demography import MATURITY_DAYS_BY_PEOPLE
 from src.sim.medieval.demography import BIRTH_PERMILLE, DEPENDENT, MATURE_OCCUPATION
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.persistence import load_world, save_world, world_snapshot
@@ -126,8 +127,9 @@ async def test_a_fed_settlement_grows_into_dependents_until_housing_is_full(tmp_
 
 
 async def test_maturity_is_dated_and_never_invents_people(monkeypatch):
-    monkeypatch.setattr("src.classes.society.demography.MATURITY_DAYS", 60)
-    monkeypatch.setattr("src.sim.medieval.demography.MATURITY_DAYS", 60)
+    accelerated = {people: 60 for people in MATURITY_DAYS_BY_PEOPLE}
+    monkeypatch.setattr("src.classes.society.demography.MATURITY_DAYS_BY_PEOPLE", accelerated)
+    monkeypatch.setattr("src.sim.medieval.demography.MATURITY_DAYS_BY_PEOPLE", accelerated)
     # A batch large enough for a partial loss to be a real number; the shipped
     # permille is what the other test measures.
     monkeypatch.setattr("src.sim.medieval.demography.BIRTH_PERMILLE", 50)
@@ -137,6 +139,7 @@ async def test_maturity_is_dated_and_never_invents_people(monkeypatch):
 
     cohort = max((item for item in world.society.birth_cohorts.values() if item.settlement_id == TARGET),
                  key=lambda item: (item.count, item.id))
+    assert cohort.maturity_days == 60
     assert cohort.matures_day == cohort.born_day + 60
     assert cohort.count >= 3, "the prepared batch can lose people and still mature some"
 
@@ -175,3 +178,63 @@ async def test_maturity_is_dated_and_never_invents_people(monkeypatch):
     causes = {link.cause_event_id for link in matured.causal_links}
     assert all(item.causal_origin.value != "llm_interpretation"
                for item in world.events if item.id in causes)
+
+
+async def test_people_specific_maturity_changes_the_dated_work_transition(monkeypatch, tmp_path):
+    assert MATURITY_DAYS_BY_PEOPLE == {
+        "human": 15 * 360, "elf": 25 * 360, "dwarf": 20 * 360, "orc": 12 * 360,
+    }
+    accelerated = {"human": 60, "elf": 90, "dwarf": 120, "orc": 30}
+    monkeypatch.setattr("src.classes.society.demography.MATURITY_DAYS_BY_PEOPLE", accelerated)
+    monkeypatch.setattr("src.sim.medieval.demography.MATURITY_DAYS_BY_PEOPLE", accelerated)
+    monkeypatch.setattr("src.sim.medieval.demography.BIRTH_PERMILLE", 50)
+    world = fed_world()
+    engine = MedievalSimulator(world)
+    await fed_month(engine, world)
+
+    cohorts = {item.people: item for item in world.society.birth_cohorts.values()
+               if item.settlement_id == TARGET}
+    assert set(cohorts) == set(accelerated)
+    assert {people: item.maturity_days for people, item in cohorts.items()} == accelerated
+    assert {people: item.matures_day for people, item in cohorts.items()} == {
+        people: item.born_day + accelerated[people] for people, item in cohorts.items()
+    }
+    events_by_id = {event.id: event for event in world.events}
+    for people, cohort in cohorts.items():
+        receipt = events_by_id[cohort.birth_event_id]
+        assert any(delta.owner_kind == "birth_cohort" and delta.owner_id == cohort.id
+                   and delta.aspect == "maturity_days" and delta.after == str(accelerated[people])
+                   for delta in receipt.deltas)
+        assert any(delta.owner_kind == "birth_cohort" and delta.owner_id == cohort.id
+                   and delta.aspect == "matures_day" and delta.after == str(cohort.matures_day)
+                   for delta in receipt.deltas)
+
+    # The due-day contract and stored duration survive a real snapshot round-trip.
+    path = tmp_path / "people-maturity.mws"
+    save_world(world, path)
+    world = load_world(path)
+    engine = MedievalSimulator(world)
+    for key, need in tuple(world.economy.needs.items()):
+        world.economy.needs[key] = need.model_copy(update={"health": 0})
+    target_cohorts = {item.people: item for item in world.society.birth_cohorts.values()
+                      if item.settlement_id == TARGET}
+    await reach_fed(engine, world, target_cohorts["orc"].matures_day)
+
+    assert world.society.birth_cohorts[target_cohorts["orc"].id].stage == "matured"
+    for people in ("human", "elf", "dwarf"):
+        assert world.society.birth_cohorts[target_cohorts[people].id].stage == "pending"
+    matured = next(event for event in world.events if event.event_type == "generation_matured"
+                   and any(delta.owner_kind == "birth_cohort" and delta.owner_id == target_cohorts["orc"].id
+                           for delta in event.deltas))
+    moved = next(int(delta.after) for delta in matured.deltas
+                 if delta.owner_kind == "birth_cohort" and delta.owner_id == target_cohorts["orc"].id
+                 and delta.aspect == "matured_count")
+    adult_delta = next(delta for delta in matured.deltas
+                       if delta.owner_kind == "population_group"
+                       and delta.owner_id == f"pop:{TARGET}:orc:{MATURE_OCCUPATION}"
+                       and delta.aspect == "count")
+    assert int(adult_delta.after) - int(adult_delta.before) == moved
+    assert not any(event.event_type == "generation_matured"
+                   and any(delta.owner_kind == "birth_cohort" and delta.owner_id == target_cohorts[people].id
+                           for delta in event.deltas)
+                   for event in world.events for people in ("human", "elf", "dwarf"))

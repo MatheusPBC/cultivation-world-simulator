@@ -94,6 +94,42 @@ def recent_creature_attacks_for_report(world, report):
     return sorted(incidents, key=lambda item: item["event_id"])
 
 
+def observed_assembly_interference(world, report):
+    """Public local interference actually witnessed in an own observation.
+
+    A received aggregate bulletin does not disclose the hidden rite contract,
+    caster, inputs or motives. Only a direct local report carrying the pressure
+    receipt may expose the publicly present force's act.
+    """
+    if report.publisher_ref != report.recipient_ref or report.channel != "local_settlement_report":
+        return []
+    events = world.event_index()
+    observation = events.get(report.event_id)
+    if observation is None or observation.event_type != "settlement_observed":
+        return []
+    incidents = []
+    for link in observation.causal_links:
+        pressure = events.get(link.cause_event_id)
+        if (pressure is None or pressure.event_type != "rite_interruption_pressure"
+                or not 0 <= report.observed_day - pressure.day < 30
+                or not any(d.owner_id == report.settlement_id and d.aspect == "unrest" for d in pressure.deltas)):
+            continue
+        interruption = next((events.get(c.cause_event_id) for c in pressure.causal_links
+                             if events.get(c.cause_event_id) is not None
+                             and events[c.cause_event_id].event_type == "rite_interrupted"), None)
+        denial = (next((events.get(c.cause_event_id) for c in interruption.causal_links
+                       if events.get(c.cause_event_id) is not None
+                       and events[c.cause_event_id].event_type == "assembly_denied"), None)
+                  if interruption else None)
+        if denial is not None:
+            public = denial.causal_payload.get("social_conflict", {})
+            if public.get("settlement_id") == report.settlement_id:
+                incidents.append({"event_id": pressure.id, "day": pressure.day,
+                                  "assembly_denial_event_id": denial.id,
+                                  "site_id": public.get("site_id"), "actor_ref": public.get("actor_ref")})
+    return sorted(incidents, key=lambda item: item["event_id"])
+
+
 def _known_settlement_reports(world, actor):
     reports = []
     for report in world.knowledge.settlements_for_actor(actor):
@@ -102,6 +138,7 @@ def _known_settlement_reports(world, actor):
                         "field_engagements": [item.model_dump(mode="json")
                                               for item in report.field_engagements],
                         "recent_creature_attacks": recent_creature_attacks_for_report(world, report),
+                        "observed_assembly_interference": observed_assembly_interference(world, report),
                         **_latest_food_affordability(world, report)})
     return tuple(reports)
 
@@ -343,8 +380,10 @@ def build_actor_dossier(world, actor):
     """Only current, actor-owned knowledge; never a live or foreign record."""
     if not isinstance(actor, EntityRef):
         raise TypeError("dossier requires an EntityRef actor")
+    from .religion import religious_context
     return {
         "actor": actor.to_dict(),
+        "religious_identity": religious_context(world, actor),
         "today": world.clock.absolute_day,
         "known_settlement_reports": _known_settlement_reports(world, actor),
         "own_production_readings": _own_production_readings(world, actor),

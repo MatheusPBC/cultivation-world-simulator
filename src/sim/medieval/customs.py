@@ -367,6 +367,8 @@ def _refuse_if_embargoed(world, notice_id):
     source = world.economy.stocks.get(order.source_id)
     if source is None:
         return None
+    policy = (world.authority.tax_policies.get(checkpoint.operator_ref.id)
+              if checkpoint.operator_ref.kind == "polity" else None)
     before = source.goods.get(order.resource_id, 0)
     resolved = order.resolved_quantity + parcel.quantity
     event = record_event(
@@ -380,7 +382,9 @@ def _refuse_if_embargoed(world, notice_id):
             _delta("customs_notice", notice.id, "state", notice.state, "refused"),
         ),
         cause_ids=_causes(notice.event_id, parcel.last_event_id, order.last_event_id,
-                          checkpoint.last_event_id, source.last_event_ids.get(order.resource_id)),
+                          checkpoint.last_event_id,
+                          policy.embargo_policy_event_id if policy is not None else None,
+                          source.last_event_ids.get(order.resource_id)),
     )
     world.economy.stocks[source.id] = source.model_copy(update={
         "goods": {**source.goods, order.resource_id: before + parcel.quantity},
@@ -654,13 +658,19 @@ def seize_contraband_cargo(world, option_id, *, decision_event_id):
     resolved = order.resolved_quantity + parcel.quantity
     event = record_event(
         candidate, "contraband_seized", "A alfândega apreendeu contrabando detectado e o recolheu ao estoque civil.",
-        fact_kind=FactKind.STATE_TRANSITION,
+        fact_kind=FactKind.STATE_TRANSITION, causal_origin=CausalOrigin.ACTOR_DECISION,
+        causal_payload={
+            "decision_event_id": decision_event_id,
+            "actor_ref": actor.to_dict(),
+            "selected_affordance_id": option.id,
+        },
         deltas=(_delta("stock", destination.id, order.resource_id, before, before + parcel.quantity),
                 _delta("cargo", parcel.id, "quantity", parcel.quantity, 0),
                 _delta("freight", order.id, "resolved_quantity", order.resolved_quantity, resolved),
                 _delta("customs_notice", notice.id, "state", notice.state, "seized")),
-        cause_ids=_causes(*_decision_causes(decision), notice.event_id, notice.state_event_id, parcel.last_event_id,
-                          order.last_event_id, checkpoint.last_event_id, destination.last_event_ids.get(order.resource_id)),
+        cause_ids=_causes(decision.id, notice.event_id, notice.state_event_id, parcel.last_event_id,
+                          order.last_event_id, checkpoint.last_event_id,
+                          destination.last_event_ids.get(order.resource_id)),
     )
     candidate.economy.stocks[destination.id] = destination.model_copy(update={
         "goods": {**destination.goods, order.resource_id: before + parcel.quantity},

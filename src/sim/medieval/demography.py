@@ -12,7 +12,7 @@ moved. Nothing is drawn at random, no person is named and no family exists.
 """
 
 from src.classes.event import FactKind
-from src.classes.society.demography import MATURITY_DAYS, BirthCohort
+from src.classes.society.demography import MATURITY_DAYS_BY_PEOPLE, BirthCohort
 from src.systems.calendar_agenda import ScheduledSituation
 
 from .economy import _causes, _delta
@@ -68,18 +68,22 @@ def apply_monthly_births(world):
             before = existing.count if existing is not None else 0
             identity = f"birth-cohort:event:{len(world.events) + 1}:{settlement_id}:{people}"
             group_id = existing.id if existing is not None else f"pop:{settlement_id}:{people}:{DEPENDENT}"
+            maturity_days = MATURITY_DAYS_BY_PEOPLE[people]
+            matures_day = day + maturity_days
             event = record_event(
                 world, "settlement_births",
                 f"{settlement.name}: {count} novos habitantes nasceram num ciclo alimentado.",
                 fact_kind=FactKind.STATE_TRANSITION,
                 deltas=(_delta("population_group", group_id, "count", before, before + count),
-                        _delta("birth_cohort", identity, "count", None, count)),
+                        _delta("birth_cohort", identity, "count", None, count),
+                        _delta("birth_cohort", identity, "maturity_days", None, maturity_days),
+                        _delta("birth_cohort", identity, "matures_day", None, matures_day)),
                 cause_ids=_causes(need.last_event_id, *(group.last_event_id for group in adults)))
             world.society.add_people(settlement_id, people, DEPENDENT, count)
             world.society.population[group_id] = world.society.population[group_id].model_copy(
                 update={"last_event_id": event.id})
             cohort = BirthCohort(id=identity, settlement_id=settlement_id, people=people, count=count,
-                                 born_day=day, matures_day=day + MATURITY_DAYS,
+                                 born_day=day, maturity_days=maturity_days, matures_day=matures_day,
                                  birth_event_id=event.id, last_event_id=event.id)
             world.society.birth_cohorts[cohort.id] = cohort
             world.agenda.schedule(ScheduledSituation(cohort.id, MATURITY_KIND, cohort.matures_day))
@@ -128,5 +132,5 @@ def resolve_generation_maturity(world, situations):
             update={"stage": "matured", "last_event_id": event.id})
 
 
-__all__ = ["BIRTH_PERMILLE", "HEALTH_THRESHOLD", "MATURITY_KIND", "apply_monthly_births",
+__all__ = ["BIRTH_PERMILLE", "HEALTH_THRESHOLD", "MATURITY_DAYS_BY_PEOPLE", "MATURITY_KIND", "apply_monthly_births",
            "resolve_generation_maturity"]

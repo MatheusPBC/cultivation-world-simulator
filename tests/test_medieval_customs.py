@@ -29,13 +29,10 @@ from src.sim.medieval.customs import (
     open_customs_checkpoint,
     pay_customs_fee,
     return_contraband_cargo,
-    seize_contraband_cargo,
 )
 from src.sim.medieval.engine import MedievalSimulator
 from src.sim.medieval.events import record_event
 from src.sim.medieval import ai_decider
-from src.sim.medieval.customs_policy import customs_adapters
-from src.sim.medieval.institutional_decision_turn import review_institutional_decision_turn
 from src.sim.medieval.logistics import open_order
 from src.sim.medieval.persistence import SCHEMA, load_world, save_world, world_snapshot
 from src.sim.simulator_engine.month_transaction import SimulationMonthCheckpoint
@@ -122,25 +119,48 @@ def test_presentation_then_manifest_payment_releases_same_parcel_and_survives_sa
     world.knowledge.validate(world)
 
 
-def test_customs_resolution_is_an_actor_choice_in_the_shared_affordance_turn(monkeypatch):
+def test_customs_evasion_is_an_actor_choice_in_the_full_monthly_menu(monkeypatch):
+    from src.sim.medieval.institutional_agenda import (monthly_actors, monthly_adapters,
+                                                        review_monthly_institutional_turn)
+    from src.sim.medieval.institutional_decision_turn import _by_id
+
     world = prepared_world()
     order, parcel, notice = presented_parcel(world)
-    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 2,
-                                                    "ai_max_calls": 10})
+    notice = world.knowledge.customs_notices[f"customs_notice:{parcel.id}"]
+    assert notice.classification == "ordinary" and notice.state == "presented"
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 256,
+                                                    "ai_max_calls": 1000})
+    actor = order.owner_ref
+    adapters = monthly_adapters()
+    assert "customs" in {adapter.name for adapter in adapters}
+    assert actor in monthly_actors(world)
+    options = _by_id(world, actor, adapters)
+    option = next(option for _, option in options.values()
+                  if getattr(option, "action", None) == "attempt_customs_fee_evasion"
+                  and option.parcel_id == parcel.id)
+    assert any(getattr(candidate, "action", None) == "declare_customs_manifest"
+               and candidate.parcel_id == parcel.id for _, candidate in options.values())
     monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr(type(world.rng), "randrange", lambda _rng, _n: 0)
+    selected = []
 
-    async def choose_declaration(prompt, *_args, **_kwargs):
+    async def choose_customs_evasion(prompt, *_args, **_kwargs):
         payload = json.loads(prompt[prompt.index("{"):])
-        selected = next(item["id"] for item in payload["choices"]
-                        if item["id"].startswith("customs-declare"))
-        return {"selected_id": selected}
+        choice = next((item for item in payload["choices"] if item["id"] == option.id), None)
+        if payload["you_are"]["id"] == actor.id and choice is not None:
+            selected.append(choice["id"])
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
 
-    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_declaration)
-    claims, covered = asyncio.run(review_institutional_decision_turn(world, order.owner_ref, customs_adapters()))
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_customs_evasion)
+    asyncio.run(review_monthly_institutional_turn(world))
 
-    assert covered is True and claims == {}
-    assert world.knowledge.customs_notices[notice.id].state == "fee_due"
-    assert f"cargo_manifest:{parcel.id}" in world.economy.cargo_manifests
+    assert selected == [option.id]
+    assert world.knowledge.customs_notices[notice.id].state == "detected"
+    decision = next(item for item in world.events if item.decision == option.decision())
+    detection = next(item for item in world.events
+                     if item.event_type == "customs_fee_evasion_detected")
+    assert decision.id in {link.cause_event_id for link in detection.causal_links}
 
 
 def test_presentation_classifies_catalogued_contraband_without_inventing_a_material_result():
@@ -160,6 +180,11 @@ def test_presentation_classifies_catalogued_contraband_without_inventing_a_mater
     presentation = next(event for event in world.events if event.id == notice.event_id)
     assert any(delta.owner_kind == "customs_notice" and delta.aspect == "classification"
                and delta.after == "contraband" for delta in presentation.deltas)
+    from src.server.medieval.queries import causal_view
+    classification_why = causal_view(world, presentation.id)
+    assert classification_why.event.id == presentation.id
+    assert any(delta.aspect == "classification" and delta.after == "contraband"
+               for delta in classification_why.event.deltas)
     assert parcel.stage == "held" and notice.state == "presented"
 
 
@@ -192,8 +217,17 @@ def test_owner_can_explicitly_return_contraband_to_source_stock(tmp_path):
     world.knowledge.validate(world)
 
 
-def test_checkpoint_owner_can_explicitly_seize_detected_contraband_into_local_stock():
-    world = prepared_world()
+@pytest.mark.asyncio
+async def test_checkpoint_owner_chooses_contraband_seizure_in_monthly_menu(monkeypatch):
+    world = create_medieval_world(73)
+    world.economy.facilities.clear()
+    world.strategy.objectives.clear()
+    actor = world.map.infrastructure_sites[SITE].owner_ref
+    open_option = customs_open_options(world, SITE, actor)[0]
+    open_customs_checkpoint(world, open_option.id,
+                            decision_event_id=decided(world, open_option, "customs_open_decided").id)
+    await MedievalSimulator(world).step()
+    assert checkpoint_active(world, world.economy.customs_checkpoints[f"customs:{SITE}"])
     source = world.economy.stocks["stock:ferroalto"]
     world.economy.stocks[source.id] = source.model_copy(update={
         "goods": {**source.goods, "weapons": 10},
@@ -202,7 +236,7 @@ def test_checkpoint_owner_can_explicitly_seize_detected_contraband_into_local_st
                             fact_kind=FactKind.DECISION, decision={"action": "prepared_freight"})
     order = open_order(world, "stock:ferroalto", "stock:pontenegro", "weapons", 2, [ROUTE],
                        decision_ids=(decision.id,))
-    asyncio.run(MedievalSimulator(world).step())
+    await MedievalSimulator(world).step()
     parcel = next(item for item in world.economy.parcels.values() if item.order_id == order.id)
     notice = world.knowledge.customs_notices[f"customs_notice:{parcel.id}"]
     # The catalogued contraband classification is evidence. It still needs the
@@ -210,14 +244,60 @@ def test_checkpoint_owner_can_explicitly_seize_detected_contraband_into_local_st
     operator = world.economy.customs_checkpoints[notice.checkpoint_id].operator_ref
     seizure = customs_seizure_options(world, operator)
     assert seizure and all(item.actor_ref == operator for item in seizure)
+    assert len(seizure) == 1, "o menu deve distinguir inequivocamente o destino de estoque"
     target = seizure[0]
     before = world.economy.stocks[target.destination_stock_id].goods.get("weapons", 0)
-    event = seize_contraband_cargo(world, target.id, decision_event_id=decided(world, target).id)
+    world.config = world.config.model_copy(update={"ai_enabled": True, "ai_calls_per_step": 256,
+                                                    "ai_max_calls": 1000})
+    from src.sim.medieval.institutional_agenda import (monthly_actors, monthly_adapters,
+                                                        review_monthly_institutional_turn)
+    from src.sim.medieval.institutional_decision_turn import _by_id
+
+    adapters = monthly_adapters()
+    assert operator in monthly_actors(world)
+    customs_adapter = next(item for item in adapters if item.name == "customs")
+    label = customs_adapter.label_fn(target)
+    current = _by_id(world, operator, adapters)
+    assert target.id in current
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    selected = []
+
+    async def choose_seizure(prompt, *_args, **_kwargs):
+        payload = json.loads(prompt.split("\n", 1)[1])
+        choice = next((item for item in payload["choices"] if item["label"] == label), None)
+        if payload["you_are"]["id"] == operator.id and choice is not None:
+            selected.append(target.id)
+            return {"selected_id": choice["id"]}
+        return {"selected_id": ai_decider.NO_ACTION}
+
+    monkeypatch.setattr("src.utils.llm.client.call_llm_json", choose_seizure)
+    await review_monthly_institutional_turn(world)
+
+    assert selected == [target.id]
+    decision = next(item for item in world.events
+                    if item.fact_kind is FactKind.DECISION and item.decision == target.decision())
+    assert decision.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert decision.causal_payload["decision_source"]["kind"] == "provider"
+    event = next(item for item in world.events
+                 if item.event_type == "contraband_seized"
+                 and decision.id in {link.cause_event_id for link in item.causal_links})
+    assert event.causal_origin is CausalOrigin.ACTOR_DECISION
+    assert event.causal_payload == {
+        "decision_event_id": decision.id,
+        "actor_ref": operator.to_dict(),
+        "selected_affordance_id": target.id,
+    }
     assert event.event_type == "contraband_seized"
     assert parcel.id not in world.economy.parcels
     assert world.economy.stocks[target.destination_stock_id].goods["weapons"] == before + parcel.quantity
     assert world.economy.freight_orders[order.id].resolved_quantity == parcel.quantity
     assert world.knowledge.customs_notices[notice.id].state == "seized"
+    from src.server.medieval.queries import causal_view
+    why = causal_view(world, event.id)
+    assert decision.id in {item.id for item in why.causes}
+    assert any(delta.owner_kind == "stock" and delta.owner_id == target.destination_stock_id
+               and delta.aspect == "weapons" and int(delta.after) - int(delta.before) == parcel.quantity
+               for delta in why.event.deltas)
     world.economy.validate(world)
     world.knowledge.validate(world)
 
@@ -263,7 +343,8 @@ def test_detected_evasion_keeps_cargo_held_then_legal_declaration_and_payment(mo
     option = next(item for item in customs_cargo_options(world, order.owner_ref)
                   if item.action == "attempt_customs_fee_evasion")
     monkeypatch.setattr(type(world.rng), "randrange", lambda _rng, _n: 0)
-    detected = attempt_customs_fee_evasion(world, option.id, decision_event_id=decided(world, option).id)
+    decision = decided(world, option)
+    detected = attempt_customs_fee_evasion(world, option.id, decision_event_id=decision.id)
     notice = world.knowledge.customs_notices[notice.id]
     checkpoint = world.economy.customs_checkpoints[notice.checkpoint_id]
     assert detected.event_type == "customs_fee_evasion_detected"
@@ -271,6 +352,11 @@ def test_detected_evasion_keeps_cargo_held_then_legal_declaration_and_payment(mo
     assert checkpoint.inspection_slots_used == 1
     assert {delta.aspect for delta in detected.deltas if delta.owner_kind == "customs_inspection"} == {
         "roll_permille", "threshold_permille"}
+    from src.server.medieval.queries import causal_view
+    detection_why = causal_view(world, detected.id)
+    assert decision.id in {item.id for item in detection_why.causes}
+    assert any(delta.aspect == "state" and delta.after == "detected"
+               for delta in detection_why.event.deltas)
 
     declaration = next(item for item in customs_cargo_options(world, order.owner_ref)
                        if item.action == "declare_customs_manifest")

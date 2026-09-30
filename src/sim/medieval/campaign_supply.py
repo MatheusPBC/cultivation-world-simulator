@@ -68,14 +68,17 @@ def campaign_stock_id(detachment_id):
 
 
 def campaign_baggage_ready_for_departure(world, detachment, *, ignore_notice=False):
-    """An empty, uncommitted bag may physically travel with its own column.
+    """A bag moves only when no parcel remains at its recorded destination.
 
-    Pending supply remains at its existing place until ordinary freight
-    resolves.  Withdrawal therefore never drags a stock or parcel across the
-    map merely because a force changed plans.
+    Powder and artillery are durable campaign equipment carried by the column;
+    they may move with it and their stock location is changed in the same
+    movement receipt. Pending freight and other cargo remain at their recorded
+    place until their own owners resolve them.
     """
     stock = world.economy.stocks.get(campaign_stock_id(detachment.id))
-    if stock is not None and any(quantity for quantity in stock.goods.values()):
+    if (stock is not None
+            and any(quantity and resource_id not in {"artillery", "gunpowder"}
+                    for resource_id, quantity in stock.goods.items())):
         return False
     active_notice = any(
         notice.detachment_id == detachment.id and notice.recipient_ref == detachment.owner_ref
@@ -455,20 +458,31 @@ def load_campaign_baggage(world):
                      and (order := world.economy.freight_orders[notice.freight_id]).delivered_quantity
                      == order.quantity
                      and not any(parcel.order_id == order.id for parcel in world.economy.parcels.values())]
+        position = world.society.force_positions.get(f"force-position:{detachment.id}")
         event = record_event(
             world, "campaign_provisions_loaded", "Alimento entregue foi carregado na bagagem da coluna.",
             fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"kind": "campaign_baggage_loading", "detachment_id": detachment.id,
+                            "settlement_id": detachment.location_id,
+                            "position_id": position.id if position is not None and position.stage == "prepared"
+                            else None},
             deltas=(_delta("stock", stock.id, "food", available, available - amount),
                     _delta("detachment", detachment.id, "provisions", detachment.provisions, updated.provisions),
                     *(_delta("campaign_supply_notice", notice.id, "state", "dispatched", "fulfilled")
                       for notice in fulfilled)),
             cause_ids=_causes(stock.last_event_ids.get("food"), detachment.last_event_id,
+                              position.last_event_id if position is not None and position.stage == "prepared" else None,
                               *(notice.last_event_id for notice in fulfilled)),
         )
         world.economy.stocks[stock.id] = stock.model_copy(update={
             "goods": {**stock.goods, "food": available - amount},
             "last_event_ids": {**stock.last_event_ids, "food": event.id}})
         world.society.detachments[detachment.id] = updated.model_copy(update={"last_event_id": event.id})
+        if position is not None and position.stage == "prepared":
+            from .route_intelligence import observe_force_position_routes
+            observe_force_position_routes(world, world.society.detachments[detachment.id], event)
+        from .force import schedule_force_contact_review_for_detachment
+        schedule_force_contact_review_for_detachment(world, world.society.detachments[detachment.id], event)
         for notice in fulfilled:
             _transition_notice(world, notice, "fulfilled", event)
             observed_delay = any(

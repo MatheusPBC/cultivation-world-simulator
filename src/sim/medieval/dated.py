@@ -19,12 +19,14 @@ from .civic_protest import resolve_civic_protests
 from .civic_strike import resolve_civic_strikes
 from .demography import resolve_generation_maturity
 from .technique_copy import resolve_technique_copies
+from .evocation import resolve_manifestations
 
 
 def resolve_dated(world, situations):
     if any(s.kind not in {"activity", "cargo", "migration", "workforce_transition", "apprenticeship",
                           "force", "force_preparation", "force_training", "rite", "rite_interruption", "creature_review", "recourse_review",
                           "character_rite_offer_review", "character_rite_sponsor_review", "character_travel_review",
+                          "religious_group_response_review",
                           "force_contact_review", "detachment_command_review",
                           "detachment_march_command_review",
                           "strategy_response_review",
@@ -32,10 +34,11 @@ def resolve_dated(world, situations):
                           "campaign_supply_review", "field_engagement", "field_aftermath_review",
                           "headquarters_field_response_review", "diplomacy",
                           "diplomatic_review", "investigation", "civic_protest", "generation_maturity", "technique_copy",
-                          "siege_campaign", "civic_general_strike"}
+                          "siege_campaign", "civic_general_strike", "manifestation"}
            for s in situations):
         raise ValueError("unknown dated situation")
     resolve_dated_activities(world, [s for s in situations if s.kind == "activity"])
+    resolve_manifestations(world, [s for s in situations if s.kind == "manifestation"])
     # Death, office expiry and an externally moved character do not leave a
     # tactical command silently attached to a column.
     revoke_invalid_detachment_commands(world)

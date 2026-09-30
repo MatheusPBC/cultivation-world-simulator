@@ -29,6 +29,19 @@ from .settlement_investment import revoke_settlement_investments_for
 
 BEGIN_ACTION = "begin_siege_campaign"
 PROGRESS_KIND = "siege_campaign"
+
+
+def _schedule_campaign_contact_reviews(world, campaign, source_event):
+    """Let each physically present institution reassess a changed campaign."""
+    from .force import schedule_force_contact_review_for_detachment
+
+    garrison = world.society.garrisons.get(campaign.defender_garrison_id)
+    participant_ids = [campaign.attacker_detachment_id]
+    if garrison is not None:
+        participant_ids.append(garrison.detachment_id)
+    for detachment_id in participant_ids:
+        detachment = world.society.detachments.get(detachment_id)
+        schedule_force_contact_review_for_detachment(world, detachment, source_event)
 # The campaign already consumes the ordinary daily ration through the force
 # owner.  A sustained investment also creates a second, bounded pressure on
 # the besieged column: the blockade makes one additional ration per soldier
@@ -327,6 +340,7 @@ def begin_siege_campaign(world, actor, option_id, decision_event_id):
                           knowledge.event_id if fortified else None))
     candidate.society.siege_campaigns[identity] = campaign.model_copy(update={"last_event_id": event.id})
     candidate.agenda.schedule(ScheduledSituation(identity, PROGRESS_KIND, campaign.next_progress_day))
+    _schedule_campaign_contact_reviews(candidate, campaign, event)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     world.__dict__.update(candidate.__dict__)
@@ -370,7 +384,8 @@ def siege_campaign_withdrawal_options(world, actor):
             if destination.id == settlement.id or destination.administrator_id != actor.id:
                 continue
             report = world.knowledge.settlement_report(actor, destination.id)
-            if report is None or report.observed_day != world.clock.absolute_day:
+            if (report is None
+                    or not 0 <= world.clock.absolute_day - report.observed_day < 30):
                 continue
             for exit_route_id in investment.route_ids:
                 route = world.map.routes.get(exit_route_id)
@@ -394,12 +409,24 @@ def _execute_siege_withdrawal(candidate, actor, option, decision_event_id, *,
     """Execute a current siege withdrawal from any accepted actor decision."""
     require_authority(candidate, actor, "military")
     campaign = candidate.society.siege_campaigns[option.campaign_id]
+    decision = next((event for event in candidate.events if event.id == decision_event_id), None)
+    if decision is None:
+        raise ValueError("siege withdrawal requires its current actor decision")
     # A withdrawal is also a material decision to abandon an outstanding
     # campaign-supply observation.  Pending cargo is not moved or deleted;
     # dispatched cargo still blocks this option until its own owner resolves it.
     supply_lapsed = _lapse_campaign_notices(candidate, option.detachment_id, decision_event_id)
     lifted_investments = revoke_settlement_investments_for(
         candidate, candidate.society.detachments[option.detachment_id], cause_ids=(decision_event_id,))
+    garrison_withdrawal = None
+    garrison = candidate.society.garrisons.get(f"garrison:{option.detachment_id}")
+    if garrison is not None and garrison.stage == "active":
+        from .force import GarrisonOption, _withdraw_garrison
+        garrison_withdrawal = _withdraw_garrison(candidate, actor, GarrisonOption(
+            id=f"siege-campaign-garrison-exit:{garrison.id}:{garrison.last_event_id}",
+            actor_ref=actor, detachment_id=option.detachment_id,
+            settlement_id=garrison.settlement_id, account_id=garrison.account_id,
+            daily_wage=0, kind="withdraw"), decision)
     withdrawal = next((item for item in withdrawal_options(
                            candidate, actor, detachment_id=option.detachment_id,
                            allow_open_campaign_supply=True, campaign_authorized=True)
@@ -415,6 +442,7 @@ def _execute_siege_withdrawal(candidate, actor, option, decision_event_id, *,
         deltas=(_delta("siege_campaign", campaign.id, "phase", campaign.phase, "withdrawn"),),
         cause_ids=_causes(decision_event_id, campaign.last_event_id, material.id,
                           supply_lapsed.id if supply_lapsed is not None else None,
+                          garrison_withdrawal.id if garrison_withdrawal is not None else None,
                           *(item.id for item in lifted_investments)))
     candidate.society.siege_campaigns[campaign.id] = campaign.model_copy(
         update={"phase": "withdrawn", "next_progress_day": None, "last_event_id": event.id})
@@ -456,7 +484,8 @@ def siege_occupation_options(world, actor):
         if (attacker is None or settlement is None or garrison is None or defender is None or report is None
                 or attacker.stage != "present" or attacker.location_id != settlement.id
                 or defender.owner_ref == actor or defender.stage != "present"
-                or attacker.provisions < attacker.count or report.observed_day != world.clock.absolute_day
+                or attacker.provisions < attacker.count
+                or not 0 <= world.clock.absolute_day - report.observed_day < 3
                 or report.occupier_id != settlement.occupier_id or settlement.occupier_id != defender.owner_ref.id
                 or settlement.occupier_id == actor.id):
             continue
@@ -496,6 +525,11 @@ def occupy_after_siege_breach(world, actor, option_id, decision_event_id):
         deltas=(_delta("settlement", settlement.id, "occupier_id", before, actor.id),),
         cause_ids=_causes(decision.id, option.campaign_event_id, campaign.decision_event_id),
     )
+    from .settlement_intelligence import refresh_existing_local_settlement_reports
+    refresh_existing_local_settlement_reports(candidate, settlement.id, cause_event_ids=(event.id,))
+    from .force import schedule_force_contact_review_for_detachment
+    schedule_force_contact_review_for_detachment(
+        candidate, candidate.society.detachments.get(campaign.attacker_detachment_id), event)
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.economy.validate(candidate)
     candidate.knowledge.validate(candidate)
@@ -570,6 +604,10 @@ def resolve_siege_campaigns(world, situations):
                              defender=defender, defender_provisions=defender_provisions,
                              reading_deltas=(barrier_reading,))
             collapse_garrison_for_siege(world, garrison.id, campaign_event_id=breach.id)
+            from .settlement_intelligence import refresh_existing_local_settlement_reports
+            refresh_existing_local_settlement_reports(
+                world, campaign.settlement_id, cause_event_ids=(breach.id,))
+            _schedule_campaign_contact_reviews(world, campaign, breach)
             continue
         event = record_event(
             world, "siege_campaign_progressed",
@@ -590,6 +628,7 @@ def resolve_siege_campaigns(world, situations):
                                                "last_event_id": event.id})
         world.society.siege_campaigns[campaign.id] = updated
         world.agenda.schedule(ScheduledSituation(campaign.id, PROGRESS_KIND, updated.next_progress_day))
+        _schedule_campaign_contact_reviews(world, updated, event)
 
 
 __all__ = ["BEGIN_ACTION", "OCCUPY_AFTER_BREACH_ACTION", "WITHDRAW_SIEGE_ACTION", "SiegeCampaignOption",

@@ -98,6 +98,7 @@ class Organization(SocietyValue):
     seat_id: Identity
     member_ids: tuple[Identity, ...]
     interests: tuple[Identity, ...]
+    doctrine: tuple[Identity, ...] = ()
 
     @model_validator(mode="after")
     def unique_members(self):

@@ -11,7 +11,7 @@ from src.classes.economy.models import (Market, MoneyAccount, Payroll, Permanent
 from src.classes.economy.logistics import CargoParcel, FreightOrder, RouteFlow
 from src.classes.economy.expansion import ExpansionBlueprint, ExpansionProject
 from src.classes.economy.maintenance import RepairBlueprint, RepairProject
-from src.classes.research.models import (ResearchProject, RiteBlueprintMetadata, Technology,
+from src.classes.research.models import (Manifestation, ResearchProject, Rite, Ward, RiteBlueprintMetadata, Technology,
                                          TechnicalKnowledge)
 from src.classes.governance.diplomacy import DiplomaticProposal, InstitutionalMemory, Obligation
 from src.classes.governance.models import (AuthorityClaim, AuthorityRecognition, CreatureTributeNotice, CustomsNotice, DiplomaticNotice, FiscalRouteReport,
@@ -29,6 +29,7 @@ from src.classes.society.workforce import WorkforceTransition
 from src.classes.society.movement import CivicMovement
 from src.classes.society.strike import CivicStrike
 from src.classes.society.amnesty import CivicAmnesty
+from src.classes.society.religion import ReligiousAdherence
 from src.classes.society.force import (AssemblyDenial, Detachment, DetachmentCommand, FieldEngagement, ForcePosition,
                                        ForceStandoff, RouteInterdiction, SettlementInvestment, SiegeCampaign, Garrison)
 from src.classes.society.control import TerritorialControl
@@ -107,6 +108,10 @@ class CharacterView(Character):
     age_years: int
 
 
+class PopulationGroupView(PopulationGroup):
+    maturity_years: int
+
+
 class SettlementView(Settlement):
     population: int
     present_population: int
@@ -128,7 +133,7 @@ class SocietyView(SocietyValue):
     settlements: list[SettlementView]
     polities: list[Polity]
     organizations: list[Organization]
-    population_groups: list[PopulationGroup]
+    population_groups: list[PopulationGroupView]
     activities: list[Activity]
     migrations: list[MigrationJourney]
     workforce_transitions: list[WorkforceTransition]
@@ -136,6 +141,7 @@ class SocietyView(SocietyValue):
     civic_movements: list[CivicMovement]
     civic_strikes: list[CivicStrike]
     civic_amnesties: list[CivicAmnesty]
+    religious_adherences: list[ReligiousAdherence]
 
 
 class DossierEntry(SocietyValue):
@@ -314,6 +320,9 @@ class ResearchView(SocietyValue):
     knowledge: list[TechnicalKnowledge]
     technology_sales: list[TechnologySaleEvidenceView]
     rite_blueprints: list[RiteBlueprintMetadata]
+    manifestations: list[Manifestation]
+    rites: list[Rite]
+    wards: list[Ward]
 
 
 class InstitutionalMemoryView(InstitutionalMemory):

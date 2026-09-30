@@ -88,7 +88,10 @@ def expansion_options(world, actor):
             production_pressure = blueprint.stock_capacity_gain == 0 and facility.last_batches == facility.max_batches
             if not (storage_pressure or production_pressure):
                 continue
-            if output_store_full and not storage_pressure:
+            # A second product line has its own output and must not be hidden
+            # merely because the anchor's product is abundant. Shared stock
+            # capacity still bounds its actual production in Economy.
+            if output_store_full and not storage_pressure and not blueprint.additional_recipe_id:
                 continue
             target_recipe = blueprint.additional_recipe_id or blueprint.to_recipe_id
             if (line_exists_or_planned(economy, facility, blueprint)

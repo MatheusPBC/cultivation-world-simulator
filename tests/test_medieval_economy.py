@@ -96,7 +96,7 @@ def test_workers_are_shared_between_facilities_and_recruitment_removes_labor():
     from src.sim.medieval.economy import produce_monthly
     # Two workshops compete for exactly ten artisans; each batch requires ten.
     for group_id, group in list(world.society.population.items()):
-        if group.settlement_id == "ferroalto":
+        if group.settlement_id == "ferroalto" and group.occupation != "soldier":
             named = tuple(c.id for c in world.society.characters.values() if c.population_group_id == group_id)
             world.society.transfer_people(group_id, "ferroalto", "soldier", group.count, named)
     group = next(g for g in world.society.population.values() if g.settlement_id == "ferroalto" and g.occupation == "soldier")
@@ -144,19 +144,26 @@ async def test_month_consumes_each_person_once_and_daily_interrupt_does_not_cons
     await engine.step()
     assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
     await engine.step()
-    # No household has any money and no relief act has run yet, so nothing
-    # left any granary: the shortfall is real, not silently forgiven.
-    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
-    assert sum(need.missing_food for need in world.economy.needs.values()) == 10900
+    # Public surplus is exposed to the storage law, but neither household
+    # shortfall nor the unsold reserve is silently treated as consumed.
+    losses = [event for event in world.events if event.event_type == "public_food_storage_loss"]
+    spoiled = sum(int(delta.before) - int(delta.after)
+                  for event in losses for delta in event.deltas
+                  if delta.owner_kind == "stock" and delta.aspect == "food")
+    after_storage = sum(s.goods.get("food", 0) for s in world.economy.stocks.values())
+    assert spoiled == before - after_storage == 109
+    assert losses and all(event.causal_links or (event.causal_payload or {}).get("root_premise")
+                          for event in losses)
+    assert sum(need.missing_food for need in world.economy.needs.values()) == 4700
     # The administration now chooses, settlement by settlement, to give its
-    # own stored food away -- the only way anyone actually eats.  The food
-    # leaves public granaries and enters canonical household pantries; it is
-    # not destroyed by the relief receipt.
+    # own stored food to groups whose earnings could not buy the remaining
+    # need. The food leaves public granaries and enters canonical household
+    # pantries; it is not destroyed by the relief receipt.
     relieve_all_settlements(world)
     public_food = sum(s.goods.get("food", 0) for s in world.economy.stocks.values()
                       if not s.id.startswith("household-stock:"))
-    assert public_food == before - 10900
-    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before
+    assert public_food == before - spoiled - 10900
+    assert sum(s.goods.get("food", 0) for s in world.economy.stocks.values()) == before - spoiled
     assert sum(need.missing_food for need in world.economy.needs.values()) == 0
 
 

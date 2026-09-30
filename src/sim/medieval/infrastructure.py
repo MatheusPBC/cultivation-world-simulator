@@ -206,6 +206,8 @@ def _progress_repair(world, project, available, day):
     blocker = next((name for name in sorted(limits) if limits[name] == 0), None)
     restored = project.restored_permille + units
     integrity = min(1.0, site.integrity + units / 1000)
+    if integrity >= 1.0 - 1e-9:
+        integrity = 1.0
     stage = "completed" if integrity >= 1.0 else "repairing" if units else "blocked"
     if not units:
         deltas = (_delta("repair", project.id, "restored_permille", restored, restored),
@@ -383,12 +385,13 @@ def repair_authorization_options(world, actor):
     current observation of real damage, its own local stock/account, no repair
     already open for the site, and current supply/trade authority.
     """
+    from .rites import site_under_elemental_rite
     if not isinstance(actor, EntityRef):
         return ()
     options = []
     for site_id in sorted(world.map.infrastructure_sites):
         site = world.map.infrastructure_sites[site_id]
-        if (site.maintainer_ref != actor
+        if (site.maintainer_ref != actor or site_under_elemental_rite(world, site_id)
                 or any(p.site_id == site_id and p.stage != "completed" for p in world.economy.repairs.values())):
             continue
         blueprint = site_blueprint(world, site)

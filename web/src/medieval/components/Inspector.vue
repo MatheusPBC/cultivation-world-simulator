@@ -6,13 +6,19 @@ import { formatNumber as n, calendar } from '../mappers'
 import SupplyPlans from './SupplyPlans.vue'
 import IncomePanel from './IncomePanel.vue'
 import ResearchPanel from './ResearchPanel.vue'
+import RiteExecutions from './RiteExecutions.vue'
 import DiplomacyPanel from './DiplomacyPanel.vue'
 import MigrationPanel from './MigrationPanel.vue'
 import WorkforcePanel from './WorkforcePanel.vue'
 import type { EntityRef } from '../../types/medieval-api'
 const {t,te}=useI18n()
-const {tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}=useInspection()
+const {tab,data,settlement,character,characterFaith,organizationAdherences,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}=useInspection()
 const label=(key:string)=>te('kinds.'+key)?t('kinds.'+key):key
+const organizationMemberName=(id:string)=>data.value.society.characters.find(item=>item.id===id)?.name??id
+const organizationMemberPeople=(id:string)=>{
+  const member=data.value.society.characters.find(item=>item.id===id)
+  return member ? label(member.people) : ''
+}
 const repairInputs=(inputs:Record<string,number> = {}) => Object.entries(inputs).map(([id,amount])=>`${resourceName(id)}: ${n(amount)}`).join(', ')
 const checkpointsForSite=(siteId:string)=>data.value.economy.customs_checkpoints.filter(checkpoint=>checkpoint.site_id===siteId)
 const checkpointName=(checkpointId:string)=>data.value.economy.customs_checkpoints.find(checkpoint=>checkpoint.id===checkpointId)?.id??checkpointId
@@ -27,6 +33,47 @@ const checkpointLabel=(checkpointId:string)=>{
 const dossierCategory=(category:string)=>t('dossierCategories.'+category,{default:category})
 const dossierText=(entry:{category:string;id:string;payload:Record<string,unknown>})=>{
   const payload=entry.payload
+  if(entry.category==='authority_office'){
+    const scopes=(payload.scopes as string[]).map(scope=>t('officeScopes.'+scope)).join(', ')
+    return t('dossierOffice',{institution:entityName(data.value,payload.institution_ref as EntityRef),
+      holder:entityName(data.value,payload.holder_ref as EntityRef),scopes,
+      state:t(payload.active?'officeActive':'officeInactive')})
+  }
+  if(entry.category==='current_activity'){
+    const detail=payload.kind==='travel'
+      ? placeName(String(payload.origin_id))+' → '+placeName(String(payload.destination_id))
+      : label(String(payload.skill))
+    return t('dossierCurrentActivity',{kind:label(String(payload.kind)),detail,
+      from:calendar(Number(payload.started_day)),progress:n(Number(payload.progress_days)),
+      pending:payload.due_day===null?t('practiceCyclePending'):t('activityDue',{date:calendar(Number(payload.due_day))})})
+  }
+  if(entry.category==='field_command')
+    return t('dossierFieldCommand',{column:String(payload.detachment_id),from:calendar(Number(payload.appointed_day)),
+      doctrine:payload.doctrine?String(payload.doctrine):t('none')})
+  if(entry.category==='strategic_objective')
+    return t('dossierObjective',{kind:t('objectiveKinds.'+String(payload.kind)),settlement:placeName(String(payload.settlement_id)),
+      resource:resourceName(String(payload.resource_id)),months:n(Number(payload.reserve_months))})
+  if(entry.category==='strategic_plan')
+    return t('dossierPlan',{stage:t('planStages.'+String(payload.stage)),date:calendar(Number(payload.last_review_day)),
+      objective:String(payload.objective_id),blocker:payload.blocker?String(payload.blocker):t('none')})
+  if(entry.category==='ritual_activity'){
+    const costs=Object.entries(payload.planned_cost as Record<string,number>).map(([resource,quantity])=>
+      n(quantity)+' '+(data.value.economy.resources.find(item=>item.id===resource)?.name??resource)).join(', ')
+    return t('dossierRitualActivity',{site:data.value.map.sites.find(site=>site.id===payload.site_id)?.name??String(payload.site_id),
+      role:t('riteRoles.'+String(payload.role)),costs,
+      stage:t('riteStages.'+String(payload.stage)),from:calendar(Number(payload.started_day)),until:calendar(Number(payload.due_day))})
+  }
+  if(entry.category==='religious_adherence')
+    return t('dossierChosenFaith',{tradition:entityName(data.value,{kind:'organization',id:String(payload.organization_id)})})
+  if(entry.category==='religious_invitation_notices'){
+    const publisher=payload.publisher_ref as EntityRef
+    return t('dossierFaithInvitation',{tradition:entityName(data.value,publisher),until:calendar(Number(payload.expires_day))})
+  }
+  if(entry.category==='known_fact'&&payload.decision&&typeof payload.decision==='object'){
+    const choice=payload.decision as Record<string,unknown>
+    return String(payload.content??'')+' · '+t('decision')+': '+String(choice.action??'')
+      +(choice.selected_affordance_id?' · '+t('selectedAffordance')+': '+String(choice.selected_affordance_id):'')
+  }
   if(entry.category==='institutional_aid_notices'){
     const requesterRef=payload.requester_ref
     const requester=requesterRef&&typeof requesterRef==='object'
@@ -39,7 +86,7 @@ const dossierText=(entry:{category:string;id:string;payload:Record<string,unknow
   return String(payload.content??payload.result??payload.name??payload.kind??entry.id)
 }
 const characterHistory=computed(()=>dossier.value.filter(entry=>entry.category==='known_fact')
-  .sort((a,b)=>(b.learned_day??-1)-(a.learned_day??-1)||b.id.localeCompare(a.id)).slice(0,10))
+  .sort((a,b)=>(b.learned_day??-1)-(a.learned_day??-1)||b.id.localeCompare(a.id)))
 const nonFactDossier=computed(()=>dossier.value.filter(entry=>entry.category!=='known_fact'))
 const defensePlans=computed(()=>polity.value ? data.value.governance.plans.flatMap(plan=>{
   const objective=data.value.governance.objectives.find(item=>item.id===plan.objective_id)
@@ -49,7 +96,7 @@ const defensePlans=computed(()=>polity.value ? data.value.governance.plans.flatM
 const currentMilitaryOffices=computed(()=>polity.value ? data.value.governance.offices.filter(office=>
   office.institution_ref.kind==='polity' && office.institution_ref.id===polity.value!.id
   && (office.scopes.includes('policy') || office.scopes.includes('operations'))
-  && office.starts_day<=data.value.world.day && (office.ends_day===null || office.ends_day>=data.value.world.day)
+  && office.starts_day<=data.value.world.day && (office.ends_day===null || office.ends_day>data.value.world.day)
 ) : [])
 const detachmentCommand=computed(()=>detachment.value ? data.value.campaigns.commands.find(item=>item.detachment_id===detachment.value!.id) : undefined)
 const detachmentPlan=computed(()=>detachment.value ? data.value.governance.plans.find(plan=>plan.detachment_id===detachment.value!.id) : undefined)
@@ -80,7 +127,7 @@ const fieldBattles=computed(()=>{
     <div class="inspector-body">
       <SupplyPlans v-if="tab==='reserves'" />
       <IncomePanel v-if="tab==='finances'" />
-      <ResearchPanel v-if="tab==='research'" />
+      <ResearchPanel v-if="tab==='research'" @inspect="select" />
       <DiplomacyPanel v-if="tab==='diplomacy'" />
       <MigrationPanel v-if="tab==='migrations'" />
       <WorkforcePanel v-if="tab==='workforce'" />
@@ -114,7 +161,7 @@ const fieldBattles=computed(()=>{
               <tbody><tr v-for="id in Object.keys(market.prices)" :key="id"><td>{{resourceName(id)}}</td><td>{{n(market.observed_supply?.[id]??0)}}</td><td>{{n(market.observed_demand?.[id]??0)}}</td><td>{{n(market.prices[id])}}</td></tr></tbody>
             </table>
           </template>
-          <h3>{{t('groups')}}</h3><div v-for="g in groups" :key="g.id" class="list-row"><span>{{label(g.people)}} · {{label(g.occupation)}}</span><strong>{{n(g.count)}}</strong></div>
+          <h3>{{t('groups')}}</h3><div v-for="g in groups" :key="g.id" class="list-row" :data-population-group="g.id"><span>{{label(g.people)}} · {{label(g.occupation)}}<small>{{t('workAgeThreshold',{age:g.maturity_years})}}</small></span><strong>{{n(g.count)}}</strong></div>
           <h3>{{t('civicProtests')}}</h3>
           <p v-if="!data.society.civic_protests.some(p=>p.settlement_id===settlement!.id)" class="muted">{{t('noCivicProtests')}}</p>
           <article v-for="protest in data.society.civic_protests.filter(p=>p.settlement_id===settlement!.id)" :key="protest.id" class="stock-card" :data-protest="protest.id">
@@ -145,6 +192,7 @@ const fieldBattles=computed(()=>{
             <button @click="source(amnesty.last_event_id)">{{t('source')}}</button>
           </article>
           <h3>{{t('sites')}}</h3><button v-for="s in localSites" :key="s.id" class="link-row" @click="select('site',s.id)">{{s.name}} <span>→</span></button>
+          <RiteExecutions :settlement-id="settlement.id" @inspect="select" />
           <h3>{{t('routes')}}</h3><button v-for="r in localRoutes" :key="r.route.id" class="link-row" @click="select('route',r.route.id)">{{label(r.route.mode)}} · {{n(r.operational_capacity)}} {{t('bulkDay')}} <span>→</span></button>
         </template>
         <template v-else-if="polity">
@@ -180,6 +228,22 @@ const fieldBattles=computed(()=>{
         <template v-else-if="organization">
           <p class="eyebrow">{{t('organizations')}} · {{label(organization.kind)}}</p><h2>{{organization.name}}</h2>
           <button class="link-row" @click="select('settlement',organization.seat_id)">{{t('seat')}}: {{placeName(organization.seat_id)}} →</button>
+          <template v-if="organization.doctrine.length">
+            <h3>{{t('religiousDoctrine')}}</h3>
+            <p class="muted">{{t('religiousBeliefHelp')}}</p>
+            <p v-for="belief in organization.doctrine" :key="belief">{{belief}}</p>
+            <h3>{{t('religiousAdherence')}}</h3>
+            <article v-for="adherence in organizationAdherences" :key="adherence.id" :data-adherence="adherence.id">
+              <p>{{entityName(data,adherence.actor_ref)}} · {{calendar(adherence.joined_day)}}</p>
+              <button @click="source(adherence.last_event_id)">{{t('source')}}</button>
+            </article>
+          </template>
+          <h3>{{t('members')}}</h3>
+          <p v-if="!organization.member_ids.length" class="muted">{{t('noMembers')}}</p>
+          <button v-for="memberId in organization.member_ids" :key="memberId" class="link-row"
+            :data-organization-member="memberId" @click="select('character',memberId)">
+            {{organizationMemberName(memberId)}} · {{organizationMemberPeople(memberId)}} →
+          </button>
           <h3>{{t('interests')}}</h3><p v-for="interest in organization.interests" :key="interest" class="muted">{{interest}}</p>
           <h3>{{t('knownDossier')}}</h3>
           <p v-if="dossierLoading" class="muted">{{t('loadingDossier')}}</p>
@@ -196,6 +260,13 @@ const fieldBattles=computed(()=>{
         <template v-else-if="character">
           <p class="eyebrow">{{label(character.people)}} · {{character.death_day===null?t('living'):t('deceased')}}</p><h2>{{character.name}}</h2><p>{{character.age_years}} {{t('years')}}</p>
           <button class="link-row" @click="select('settlement',character.location_id)">{{placeName(character.location_id)}} →</button>
+          <h3>{{t('religiousAdherence')}}</h3>
+          <p class="muted">{{t('religiousAdherenceHelp')}}</p>
+          <article v-if="characterFaith" :data-adherence="characterFaith.id">
+            <p>{{entityName(data,{kind:'organization',id:characterFaith.organization_id})}} · {{calendar(characterFaith.joined_day)}}</p>
+            <button @click="source(characterFaith.last_event_id)">{{t('source')}}</button>
+          </article>
+          <p v-else class="muted">{{t('noDeclaredFaith')}}</p>
           <h3>{{t('motivations')}}</h3><p v-for="m in character.motivations" :key="m">{{m}}</p>
           <h3>{{t('skills')}}</h3><div v-for="(v,k) in character.skills" :key="k" class="list-row"><span>{{label(k)}}</span><strong>{{v}} / 100</strong></div>
           <h3>{{t('organizations')}}</h3><p v-for="o in data.society.organizations.filter(o=>o.member_ids.includes(character!.id))" :key="o.id">{{o.name}}</p>
@@ -226,6 +297,7 @@ const fieldBattles=computed(()=>{
         <template v-else-if="site">
           <p class="eyebrow">{{t('sites')}}</p><h2>{{site.name}}</h2><dl><dt>{{t('owner')}}</dt><dd>{{entityName(data,site.owner_ref)}}</dd><dt>{{t('maintainer')}}</dt><dd>{{entityName(data,site.maintainer_ref)}}</dd><dt>{{t('integrity')}}</dt><dd>{{n(site.integrity*100)}}%</dd><dt>{{t('activity')}}</dt><dd>{{site.enabled?t('enabled'):t('disabled')}}</dd><dt>{{t('serviceSuspended')}}</dt><dd>{{site.service_suspended?t('serviceSuspended'):t('serviceOperating')}}</dd></dl>
           <button v-if="site.last_event_id" @click="source(site.last_event_id)">{{t('source')}}</button>
+          <RiteExecutions :site-id="site.id" @inspect="select" />
           <h3>{{t('production')}}</h3><div v-for="f in data.economy.facilities.filter(f=>f.site_id===site!.id)" :key="f.id"><p>{{t('batches')}}: {{f.last_batches}} / {{f.max_batches}}</p><p>{{t('limitations')}}: {{f.last_limitations.join(', ')||t('none')}}</p><button v-if="f.last_event_id" @click="source(f.last_event_id)">{{t('source')}}</button></div>
           <template v-if="data.economy.repairs.some(r=>r.site_id===site!.id)">
             <h3>{{t('repairs')}}</h3>

@@ -264,6 +264,7 @@ def produce_monthly(world, available=None) -> None:
 
 def consume_monthly(world) -> None:
     from .consumption import purchase_monthly_rations
+    from .food_preservation import deteriorate_public_food
     from .logistics import _route_causes
     from .migration import consume_travel_provisions
     economy = world.economy
@@ -281,6 +282,11 @@ def consume_monthly(world) -> None:
         domestic, domestic_receipts = _consume_household_food(world, need.id, required_by_group)
         required = sum(required_by_group.values()) + domestic
         public_required = sum(required_by_group.values())
+        # Public stores expose only food above this cycle's subsistence reserve
+        # to the deterministic storage-loss law.  Private pantries and freight
+        # remain owned by their existing systems.
+        deteriorate_public_food(world, need, public_required)
+        stock = economy.stocks[need.stock_id]
         pool = min(public_required, stock.goods.get("food", 0))
         # Keep the affordability bottleneck explicit in the canonical reading.
         # Public stock can be abundant while a household cannot buy its share;
@@ -452,6 +458,10 @@ def apply_rite_persecution_pressure(world, settlement_id, *, interruption_event_
         deltas=(_delta("subsistence", settlement_id, "unrest", need.unrest, updated.unrest),),
         cause_ids=_causes(interruption_event_id, need.last_event_id))
     world.economy.needs[need.id] = updated.model_copy(update={"last_event_id": event.id})
+    # Residents already observing this place can perceive the changed local
+    # pressure. This creates no new observer, bulletin, movement or decision.
+    from .settlement_intelligence import refresh_existing_local_settlement_reports
+    refresh_existing_local_settlement_reports(world, settlement_id, cause_event_ids=(event.id,))
     return event
 
 

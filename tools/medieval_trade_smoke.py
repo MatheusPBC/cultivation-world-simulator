@@ -44,8 +44,11 @@ def assert_conservation(world, initial_food, initial_money):
     consumed = sum(int(d.before) - int(d.after) for e in world.events
                    if e.event_type in {"subsistence_resolved", "household_purchase_completed"}
                    for d in e.deltas if d.owner_kind == "stock" and d.aspect == "food")
-    if food_total(world) + consumed != initial_food:
-        raise AssertionError("stock + cargo + consumed food is not conserved")
+    storage_loss = sum(int(d.before) - int(d.after) for e in world.events
+                       if e.event_type == "public_food_storage_loss"
+                       for d in e.deltas if d.owner_kind == "stock" and d.aspect == "food")
+    if food_total(world) + consumed + storage_loss != initial_food:
+        raise AssertionError("stock + cargo + consumed food + storage loss is not conserved")
     if sum(a.balance for a in world.economy.accounts.values()) != initial_money:
         raise AssertionError("money is not conserved")
 

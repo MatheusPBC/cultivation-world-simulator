@@ -195,7 +195,8 @@ async def test_unanswered_demand_can_affect_only_an_anonymous_endpoint_cohort(tm
     from types import SimpleNamespace
     from src.sim.medieval.character_rite_policy import _sponsor_situation
     sponsor_context = _sponsor_situation(
-        world, administrator, SimpleNamespace(settlement_id=settlement.id))
+        world, administrator, SimpleNamespace(settlement_id=settlement.id,
+                                              blueprint_id="rite-of-restoration"))
     assert sponsor_context["local_observation"]["recent_creature_attacks"] == [incident]
     world.clock = world.clock.advance(31)
     refresh_settlement_reports(world)

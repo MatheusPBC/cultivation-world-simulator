@@ -45,6 +45,32 @@ it('rejects incomplete research payloads at the snapshot boundary', () => {
   expect(() => acceptSnapshot(data)).toThrow('incompleto')
 })
 
+it('shows temporary evocation and navigates to its material receipt', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  data.research.manifestations = [{ id: 'manifestation:rite:1', rite_id: 'rite:1',
+    sponsor_ref: { kind: 'organization', id: 'liga-das-barcas' }, site_id: 'docas-de-portovelho',
+    started_day: 4, until_day: 16, stage: 'spent', last_event_id: 'event:7' }]
+  store.snapshot = data
+  const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
+  await panel.findAll('nav button').find(b => b.text() === 'Pesquisa')!.trigger('click')
+  const manifestation = panel.get('[data-manifestation="manifestation:rite:1"]')
+  expect(manifestation.text()).toContain('Docas de Portovelho')
+  expect(manifestation.text()).toContain('Dissipada no impacto')
+  expect(manifestation.text()).toContain('Prazo máximo')
+  expect(panel.text()).toContain('não são moradores ou estoques')
+  await manifestation.get('button').trigger('click')
+  expect(store.focusEventId).toBe('event:7')
+  panel.unmount()
+})
+
+it('rejects snapshots without the current manifestation registry', () => {
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  Object.assign(data.research, { manifestations: undefined })
+  expect(() => acceptSnapshot(data)).toThrow('incompleto')
+})
+
 it('shows recipe adaptation separately from capacity and identifies research wages', () => {
   const pinia = createPinia(); setActivePinia(pinia)
   const store = useObserverStore()

@@ -1,9 +1,11 @@
 """Pure projections of canonical state, called while the runtime owns its lock."""
 
 from .contracts import (CalendarView, CausalView, CharacterView, EconomyView, EventsView,
+                        PopulationGroupView,
                         MapView, RouteView, SettlementView, SocietyView, WorldView)
 from .errors import RuntimeProblem
 from src.classes.mechanical_language import EntityRef
+from src.classes.society.demography import MATURITY_DAYS_BY_PEOPLE
 
 
 def observatory_view(runtime):
@@ -246,7 +248,9 @@ def research_view(world):
     ]
     return ResearchView(technologies=ordered(world.research.technologies),
                         projects=ordered(world.research.projects), knowledge=ordered(world.knowledge.technologies),
-                        technology_sales=sales, rite_blueprints=rite_blueprints)
+                        technology_sales=sales, rite_blueprints=rite_blueprints,
+                        manifestations=ordered(world.research.manifestations),
+                        rites=ordered(world.research.rites), wards=ordered(world.research.wards))
 
 
 def governance_view(world):
@@ -319,14 +323,18 @@ def settlements(world):
 def society_view(world):
     characters = [CharacterView(**c.model_dump(), age_years=((c.death_day if c.death_day is not None else world.clock.absolute_day)
                                                            - c.birth_day) // 360) for c in ordered(world.society.characters)]
+    groups = [PopulationGroupView(**group.model_dump(),
+                                  maturity_years=MATURITY_DAYS_BY_PEOPLE[group.people] // 360)
+              for group in ordered(world.society.population)]
     return SocietyView(characters=characters, settlements=settlements(world), polities=ordered(world.society.polities),
-                       organizations=ordered(world.society.organizations), population_groups=ordered(world.society.population),
+                       organizations=ordered(world.society.organizations), population_groups=groups,
                        activities=ordered(world.activities), migrations=ordered(world.society.migrations),
                        workforce_transitions=ordered(world.society.workforce_transitions),
                        civic_protests=ordered(world.society.civic_protests),
                        civic_movements=ordered(world.society.civic_movements),
                        civic_strikes=ordered(world.society.civic_strikes),
-                       civic_amnesties=ordered(world.society.civic_amnesties))
+                       civic_amnesties=ordered(world.society.civic_amnesties),
+                       religious_adherences=ordered(world.society.religious_adherences))
 
 
 def _dossier_entry_key(entry):
@@ -387,11 +395,13 @@ def actor_dossier(world, actor_kind, actor_id, after=None, limit=50):
 
     entries = []
     events = world.event_index()
+    participant_receipts = {}
 
     def add(category, item):
         payload = item.model_dump(mode="json")
         event_id = payload.get("event_id") or payload.get("source_event_id") or payload.get("last_event_id")
-        learned_day = payload.get("learned_day")
+        learned_day = payload.get("learned_day", payload.get("joined_day",
+                                  payload.get("offered_day", payload.get("observed_day"))))
         entries.append(DossierEntry(category=category, id=item.id, event_id=event_id,
                                     learned_day=learned_day, payload=payload))
 
@@ -402,6 +412,52 @@ def actor_dossier(world, actor_kind, actor_id, after=None, limit=50):
     for item in world.knowledge.technologies.values():
         if item.owner_ref == actor:
             add("technical_knowledge", item)
+    for item in world.society.religious_adherences.values():
+        if item.actor_ref == actor:
+            add("religious_adherence", item)
+    for office in world.authority.offices.values():
+        if actor not in (office.holder_ref, office.institution_ref):
+            continue
+        holder = world.society.characters.get(office.holder_ref.id) if office.holder_ref.kind == "character" else None
+        active = (office.starts_day <= world.clock.absolute_day
+                  and (office.ends_day is None or world.clock.absolute_day < office.ends_day)
+                  and (office.holder_ref.kind != "character" or (holder is not None and holder.death_day is None)))
+        # Office records do not carry appointment receipts. Preserve that
+        # evidence limit rather than inventing a source, a thought or a plan.
+        entries.append(DossierEntry(category="authority_office", id=office.id,
+                                    payload={**office.model_dump(mode="json"), "active": active}))
+    for activity in world.activities.values():
+        if actor.kind == "character" and activity.character_id == actor.id:
+            entries.append(DossierEntry(category="current_activity", id=activity.id,
+                                        event_id=activity.decision_event_id, learned_day=activity.started_day,
+                                        payload=activity.model_dump(mode="json")))
+    for command in world.society.detachment_commands.values():
+        if actor.kind == "character" and command.character_id == actor.id:
+            add("field_command", command)
+    for rite in world.research.rites.values():
+        sponsor = rite.sponsor_ref == actor
+        officiant = actor.kind == "character" and rite.officiant_id == actor.id
+        if sponsor or officiant:
+            receipt = events.get(rite.last_event_id)
+            character = world.society.characters[actor.id] if officiant else None
+            if receipt is None or (character is not None and character.death_day is not None and receipt.day > character.death_day):
+                continue
+            # Own participation is self-knowledge; sponsorship is not permission
+            # to inspect another institution's treasury, stock or private menu.
+            payload = rite.model_dump(mode="json", exclude={"stock_id", "account_id"} if officiant else set())
+            payload["role"] = "officiant" if officiant else "sponsor"
+            payload["planned_cost"] = world.research.rite_blueprints[rite.blueprint_id].cost
+            entries.append(DossierEntry(category="ritual_activity", id=rite.id,
+                                        event_id=rite.last_event_id, learned_day=receipt.day, payload=payload))
+            if sponsor:
+                continue
+            public_owners = {("rite", rite.id), ("rite_recovery", actor.id),
+                             ("site", rite.site_id), ("ward", f"ward:{rite.id}"),
+                             ("manifestation", f"manifestation:{rite.id}")}
+            if rite.target_settlement_id is None:
+                public_owners.add(("subsistence", rite.settlement_id))
+            participant_receipts[receipt.id] = [delta.to_dict() for delta in receipt.deltas
+                                                if (delta.owner_kind, delta.owner_id) in public_owners]
     for item in world.relations.memories.values():
         if item.institution_ref == actor:
             payload = item.model_dump(mode="json")
@@ -457,8 +513,13 @@ def actor_dossier(world, actor_kind, actor_id, after=None, limit=50):
             # StateDelta is a domain dataclass, not a Pydantic model.  Use its
             # canonical wire representation so the actor-facing read model
             # remains JSON-safe after a material event reaches the dossier.
-            "deltas": [delta.to_dict() for delta in event.deltas],
+            "deltas": participant_receipts.get(event.id, [delta.to_dict() for delta in event.deltas]),
         }
+        if event.id in own_decision_ids:
+            # Exact authored choice/inaction, not a retrospective rationale.
+            # A foreign decision delivered by a notice does not become the
+            # recipient's own thought or private menu.
+            payload["decision"] = event.decision
         known_causes = [link.cause_event_id for link in event.causal_links
                         if link.cause_event_id in known_event_set]
         entries.append(DossierEntry(category="known_fact", id=f"fact:{event.id}",

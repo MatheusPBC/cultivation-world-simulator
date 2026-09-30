@@ -20,7 +20,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   boundary and must not create a second planner or mutate the published world.
   Add a focused rejection/rollback check for each new direct command.
 - Persistent `MedievalRunConfig` contains explicit seed/count/locale/policy;
-  save schema 79 (Society schema 21, economy schema 20, Knowledge schema 10, Strategy schema 3) requires the current snapshot shape and rejects incomplete
+  save schema 84 (Society schema 23, economy schema 20, Knowledge schema 12, Research schema 5, Strategy schema 3) requires the current snapshot shape and rejects incomplete
   configuration and older snapshots, preserved
   without overwrite or migration. Session IDs, pause, speed, locks and secrets
   are not saved.
@@ -174,14 +174,14 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   stop offering without erasing history; an overdue loan persists until a
   separate borrower decision repays it. Multiple households may independently
   contribute once each; a partial contribution leaves the remaining request open,
-  bounded by its original principal and expiry. Save schema 79, Economy 20 and
+  bounded by its original principal and expiry. Save schema 80, Economy 20 and
   Knowledge 10 reject older snapshots; there is no credit creation, interest,
   default, partial repayment or public manual command.
 - `ProductionPriority` can order one facility in a same-owner payroll account
   for the next boundary only after a current `production_limited` receipt proves
   that shared payroll funds bind. It changes evaluation order, not cash,
   reservation, cross-settlement worker allocation or guaranteed output. Economy
-  schema 20 and save schema 79 reject older snapshots without migration.
+  schema 20 and save schema 80 reject older snapshots without migration.
 - Institutional food aid is a prepared/direct-executor vertical. The requester
   uses only its own current causal `SettlementReport.missing_food` and selects a
   transient engine-enumerated option; the persisted notice contains only
@@ -211,7 +211,7 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   `request`; requests name only a blocked food plan, current shortfall and one
   open chain/settlement, while accept/fulfill/remediate use current valid options.
   The calendar permits request at N, reply at N+1 and fulfillment at N+2. Saves
-  older than schema 79 are rejected and preserved
+  older than schema 80 are rejected and preserved
   without migration or overwrite.
 - Additional production lines use deterministic site/recipe IDs and share their
   anchor's stock/account/workforce without replacing it. Completed construction
@@ -231,6 +231,53 @@ See `docs/specs/medieval-public-api.md` for the current contract.
   Monthly paid research reserves the named leader inside cohort labor, not an extra
   person. Application is a knowledge-gated material construction project. Teaching
   requires current bilateral consent; see docs/specs/medieval-research.md for limits.
+- Earth shaping is an authored local rite, not a free-form spell: a qualified
+  resident independently offers it after their own local site observation, then
+  the explicit owner/maintainer independently sponsors it using their own current
+  site report. Six dated days, four reagents, one crystal and two paid artisans
+  restore at most 0.10 integrity of an existing mountain pass; recovery lasts
+  three days. Conventional repair and elemental work cannot overlap. A disabled
+  or destroyed site is ineligible, and the rite never enables it. The existing
+  assembly-denial owner can interrupt this rite with reagent loss and no repair.
+  Local named residents observe only sites at their physical residence; historical
+  personal sightings remain dated knowledge after later movement.
+- Evocation is a separate finite construct owned by Research, not a renamed
+  ward or a summoned population. A resident with evocation skill 35 and own
+  local site observation offers it; the explicit aquatic transport-site owner
+  independently sponsors from its own report. Four days, six reagents, two
+  crystals and two paid artisans create a 12-day anteparo with two-day recovery.
+  One drake/serpent site impact spends it, absorbing half the registered damage
+  capped at 0.05 integrity; otherwise its agenda expires it without refund.
+  Reports observe presence/disappearance. Assembly denial prevents formation,
+  including when denial resolution coincides with completion. No extra goods,
+  population or protection at other sites is produced.
+- Religious adherence belongs to Society, separately from organization membership
+  and people identity. Aurora/Coro doctrines are declared beliefs, not physics.
+  A religious institution's diplomacy authority, available local member and own
+  recent settlement report enable one private local invitation lasting seven
+  days. Knowledge owns that invitation; only the recipient's separate current
+  decision changes its affiliation. Cohort affiliation does not decide named
+  people's faith. The direct owner commands use execute_material and preserve
+  population, money, stock, skills, authority and memberships. Invitation is a
+  monthly institutional menu choice. In AI-enabled mode a received invitation
+  wakes the recipient tomorrow: characters share their individual initiative
+  turn; groups share the daily institutional turn with work/food/migration/civic
+  alternatives. Neither wake-up nor offline policy accepts a faith. Actor context
+  shows only its own chosen affiliation and received public doctrine; prior
+  affiliation is a causal source for subsequent decisions that see that context.
+- A material rite interruption refreshes only pre-existing direct settlement
+  observers still physically present; it never creates a movement, converts a
+  group or broadcasts a private ritual contract. Their dossier can expose the
+  public local interference through the actual pressure/denial receipts, not
+  the caster, blueprint, supplies or motives. Existing civic options still need
+  the group's own decision; lifting denial neither restores spent inputs nor
+  completes an interrupted rite.
+- Observer ResearchView requires canonical `rites` and `wards` alongside the
+  authored catalogue and manifestations. The UI keeps declared doctrine separate
+  from ritual state, never treats sponsorship as an effect, and links actual
+  officiant/sponsor choices and material receipts. Religious institutions use the
+  same owned-knowledge/bilateral teaching rules as other institutions; instruction
+  neither changes faith nor grants productive capacity or goods by itself.
 - A technology-theft affordance requires a local agent, a current site report and
   sighting, plus a recent paid `production_completed` receipt for a line whose
   operating recipe requires that exact technique. Merely knowing a technique

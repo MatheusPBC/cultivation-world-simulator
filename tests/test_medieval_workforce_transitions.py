@@ -55,8 +55,21 @@ async def test_natural_food_pressure_can_improve_through_workforce_decisions():
         for delta in event.deltas) for event in world.events)
 
 
-def labour_limited_world():
+def labour_limited_world(only_people=None):
     world = create_medieval_world(73)
+    target_group_id = f"pop:campomanso:{only_people}:farmer" if only_people else None
+    if target_group_id is not None:
+        # The fixture makes the requested people cohort the first eligible
+        # recipient of the same artisan demand; earlier local cohorts remain
+        # present but are already in the target occupation.
+        for group in sorted(tuple(world.society.population.values()), key=lambda item: item.id):
+            if (group.settlement_id != "campomanso" or group.id == target_group_id
+                    or group.occupation == "artisan" or group.count < 5
+                    or group.id > target_group_id):
+                continue
+            character_ids = tuple(character.id for character in world.society.characters.values()
+                                  if character.population_group_id == group.id)
+            world.society.transfer_people(group.id, group.settlement_id, "artisan", group.count, character_ids)
     facility = world.economy.facilities["works:campos-do-lume"]
     recipe = world.economy.recipes[facility.recipe_id]
     # The site and material recipe remain canonical; only this prepared fixture
@@ -98,6 +111,44 @@ async def test_population_group_can_choose_workforce_offer_from_the_composed_tur
     assert transition.source_group_id == group.id
     assert transition.decision_event_id in {event.id for event in world.events
                                             if event.event_type == "institutional_decision_turn_decided"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("people", ("human", "elf", "dwarf", "orc"))
+async def test_each_people_can_choose_and_complete_the_same_paid_work_offer(monkeypatch, people):
+    world, group, facility, _ = labour_limited_world(only_people=people)
+    options = workforce_transition_options(world, group.id)
+    option = next(item for item in options
+                  if world.knowledge.workforce_offer_notices[item.notice_id].target_occupation == "artisan")
+    actor = EntityRef("population_group", group.id)
+    sponsor_before = world.economy.accounts[facility.payroll_account_id].balance
+
+    monkeypatch.setattr(ai_decider, "provider_available", lambda: True)
+    monkeypatch.setattr(ai_decider, "within_budget", lambda _world: True)
+    async def choose(*_args, **_kwargs):
+        return option.id
+    monkeypatch.setattr(ai_decider, "select_option", provider_selection_stub(choose))
+    _claims, covered = await review_institutional_decision_turn(world, actor, workforce_adapters())
+
+    assert covered is True
+    transition = next(iter(world.society.workforce_transitions.values()))
+    assert transition.source_group_id == group.id
+    assert world.economy.accounts[facility.payroll_account_id].balance < sponsor_before
+    decision = next(event for event in world.events if event.id == transition.decision_event_id)
+    assert decision.decision["actor_ref"] == actor.to_dict()
+    assert decision.decision["selected_affordance_id"] == option.id
+
+    source_count = world.society.population[group.id].count
+    target_id = transition.target_group_id
+    world.clock = world.clock.advance(transition.due_day - world.clock.absolute_day)
+    resolve_workforce_transitions(world, due_situations(world, transition))
+
+    assert world.society.population[group.id].count == source_count - transition.count
+    assert world.society.population[target_id].people == people
+    assert world.society.population[target_id].occupation == "artisan"
+    completed = next(event for event in world.events if event.event_type == "workforce_transition_completed"
+                     and any(delta.owner_id == target_id for delta in event.deltas))
+    assert transition.last_event_id in {link.cause_event_id for link in completed.causal_links}
 
 
 def test_local_transition_is_dated_conservative_and_causally_material(tmp_path):

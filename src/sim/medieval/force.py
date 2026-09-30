@@ -1399,8 +1399,37 @@ def _abandon_force_position(world, detachment, *, cause_ids=()):
 
 def _refresh_position_sightings(world, detachment, event):
     for standoff in tuple(world.society.force_standoffs.values()):
-        if standoff.stage == "active" and detachment.id in standoff.detachment_ids:
-            observe_force_contact_sightings(world, standoff, extra_cause_ids=(event.id,))
+        if standoff.stage != "active" or detachment.id not in standoff.detachment_ids:
+            continue
+        observation = observe_force_contact_sightings(
+            world, standoff, extra_cause_ids=(event.id,))
+        # A prepared column gets a new material menu, while its rival receives
+        # a new turn only if the bounded posture reading actually changed.
+        # Thus preparation unlocks a second independent choice without giving
+        # the opponent a fictitious or always-current signal.
+        from .force_contact_policy import schedule_contact_review
+        for notice in world.knowledge.force_contact_notices.values():
+            if (notice.standoff_id == standoff.id
+                    and (notice.own_detachment_id == detachment.id
+                         or (observation is not None and notice.last_event_id == observation.id))):
+                schedule_contact_review(world, notice, world.clock.absolute_day + 1)
+
+
+def schedule_force_contact_review_for_detachment(world, detachment, source_event):
+    """Reopen the field decision when a material change alters its menu."""
+    if (detachment is None or source_event is None
+            or source_event.event_type not in {"campaign_provisions_loaded", "siege_campaign_breached",
+                                               "settlement_occupied_after_siege", "siege_campaign_started",
+                                               "siege_campaign_progressed"}):
+        return ()
+    from .force_contact_policy import schedule_contact_review
+
+    for standoff in world.society.force_standoffs.values():
+        if standoff.stage != "active" or detachment.id not in standoff.detachment_ids:
+            continue
+        for notice in world.knowledge.force_contact_notices.values():
+            if notice.standoff_id == standoff.id and notice.own_detachment_id == detachment.id:
+                schedule_contact_review(world, notice, world.clock.absolute_day + 1)
 
 
 def resolve_force_positions(world, situations):
@@ -1428,6 +1457,8 @@ def resolve_force_positions(world, situations):
             cause_ids=_causes(position.last_event_id, detachment.last_event_id))
         world.society.force_positions[position.id] = position.model_copy(update={"stage": "prepared",
                                                                                    "last_event_id": event.id})
+        from .route_intelligence import observe_force_position_routes
+        observe_force_position_routes(world, detachment, event)
         _refresh_position_sightings(world, detachment, event)
         from .rites import observe_rites
         observe_rites(world, settlement_id=detachment.location_id)
@@ -1935,10 +1966,13 @@ def _advance(world, detachment):
             traversed = world.map.routes[traversed_route_id]
             position_region_id = next(item for item in traversed.endpoint_region_ids
                                       if item != position_region_id)
+    from .logistics import _route_causes
+    route_causes = _route_causes(world, (route_id,))[route_id]
     event = _record(world, detachment, updated,
                     "detachment_arrived" if arrived else "detachment_marched",
                     "A coluna chegou ao destino." if arrived else "A coluna avançou um trecho.",
                     deltas=tuple(movement_deltas),
+                    causes=route_causes,
                     causal_payload={"detachment_id": detachment.id,
                                     "position_region_id": (world.society.settlements[location].region_id
                                                            if arrived else position_region_id)})
@@ -1957,7 +1991,7 @@ def _advance(world, detachment):
 
 
 def _move_empty_campaign_baggage(world, detachment, location_id):
-    """The empty temporary bag follows its real column, never its cargo."""
+    """The campaign bag and allowed carried ordnance follow the real column."""
     from .campaign_supply import campaign_baggage_ready_for_departure, campaign_stock_id
 
     stock = world.economy.stocks.get(campaign_stock_id(detachment.id))

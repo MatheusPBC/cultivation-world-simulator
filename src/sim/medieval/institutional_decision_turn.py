@@ -145,10 +145,12 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
                  if situation_fn is not None else _composed_situation(world, actor, by_id))
     choices = [{"id": option_id, "label": adapter.label_fn(option)}
                for option_id, (adapter, option) in sorted(by_id.items())]
+    affiliation = situation.get("religious_identity", {}).get("own_affiliation")
+    identity_causes = (affiliation["event_id"],) if affiliation else ()
     # Adapters may have no canonical evidence for an optional context field;
     # ``None`` is not a causal link and must never reach sorting or the event.
     causes = tuple(sorted({cause for adapter, option in by_id.values()
-                           for cause in adapter.causes_fn(world, option) if cause}))
+                           for cause in adapter.causes_fn(world, option) if cause} | set(identity_causes)))
     selected = await ai_decider.select_option(world, actor, situation, choices, causes=causes)
     if selected is None and not was_askable:
         return {}, False
@@ -191,7 +193,7 @@ async def review_institutional_decision_turn(world, actor, adapters, *, situatio
     decision = record_event(
         world, DECISION_EVENT_TYPE, "O ator escolheu entre opções institucionais concorrentes.",
         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-        decision=option.decision(), cause_ids=adapter.causes_fn(world, option),
+        decision=option.decision(), cause_ids=(*adapter.causes_fn(world, option), *identity_causes),
     )
     try:
         adapter.execute_fn(world, actor, option.id, decision.id)

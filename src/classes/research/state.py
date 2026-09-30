@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from src.classes.event import FactKind
 from src.classes.governance.serialization import RegistrySerialization, validate_actor
 from src.classes.mechanical_language import EntityRef
-from .models import (Apprenticeship, Rite, RiteBlueprint, RiteRecovery, TechniqueCopy, Technology,
+from .models import (Apprenticeship, Manifestation, Rite, RiteBlueprint, RiteRecovery, TechniqueCopy, Technology,
                      ResearchProject, Ward, research_terms)
 
 
@@ -16,12 +16,15 @@ class ResearchState(RegistrySerialization):
     wards: dict[str, Ward] = field(default_factory=dict)
     rite_recoveries: dict[str, RiteRecovery] = field(default_factory=dict)
     technique_copies: dict[str, TechniqueCopy] = field(default_factory=dict)
+    manifestations: dict[str, Manifestation] = field(default_factory=dict)
     registries = {'technologies': Technology, 'projects': ResearchProject,
                   'apprenticeships': Apprenticeship, 'rite_blueprints': RiteBlueprint, 'rites': Rite,
-                  'wards': Ward, 'rite_recoveries': RiteRecovery, 'technique_copies': TechniqueCopy}
-    schema_version = 3
+                  'wards': Ward, 'rite_recoveries': RiteRecovery, 'technique_copies': TechniqueCopy,
+                  'manifestations': Manifestation}
+    schema_version = 5
 
     def validate(self, world=None):
+        from src.classes.governance.knowledge import site_report_id
         super().validate(world)
         visited, visiting = set(), set()
         def visit(key):
@@ -202,6 +205,33 @@ class ResearchState(RegistrySerialization):
                     and events[link.cause_event_id].event_type == 'assembly_denied'
                     for link in event.causal_links):
                 raise ValueError('interrupted rite requires a factual assembly denial')
+            if blueprint.kind in {'earth_shaping', 'evocation'}:
+                site = world.map.infrastructure_sites[rite.site_id]
+                if (rite.due_day != rite.started_day + blueprint.days
+                        or (blueprint.kind == 'earth_shaping' and site.kind != blueprint.site_kind)
+                        or (blueprint.kind == 'evocation' and not site.water_body_ids)):
+                    raise ValueError('material rite requires its authored local target and duration')
+                # The start must cite the sponsor's own actual site observation.
+                start = next((item for item in world.events_of_type('rite_started')
+                              if any(d.owner_kind == 'rite' and d.owner_id == rite.id
+                                     for d in item.deltas)), None)
+                if start is None or not any(
+                        (source := events.get(link.cause_event_id)) is not None
+                        and source.event_type == 'site_observed'
+                        and any(d.owner_kind == 'site_report'
+                                and d.owner_id == site_report_id(rite.sponsor_ref, site.id)
+                                for d in source.deltas)
+                        for link in start.causal_links):
+                    raise ValueError('material rite requires its sponsor site observation')
+                if blueprint.kind == 'evocation' and rite.stage == 'completed':
+                    if f'manifestation:{rite.id}' not in self.manifestations:
+                        raise ValueError('completed evocation requires its actual manifestation')
+                if blueprint.kind == 'earth_shaping' and rite.stage == 'completed':
+                    changes = [d for d in event.deltas if d.owner_kind == 'site'
+                               and d.owner_id == rite.site_id and d.aspect == 'integrity']
+                    if (len(changes) != 1 or not 0 < float(changes[0].after) - float(changes[0].before)
+                            <= blueprint.integrity_gain_permille / 1000 + 1e-9):
+                        raise ValueError('earth shaping requires its bounded integrity receipt')
         for copy in self.technique_copies.values():
             if copy.technology_id not in self.technologies:
                 raise ValueError('technique copy requires a catalogued technique')
@@ -275,6 +305,43 @@ class ResearchState(RegistrySerialization):
                         or not any(d.owner_kind == 'ward' and d.owner_id == ward.id and d.aspect == 'until_day'
                                    and d.after == str(ward.until_day) for d in event.deltas)):
                     raise ValueError('a ward requires its factual receipt')
+        active_sites = set()
+        for manifestation in self.manifestations.values():
+            rite = self.rites.get(manifestation.rite_id)
+            blueprint = self.rite_blueprints.get(rite.blueprint_id) if rite else None
+            if (rite is None or blueprint is None or blueprint.kind != 'evocation'
+                    or rite.stage != 'completed' or manifestation.site_id != rite.site_id
+                    or manifestation.sponsor_ref != rite.sponsor_ref
+                    or manifestation.started_day != rite.due_day
+                    or manifestation.until_day != manifestation.started_day + blueprint.manifestation_days):
+                raise ValueError('manifestation requires its own completed evocation and finite term')
+            if manifestation.stage == 'active':
+                if manifestation.site_id in active_sites:
+                    raise ValueError('a site may hold only one active manifestation')
+                active_sites.add(manifestation.site_id)
+            if world is None:
+                continue
+            event = events.get(manifestation.last_event_id)
+            scheduled = world.agenda.get(manifestation.id)
+            if (manifestation.site_id not in world.map.infrastructure_sites or event is None
+                    or not any(d.owner_kind == 'manifestation' and d.owner_id == manifestation.id
+                               and d.aspect == 'stage' and d.after == manifestation.stage for d in event.deltas)):
+                raise ValueError('manifestation requires its own material lifetime receipt')
+            if manifestation.stage == 'active':
+                if (manifestation.until_day <= world.clock.absolute_day or scheduled is None
+                        or scheduled.kind != 'manifestation' or scheduled.due_day != manifestation.until_day
+                        or event.id != rite.last_event_id):
+                    raise ValueError('active manifestation requires its dated expiry and creation receipt')
+            elif scheduled is not None:
+                raise ValueError('a concluded manifestation cannot remain on the agenda')
+            if manifestation.stage == 'expired' and (event.event_type != 'manifestation_expired'
+                                                     or event.day != manifestation.until_day):
+                raise ValueError('manifestation expiry requires its own dated receipt')
+            if manifestation.stage == 'spent' and (event.event_type != 'creature_damaged_site'
+                    or not any(d.owner_kind == 'site' and d.owner_id == manifestation.site_id
+                               and d.aspect == 'integrity' for d in event.deltas)
+                    or rite.last_event_id not in {link.cause_event_id for link in event.causal_links}):
+                raise ValueError('spent manifestation requires its intercepted physical impact')
         for recovery in self.rite_recoveries.values():
             rite = self.rites.get(recovery.rite_id)
             if rite is None or rite.officiant_id != recovery.character_id or rite.stage == 'officiating':
@@ -299,6 +366,8 @@ class ResearchState(RegistrySerialization):
             for entry in world.agenda.to_dict():
                 if entry['kind'] == 'rite' and entry['id'] not in self.rites:
                     raise ValueError('agenda references a missing rite')
+                if entry['kind'] == 'manifestation' and entry['id'] not in self.manifestations:
+                    raise ValueError('agenda references a missing manifestation')
                 if entry['kind'] == 'rite_interruption' and entry['id'] not in world.society.assembly_denials:
                     raise ValueError('agenda references a missing assembly denial')
             for entry in world.agenda.to_dict():

@@ -132,10 +132,41 @@ def _decide(world, option):
 def _start_siege(monkeypatch, extra_food, *, dispatch_repeat_supply=True):
     world, _, _ = occupied_response_world()
     sustained = extra_food >= 12000
+    population_before = sum(group.count for group in world.society.population.values())
     source_group = max((group for group in world.society.population.values()
                         if group.settlement_id == SOURCE and group.occupation == "soldier"),
                        key=lambda group: group.count)
-    world.society.population[source_group.id] = source_group.model_copy(update={"count": 60})
+    required_people = max(0, 60 - source_group.count)
+    if required_people:
+        civilian_group = max((group for group in world.society.population.values()
+                              if group.settlement_id == SOURCE
+                              and group.people == source_group.people
+                              and group.occupation != "soldier"),
+                             key=lambda group: group.count)
+        assert civilian_group.count >= required_people
+        transfer = record_event(
+            world, "test_campaign_force_mobilized",
+            "A premissa da fixture transfere moradores existentes à coorte militar local.",
+            fact_kind=FactKind.STATE_TRANSITION,
+            causal_payload={"root_premise": {
+                "kind": "scenario_bootstrap", "domain": "persistent_campaign_chain_fixture",
+                "source_refs": [{"kind": "scenario", "id": "persistent_campaign_chain_fixture"},
+                                {"kind": "settlement", "id": SOURCE},
+                                {"kind": "population_group", "id": civilian_group.id},
+                                {"kind": "population_group", "id": source_group.id}],
+                "observed_day": world.clock.absolute_day}},
+            deltas=(_delta("population_group", civilian_group.id, "count",
+                           civilian_group.count, civilian_group.count - required_people),
+                    _delta("population_group", source_group.id, "count",
+                           source_group.count, source_group.count + required_people)))
+        world.society.population[civilian_group.id] = civilian_group.model_copy(
+            update={"count": civilian_group.count - required_people,
+                    "last_event_id": transfer.id})
+        source_group = source_group.model_copy(
+            update={"count": source_group.count + required_people,
+                    "last_event_id": transfer.id})
+        world.society.population[source_group.id] = source_group
+    assert sum(group.count for group in world.society.population.values()) == population_before
     if extra_food:
         source_stock = next(stock for stock in world.economy.stocks.values()
                             if stock.owner_ref == OWNER and stock.location_id == SOURCE)

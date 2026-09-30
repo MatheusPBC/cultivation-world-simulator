@@ -2,8 +2,10 @@
 import { useI18n } from 'vue-i18n'
 import { useResearch } from '../composables/useResearch'
 import { formatNumber as n, calendar } from '../mappers'
+import RiteExecutions from './RiteExecutions.vue'
+const emit=defineEmits<{inspect:[kind:'character'|'organization'|'polity'|'site',id:string]}>()
 const { t } = useI18n()
-const { projects, knowledge, catalog, rites, source } = useResearch()
+const { projects, knowledge, catalog, rites, manifestations, wards, source } = useResearch()
 </script>
 <template>
   <section aria-labelledby="research-title">
@@ -24,6 +26,19 @@ const { projects, knowledge, catalog, rites, source } = useResearch()
     <article v-for="k in knowledge" :key="k.id" :data-knowledge="k.id" class="stock-card">
       <h4>{{ k.technology.name }}</h4><p>{{ k.owner }} · {{ t('knowledgeChannels.' + k.channel) }}</p>
       <p class="muted">{{ calendar(k.learned_day) }}</p><button @click="source(k.event_id)">{{ t('source') }}</button>
+    </article>
+    <RiteExecutions @inspect="(kind,id)=>emit('inspect',kind,id)" />
+    <h3>{{ t('materialWards') }}</h3>
+    <article v-for="ward in wards" :key="ward.id" class="stock-card" :data-ward="ward.id">
+      <h4>{{ ward.settlement }}</h4><p>{{ ward.sponsor }} · {{ t(ward.active ? 'wardActive' : 'wardExpired') }}</p>
+      <p>{{ t('manifestationUntil') }}: {{ calendar(ward.until_day) }}</p>
+      <button @click="source(ward.last_event_id)">{{ t('source') }}</button>
+    </article>
+    <h3>{{ t('manifestations') }}</h3><p class="muted">{{ t('manifestationHelp') }}</p>
+    <article v-for="item in manifestations" :key="item.id" class="stock-card" :data-manifestation="item.id">
+      <h4>{{ item.site }}</h4><p>{{ item.owner }} · {{ t('manifestationStages.' + item.stage) }}</p>
+      <p>{{ t('manifestationUntil') }}: {{ calendar(item.until_day) }}</p>
+      <button @click="source(item.last_event_id)">{{ t('source') }}</button>
     </article>
     <details><summary>{{ t('researchCatalog') }}</summary><p class="muted">{{ t('catalogHelp') }}</p>
       <article v-for="tech in catalog" :key="tech.id" class="stock-card"><h4>{{ tech.name }}</h4>

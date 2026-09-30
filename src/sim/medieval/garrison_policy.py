@@ -29,15 +29,25 @@ def garrison_actors(world):
 
 
 def _situation(world, actor, options):
+    today = world.clock.absolute_day
+    garrisons = []
+    for option in options:
+        garrison = world.society.garrisons.get(f"garrison:{option.detachment_id}")
+        garrisons.append({
+            "id": option.id,
+            "settlement_id": option.settlement_id,
+            "detachment_id": option.detachment_id,
+            "kind": option.kind,
+            "daily_wage": option.daily_wage,
+            "stage": garrison.stage if garrison is not None else None,
+            "started_day": garrison.started_day if garrison is not None else None,
+            "days_active": (max(0, today - garrison.started_day)
+                            if garrison is not None and garrison.stage == "active" else 0),
+        })
     return {
         "you_are": actor.to_dict(),
-        "garrisons": [
-            {"id": option.id, "settlement_id": option.settlement_id,
-             "detachment_id": option.detachment_id, "kind": option.kind,
-             "daily_wage": option.daily_wage}
-            for option in options
-        ],
-        "today": world.clock.absolute_day,
+        "garrisons": garrisons,
+        "today": today,
     }
 
 

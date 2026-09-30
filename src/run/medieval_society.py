@@ -101,13 +101,16 @@ def create_medieval_society(
             personality=Personality(**{name: round(rng.random(), 3) for name in Personality.model_fields}),
             motivations=tuple(rng.sample(data["motivations"], 2)),
         )
-    for index, raw in enumerate(data["organizations"]):
+    organization_ids = [raw["id"] for raw in data["organizations"]]
+    organization_members = {organization_id: [] for organization_id in organization_ids}
+    membership_candidates = list(society.characters.values())
+    random.Random(f"{seed}:organization-membership").shuffle(membership_candidates)
+    for index, character in enumerate(membership_candidates):
+        organization_members[organization_ids[index % len(organization_ids)]].append(character.id)
+    for raw in data["organizations"]:
         organization = Organization.model_validate({
             **raw,
-            "member_ids": [
-                c.id for i, c in enumerate(society.characters.values())
-                if i % len(data["organizations"]) == index
-            ],
+            "member_ids": organization_members[raw["id"]],
         })
         if organization.id in society.organizations:
             raise ValueError("duplicate organization")

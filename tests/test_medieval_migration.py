@@ -22,10 +22,10 @@ from src.systems.calendar_scheduler import CalendarScheduler
 from tools.medieval_autonomy_smoke import ledger_resource_effects, resource_totals
 
 
-def pressured_household():
+def pressured_household(people="human"):
     world = create_medieval_world(73)
     group = next(group for group in world.society.population.values()
-                 if group.id == "pop:pedraclara:human:artisan")
+                 if group.id == f"pop:pedraclara:{people}:artisan")
     account = world.economy.accounts[f"household:{group.id}"]
     world.economy.accounts[account.id] = account.model_copy(update={"balance": 10_000})
     world.economy.stocks[f"household-stock:{group.id}"] = Stock(
@@ -113,8 +113,9 @@ def test_food_access_projection_links_active_population_reservations_without_mut
 
 
 @pytest.mark.asyncio
-async def test_known_pressure_moves_household_with_its_own_cash_and_rations(tmp_path):
-    world, group, source_account = pressured_household()
+@pytest.mark.parametrize("people", ("human", "elf", "dwarf", "orc"))
+async def test_known_pressure_moves_each_people_with_its_own_cash_and_rations(tmp_path, people):
+    world, group, source_account = pressured_household(people)
     options = migration_options(world, group.id)
     total_money = sum(account.balance for account in world.economy.accounts.values())
     total_food = sum(stock.goods.get("food", 0) for stock in world.economy.stocks.values())

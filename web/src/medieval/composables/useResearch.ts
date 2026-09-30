@@ -24,6 +24,20 @@ export function useResearch() {
     requirements: tech.prerequisites.map(id => technologies.value.get(id)?.name ?? id).join(', '),
   })))
   const rites = computed(() => data.value.research.rite_blueprints)
+  const executions = computed(() => data.value.research.rites.map(rite => ({ ...rite,
+    sponsor: entityName(data.value, rite.sponsor_ref),
+    officiant: entityName(data.value, { kind: 'character', id: rite.officiant_id }),
+    site: data.value.map.sites.find(site => site.id === rite.site_id)?.name ?? rite.site_id,
+  })))
+  const wards = computed(() => data.value.research.wards.map(ward => ({ ...ward,
+    sponsor: entityName(data.value, ward.sponsor_ref),
+    settlement: data.value.society.settlements.find(place => place.id === ward.settlement_id)?.name ?? ward.settlement_id,
+    active: ward.started_day <= data.value.world.day && data.value.world.day < ward.until_day,
+  })))
+  const manifestations = computed(() => data.value.research.manifestations.map(item => ({ ...item,
+    owner: entityName(data.value, item.sponsor_ref),
+    site: data.value.map.sites.find(site => site.id === item.site_id)?.name ?? item.site_id,
+  })))
   const source = (id: string) => { store.focusEventId = id }
-  return { projects, knowledge, catalog, rites, source }
+  return { projects, knowledge, catalog, rites, manifestations, executions, wards, source }
 }

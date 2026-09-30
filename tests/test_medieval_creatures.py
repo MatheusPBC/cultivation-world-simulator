@@ -121,6 +121,41 @@ async def test_a_river_crossing_is_perceived_and_a_tribute_settles_the_demand(tm
                and item.id in remembered for item in restored.events)
 
 
+async def test_serpent_request_and_independent_institutional_tribute_preserve_memory(tmp_path):
+    from src.sim.medieval.events import validate_history
+    world = await crossed_world()
+    identity = "creature:drake-do-lume-echo"
+    buy_across_the_river(world)
+    engine = MedievalSimulator(world)
+    for _ in range(40):
+        serpent = world.creatures.creatures[identity]
+        if serpent.condition < serpent.hunger_threshold:
+            break
+        await engine.step()
+    request = next(o for o in creature_options(world, identity)
+                   if o.kind == "request" and o.route_id == ROUTE_ID)
+    creature_decision = decide(world, request)
+    execute_creature_option(world, identity, request.id, creature_decision.id)
+    demand = next(d for d in world.creatures.demands.values() if d.creature_id == identity)
+    option = next(o for o in tribute_options(world, AUREN) if o.demand_id == demand.id)
+    before_food = total_food(world)
+    institutional_decision = decide(world, option)
+    assert creature_decision.decision["actor_ref"] != institutional_decision.decision["actor_ref"]
+    satisfied = offer_creature_tribute(world, AUREN, option.id, institutional_decision.id)
+    assert satisfied.stage == "satisfied"
+    assert total_food(world) == before_food - option.food
+    serpent = world.creatures.creatures[identity]
+    assert satisfied.last_event_id in serpent.memory_event_ids
+    assert world.map.routes[ROUTE_ID].enabled
+    assert not any(o.kind == "restrict" for o in creature_options(world, identity))
+    receipt = world.event_index()[satisfied.last_event_id]
+    assert institutional_decision.id in {link.cause_event_id for link in receipt.causal_links}
+    validate_history(world.events, world.clock.absolute_day)
+    path = tmp_path / "serpent-tribute.mws"
+    save_world(world, path)
+    assert world_snapshot(load_world(path)) == world_snapshot(world)
+
+
 async def test_partial_tribute_keeps_demand_open_and_can_be_completed():
     world = await crossed_world()
     request = pick(world, "request", route_id=ROUTE_ID)

@@ -428,6 +428,10 @@ def _damage_site(world, creature, option, decision):
     if definition is None:
         raise ValueError("creature site damage has no engine-owned hazard definition")
     resistance_profiles = ward_resistance_capabilities(world, site)
+    from .evocation import active_manifestation, spend_manifestation
+    manifestation = active_manifestation(world, site.id)
+    manifestation_deltas = ((_delta("manifestation", manifestation.id, "stage", "active", "spent"),)
+                            if manifestation is not None else ())
     after_integrity = max(0.0, before_integrity - magnitude)
     before_condition = creature.condition
     after_condition = max(0, before_condition - CONDITION_PER_SITE_DAMAGE)
@@ -445,8 +449,10 @@ def _damage_site(world, creature, option, decision):
         deltas=(_delta("site", site.id, "integrity", before_integrity, after_integrity),
                 _delta("creature", creature.id, "condition", before_condition, after_condition),
                 _delta("creature", creature.id, "damaged_site_id", None, site.id),
-                _delta("creature", creature.id, "damage_event_id", None, event_id)),
-        cause_ids=_causes(decision.id, demand.last_event_id, creature.last_event_id),
+                _delta("creature", creature.id, "damage_event_id", None, event_id),
+                *manifestation_deltas),
+        cause_ids=_causes(decision.id, demand.last_event_id, creature.last_event_id,
+                          manifestation.last_event_id if manifestation else None),
     )
     event = event.model_copy(update={"causal_payload": {
         "decision_event_id": decision.id,
@@ -464,9 +470,16 @@ def _damage_site(world, creature, option, decision):
         "hazard_resistance": {
             profile: True for profile in resistance_profiles
         } | {"standing_ward": "standing_ward" in resistance_profiles},
+        "evoked_interception": ({"manifestation_id": manifestation.id,
+                                  "raw_magnitude": definition.magnitude(1.0, tuple(site.capability_ids) + resistance_profiles),
+                                  "result_magnitude": magnitude}
+                                 if manifestation else None),
     }})
     world.events[-1] = event
     world.map.update_infrastructure_site_runtime(site.id, integrity=after_integrity, last_event_id=event.id)
+    if manifestation is not None:
+        spend_manifestation(world, manifestation, event.id)
+        world.research.validate(world)
     world.creatures.creatures[creature.id] = _remember(creature.model_copy(update={
         "condition": after_condition, "damaged_site_id": site.id,
         "damage_event_id": event.id, "last_event_id": event.id}), event.id)

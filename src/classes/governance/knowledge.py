@@ -7,7 +7,7 @@ from .models import (KnowledgeReport, DiplomaticNotice, AuthorityClaimNotice, Fi
                      CreatureTributeNotice, CreatureDamageNotice, ForceContactNotice, FieldEngagementOfferNotice,
                      FieldEngagementOutcomeNotice, CampaignSupplyNotice, SettlementPressureNotice,
                      RiteObservation, InvestigationFinding, InvestigationAccusationNotice, EspionageFinding, TechnologyTheftFinding,
-                     CivicDemandNotice, FamilyLoanNotice, TechnologySighting)
+                     CivicDemandNotice, FamilyLoanNotice, TechnologySighting, ReligiousInvitationNotice)
 from .serialization import RegistrySerialization, validate_actor
 from src.classes.causal_origin import CausalOrigin
 from src.classes.event import FactKind
@@ -194,7 +194,7 @@ def _authorizes_technology_sighting(decision, *, holder_ref, recipient_ref,
 
 @dataclass
 class KnowledgeState(RegistrySerialization):
-    schema_version = 10
+    schema_version = 12
     _registry_epoch: int = field(default=0, init=False, repr=False, compare=False)
     _registry_epochs: dict[str, int] = field(default_factory=dict, init=False, repr=False, compare=False)
     _structural_validation_epoch: int | None = field(default=None, init=False, repr=False, compare=False)
@@ -227,6 +227,7 @@ class KnowledgeState(RegistrySerialization):
     civic_demand_notices: dict[str, CivicDemandNotice] = field(default_factory=dict)
     technology_sightings: dict[str, TechnologySighting] = field(default_factory=dict)
     family_loan_notices: dict[str, FamilyLoanNotice] = field(default_factory=dict)
+    religious_invitation_notices: dict[str, ReligiousInvitationNotice] = field(default_factory=dict)
     registries = {"reports": KnowledgeReport, "technologies": TechnicalKnowledge, "notices": DiplomaticNotice,
                   "authority_claim_notices": AuthorityClaimNotice,
                   "route_reports": RouteReport, "fiscal_route_reports": FiscalRouteReport,
@@ -250,6 +251,7 @@ class KnowledgeState(RegistrySerialization):
     registries["civic_demand_notices"] = CivicDemandNotice
     registries["technology_sightings"] = TechnologySighting
     registries["family_loan_notices"] = FamilyLoanNotice
+    registries["religious_invitation_notices"] = ReligiousInvitationNotice
 
     def __post_init__(self):
         self._bind_registry_epoch()
@@ -595,6 +597,9 @@ class KnowledgeState(RegistrySerialization):
             self._validate_settlement_pressure_notice(world, events, notice)
         for observation in self.rite_observations.values():
             self._validate_rite_observation(world, events, observation)
+        for notice in self.religious_invitation_notices.values():
+            from src.sim.medieval.religion import validate_invitation
+            validate_invitation(world, notice)
         for finding in self.investigation_findings.values():
             self._validate_investigation_finding(world, events, finding)
         for notice in self.investigation_accusation_notices.values():
@@ -1380,6 +1385,11 @@ class KnowledgeState(RegistrySerialization):
         validate_actor(world, report.recipient_ref)
         validate_actor(world, report.publisher_ref)
         receipt = events.get(report.event_id)
+        if report.manifestation_id is not None:
+            manifestation = world.research.manifestations.get(report.manifestation_id)
+            if (manifestation is None or manifestation.site_id != report.site_id
+                    or not manifestation.started_day <= report.observed_day < manifestation.until_day):
+                raise ValueError("site observation requires an actual dated manifestation at that site")
         if (report.site_id not in world.map.infrastructure_sites or receipt is None
                 or report.recipient_ref != report.publisher_ref
                 or report.id != site_report_id(report.recipient_ref, report.site_id)
@@ -1391,6 +1401,13 @@ class KnowledgeState(RegistrySerialization):
                            and d.after == report.observation() for d in receipt.deltas)):
             raise ValueError("site observation requires its own typed receipt")
         if report.channel == "local_site_report":
+            if report.recipient_ref.kind == "character":
+                # A dated personal sighting survives a later journey or death.
+                # Presence is checked when the observation is emitted; today's
+                # residence cannot rewrite a historical receipt.
+                if report.recipient_ref.id not in world.society.characters:
+                    raise ValueError("local site report requires an existing person")
+                return
             group = world.society.population.get(report.recipient_ref.id)
             settlement = world.society.settlements.get(group.settlement_id) if group is not None else None
             site = world.map.infrastructure_sites[report.site_id]
@@ -1462,6 +1479,62 @@ class KnowledgeState(RegistrySerialization):
                             or site_reading.get("observed_day") != report.observed_day
                             or site_report_event.id not in direct_causes):
                         raise ValueError("local infrastructure route observation lacks a current site reading")
+                    return
+                if payload.get("kind") == "field_force_position_route_observation":
+                    source = events.get(payload.get("source_event_id"))
+                    detachment = world.society.detachments.get(payload.get("detachment_id"))
+                    position_id = payload.get("position_id")
+                    settlement = world.society.settlements.get(payload.get("settlement_id"))
+                    route = world.map.routes[report.route_id]
+                    direct_causes = {link.cause_event_id for link in receipt.causal_links}
+                    preparation = next((cause for cause in causes(source)
+                                        if cause.event_type == "force_position_preparing"), None) \
+                        if source is not None else None
+                    if (report.publisher_ref.kind != "polity" or detachment is None
+                            or detachment.owner_ref != report.publisher_ref
+                            or payload.get("actor_ref") != report.publisher_ref.to_dict()
+                            or payload.get("position_id") != f"force-position:{detachment.id}"
+                            or settlement is None
+                            or settlement.region_id not in route.endpoint_region_ids
+                            or source is None
+                            or payload.get("source_event_type") != source.event_type
+                            or source.event_type not in {"force_position_prepared", "campaign_provisions_loaded"}
+                            or source.day != report.observed_day or source.id not in direct_causes
+                            ):
+                        raise ValueError("field force-position observation lacks physical posture provenance")
+                    if source.event_type == "force_position_prepared":
+                        if (not any(delta.owner_kind == "force_position" and delta.owner_id == position_id
+                                    and delta.aspect == "stage" and delta.after == "prepared"
+                                    for delta in source.deltas)
+                                or preparation is None
+                                or not any(delta.owner_kind == "force_position" and delta.owner_id == position_id
+                                           and delta.aspect == "settlement_id" and delta.after == settlement.id
+                                           for delta in preparation.deltas)):
+                            raise ValueError("field force-position observation lacks its local settlement premise")
+                    else:
+                        loading = source.causal_payload or {}
+                        position_receipt = next((cause for cause in causes(source)
+                                                 if cause.event_type == "force_position_prepared"
+                                                 and cause.id in direct_causes), None)
+                        position_preparation = next((cause for cause in causes(position_receipt)
+                                                     if cause.event_type == "force_position_preparing"), None) \
+                            if position_receipt is not None else None
+                        if (loading.get("kind") != "campaign_baggage_loading"
+                                or loading.get("detachment_id") != detachment.id
+                                or loading.get("settlement_id") != settlement.id
+                                or loading.get("position_id") != position_id
+                                or not any(delta.owner_kind == "detachment" and delta.owner_id == detachment.id
+                                           and delta.aspect == "provisions" and delta.after > delta.before
+                                           for delta in source.deltas)
+                                or position_receipt is None
+                                or not any(delta.owner_kind == "force_position" and delta.owner_id == position_id
+                                           and delta.aspect == "stage" and delta.after == "prepared"
+                                           for delta in position_receipt.deltas)
+                                or position_preparation is None
+                                or not any(delta.owner_kind == "force_position" and delta.owner_id == position_id
+                                           and delta.aspect == "settlement_id" and delta.after == settlement.id
+                                           for delta in position_preparation.deltas)):
+                            raise ValueError("field force-position resighting lacks a local supply receipt")
                     return
                 source = events.get(payload.get("source_event_id"))
                 command_event = events.get(payload.get("command_event_id"))

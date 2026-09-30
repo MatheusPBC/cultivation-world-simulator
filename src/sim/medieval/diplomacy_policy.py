@@ -717,6 +717,12 @@ def _learning_options(world, actor):
 def _choice(option):
     if hasattr(option, "label"):
         return {"id": option.id, "label": option.label}
+    if isinstance(option, RenegotiationOption):
+        return {"id": option.id,
+                "label": "Propor um novo prazo para a obrigação conhecida que foi descumprida."}
+    if isinstance(option, PaymentRemediationOption):
+        return {"id": option.id,
+                "label": "Reparar materialmente a obrigação de pagamento conhecida que foi descumprida."}
     if option.action == DISCLOSE_TECHNOLOGY_ACTION:
         return {'id': option.id,
                 'label': f'Comunicar indício factual da técnica própria {option.technology_id}.'}

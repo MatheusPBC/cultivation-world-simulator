@@ -180,7 +180,13 @@ async def test_shortage_and_abundance_move_prices_in_opposite_bounded_steps():
     assert world.economy.markets["pedraclara"].updated_day == 30
     assert world.economy.markets["pedraclara"].observed_supply["food"] == 0
     assert world.economy.markets["pedraclara"].observed_demand["food"] == world.society.population_at("pedraclara")
-    assert world.economy.markets["portovelho"].observed_supply["food"] == 30000
+    losses = [event for event in world.events
+              if event.event_type == "public_food_storage_loss"
+              and event.causal_payload["food_storage_loss"]["stock_id"] == "stock:portovelho"]
+    assert len(losses) == 1
+    loss = losses[0].causal_payload["food_storage_loss"]
+    assert (loss["reserve_quantity"], loss["exposed_quantity"], loss["loss_quantity"]) == (2000, 28000, 140)
+    assert world.economy.markets["portovelho"].observed_supply["food"] == 30000 - loss["loss_quantity"]
 
 
 def test_market_readings_are_causal_and_survive_save_load(tmp_path):

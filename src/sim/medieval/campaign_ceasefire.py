@@ -37,7 +37,7 @@ OFFER_ACTION = "offer_campaign_ceasefire"
 RESPONSE_ACTION = "respond_campaign_ceasefire"
 FULFILL_ACTION = "fulfill_campaign_ceasefire"
 REMEDIATE_ACTION = "remediate_campaign_withdrawal"
-OFFER_WINDOW_DAYS = 1
+OFFER_WINDOW_DAYS = 3
 WITHDRAWAL_DUE_DAYS = 3
 
 
@@ -113,15 +113,33 @@ def _campaign_parts(world, campaign_id):
     return campaign, attacker, defender
 
 
-def _defender_garrison_active(world, campaign):
-    """Whether the defender still has an active duty this ceasefire can end.
+def _defender_withdrawable(world, campaign):
+    """Whether the defender still has a physical presence that can withdraw.
 
-    A collapsed garrison has no executable withdrawal: ``_withdraw_garrison``
-    only ends an ``active`` duty.  The affordance must disappear rather than
-    be offered and fail at fulfillment.
+    Siege can collapse the duty while the real detachment remains present.
+    A ceasefire can still require that force's independent physical withdrawal;
+    fulfillment ends the duty only when it is still active.
     """
     garrison = world.society.garrisons.get(campaign.defender_garrison_id)
-    return garrison is not None and garrison.stage == "active"
+    detachment = (world.society.detachments.get(garrison.detachment_id)
+                  if garrison is not None else None)
+    return (garrison is not None and garrison.stage in {"active", "collapsed"}
+            and detachment is not None and detachment.stage == "present"
+            and detachment.location_id == campaign.settlement_id)
+
+
+def _schedule_contact_reviews(world, campaign):
+    """Reopen each participant's own contact turn for reply or fulfillment."""
+    from .force_contact_policy import schedule_contact_review
+
+    garrison = world.society.garrisons.get(campaign.defender_garrison_id)
+    detachment_ids = {campaign.attacker_detachment_id}
+    if garrison is not None:
+        detachment_ids.add(garrison.detachment_id)
+    for notice in world.knowledge.force_contact_notices.values():
+        if (notice.own_detachment_id in detachment_ids
+                and notice.settlement_id == campaign.settlement_id):
+            schedule_contact_review(world, notice, world.clock.absolute_day + 1)
 
 
 def _open_offer(world, campaign_id):
@@ -156,7 +174,7 @@ def campaign_ceasefire_offer_options(world, actor):
             own_withdrawals = tuple(item for item in siege_campaign_withdrawal_options(world, actor)
                                     if item.campaign_id == campaign.id)
         elif actor == defender_detachment.owner_ref:
-            if not _defender_garrison_active(world, campaign):
+            if not _defender_withdrawable(world, campaign):
                 continue
             own_detachment = defender_detachment
             own_withdrawals = tuple(item for item in withdrawal_options(
@@ -170,7 +188,7 @@ def campaign_ceasefire_offer_options(world, actor):
                 f"{own_detachment.last_event_id}:{own_withdrawals[0].id}")
         options.append(CampaignCeasefireOffer(
             f"{base}:unilateral-self", actor, campaign.id, "unilateral_self"))
-        if campaign.phase == "sieging":
+        if campaign.phase in {"sieging", "breached"}:
             options.append(CampaignCeasefireOffer(
                 f"{base}:mutual", actor, campaign.id, "mutual"))
     return tuple(sorted(options, key=lambda item: item.id))
@@ -195,7 +213,10 @@ def offer_campaign_ceasefire(world, actor, option_id, decision_event_id):
         own_detachment, counterpart_detachment = defender, attacker
     else:
         raise ValueError("campaign ceasefire actor is not a current participant")
-    due_day = candidate.clock.absolute_day + WITHDRAWAL_DUE_DAYS
+    # The withdrawal obligation begins after the proposal window closes; this
+    # keeps its material deadline later than the offer's expiry.
+    due_day = (candidate.clock.absolute_day + OFFER_WINDOW_DAYS
+               + WITHDRAWAL_DUE_DAYS)
     clauses = [CampaignWithdrawalClause(
         debtor_ref=actor, creditor_ref=counterpart_detachment.owner_ref, due_day=due_day,
         campaign_id=campaign.id, detachment_id=own_detachment.id)]
@@ -208,6 +229,7 @@ def offer_campaign_ceasefire(world, actor, option_id, decision_event_id):
         candidate.clock.absolute_day + OFFER_WINDOW_DAYS,
         decision_event_id=decision_event_id, intent=option.decision(),
         proposal_kind="campaign_ceasefire", request_affordance_id=option.id)
+    _schedule_contact_reviews(candidate, campaign)
     candidate.relations.validate(candidate)
     candidate.knowledge.validate(candidate)
     world.__dict__.update(candidate.__dict__)
@@ -239,6 +261,12 @@ def respond_campaign_ceasefire(world, actor, option_id, decision_event_id):
         raise ValueError("campaign ceasefire response is stale or unknown")
     proposal = respond_proposal(candidate, option.proposal_id, option.response,
                                 decision_event_id=decision_event_id, intent=option.decision())
+    if proposal.status == "accepted":
+        campaign_id = next((clause.campaign_id for clause in proposal.clauses
+                            if clause.kind == "campaign_withdrawal"), None)
+        campaign = candidate.society.siege_campaigns.get(campaign_id)
+        if campaign is not None:
+            _schedule_contact_reviews(candidate, campaign)
     candidate.relations.validate(candidate)
     candidate.knowledge.validate(candidate)
     world.__dict__.update(candidate.__dict__)
@@ -267,7 +295,7 @@ def campaign_ceasefire_fulfillment_options(world, actor):
             routes = tuple(item for item in siege_campaign_withdrawal_options(world, actor)
                            if item.campaign_id == clause.campaign_id
                            and item.detachment_id == clause.detachment_id)
-        elif _defender_garrison_active(world, campaign):
+        elif _defender_withdrawable(world, campaign):
             routes = tuple(item for item in withdrawal_options(
                 world, actor, detachment_id=clause.detachment_id,
                 allow_open_campaign_supply=True, campaign_authorized=True))
@@ -315,16 +343,18 @@ def fulfill_campaign_ceasefire(world, actor, option_id, decision_event_id):
         _lapse_campaign_notices(candidate, clause.detachment_id, decision_event_id)
         garrison = next(item for item in candidate.society.garrisons.values()
                         if item.detachment_id == clause.detachment_id)
-        _withdraw_garrison(candidate, actor, GarrisonOption(
-            id=f"campaign-ceasefire-garrison:{garrison.id}:{garrison.last_event_id}",
-            actor_ref=actor, detachment_id=clause.detachment_id,
-            settlement_id=garrison.settlement_id, account_id=garrison.account_id,
-            daily_wage=0, kind="withdraw"),
-            next(item for item in candidate.events if item.id == decision_event_id))
+        if garrison.stage == "active":
+            _withdraw_garrison(candidate, actor, GarrisonOption(
+                id=f"campaign-ceasefire-garrison:{garrison.id}:{garrison.last_event_id}",
+                actor_ref=actor, detachment_id=clause.detachment_id,
+                settlement_id=garrison.settlement_id, account_id=garrison.account_id,
+                daily_wage=0, kind="withdraw"),
+                next(item for item in candidate.events if item.id == decision_event_id))
         material_event = _begin_withdrawal(candidate, actor, route, decision_event_id,
                                            selected_affordance_id=option.id)
         material_event_id = material_event.id
     conclude_obligation(candidate, obligation, "fulfilled", material_event_id)
+    _schedule_contact_reviews(candidate, candidate.society.siege_campaigns[clause.campaign_id])
     candidate.society.validate(set(candidate.map.regions), candidate)
     candidate.relations.validate(candidate)
     candidate.knowledge.validate(candidate)

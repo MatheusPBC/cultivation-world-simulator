@@ -8,6 +8,10 @@ export function useInspection() {
   const data=computed(()=>store.snapshot!)
   const settlement=computed(()=>data.value.society.settlements.find(s=>store.selection?.kind==='settlement' && s.id===store.selection.id))
   const character=computed(()=>data.value.society.characters.find(s=>store.selection?.kind==='character' && s.id===store.selection.id))
+  const characterFaith=computed(()=>data.value.society.religious_adherences.find(
+    item=>item.actor_ref.kind==='character' && item.actor_ref.id===character.value?.id))
+  const organizationAdherences=computed(()=>data.value.society.religious_adherences.filter(
+    item=>item.organization_id===organization.value?.id))
   const polity=computed(()=>data.value.society.polities.find(s=>store.selection?.kind==='polity' && s.id===store.selection.id))
   const organization=computed(()=>data.value.society.organizations.find(s=>store.selection?.kind==='organization' && s.id===store.selection.id))
   const site=computed(()=>data.value.map.sites.find(s=>store.selection?.kind==='site' && s.id===store.selection.id))
@@ -85,5 +89,5 @@ export function useInspection() {
       if(request===dossierRequest)dossierLoading.value=false
     }
   }
-  return {store,tab,data,settlement,character,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}
+  return {store,tab,data,settlement,character,characterFaith,organizationAdherences,polity,organization,site,route,detachment,routeReports,fiscalRouteReports,siteReports,groups,stocks,market,localSites,localRoutes,resourceName,polityName,placeName,select,source,entityName,dossier,dossierLoading,dossierError,dossierHasMore,loadMoreDossier}
 }

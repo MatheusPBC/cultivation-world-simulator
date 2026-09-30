@@ -26,8 +26,8 @@
     {"id": "oficios-da-serra", "name": "Companhia dos Ofícios da Serra", "kind": "merchant_guild", "seat_id": "ferroalto", "interests": ["insumos estáveis", "qualidade das ferramentas"]},
     {"id": "torre-do-ambar", "name": "Torre do Âmbar", "kind": "arcane_tower", "seat_id": "ferroalto", "interests": ["pesquisa arcana", "autonomia", "acesso a reagentes"]},
     {"id": "circulo-do-veu", "name": "Círculo do Véu", "kind": "arcane_tower", "seat_id": "salgueiro", "interests": ["conhecimento", "preservação das águas"]},
-    {"id": "ordem-da-aurora", "name": "Ordem da Aurora", "kind": "religious_order", "seat_id": "pedraclara", "interests": ["proteção dos vulneráveis", "prestígio", "cura"]},
-    {"id": "coro-das-cinzas", "name": "Coro das Cinzas", "kind": "cult", "seat_id": "cinzaverde", "interests": ["segredo", "poder ritual", "recrutamento"]}
+    {"id": "ordem-da-aurora", "name": "Ordem da Aurora", "kind": "religious_order", "seat_id": "pedraclara", "interests": ["proteção dos vulneráveis", "prestígio", "cura"], "doctrine": ["amparar os vulneráveis", "partilhar cuidado", "interpretar o Dao pela compaixão"]},
+    {"id": "coro-das-cinzas", "name": "Coro das Cinzas", "kind": "cult", "seat_id": "cinzaverde", "interests": ["segredo", "poder ritual", "recrutamento"], "doctrine": ["preservar conhecimento ritual", "honrar os mortos", "interpretar o Dao pela transformação"]}
   ],
   "first_names": ["Alda", "Beren", "Cora", "Darian", "Elira", "Fenn", "Gara", "Hadrik", "Isolde", "Joren", "Kaela", "Loran", "Mira", "Neris", "Orin"],
   "family_names": ["Valverde", "Pedralume", "Ventoforte", "Ribeira"],

@@ -1,10 +1,14 @@
-"""One authored restorative rite, performed as material work with witnesses.
+"""Authored restorative, protective, elemental and evocative work with witnesses.
 
-There is no spell language, no summoning and no magical combat here. A rite is
+There is no spell language or autonomous summoned population here. A rite is
 an institution spending its own reagents and paying its own local assistants
 while a qualified resident officiates at a capable site it owns. It relieves
 the recorded health of that settlement by a bounded amount and creates nothing
-else: no food, no money, no people, no capacity and no control.
+else: no food, no money, no people and no control. Earth shaping instead
+restores at most 0.10 integrity of a damaged local mountain pass, using the
+same independent offer, sponsorship, material costs and dated work.
+Evocation instead forms one finite-lived site construct which intercepts one
+bounded creature impact and then dissolves; it creates neither goods nor people.
 
 The rite is public where it happens: a local report says only that one is
 underway. Anyone with a supplied detachment standing there may interrupt it,
@@ -21,7 +25,7 @@ from src.classes.governance.authority import can_actor_act_for, require_authorit
 from src.classes.mechanical_language import EntityRef
 from src.classes.governance.knowledge import rite_observation_id
 from src.classes.governance.models import RiteObservation
-from src.classes.research.models import Rite, RiteRecovery, Ward
+from src.classes.research.models import Manifestation, Rite, RiteRecovery, Ward
 from src.classes.society.models import Identity
 from src.systems.calendar_agenda import ScheduledSituation
 
@@ -29,6 +33,9 @@ from .demand import reserve_quantity
 from .economy import _apply_stock, _causes, _delta, monthly_workforce
 from .events import record_event
 from .labor import settle_work
+from .infrastructure import current_observation
+from .material_execution import execute_material
+from .evocation import active_manifestation
 
 OFFER_ACTION = "offer_rite"
 SPONSOR_ACTION = "sponsor_rite"
@@ -68,6 +75,7 @@ class RiteSponsorOption:
     settlement_id: Identity
     stock_id: Identity
     account_id: Identity
+    site_report_event_id: Identity | None = None
     target_settlement_id: Identity | None = None
     route_id: Identity | None = None
 
@@ -165,10 +173,38 @@ def _reachable(world, sponsor, settlement):
             yield target_id, route_id
 
 
+def site_under_elemental_rite(world, site_id, *, excluding=None):
+    return any(rite.id != excluding and rite.site_id == site_id and rite.stage == "officiating"
+               and world.research.rite_blueprints[rite.blueprint_id].kind == "earth_shaping"
+               for rite in world.research.rites.values())
+
+
+def _elemental_site_ready(world, site, sponsor, *, excluding=None):
+    report = current_observation(world, sponsor, site.id)
+    return (site.kind == "mountain_pass" and site.owner_ref == site.maintainer_ref == sponsor
+            and site.enabled and 0 < site.integrity < 1
+            and report is not None and report.integrity == site.integrity and report.enabled == site.enabled
+            and not any(project.site_id == site.id and project.stage != "completed"
+                        for project in world.economy.repairs.values())
+            and not site_under_elemental_rite(world, site.id, excluding=excluding))
+
+
 def _sponsor_site(world, sponsor, blueprint, settlement):
     return next((site for _, site in sorted(world.map.infrastructure_sites.items())
                  if site.owner_ref == sponsor and settlement.region_id in site.region_ids
-                 and blueprint.capability_id in site.capability_ids and site.enabled and site.integrity > 0), None)
+                 and blueprint.capability_id in site.capability_ids and site.enabled and site.integrity > 0
+                 and (blueprint.kind != "earth_shaping" or _elemental_site_ready(world, site, sponsor))
+                 and (blueprint.kind != "evocation" or _evocation_site_ready(world, site, sponsor))), None)
+
+
+def _evocation_site_ready(world, site, sponsor, *, excluding=None):
+    report = current_observation(world, sponsor, site.id)
+    return (site.owner_ref == sponsor and site.water_body_ids and site.enabled and site.integrity > 0
+            and report is not None and report.integrity == site.integrity and report.enabled == site.enabled
+            and active_manifestation(world, site.id) is None
+            and not any(rite.id != excluding and rite.site_id == site.id and rite.stage == "officiating"
+                        and world.research.rite_blueprints[rite.blueprint_id].kind == "evocation"
+                        for rite in world.research.rites.values()))
 
 
 def _sponsor_holdings(world, sponsor, settlement_id):
@@ -229,7 +265,13 @@ def rite_offer_options(world, officiant_id):
             stock, account = _sponsor_holdings(world, sponsor, settlement.id)
             if site is None or stock is None or account is None:
                 continue
-            if blueprint.kind == "ward":
+            evidence = report
+            if blueprint.kind in {"earth_shaping", "evocation"}:
+                evidence = current_observation(world, EntityRef("character", character.id), site.id)
+                if evidence is None or evidence.integrity != site.integrity or not evidence.enabled:
+                    continue
+                targets = ((None, None),)
+            elif blueprint.kind == "ward":
                 # One standing protection per place; a ward heals nobody, so
                 # the local reading needs no distress at all.
                 targets = () if ward_active(world, settlement.id) is not None else ((None, None),)
@@ -240,10 +282,10 @@ def rite_offer_options(world, officiant_id):
             for target_id, route_id in targets:
                 options.append(RiteOfferOption(
                     id=(f"rite-offer:{officiant_id}:{sponsor.kind}:{sponsor.id}:{blueprint_id}:{site.id}:"
-                        f"{target_id or '-'}:{route_id or '-'}:{report.event_id}"),
+                        f"{target_id or '-'}:{route_id or '-'}:{evidence.event_id}"),
                     officiant_id=officiant_id, sponsor_ref=sponsor, blueprint_id=blueprint_id,
-                    site_id=site.id, settlement_id=settlement.id, report_id=report.id,
-                    report_event_id=report.event_id, target_settlement_id=target_id, route_id=route_id))
+                    site_id=site.id, settlement_id=settlement.id, report_id=evidence.id,
+                    report_event_id=evidence.event_id, target_settlement_id=target_id, route_id=route_id))
     return tuple(options)
 
 
@@ -310,18 +352,26 @@ def rite_sponsor_options(world, sponsor):
         if stock is None or account is None or not _affordable(world, blueprint, stock, account,
                                                                offer.settlement_id, available):
             continue
+        site_report = (current_observation(world, sponsor, offer.site_id)
+                       if blueprint.kind in {"earth_shaping", "evocation"} else None)
         options.append(RiteSponsorOption(
-            id=f"rite-sponsor:{event.id}:{stock.id}:{account.id}",
+            id=(f"rite-sponsor:{event.id}:{stock.id}:{account.id}"
+                + (f":{site_report.event_id}" if site_report else "")),
             sponsor_ref=sponsor, offer_event_id=event.id, officiant_id=offer.officiant_id,
             blueprint_id=offer.blueprint_id, site_id=offer.site_id, settlement_id=offer.settlement_id,
             stock_id=stock.id, account_id=account.id,
+            site_report_event_id=site_report.event_id if site_report else None,
             target_settlement_id=offer.target_settlement_id, route_id=offer.route_id))
     return tuple(options)
 
 
 def sponsor_rite(world, sponsor, option_id, decision_event_id):
     """Bind the rite. Nothing is consumed and no health changes at the start."""
-    candidate = deepcopy(world)
+    return execute_material(world, _sponsor_rite, sponsor, option_id, decision_event_id)
+
+
+def _sponsor_rite(world, sponsor, option_id, decision_event_id):
+    candidate = world
     decision, actor = _decision(candidate, decision_event_id, SPONSOR_ACTION)
     if actor != sponsor:
         raise ValueError("rite sponsorship has the wrong actor")
@@ -339,7 +389,7 @@ def sponsor_rite(world, sponsor, option_id, decision_event_id):
                          f"{blueprint.name}: rito iniciado; nada foi consumido nem curado ainda.",
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("rite", identity, "stage", None, "officiating"),),
-                         cause_ids=_causes(option.offer_event_id, decision.id))
+                         cause_ids=_causes(option.offer_event_id, decision.id, option.site_report_event_id))
     rite = Rite(id=identity, sponsor_ref=actor, blueprint_id=option.blueprint_id,
                 officiant_id=option.officiant_id, site_id=option.site_id, settlement_id=option.settlement_id,
                 stock_id=option.stock_id, account_id=option.account_id, started_day=day,
@@ -349,10 +399,7 @@ def sponsor_rite(world, sponsor, option_id, decision_event_id):
     candidate.research.rites[rite.id] = rite
     candidate.agenda.schedule(ScheduledSituation(rite.id, "rite", rite.due_day))
     observe_rites(candidate, settlement_id=rite.settlement_id)
-    candidate.research.validate(candidate)
-    candidate.economy.validate(candidate)
-    world.__dict__.update(candidate.__dict__)
-    return world.research.rites[rite.id]
+    return candidate.research.rites[rite.id]
 
 
 def rite_stop_options(world, actor):
@@ -486,6 +533,12 @@ def _completion_blocker(world, rite, available):
     if (site is None or site.owner_ref != rite.sponsor_ref or not site.enabled or site.integrity <= 0
             or blueprint.capability_id not in site.capability_ids):
         return "site_unavailable"
+    if blueprint.kind == "earth_shaping" and not _elemental_site_ready(
+            world, site, rite.sponsor_ref, excluding=rite.id):
+        return "site_changed"
+    if blueprint.kind == "evocation" and not _evocation_site_ready(
+            world, site, rite.sponsor_ref, excluding=rite.id):
+        return "site_changed"
     if stock is None or account is None or not _affordable(world, blueprint, stock, account,
                                                            rite.settlement_id, available):
         return "means"
@@ -534,6 +587,32 @@ def _complete(world, rite, available):
             started_day=world.clock.absolute_day, until_day=ward_until,
             resistance_capability_id=blueprint.resistance_capability_id or "standing_ward",
             last_event_id=event.id)
+    elif blueprint.kind == "evocation":
+        identity = f"manifestation:{rite.id}"
+        until_day = world.clock.absolute_day + blueprint.manifestation_days
+        report = current_observation(world, rite.sponsor_ref, rite.site_id)
+        event = _apply_stock(world, stock, goods, "rite_completed",
+                             f"{blueprint.name}: anteparo manifestado até o dia {until_day} ou seu primeiro impacto.",
+                             extra_deltas=(stage, recovery,
+                                           _delta("manifestation", identity, "stage", None, "active")),
+                             cause_ids=_causes(rite.last_event_id, rite.sponsor_decision_id,
+                                               rite.officiant_decision_id, report.event_id))
+        world.research.manifestations[identity] = Manifestation(
+            id=identity, rite_id=rite.id, sponsor_ref=rite.sponsor_ref, site_id=rite.site_id,
+            started_day=world.clock.absolute_day, until_day=until_day, last_event_id=event.id)
+        world.agenda.schedule(ScheduledSituation(identity, "manifestation", until_day))
+    elif blueprint.kind == "earth_shaping":
+        site = world.map.infrastructure_sites[rite.site_id]
+        integrity = min(1.0, site.integrity + blueprint.integrity_gain_permille / 1000)
+        report = current_observation(world, rite.sponsor_ref, rite.site_id)
+        event = _apply_stock(world, stock, goods, "rite_completed",
+                             f"{blueprint.name}: integridade de {site.name} recuperada em "
+                             f"{round((integrity - site.integrity) * 100)} pontos percentuais.",
+                             extra_deltas=(stage, recovery,
+                                           _delta("site", site.id, "integrity", site.integrity, integrity)),
+                             cause_ids=_causes(rite.last_event_id, rite.sponsor_decision_id,
+                                               rite.officiant_decision_id, report.event_id, site.last_event_id))
+        world.map.update_infrastructure_site_runtime(site.id, integrity=integrity, last_event_id=event.id)
     else:
         need = world.economy.needs[rite.target_settlement_id or rite.settlement_id]
         health = min(MAX_HEALTH, need.health + blueprint.health_gain_permille)
@@ -549,17 +628,43 @@ def _complete(world, rite, available):
                 wage=blueprint.wage_per_worker, available=available, production_event_id=event.id)
     world.research.rites[rite.id] = rite.model_copy(update={"stage": "completed", "last_event_id": event.id})
     _recover(world, rite, event.id, until)
+    if blueprint.kind == "evocation":
+        from .route_intelligence import refresh_site_reports
+        refresh_site_reports(world, site_ids=(rite.site_id,))
     return event
 
 
-def _fail(world, rite, blocker):
+def _fail(world, rite, blocker, available):
     until = _recovery_until(world, rite)
+    means_causes = ()
+    if blocker == "means":
+        blueprint = world.research.rite_blueprints[rite.blueprint_id]
+        stock = world.economy.stocks.get(rite.stock_id)
+        account = world.economy.accounts.get(rite.account_id)
+        # A contract does not reserve goods, money or local workers. When a
+        # competing execution spent them, failure must retain that real cause.
+        stock_causes = tuple(
+            stock.last_event_ids.get(resource)
+            for resource, amount in blueprint.inputs.items()
+            if stock.goods.get(resource, 0) - reserve_quantity(world, stock.id, resource) < amount
+        ) if stock else ()
+        workers_missing = _local_cohort(
+            world, rite.settlement_id, blueprint.assistant_occupation, available) < blueprint.assistants
+        means_causes = _causes(
+            *stock_causes,
+            account.last_event_id if account and account.balance < (
+                blueprint.assistants * blueprint.wage_per_worker) else None,
+            *(payroll.last_event_id for payroll in world.economy.payrolls.values()
+              if workers_missing and payroll.day == world.clock.absolute_day and any(
+                  world.society.population[group].settlement_id == rite.settlement_id
+                  and world.society.population[group].occupation == blueprint.assistant_occupation
+                  for group in payroll.workers_by_group)))
     event = record_event(world, "rite_failed",
-                         f"O rito não pôde ser concluído ({blocker}); nenhuma cura foi produzida.",
+                         f"O rito não pôde ser concluído ({blocker}); nenhum efeito foi produzido.",
                          fact_kind=FactKind.STATE_TRANSITION,
                          deltas=(_delta("rite", rite.id, "stage", "officiating", "failed"),
                                  _delta("rite_recovery", rite.officiant_id, "until_day", None, until)),
-                         cause_ids=_causes(rite.last_event_id, rite.sponsor_decision_id))
+                         cause_ids=_causes(rite.last_event_id, rite.sponsor_decision_id, *means_causes))
     world.research.rites[rite.id] = rite.model_copy(update={"stage": "failed", "last_event_id": event.id})
     _recover(world, rite, event.id, until)
     return event
@@ -568,7 +673,10 @@ def _fail(world, rite, blocker):
 def resolve_rites(world, situations):
     """Dated resolution: revalidate, then spend, pay and relieve — in that order."""
     available = monthly_workforce(world)
-    for situation in situations:
+    interrupted = set()
+    # A denial already physically established before today precedes completion.
+    # Do not let agenda ID ordering decide which simultaneous fact takes effect.
+    for situation in sorted(situations, key=lambda item: (item.kind != "rite_interruption", item.id)):
         if situation.kind == "rite_interruption":
             denial = world.society.assembly_denials.get(situation.id)
             if denial is None:
@@ -580,6 +688,7 @@ def resolve_rites(world, situations):
                 interruption = _forfeit(world, rite, "rite_interrupted",
                          "A assembleia negada impediu a conclusão do rito; os reagentes comprometidos se perderam.",
                          stage="interrupted", causes=(denial.last_event_id,))
+                interrupted.add(rite.id)
                 # The force's material denial is the cause of a bounded social
                 # consequence.  It does not create a movement or choose a
                 # response; Economy only records the pressure from which later
@@ -589,6 +698,10 @@ def resolve_rites(world, situations):
                     world, denial.settlement_id, interruption_event_id=interruption.id)
             continue
         rite = world.research.rites.get(situation.id)
+        if (situation.kind == "rite" and situation.id in interrupted
+                and rite.due_day == world.clock.absolute_day):
+            # This completion was popped with the denial, before its cancellation.
+            continue
         if (situation.kind != "rite" or rite is None or rite.stage != "officiating"
                 or rite.due_day != world.clock.absolute_day):
             raise ValueError("unknown or inconsistent dated rite")
@@ -596,4 +709,4 @@ def resolve_rites(world, situations):
         if blocker is None:
             _complete(world, rite, available)
         else:
-            _fail(world, rite, blocker)
+            _fail(world, rite, blocker, available)

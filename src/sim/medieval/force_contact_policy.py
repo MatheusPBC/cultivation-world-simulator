@@ -32,6 +32,17 @@ from .administration_concession import (
     administration_concession_offer_options, administration_concession_response_options,
     administration_transfer_fulfillment_options, fulfill_administration_transfer,
     offer_administration_concession, respond_administration_concession)
+from .campaign_ceasefire import (
+    FULFILL_ACTION as CAMPAIGN_CEASEFIRE_FULFILL_ACTION,
+    OFFER_ACTION as CAMPAIGN_CEASEFIRE_OFFER_ACTION,
+    REMEDIATE_ACTION as CAMPAIGN_CEASEFIRE_REMEDIATE_ACTION,
+    RESPONSE_ACTION as CAMPAIGN_CEASEFIRE_RESPONSE_ACTION,
+    campaign_ceasefire_fulfillment_options, campaign_ceasefire_offer_options,
+    campaign_ceasefire_response_options, campaign_withdrawal_remediation_options,
+    fulfill_campaign_ceasefire, offer_campaign_ceasefire, remediate_campaign_withdrawal,
+    respond_campaign_ceasefire)
+from .campaign_ordnance import (BOMBARD_ACTION, DISPATCH_ACTION, campaign_ordnance_options,
+                               execute_campaign_ordnance_option)
 from .siege_campaign import (OCCUPY_AFTER_BREACH_ACTION, occupy_after_siege_breach,
                               siege_occupation_options)
 from .territorial_control import (CONTROL_ACTION, WITHDRAW_CONTROL_ACTION,
@@ -81,6 +92,88 @@ def _notice_id(situation):
     return identity or None
 
 
+def _campaign_ceasefire_options(world, notice, options_fn):
+    """Keep a contact turn scoped to the campaign involving its own column."""
+    own_detachment_id = notice.own_detachment_id
+    matching_campaign_ids = {
+        campaign.id for campaign in world.society.siege_campaigns.values()
+        if campaign.settlement_id == notice.settlement_id
+        and campaign.attacker_detachment_id == own_detachment_id
+    }
+    for campaign in world.society.siege_campaigns.values():
+        garrison = world.society.garrisons.get(campaign.defender_garrison_id)
+        if (campaign.settlement_id == notice.settlement_id and garrison is not None
+                and garrison.detachment_id == own_detachment_id):
+            matching_campaign_ids.add(campaign.id)
+    options = []
+    for option in options_fn(world, notice.recipient_ref):
+        campaign_id = getattr(option, "campaign_id", None)
+        if campaign_id is None:
+            proposal = world.relations.proposals.get(getattr(option, "proposal_id", None))
+            campaign_id = next((clause.campaign_id for clause in proposal.clauses
+                                if clause.kind == "campaign_withdrawal"), None) if proposal else None
+        if campaign_id in matching_campaign_ids:
+            options.append(option)
+    return tuple(options)
+
+
+def _campaign_ceasefire_options_for_notice(world, notice):
+    return (
+        *_campaign_ceasefire_options(world, notice, campaign_ceasefire_offer_options),
+        *_campaign_ceasefire_options(world, notice, campaign_ceasefire_response_options),
+        *_campaign_ceasefire_options(world, notice, campaign_ceasefire_fulfillment_options),
+        *_campaign_ceasefire_options(world, notice, campaign_withdrawal_remediation_options),
+    )
+
+
+def _campaign_ordnance_options_for_notice(world, notice):
+    return _campaign_ceasefire_options(world, notice, campaign_ordnance_options)
+
+
+def _campaign_ordnance_causes(world, options):
+    causes = []
+    for option in options:
+        campaign = world.society.siege_campaigns.get(option.campaign_id)
+        if campaign is None:
+            continue
+        causes.append(campaign.last_event_id)
+        detachment = world.society.detachments.get(campaign.attacker_detachment_id)
+        if detachment is not None:
+            causes.append(detachment.last_event_id)
+            bag = world.economy.stocks.get(f"stock:camp:{detachment.id}")
+            if bag is not None:
+                resource_ids = ((option.resource_id,) if option.resource_id else
+                                ("artillery", "gunpowder"))
+                causes.extend(bag.last_event_ids.get(resource_id) for resource_id in resource_ids)
+        if option.source_stock_id is not None and option.resource_id is not None:
+            source = world.economy.stocks.get(option.source_stock_id)
+            if source is not None:
+                causes.append(source.last_event_ids.get(option.resource_id))
+        causes.extend(option.route_report_event_ids)
+    causes.extend(item.event_id for item in world.knowledge.technologies.values()
+                  if item.technology_id == "gunpowder"
+                  and any(item.owner_ref == option.actor_ref for option in options))
+    return tuple(dict.fromkeys(event_id for event_id in causes if event_id))
+
+
+def _campaign_ceasefire_causes(world, options):
+    causes = []
+    for option in options:
+        campaign = world.society.siege_campaigns.get(getattr(option, "campaign_id", None))
+        if campaign is not None and campaign.last_event_id:
+            causes.append(campaign.last_event_id)
+        proposal = world.relations.proposals.get(getattr(option, "proposal_id", None))
+        if proposal is not None and proposal.last_event_id:
+            causes.append(proposal.last_event_id)
+        obligation = world.relations.obligations.get(getattr(option, "obligation_id", None))
+        if obligation is not None and obligation.last_event_id:
+            causes.append(obligation.last_event_id)
+        breach_event_id = getattr(option, "breach_event_id", None)
+        if breach_event_id:
+            causes.append(breach_event_id)
+    return tuple(dict.fromkeys(causes))
+
+
 def _command_notice_id(situation):
     if situation.kind != COMMAND_REVIEW_KIND or not situation.id.startswith(_COMMAND_PREFIX):
         return None
@@ -127,6 +220,9 @@ async def _contact_turn(world, notice_id):
     notice = world.knowledge.force_contact_notices.get(notice_id)
     if notice is None:
         return False
+    observation_id = notice.last_event_id or notice.event_id
+    campaign_contact_options = _campaign_ceasefire_options_for_notice(world, notice)
+    campaign_ordnance = _campaign_ordnance_options_for_notice(world, notice)
     # Offline/test worlds may intentionally leave this optional review
     # inactive.  In AI-enabled worlds, however, an available material menu
     # must reach ``select_option`` so a missing provider or exhausted budget
@@ -139,17 +235,24 @@ async def _contact_turn(world, notice_id):
     # material turn.  Neither path is forced by the calendar.
     response = force_deescalation_response_options(world, notice.recipient_ref, notice_id=notice.id)
     concession_response = administration_concession_response_options(world, notice.recipient_ref, notice_id=notice.id)
+    campaign_responses = tuple(option for option in campaign_contact_options
+                               if option.decision()["action"] == CAMPAIGN_CEASEFIRE_RESPONSE_ACTION)
     fulfill = force_withdrawal_fulfillment_options(world, notice.recipient_ref, notice_id=notice.id)
     administration_fulfill = administration_transfer_fulfillment_options(world, notice.recipient_ref)
+    campaign_fulfillment = tuple(
+        option for option in campaign_contact_options
+        if option.decision()["action"] in {CAMPAIGN_CEASEFIRE_FULFILL_ACTION,
+                                            CAMPAIGN_CEASEFIRE_REMEDIATE_ACTION})
     engagement_join = field_engagement_join_options(world, notice.recipient_ref, notice_id=notice.id)
-    if response or concession_response:
-        options = (*response, *concession_response)
+    if response or concession_response or campaign_responses:
+        options = (*response, *concession_response, *campaign_responses)
     elif engagement_join:
+        campaign_options = campaign_contact_options
         stand_down = tuple(option for option in standoff_options(world, notice.recipient_ref)
                            if option.standoff_id == notice.standoff_id
                            and option.detachment_id == notice.own_detachment_id)
         withdraw = withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id)
-        options = (*engagement_join, *stand_down, *withdraw,
+        options = (*engagement_join, *stand_down, *withdraw, *campaign_options, *campaign_ordnance,
                    *route_interdiction_options(world, notice.recipient_ref,
                                                detachment_id=notice.own_detachment_id),
                    *settlement_investment_options(world, notice.recipient_ref,
@@ -159,8 +262,8 @@ async def _contact_turn(world, notice_id):
                    *detachment_command_options(world, notice.recipient_ref,
                                                 detachment_id=notice.own_detachment_id),
                    *sabotage_options(world, notice.recipient_ref))
-    elif administration_fulfill or fulfill:
-        options = (*administration_fulfill, *fulfill)
+    elif administration_fulfill or fulfill or campaign_fulfillment:
+        options = (*administration_fulfill, *fulfill, *campaign_fulfillment)
     else:
         stand_down = tuple(option for option in standoff_options(world, notice.recipient_ref)
                            if option.standoff_id == notice.standoff_id
@@ -168,6 +271,7 @@ async def _contact_turn(world, notice_id):
         withdraw = withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id)
         offers = force_deescalation_offer_options(world, notice.recipient_ref, notice_id=notice.id)
         concessions = administration_concession_offer_options(world, notice.recipient_ref, notice_id=notice.id)
+        campaign_options = _campaign_ceasefire_options_for_notice(world, notice)
         siege_occupations = tuple(option for option in siege_occupation_options(world, notice.recipient_ref)
                                   if option.settlement_id == notice.settlement_id)
         controls = tuple(option for option in territorial_control_options(world, notice.recipient_ref)
@@ -184,12 +288,36 @@ async def _contact_turn(world, notice_id):
                                           detachment_id=notice.own_detachment_id)
         commands = detachment_command_options(world, notice.recipient_ref,
                                                detachment_id=notice.own_detachment_id)
-        options = (*stand_down, *withdraw, *offers, *concessions, *siege_occupations, *controls, *garrisons, *positions, *engagements, *interdictions, *investments, *denials,
+        options = (*stand_down, *withdraw, *offers, *concessions, *campaign_options, *campaign_ordnance,
+                   *siege_occupations, *controls, *garrisons, *positions, *engagements, *interdictions, *investments, *denials,
                    *commands,
                    *sabotage_options(world, notice.recipient_ref))
     if not options:
         return False
     detachment = world.society.detachments[notice.own_detachment_id]
+    position = world.society.force_positions.get(f"force-position:{detachment.id}")
+    settlement = world.society.settlements.get(detachment.location_id)
+    own_garrison = world.society.garrisons.get(f"garrison:{detachment.id}")
+    local_route_ids = ({route.id for route in world.map.routes.values()
+                        if settlement is not None and settlement.region_id in route.endpoint_region_ids})
+    local_observation_ids = tuple(
+        report.event_id for report in world.knowledge.route_reports.values()
+        if report.recipient_ref == notice.recipient_ref and report.route_id in local_route_ids
+        and report.channel == "field_route_observation"
+        and 0 <= world.clock.absolute_day - report.observed_day < 30)
+    settlement_report = world.knowledge.settlement_report(notice.recipient_ref, notice.settlement_id)
+    settlement_observation_id = (settlement_report.event_id
+                                if settlement_report is not None
+                                and 0 <= world.clock.absolute_day - settlement_report.observed_day < 3
+                                else None)
+    turn_causes = tuple(dict.fromkeys(
+        event_id for event_id in (observation_id, detachment.last_event_id,
+                                  position.last_event_id if position is not None else None,
+                                  own_garrison.last_event_id if own_garrison is not None else None,
+                                  *local_observation_ids, settlement_observation_id,
+                                  *_campaign_ceasefire_causes(world, campaign_contact_options),
+                                  *_campaign_ordnance_causes(world, campaign_ordnance))
+        if event_id))
     situation = {
         "today": world.clock.absolute_day,
         "your_detachment": {
@@ -197,22 +325,56 @@ async def _contact_turn(world, notice_id):
             "settlement_id": detachment.location_id,
             "count": detachment.count,
         },
+        "your_garrison": ({
+            "stage": own_garrison.stage,
+            "started_day": own_garrison.started_day,
+            "days_active": (max(0, world.clock.absolute_day - own_garrison.started_day)
+                            if own_garrison.stage == "active" else 0),
+        } if own_garrison is not None else None),
         "armed_contact": {
             "settlement_id": notice.settlement_id,
             "rival_identity": notice.counterparty_ref.to_dict(),
             **contact_sighting_for_provider(world, notice),
         },
+        "campaign_ceasefire_options": [
+            {
+                "campaign_phase": (world.society.siege_campaigns[option.campaign_id].phase
+                                   if getattr(option, "campaign_id", None) in world.society.siege_campaigns
+                                   else None),
+                "progress_days": (world.society.siege_campaigns[option.campaign_id].progress_days
+                                  if getattr(option, "campaign_id", None) in world.society.siege_campaigns
+                                  else None),
+                "proposal_status": (world.relations.proposals[option.proposal_id].status
+                                    if getattr(option, "proposal_id", None) in world.relations.proposals
+                                    else None),
+                "obligation_status": (world.relations.obligations[option.obligation_id].status
+                                      if getattr(option, "obligation_id", None) in world.relations.obligations
+                                      else None),
+                "due_day": (world.relations.proposals[world.relations.obligations[option.obligation_id].proposal_id]
+                            .clauses[world.relations.obligations[option.obligation_id].clause_index].due_day
+                            if getattr(option, "obligation_id", None) in world.relations.obligations
+                            else None),
+            }
+            for option in campaign_contact_options
+        ],
+        "campaign_ordnance_options": [
+            {"kind": option.kind, "campaign_id": option.campaign_id,
+             "resource_id": option.resource_id, "quantity": option.quantity,
+             "source_stock_id": option.source_stock_id,
+             "route_ids": list(option.route_ids)}
+            for option in campaign_ordnance
+        ],
     }
     selected = await ai_decider.select_option(
         world, notice.recipient_ref, situation,
         [{"id": option.id, "label": _label(option)} for option in options],
-        causes=(notice.event_id,),
+        causes=turn_causes,
     )
     if selected == ai_decider.NO_ACTION:
         record_no_action_decision(
             world, "force_standoff_decided", "A instituição decidiu manter a postura diante do contato armado.",
             notice.recipient_ref, affordance_ids=(option.id for option in options),
-            cause_ids=(notice.event_id,),
+            cause_ids=turn_causes,
         )
         return False
     if selected is None:
@@ -226,7 +388,7 @@ async def _contact_turn(world, notice_id):
     decision = record_event(
         world, "force_standoff_decided", "A instituição escolheu uma opção diante do contato armado.",
         fact_kind=FactKind.DECISION, causal_origin=CausalOrigin.ACTOR_DECISION,
-        decision=option.decision(), cause_ids=(notice.event_id,),
+        decision=option.decision(), cause_ids=turn_causes,
     )
     try:
         action = option.decision()["action"]
@@ -246,6 +408,17 @@ async def _contact_turn(world, notice_id):
             respond_administration_concession(world, notice.recipient_ref, option.id, decision.id)
         elif action == ADMINISTRATION_TRANSFER_FULFILL_ACTION:
             fulfill_administration_transfer(world, notice.recipient_ref, option.id, decision.id)
+        elif action == CAMPAIGN_CEASEFIRE_OFFER_ACTION:
+            offer_campaign_ceasefire(world, notice.recipient_ref, option.id, decision.id)
+        elif action == CAMPAIGN_CEASEFIRE_RESPONSE_ACTION:
+            respond_campaign_ceasefire(world, notice.recipient_ref, option.id, decision.id)
+        elif action in {CAMPAIGN_CEASEFIRE_FULFILL_ACTION, CAMPAIGN_CEASEFIRE_REMEDIATE_ACTION}:
+            if action == CAMPAIGN_CEASEFIRE_FULFILL_ACTION:
+                fulfill_campaign_ceasefire(world, notice.recipient_ref, option.id, decision.id)
+            else:
+                remediate_campaign_withdrawal(world, notice.recipient_ref, option.id, decision.id)
+        elif action in {DISPATCH_ACTION, BOMBARD_ACTION}:
+            execute_campaign_ordnance_option(world, notice.recipient_ref, option.id, decision.id)
         elif action == OCCUPY_AFTER_BREACH_ACTION:
             occupy_after_siege_breach(world, notice.recipient_ref, option.id, decision.id)
         elif action == GARRISON_ACTION:
@@ -281,7 +454,7 @@ async def _contact_turn(world, notice_id):
         # stale provider choice instead of silently completing the turn.
         raise ProviderDecisionRequired(
             f"provider decision required for {notice.recipient_ref.kind}:{notice.recipient_ref.id}: "
-            "force contact affordance became stale"
+            f"force contact affordance became stale: {exc}"
         ) from exc
     return True
 
@@ -342,13 +515,17 @@ async def _commander_turn(world, notice_id):
 def _current_options(world, notice):
     response = force_deescalation_response_options(world, notice.recipient_ref, notice_id=notice.id)
     concession_response = administration_concession_response_options(world, notice.recipient_ref, notice_id=notice.id)
-    if response or concession_response:
-        return (*response, *concession_response)
+    campaign_responses = _campaign_ceasefire_options(
+        world, notice, campaign_ceasefire_response_options)
+    if response or concession_response or campaign_responses:
+        return (*response, *concession_response, *campaign_responses)
     engagement_join = field_engagement_join_options(world, notice.recipient_ref, notice_id=notice.id)
     if engagement_join:
+        campaign_options = _campaign_ceasefire_options_for_notice(world, notice)
+        ordnance_options = _campaign_ordnance_options_for_notice(world, notice)
         stand_down = tuple(option for option in standoff_options(world, notice.recipient_ref)
                            if option.standoff_id == notice.standoff_id and option.detachment_id == notice.own_detachment_id)
-        return (*engagement_join, *stand_down,
+        return (*engagement_join, *stand_down, *campaign_options, *ordnance_options,
                 *withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id),
                 *route_interdiction_options(world, notice.recipient_ref,
                                             detachment_id=notice.own_detachment_id),
@@ -361,14 +538,19 @@ def _current_options(world, notice):
                 *sabotage_options(world, notice.recipient_ref))
     fulfill = force_withdrawal_fulfillment_options(world, notice.recipient_ref, notice_id=notice.id)
     administration_fulfill = administration_transfer_fulfillment_options(world, notice.recipient_ref)
-    if administration_fulfill or fulfill:
-        return (*administration_fulfill, *fulfill)
+    campaign_fulfillment = (*_campaign_ceasefire_options(
+        world, notice, campaign_ceasefire_fulfillment_options),
+        *_campaign_ceasefire_options(world, notice, campaign_withdrawal_remediation_options))
+    if administration_fulfill or fulfill or campaign_fulfillment:
+        return (*administration_fulfill, *fulfill, *campaign_fulfillment)
     stand_down = tuple(option for option in standoff_options(world, notice.recipient_ref)
                        if option.standoff_id == notice.standoff_id and option.detachment_id == notice.own_detachment_id)
     return (*stand_down,
             *withdrawal_options(world, notice.recipient_ref, detachment_id=notice.own_detachment_id),
             *force_deescalation_offer_options(world, notice.recipient_ref, notice_id=notice.id),
             *administration_concession_offer_options(world, notice.recipient_ref, notice_id=notice.id),
+            *_campaign_ceasefire_options_for_notice(world, notice),
+            *_campaign_ordnance_options_for_notice(world, notice),
             *(option for option in siege_occupation_options(world, notice.recipient_ref)
               if option.settlement_id == notice.settlement_id),
             *(option for option in territorial_control_options(world, notice.recipient_ref)
@@ -408,6 +590,21 @@ def _label(option):
                 if option.response == "accept" else "Recusar a proposta de cessão administrativa.")
     if action == ADMINISTRATION_TRANSFER_FULFILL_ACTION:
         return "Ceder a administração do assentamento conforme a obrigação aceita."
+    if action == CAMPAIGN_CEASEFIRE_OFFER_ACTION:
+        return ("Propor cessar-fogo mútuo." if getattr(option, "kind", None) == "mutual"
+                else "Propor retirada unilateral da própria coluna.")
+    if action == CAMPAIGN_CEASEFIRE_RESPONSE_ACTION:
+        return ("Aceitar o cessar-fogo." if getattr(option, "response", None) == "accept"
+                else "Recusar o cessar-fogo.")
+    if action == CAMPAIGN_CEASEFIRE_FULFILL_ACTION:
+        return "Cumprir a retirada material prometida no cessar-fogo."
+    if action == CAMPAIGN_CEASEFIRE_REMEDIATE_ACTION:
+        return "Reparar a quebra do cessar-fogo retirando materialmente a coluna."
+    if action == DISPATCH_ACTION:
+        return (f"Despachar {option.quantity} unidade(s) de {option.resource_id} à bagagem "
+                f"da coluna pelo frete atual.")
+    if action == BOMBARD_ACTION:
+        return "Disparar uma peça de cerco e consumir uma carga de pólvora contra a guarnição."
     if action == OCCUPY_AFTER_BREACH_ACTION:
         return "Ocupar o assentamento após a brecha da guarnição; a administração ficará separada."
     if action == GARRISON_ACTION:

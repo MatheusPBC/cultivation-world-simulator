@@ -86,6 +86,13 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
 - `research.rite_blueprints` expõe apenas metadados derivados de cada blueprint
   (`school`, `cost`, `range`, `duration_days`); o cliente não registra nem executa
   uma árvore de feitiços.
+- `research.rites` e `research.wards` são listas obrigatórias de execuções e
+  proteções canônicas, separadas do catálogo e das doutrinas declaradas em Society.
+  Rito expõe estágio/data, decisões de oficiante/patrocinador e último receipt;
+  patrocínio ou `officiating` não confirma efeito. `completed` aponta à execução
+  material; `failed`/`interrupted` não anunciam efeito concluído. Proteção traz
+  início/prazo e receipt, e a UI distingue vigência de expiração pela data do mundo.
+  Consulta do Dao não transfere essa informação privada aos atores.
 - GET query/governance: cargos, políticas tributárias, objetivos, planos, relatórios de
   suprimento, `SiteReport`, `customs_notices` privados e relatórios datados de rotas por ator. Cada aviso alfandegário
   também expõe a `classification` engine-owned (`ordinary` ou `contraband`), derivada do catálogo do recurso e
@@ -112,6 +119,32 @@ recurso observado. DTOs não persistem nem possuem quantidades materiais.
   presentes; isso não é canal de controle para o observador.
 - GET query/research: catálogo, projetos e conhecimento técnico por instituição;
   consulta onisciente, não transferência de conhecimento entre atores.
+- Dossiê inclui `religious_adherence` somente do próprio ator e convites somente
+  do destinatário. Suas entradas mostram data de adesão/convite/observação quando
+  não houver learned_day distinto. `known_fact.payload.decision` é a escolha
+  registrada apenas quando o autor é o ator consultado; não é explicação
+  retrospectiva e não expõe menus/pensamentos privados de outras instituições.
+  O Dao pode expandir fontes completas pela query causal, sem ensinar o ator.
+- `ritual_activity` no dossiê projeta o contrato do próprio patrocinador ou
+  oficiante: papel, datas, estado, custos materiais **previstos** do catálogo e
+  receipt. Para o oficiante, omite stock/account e remove seus deltas privados do
+  known_fact associado; efeito local/estado da própria participação permanece.
+  Resultados posteriores à morte não viram conhecimento do falecido. Isso não
+  comprova consumo antecipado nem permite conhecer saúde de um alvo distante.
+  Evidence completa de custos/resultado continua na consulta causal do Dao.
+- Dossiê projeta `current_activity` somente do próprio personagem, com fonte na
+  decisão registrada, datas, habilidade/trajeto e progresso atual. `field_command`
+  mostra somente seu próprio comando e receipt de nomeação/doutrina. Objetivos e
+  planos continuam privados ao ator institucional dono; titularidade não os copia.
+  `authority_office` mostra apenas cargos do titular ou da instituição consultada,
+  com vigência derivada do intervalo [starts_day, ends_day) e titular vivo.
+  Não há receipt de nomeação nesse modelo: event_id/learned_day ficam ausentes,
+  sem atribuir uma decisão ou data de aprendizado fictícia. Histórico carregado
+  no Inspector não sofre corte silencioso de dez fatos; paginação continua no API.
+- O observatório usa o mesmo cartão de execução de rito na Pesquisa e na
+  inspeção de povoado/site. Local filtra por settlement_id/site_id canônico;
+  links permitem acompanhar oficiante/patrocinador, abrir local e as duas
+  escolhas/receipt no why. Navegação não altera filiação, conhecimento ou rito.
 - GET query/diplomacy: listas planas de propostas, obrigações e notices (o
   agrupamento por proposta/cláusula é responsabilidade do cliente); o mesmo
   payload também está no campo `diplomacy` de query/observatory. Consultas

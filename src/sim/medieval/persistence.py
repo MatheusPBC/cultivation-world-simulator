@@ -32,10 +32,9 @@ from .activities import Activity, validate_activities
 
 
 PRODUCT = "medieval-world-simulator"
-# Family-credit requests and household notices now expose the financing purpose;
-# older snapshots are rejected without migration.
-# Older saves are rejected without rewriting data.
-SCHEMA = 79
+# Per-people maturation now affects the persisted due day of pending cohorts;
+# older snapshots are rejected without migration or rewrite.
+SCHEMA = 84
 EVENT_CHUNK_SIZE = 512
 
 

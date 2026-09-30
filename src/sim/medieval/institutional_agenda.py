@@ -12,10 +12,12 @@ Deliberately outside the monthly turn: anything already in course (an
 accepted aid obligation being fulfilled or remediated, a promised teaching
 being taught or accepted, an adopted defence plan being executed).
 
-On the DAILY cadence only the recourse turn is composed here
+On the DAILY cadence recourse and received religious group invitations are composed here
 (``review_daily_institutional_turn``): it is genuinely discretionary, keyed
 by the acting polity itself, has no cross-actor dependency inside one day,
-and keeps its own family context fragment. The other daily verticals keep
+and keep their own family context fragments. A group invitation grants a dated
+shared choice over adherence and current work/food/migration/civic alternatives,
+not automatic conversion. The other daily verticals keep
 their own owners and ordering, each for its own reason: force contact and
 campaign supply answer material processes already in course; field aftermath
 and strategy-response reviews are keyed per notice/plan, not per actor;
@@ -69,8 +71,16 @@ from .force_training import training_adapters, training_options
 from .apprenticeship import apprenticeship_sponsor_adapters, apprenticeship_sponsor_options
 from .family_loans import (family_loan_adapters, family_loan_options,
                            family_loan_repayment_options, family_loan_request_options)
+from .productive_conveyance_policy import (
+    conveyance_response_adapter,
+    newly_offered_conveyance_buyers,
+    productive_conveyance_adapters,
+    productive_conveyance_actors,
+)
 
 from src.classes.mechanical_language import EntityRef
+from .religion import invitation_options, adherence_options
+from .religion_policy import GROUP_REVIEW_KIND, religion_adapters, response_actors
 
 
 def monthly_adapters(*, allow_offers=True):
@@ -94,7 +104,8 @@ def monthly_adapters(*, allow_offers=True):
             *garrison_supply_adapters(), *sabotage_adapters(),
             *training_adapters(),
             *espionage_adapters(), *bribery_adapters(), *assembly_denial_adapters(),
-            *campaign_ceasefire_adapters(), *apprenticeship_sponsor_adapters())
+            *campaign_ceasefire_adapters(), *apprenticeship_sponsor_adapters(),
+            *productive_conveyance_adapters(), *religion_adapters())
 
 
 def monthly_actors(world):
@@ -103,6 +114,7 @@ def monthly_actors(world):
     actors.update(diplomacy_actors(world))
     actors.update(technique_copy_actors(world))
     actors.update(technology_sale_actors(world))
+    actors.update(productive_conveyance_actors(world))
     actors.update(market_purchase_actors(world))
     actors.update(actor for actor in (office.institution_ref for office in world.authority.offices.values())
                   if technology_theft_options(world, actor))
@@ -199,6 +211,10 @@ def monthly_actors(world):
     # turn behind unrelated offices. Rotate each class independently: polities
     # remain first, then population groups with workforce/civic affordances,
     # then other organizations; every class still rotates fairly.
+    actors.update(EntityRef("organization", identity) for identity in world.society.organizations
+                  if invitation_options(world, EntityRef("organization", identity)))
+    actors.update(EntityRef("population_group", identity) for identity in world.society.population
+                  if adherence_options(world, EntityRef("population_group", identity)))
     polities = tuple(sorted((actor for actor in actors if actor.kind == "polity"), key=lambda ref: ref.id))
     population_groups = tuple(sorted((actor for actor in actors if actor.kind == "population_group"),
                                      key=lambda ref: ref.id))
@@ -216,6 +232,10 @@ async def review_monthly_institutional_turn(world, *, allow_offers=True):
     ``covered`` for the policies that must not ask the same institution again
     this boundary.
     """
+    previous_conveyance_proposals = {
+        event.id for event in world.events
+        if (event.decision or {}).get("action") == "propose_productive_site_conveyance"
+    }
     claims, covered_actors = await review_institutional_decision_turn_with_provider(
         world, monthly_adapters(allow_offers=allow_offers), actors=monthly_actors(world))
     if not world.config.ai_enabled:
@@ -234,17 +254,45 @@ async def review_monthly_institutional_turn(world, *, allow_offers=True):
             claims.setdefault(kind, set()).update(identities)
         if response_covered:
             covered_actors.add(seller)
+
+    # Institutional ordering keeps polities before organizations, but a
+    # productive-site seller may be an organization. Give only the polity or
+    # organization named by a fresh same-day offer its independent acceptance
+    # consultation after the seller turn, without repeating old offers.
+    response_buyers = newly_offered_conveyance_buyers(world, previous_conveyance_proposals)
+    new_proposal_ids = {
+        event.id for event in world.events
+        if event.day == world.clock.absolute_day
+        and event.id not in previous_conveyance_proposals
+        and (event.decision or {}).get("action") == "propose_productive_site_conveyance"
+    }
+    if response_buyers:
+        response_adapter = conveyance_response_adapter(new_proposal_ids)
+        for buyer in response_buyers:
+            response_claims, response_covered = await review_institutional_decision_turn(
+                world, buyer, (response_adapter,))
+            for kind, identities in response_claims.items():
+                claims.setdefault(kind, set()).update(identities)
+            if response_covered:
+                covered_actors.add(buyer)
     return claims, covered_actors
 
 
 def daily_adapters(situations):
-    return recourse_adapters() if any(item.kind == RECOURSE_REVIEW_KIND for item in situations) else ()
+    adapters = recourse_adapters() if any(item.kind == RECOURSE_REVIEW_KIND for item in situations) else ()
+    if any(item.kind == GROUP_REVIEW_KIND for item in situations):
+        # A received invitation grants a shared turn, not an exclusive religious
+        # consultation. The group can instead work, buy food, migrate or protest.
+        adapters = (*adapters, *religion_adapters(invitations=False), *workforce_adapters(),
+                    *household_provision_adapters(), *family_loan_adapters(),
+                    *migration_adapters(), *civic_adapters())
+    return adapters
 
 
 def daily_actors(world, situations):
-    if not any(item.kind == RECOURSE_REVIEW_KIND for item in situations):
-        return ()
-    actors = tuple(sorted(set(recourse_actors(world)), key=lambda actor: (actor.kind, actor.id)))
+    actors = set(recourse_actors(world)) if any(item.kind == RECOURSE_REVIEW_KIND for item in situations) else set()
+    actors.update(response_actors(world, situations))
+    actors = tuple(sorted(actors, key=lambda actor: (actor.kind, actor.id)))
     if not actors:
         return actors
     offset = world.clock.absolute_day % len(actors)

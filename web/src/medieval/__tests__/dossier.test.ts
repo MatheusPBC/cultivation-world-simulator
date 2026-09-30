@@ -7,6 +7,56 @@ import { useObserverStore } from '../stores/world'
 import type { ObservatoryView } from '../../types/medieval-api'
 import fixture from './world.json'
 
+it('explains own office and current work in Portuguese without inventing an appointment receipt', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  store.snapshot = structuredClone(fixture) as unknown as ObservatoryView
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ok:true,revision:1,data:{
+    actor_ref:{kind:'character',id:'character:001'},next_after:null,has_more:false,entries:[
+      {category:'authority_office',id:'office:own',event_id:null,learned_day:null,cause_event_ids:[],causal_depth:0,
+        payload:{institution_ref:{kind:'polity',id:'auren'},holder_ref:{kind:'character',id:'character:001'},scopes:['policy'],active:false}},
+      {category:'current_activity',id:'activity:own',event_id:'event:practice',learned_day:30,cause_event_ids:[],causal_depth:0,
+        payload:{kind:'training',skill:'diplomacy',started_day:30,progress_days:4,due_day:null}},
+    ],
+  }}))))
+  const panel = mount(Inspector,{global:{plugins:[pinia,medievalI18n]}})
+  try {
+    store.selection={kind:'character',id:'character:001'};await flushPromises()
+    const office=panel.get('[data-dossier-entry="office:own"]')
+    expect(office.text()).toContain('Mandato sem autoridade vigente')
+    expect(office.text()).toContain('Direção política')
+    expect(office.find('button').exists()).toBe(false)
+    const work=panel.get('[data-dossier-entry="activity:own"]')
+    expect(work.text()).toContain('Treinamento · Diplomacia')
+    expect(work.text()).toContain('4 dias de prática acumulados')
+    await work.get('button').trigger('click');expect(store.focusEventId).toBe('event:practice')
+  } finally {panel.unmount();vi.unstubAllGlobals()}
+})
+
+it('shows actual ritual participation, planned materials and navigable outcome without inventing a thought', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  const data = structuredClone(fixture) as unknown as ObservatoryView
+  store.snapshot = data
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, revision: 1, data: {
+    actor_ref: { kind: 'character', id: 'character:001' }, entries: [{
+      category: 'ritual_activity', id: 'rite:event:2', event_id: 'event:completion', learned_day: 35,
+      cause_event_ids: [], causal_depth: 0, payload: { site_id: data.map.sites[0]!.id, role: 'officiant',
+        stage: 'completed', started_day: 30, due_day: 35, planned_cost: { reagents: 4 } },
+    }], next_after: null, has_more: false,
+  } }))))
+  const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
+  try {
+    store.selection = { kind: 'character', id: 'character:001' }; await flushPromises()
+    const activity = panel.get('[data-dossier-entry="rite:event:2"]')
+    expect(activity.text()).toContain('Participação em rito')
+    expect(activity.text()).toContain('Oficiante')
+    expect(activity.text()).toContain('Execução material concluída')
+    expect(activity.text()).toContain('Materiais previstos: 4')
+    await activity.get('button').trigger('click'); expect(store.focusEventId).toBe('event:completion')
+  } finally { panel.unmount(); vi.unstubAllGlobals() }
+})
+
 it('loads the selected character dossier and navigates to its source event', async () => {
   const pinia = createPinia(); setActivePinia(pinia)
   const store = useObserverStore()
@@ -19,7 +69,8 @@ it('loads the selected character dossier and navigates to its source event', asy
         { category: 'known_fact', id: 'fact:event:42', event_id: 'event:42', learned_day: 30,
           cause_event_ids: [], causal_depth: 0, payload: { content: 'A ponte foi danificada.', fact_kind: 'state_transition' } },
         { category: 'known_fact', id: 'fact:event:43', event_id: 'event:43', learned_day: 60,
-          cause_event_ids: [], causal_depth: 0, payload: { content: 'Li Wen decidiu estudar a técnica.', fact_kind: 'decision' } },
+          cause_event_ids: [], causal_depth: 0, payload: { content: 'Li Wen decidiu estudar a técnica.', fact_kind: 'decision',
+            decision: { action: 'accept_religious_adherence', selected_affordance_id: 'religious-join:invitation:event:41' } } },
       ],
       next_after: null, has_more: false,
     } }))
@@ -32,6 +83,7 @@ it('loads the selected character dossier and navigates to its source event', asy
     expect.stringContaining('A ponte foi danificada.'),
   ])
   const entry = panel.get('[data-character-history="fact:event:42"]')
+  expect(panel.get('[data-character-history="fact:event:43"]').text()).toContain('Opção canônica escolhida: religious-join:invitation:event:41')
   expect(entry.text()).toContain('A ponte foi danificada.')
   await entry.get('button').trigger('click')
   expect(store.focusEventId).toBe('event:42')
@@ -76,6 +128,9 @@ it('selects an organization from governments, loads its dossier, and navigates t
   const pinia = createPinia(); setActivePinia(pinia)
   const store = useObserverStore()
   store.snapshot = structuredClone(fixture) as unknown as ObservatoryView
+  store.snapshot.society.organizations.find(item => item.id === 'casa-alvor')!.member_ids = [
+    'character:001', 'character:002',
+  ]
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     expect(url).toContain('/api/v2/query/dossier/organization/casa-alvor')
     return new Response(JSON.stringify({ ok: true, revision: 6, data: {
@@ -90,11 +145,36 @@ it('selects an organization from governments, loads its dossier, and navigates t
   await panel.get('[data-organization="casa-alvor"] button').trigger('click')
   await flushPromises()
   expect(panel.text()).toContain('Casa Alvor')
+  const members = panel.findAll('[data-organization-member]')
+  expect(members.map(item => item.text())).toEqual([
+    expect.stringContaining('Kaela Valverde · Humano'),
+    expect.stringContaining('Fenn Pedralume · Elfo'),
+  ])
   const entry = panel.get('[data-dossier-entry="fact:event:organization"]')
   expect(entry.text()).toContain('pedido de proteção')
   await entry.get('button').trigger('click')
   expect(store.focusEventId).toBe('event:organization')
   panel.unmount(); vi.unstubAllGlobals()
+})
+
+it('explains the people-specific work-entry age in settlement population groups', async () => {
+  const pinia = createPinia(); setActivePinia(pinia)
+  const store = useObserverStore()
+  store.snapshot = structuredClone(fixture) as unknown as ObservatoryView
+  const ages = { human: 15, elf: 25, dwarf: 20, orc: 12 }
+  for (const group of store.snapshot.society.population_groups) {
+    group.maturity_years = ages[group.people]
+  }
+
+  const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
+  await panel.findAll('.inspector-tabs button')[3]!.trigger('click')
+  const settlement = panel.findAll('button.link-row').find(button => button.text().includes('Campomanso'))
+  expect(settlement).toBeDefined()
+  await settlement!.trigger('click')
+  const group = store.snapshot.society.population_groups.find(item => item.settlement_id === 'campomanso'
+    && item.people === 'elf')!
+  expect(panel.get(`[data-population-group="${group.id}"]`).text()).toContain('Entrada no trabalho: 25 anos')
+  panel.unmount()
 })
 
 it('renders institutional aid notices with translated categories and canonical details', async () => {
@@ -138,6 +218,8 @@ it('loads older dossier pages without duplicating recent character history', asy
             cause_event_ids: [], causal_depth: 0, payload: { content: 'Decisão recente.', fact_kind: 'decision' } },
           { category: 'known_fact', id: 'fact:event:older', event_id: 'event:older', learned_day: 30,
             cause_event_ids: [], causal_depth: 0, payload: { content: 'Relato conhecido.', fact_kind: 'occurrence' } },
+          ...Array.from({length: 9}, (_,i)=>({category:'known_fact',id:`fact:extra:${i}`,event_id:`extra:${i}`,
+            learned_day:20-i,cause_event_ids:[],causal_depth:0,payload:{content:`Fato carregado ${i}.`}})),
         ], next_after: 'older-page-cursor', has_more: true }
     return new Response(JSON.stringify({ ok: true, revision: 7, data: {
       actor_ref: { kind: 'character', id: 'character:001' }, ...page,
@@ -146,11 +228,12 @@ it('loads older dossier pages without duplicating recent character history', asy
   const panel = mount(Inspector, { global: { plugins: [pinia, medievalI18n] } })
   store.selection = { kind: 'character', id: 'character:001' }
   await flushPromises()
-  expect(panel.findAll('[data-character-history]')).toHaveLength(2)
+  expect(panel.findAll('[data-character-history]')).toHaveLength(11)
   const loadMore = panel.findAll('button').find(button => button.text() === 'Carregar fatos anteriores')
   expect(loadMore).toBeTruthy()
   await loadMore!.trigger('click'); await flushPromises()
-  expect(panel.findAll('[data-character-history]')).toHaveLength(3)
+  expect(panel.findAll('[data-character-history]')).toHaveLength(12)
+  expect(panel.get('[data-character-history="fact:event:old"]').text()).toContain('Registro anterior.')
   const nextPage = new URL(calls[1], 'http://localhost')
   expect(nextPage.searchParams.get('after')).toBe('older-page-cursor')
   expect(nextPage.searchParams.get('limit')).toBe('50')

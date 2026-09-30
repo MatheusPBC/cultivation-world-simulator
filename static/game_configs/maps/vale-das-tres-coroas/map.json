@@ -1,7 +1,7 @@
 {
   "schema_version": 6,
   "id": "vale-das-tres-coroas",
-  "version": 1,
+  "version": 2,
   "width": 24,
   "height": 16,
   "region_rows": [
@@ -1564,7 +1564,8 @@
         803
       ],
       "capability_ids": [
-        "iron_production"
+        "iron_production",
+        "volatile_mineral_extraction"
       ],
       "owner_ref": {
         "kind": "polity",

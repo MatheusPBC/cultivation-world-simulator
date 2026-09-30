@@ -21,6 +21,8 @@ def test_initial_society_has_multiple_governments_and_mixed_populations():
         assert {g.people for g in society.population.values() if g.settlement_id == settlement_id} == {
             "human", "elf", "dwarf", "orc"
         }
+    assert any(len({society.characters[member].people for member in organization.member_ids}) > 1
+               for organization in society.organizations.values())
     assert society.total_population == 10900
     assert sum(g.count for g in society.population.values()) == society.total_population
 
@@ -34,6 +36,13 @@ def test_seeded_society_serializes_without_shared_objects_or_cultivation_fields(
     assert create_medieval_society(seed=74).to_dict() != payload
     assert all("cultivation_progress" not in c for c in payload["characters"].values())
     assert all("combat" in c["skills"] and "diplomacy" in c["skills"] for c in payload["characters"].values())
+
+
+def test_pre_maturity_law_society_schema_is_rejected_without_migration():
+    payload = create_medieval_society(seed=73).to_dict()
+    payload["schema_version"] = 21
+    with pytest.raises(ValueError, match="unsupported society schema"):
+        SocietyState.from_dict(payload)
 
 
 def test_recruiting_a_named_worker_preserves_population_and_removes_the_worker():
@@ -62,6 +71,29 @@ def test_migration_changes_residence_but_does_not_duplicate_people():
     assert society.total_population == total
     assert society.population[target].settlement_id == destination
     assert society.characters[character.id].location_id == destination
+    society.validate()
+
+
+@pytest.mark.parametrize("people", ("human", "elf", "dwarf", "orc"))
+def test_each_people_keeps_identity_through_occupation_change_and_migration(people):
+    society = create_medieval_society(seed=73)
+    source_id = f"pop:pedraclara:{people}:artisan"
+    source = society.population[source_id]
+    original_total = society.total_population
+
+    worker_id = society.transfer_people(source.id, source.settlement_id, "farmer", 1)
+    worker = society.population[worker_id]
+    assert worker.people == people
+    assert worker.occupation == "farmer"
+
+    destination_id = next(settlement_id for settlement_id in society.settlements
+                          if settlement_id != source.settlement_id)
+    migrated_id = society.transfer_people(worker.id, destination_id, worker.occupation, 1)
+    migrated = society.population[migrated_id]
+    assert migrated.people == people
+    assert migrated.occupation == worker.occupation
+    assert migrated.settlement_id == destination_id
+    assert society.total_population == original_total
     society.validate()
 
 
