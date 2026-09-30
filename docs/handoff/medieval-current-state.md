@@ -758,6 +758,26 @@ sequenciais; checkpoints anuais, conservação, auditorias, save/load/continuaç
 e budgets originais. E356 encerrou diagnóstico focal; E357 só fecha com resultado
 real. Nenhum push/merge/deploy realizado nesta continuação.
 
+## E358 — Pendência de empacotamento identificada, implementação após gate — 30/09/2026
+
+Inspeção somente leitura durante E357, sem build/teste concorrente:
+`docker-compose.yml` usa `/api/v1/query/runtime/status` nos dois healthchecks;
+app Medieval só expõe `/api/health` e status em `/api/v2/query/status`.
+`deploy/Dockerfile.frontend` copia `/app/dist`, enquanto `web/vite.config.ts`
+gera `dist-medieval`. Workflow docker-smoke e teste Docker ainda usam v1.
+Essas verificações não podem produzir entrega válida do Medieval atual.
+
+Servidor atual restringe Host/Origin a localhost; docs VPS recomendam IP privado
+direto, o que não satisfaz os guards. Preparar acesso via túnel SSH ao bind
+loopback, sem abrir wildcard ou remover proteção contra comandos remotos.
+Nenhuma conexão ou mutação da VPS nesta inspeção. Solicitada autorização atual
+para publicar branch/integrar main/deploy após aprovação, com backup dos dados
+e preservação de saves sem migração automática.
+
+E358 permanece aberto e será uma frente operacional finita após E357; não
+alterar o candidato durante a medição nem declarar Docker aprovado por build
+frontend local antigo. O gate78289 segue ativo no mesmo diretório/command.
+
 ## E354.a — Mortalidade de coortes alimentadas confirmada — 30/09/2026
 
 Base3015b718, runtimec531cdad/fingerprint95543bab. Leitura direta do save
