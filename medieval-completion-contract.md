@@ -601,8 +601,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E340, validar seis meses tardios após remover os
-ciclos transacionais de Knowledge em E339 (80 testes e equivalência comprovados).
+Próximo trabalho imediato: M8, reduzir buscas repetidas de proveniência de rotas
+identificadas em E341, preservando causas e validação integral. E340 passou
+conservação/save-load/audit, mas p95 limitado 69.4166s reprovou o teto.
+E339 removeu ciclos de Knowledge com 80 testes e equivalência comprovados.
 Experimentos E338 sem ganho foram retirados; E339 não altera política de GC,
 leis materiais ou retenção histórica. Comparar estado/história e custo real.
 Não relaxar o budget; repetir as três seeds completas no novo candidato.

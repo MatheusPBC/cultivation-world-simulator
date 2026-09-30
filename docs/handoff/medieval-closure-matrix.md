@@ -408,9 +408,19 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
       80 testes focados passaram; estado, RNG e 126.201 eventos idênticos.
       Coleta geração 2: 45.930→0 objetos. Tempo 88.50→31.39s sujeito a carga;
       relatório completo, exit code do comando não recuperado após retomada.
-  - [ ] E340: continuação natural offline 2880→3060 no candidato E339,
+  - [x] E340: continuação natural offline 2880→3060 no candidato E339,
     sem alterar o save original. Seis meses medidos, conservação/save-load e
     auditoria; evidência tardia limitada, não substitui o gate final 3×3.600 dias.
+    - [x] Conservação, save/load + continuação e auditoria passaram, exit 0;
+      131.559 eventos, original intacto, sem provider real.
+    - [ ] Performance aceitável: reprovada, p95 limitado 69.4166s >35s;
+      pressão de host observada, sem atribuição exclusiva ou relaxamento.
+  - [x] E341: perfil em memória de 30 dias após o sucessor 3060, sem provider
+    ou nova física, para discriminar custo restante antes de repetir gates.
+    Exit 0, fonte intacta, 3060→3090/132.631 eventos. Cópia 18.46s, relações
+    17.70s, buscas de causas de rota 6.41s e concessões 5.69s (instrumentados,
+    cumulativos sobrepostos). Próximo recorte: somente busca de causas de rota,
+    sem substituir validação integral por cache de consulta.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

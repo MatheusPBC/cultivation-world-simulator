@@ -1,6 +1,6 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E337 reprovado / E339 ciclos transacionais — 30/09/2026
+## Situação vigente — E340 íntegro / performance reprovada — 30/09/2026
 
 - As três novas consultas autorizadas ao Codex OAuth/Luna passaram, sem
   retries: elemental, evocação e composição. Fonte preparada dia 240 permaneceu
@@ -15,7 +15,7 @@
   tornam o p95 final de 120 amostras necessariamente >35s. Encerrado somente o
   benchmark após checkpoint 2880 seguro (último progresso dia 2940), exit 143.
   Seeds 101/137 não executadas; gate completo continua devido, não aprovado.
-- E338 em execução: auditoria do checkpoint 2880 passou (`ok=true`, 125.148
+- E338 diagnóstico concluído, budget não aceito: auditoria do checkpoint 2880 passou (`ok=true`, 125.148
   eventos); 67 testes focados de cópia/engine/execução material/persistência
   passaram nos experimentos; cinco testes de cópia passaram na fonte restante.
   As duas otimizações de cópia foram rejeitadas por ausência de ganho medido.
@@ -26,8 +26,13 @@
 - E339: medição por owner e callbacks de GC confirmaram picos de coleta de
   ciclos, não custo do Map/rebind. Referência fraca do registry ao KnowledgeState
   implementada, sem alterar física, thresholds, snapshots ou retenção histórica;
-  isolamento e equivalência natural verificados. Continuação tardia E340 é o
-  próximo aceite operacional; não é gate final. Base local `6f2f913e`.
+  isolamento e equivalência natural verificados. Continuação E340 terminou,
+  mas reprovou performance; não é gate final. Base local `6f2f913e`.
+- E339 preservado no commit local `7a5425a3`. E340 terminou 2880→3060,
+  save/load com continuação equivalente até 3061, conservação e audit `ok=true`.
+  Performance limitada reprovou: p95 de seis meses 69.4166s >35s; nenhum gate
+  completo foi iniciado. E341 concluiu o perfil do sucessor; próximas correções
+  devem abordar buscas repetidas de proveniência sem enfraquecer validadores.
 
 ## E339 — Cópia por owner e ciclos de Knowledge — 30/09/2026
 
@@ -85,6 +90,55 @@ resultado `result.json` e medição de host `host-time.txt`:
 ```text
 CWS_DATA_DIR=/tmp/cws-e340-late.MZvmQB/data /usr/bin/time -v -o /tmp/cws-e340-late.MZvmQB/host-time.txt .venv/bin/python tools/medieval_autonomy_smoke.py --resume-save /tmp/cws-v1-final-e337.SdyTOb/natural-73.checkpoint-day-02880.mws --days 180 --output /tmp/cws-e340-late.MZvmQB/natural-73-day-03060.mws --progress-jsonl /tmp/cws-e340-late.MZvmQB/progress.jsonl
 ```
+
+Resultado observado exit 0: meses 28.8048, 26.3298, 47.7043, 69.4166,
+58.8059 e 38.7334s. p95 limitado 69.4166s, quatro acima de 35s, portanto
+reprovado como preflight operacional. Não é o p95 final de 120 amostras.
+Snapshot 34.701.312 bytes; save 34.3701s, load 40.2718s, RSS máximo
+2.062.680.064 bytes; elapsed do smoke 399.28s. GNU time: parede 7:04.43,
+CPU user 392.51s/system 5.07s (93% CPU), exit 0. Houve pressão externa:
+load 9.40, swap 4.095 MiB ocupados, PSI CPU some avg10 30.15 e I/O 40.80.
+Isso é contexto, não prova de que todo pico seja externo nem dispensa o teto.
+Audit iniciou após o horizonte e durante validação final de continuação; logo
+as medidas de persistência não são um benchmark exclusivamente isolado.
+
+Conservação monetária/recursos e save/load com passo adicional passaram.
+Auditoria do sucessor via `tools/medieval_causal_audit.py` exit 0,
+`audit.json` com `ok=true`, zero causas quebradas, erros de autoria/fonte,
+material sem raiz e Story/interpretação com delta. Original SHA-256 intacto.
+131.559 eventos; população 7.770, 3.160 mortes por privação acumuladas,
+saúde média 167 e unrest 693: história íntegra não equivale a economia saudável.
+Provider real: zero consultas. Nenhum push/merge/deploy ou alteração de leis.
+
+## E341 — Perfil restrito do sucessor E340 — 30/09/2026
+
+Pré-registro: profiler existente por 30 dias do save 3060, só em memória,
+sem provider, reescrita de save ou mudança de fonte. Identificar custo dominante
+após E339 antes de propor nova correção; profiler instrumentado não aprova budget.
+
+Comando executado (exit 0):
+
+```text
+CWS_DATA_DIR=/tmp/cws-e340-late.MZvmQB/data .venv/bin/python tools/medieval_checkpoint_horizon_profile.py /tmp/cws-e340-late.MZvmQB/natural-73-day-03060.mws --days 30 --profile-limit 35
+```
+
+Relatório `e341-profile.json` e stderr no mesmo diretório; 3060→3090,
+131.559→132.631 eventos, fonte intacta, nenhuma consulta provider.
+89.439704s instrumentados, 26 steps. Custos cumulativos (sobrepostos):
+transaction_copy 18.46s/35 chamadas; Relations.validate 17.70s/32;
+Economy.validate 9.51s/37; `_route_causes` 6.41s/51 (6.40675s self);
+`_commissioned_capabilities` 5.69s/26 (5.690011s self).
+Não comparar esse tempo instrumentado diretamente com teto mensal normal.
+
+Inspeção read-only confirmou duas buscas integrais evitáveis: `_route_causes`
+percorre o ledger ao contrário até achar delta de cada rota, e rotas nunca
+alteradas mantêm `pending`, varrendo toda a história; infraestrutura percorre
+todos os deltas para encontrar última concessão. Relações ainda exige verificar
+integridade inclusive de eventos centrais adulterados, portanto um cache de
+consulta não pode substituir esse validator. Próximo recorte deve limitar-se a
+proveniência de rotas, medir ganho e provar causas idênticas, sem novo owner,
+mudança de física, truncamento ou relaxamento de auditoria. Demais hotspots não
+serão reescritos juntos. M8 permanece aberto; sem push/merge/deploy.
 
 ### Estado herdado do checkpoint E336.g
 
