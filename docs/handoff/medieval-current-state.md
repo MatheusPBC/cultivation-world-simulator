@@ -1,5 +1,36 @@
 # Estado atual — Medieval World Simulator
 
+## Acesso Android — E364 — 30/09/2026
+
+Pedido explícito preservou o link antigo Xianxia exclusivo8123:
+**http://100.101.254.17:8123**, funcional dentro da tailnet. Frontend ligado
+somente a100.101.254.17 e127.0.0.1 nessa porta; backend só127.0.0.1:8002.
+Alternativa HTTPS privada: **https://vps.tail9afb74.ts.net/**, via Serve443
+→127.0.0.1:8123. Nenhum Funnel novo/firewall/credencial; endpoints7977,
+8443,9443 e svc:hermes e AllowFunnel8443 preservados byte-a-byte em valores.
+
+Commit de acesso `1bb992dd`: `CWS_OBSERVER_ORIGINS` contém somente os dois
+endereços exatos acima no override Medieval. Aplicação aceita HTTPS ts.net
+literal ou HTTP IP CGNAT literal configurado; não aceita wildcard, hosts
+parecidos, outras máquinas ts.net, origem externa ou HTTP DNS. Padrão continua
+loopback sem variável. `tests/test_medieval_private_origin.py`:9 passed/1.85s,
+Ruff/diff-check limpos. As tentativas de TestClient síncrono foram interrompidas
+após bloqueio; transporte ASGI async existente no projeto foi usado. A
+regressão API anual foi interrompida por prioridade de entrega do usuário;
+não afirmar esse grupo inteiro aprovado. Nenhum teste real pago de IA.
+
+Build remoto somente backend exit0, Compose recriou os dois containers
+Medieval com mesmas imagens frontend/dados. Backend novo
+`sha256:250def8e48f951dc6a4362f70ca28f2731caa1f3ce537032bbc33970ab588f12`.
+Checagem real da estação pela tailnet: HTML marcador Medieval e health/status
+200; JS/CSS200; pause com cada origem privada200; origem externa403.
+Save existente `deploy-smoke-20260930` carregou30 e permaneceu pausado,
+`last_error=null`. Não foi criado/substituído mundo ou save Xianxia.
+Disco VPS após build:931MiB livres; sem limpeza. GateE360 continua prova do
+kernel inalterado, não do fingerprint completo após este ajuste de ingresso;
+a superfície API alterada tem a validação focada acima. Não repetir dez anos
+por mudança exclusiva de Host/Origin sem afetar owners materiais.
+
 ## Entrega VPS — E363 — 30/09/2026
 
 Autorização direta de Matheus recebida por transcrição: publicar sem novo

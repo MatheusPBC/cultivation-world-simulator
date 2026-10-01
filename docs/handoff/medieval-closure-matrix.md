@@ -641,10 +641,16 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     sem IA. Perfil normal/rápido consumido pelo runtime é gpt-6-luna via OAuth.
     Novo backup dispensado explicitamente. Sol6.1 não aplicado: coordenador
     do jogo é código determinístico, não modelo LLM; lacuna comunicada.
-  - [ ] E364: HTTPS privado Tailscale autorizado para Android. Preservar
+  - [x] E364: HTTPS privado Tailscale autorizado para Android. Preservar
     Serve/Funnel existentes, adicionar443 privado e aceitar somente domínio/
     origem HTTPS exatos do Medieval; verificar página, API e comando, com
     origem externa rejeitada. Sem credenciais novas ou consultas de IA.
+    Refinamento do usuário manteve também o link antigo exclusivo
+    http://100.101.254.17:8123. Commit1bb992dd,9 testes focados passaram,
+    Ruff/diff-check limpos; backend atualizado sem alteração material.
+    HTTP antigo e HTTPS vps.tail9afb74.ts.net funcionam pela tailnet: HTML,
+    health/API/assets200 e comando200; origem externa403. Proxies existentes
+    preservados e nenhum Funnel novo. Namespace/saves intactos; disco931MiB.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
