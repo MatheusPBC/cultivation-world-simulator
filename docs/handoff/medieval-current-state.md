@@ -2,6 +2,42 @@
 
 ## Situação vigente — E360 aprovado / E361 revisão local concluída — 30/09/2026
 
+### E362 — Preparação operacional somente leitura
+
+Após o checkpoint local `58ad057d`, `git ls-remote github-personal` confirmou
+branch `b5b00304d746b548826ba17f6f4bec9f4a3c04c8` e main
+`f73c055ee541b7805fcb0a3fe7a40ca762752e63`. SSH confirmou VPS em
+`896c03597df1d8179fd9a9c30ae20b1d543c896b`, checkout limpo,
+`main...origin/main [ahead66]`. As três revisões são ancestrais do candidato
+local (`merge-base --is-ancestor` exit0); não requerem reset ou force-push.
+O estado remoto deve ser rechecado imediatamente antes de publicar.
+
+`/opt/cultivation-world/app/docker-data` ocupa26MiB e está montado em `/data`;
+`.git` ocupa505MiB e o disco da VPS tem4.8GiB livres. Não há backup novo,
+build remoto ou limpeza executados. `.env` existe com permissão644: preservar
+seu conteúdo sem imprimir segredos e restringir acesso na entrega autorizada.
+Não alterar credenciais OAuth nem volumes de outros serviços.
+
+Os containers atuais estão saudáveis, expostos por Tailscale8002/8123:
+backend `app-backend`, imagem
+`sha256:0344f64f0a942762c391056d65740f51925c3484cebce22073344d3870bfc3cd`;
+frontend `app-frontend`, imagem
+`sha256:7293da0df827a288b1599d85f291b9bd442d188a9a7eeb5d22ed552ba3cd108a`.
+São a instalação antiga, não a versão Medieval validada localmente.
+
+Fluxo pendente após autorização: revalidar refs/status → publicar branch e
+integrar main sem sobrescrever divergências → backup consistente de dados e
+configuração privada com hash/verificação, reter SHA/imagens/configuração
+anteriores → atualizar checkout e construir monitorando disco → iniciar novo
+Compose → health/UI/API v2 e smoke isolado sem alterar saves reais.
+O novo acesso é loopback com túnel SSH; não ampliar Host/CORS para a VPS.
+Rollback: manter imagens antigas e restaurar configuração/revisão anterior;
+só restaurar dados se necessário, a partir do backup verificado e sem apagar
+saves recentes automaticamente. Schemas antigos permanecem rejeitados e
+preservados. Entrega e M8 continuam abertos aguardando autorização explícita.
+
+### E360/E361 — Evidência local aprovada
+
 E360 terminou com **exit0 / `ok=true`**, sem alterações do candidato abaixo.
 Relatório: `.tmp_codex/e360-final-eSYNUE/report.json`, SHA-256
 `9944b6199bb852c21fca6a8258c95d564964090ff28cf1b328e8e3a2b3151dad`.

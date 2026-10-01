@@ -621,6 +621,14 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     Revisão local: M0–M7 mantêm provas delimitadas, revalidações posteriores
     E339–E359 e naturalE360; referência antiga M1/E282 e escopo físico M4
     corrigidos. Fonte inalterada e diff-check limpo. Próximo: entrega autorizada.
+  - [x] E362: preflight somente leitura da entrega: conferir refs GitHub,
+    revisão/status da VPS, containers, montagem de dados e espaço para backup.
+    Registrar plano de rollback e riscos de schema/acesso. Não publicar,
+    criar backup remoto, reiniciar ou editar produção sem autorização corrente.
+    GitHub branchb5b00304/mainf73c055e e VPS896c0359 são ancestrais locais;
+    checkout remoto limpo, imagens anteriores saudáveis, dados26MiB preservados.
+    VPS tem4.8GiB livres; build/backup ainda não executados. SHA das imagens,
+    montagem, permissão de configuração e rollback registrados no estado atual.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
