@@ -1,8 +1,15 @@
 # Contrato de conclusão do Medieval
 
-30/09/2026 — fechamento local validado; entrega operacional pendente. Branch
+30/09/2026 — fechamento local validado e aplicação entregue na VPS. Branch
 `codex/medieval-remote`, código atual E358/E359 / fingerprint `22e14698`,
-avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
+avanço acumulado preservado. E363 publicou branch/main por fast-forward e
+implantou o código validado57bdaff3 com dados Medieval separados, health,
+save/load/continuação e CI Docker/browser aprovados. Novo backup dispensado
+explicitamente pelo usuário; Xianxia de testes parado sem apagar dados.
+Configuração de atores gpt-6-luna consumida pelo runtime, sem prova de
+consulta real nessa versão. Sol6.1 não aplicado: não existe coordenador LLM
+separado no jogo. M8 permanece aberto para reconciliar esse pedido, sem
+inventar arquitetura ou mudar o chat/auditoria. Evidência no estado atual.
 E360 terminou exit0/ok=true nesse candidato: três seeds por3600 dias,30
 checkpoints anuais e3 auditorias finais, conservação, save/load/continuação3601
 e budgets originais passaram. E361 revisou os limites M0–M7 e reconciliou
@@ -662,9 +669,10 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: entrega operacional autorizada de M8, com backup,
-publicação e smoke próprios. E360 aprovado e E361 revisão local concluída;
-não repetir o gate nem abrir novas verticais sem uma causa concreta.
+Próximo trabalho imediato: reconciliar pedido de Sol6.1 no orquestrador do
+jogo, que atualmente é código determinístico e não um modelo LLM separado.
+E363 entregou a versão validada na VPS e configurou Luna6 para atores;
+sem repetir gate, iniciar IA paga longa ou abrir nova arquitetura por inferência.
 E358 fechou empacotamento local: build, navegador real, 19 contratos e Docker
 com save/load após restart passaram. Não aprova CI remoto ou deploy.
 E359 corrigiu a rejeição de receipt de mortalidade
