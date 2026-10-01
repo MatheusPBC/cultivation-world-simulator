@@ -629,6 +629,18 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     checkout remoto limpo, imagens anteriores saudáveis, dados26MiB preservados.
     VPS tem4.8GiB livres; build/backup ainda não executados. SHA das imagens,
     montagem, permissão de configuração e rollback registrados no estado atual.
+  - [ ] E363: publicar o candidato validado na VPS por autorização direta
+    recebida em30/09, dispensando somente novo backup. Preservar dados/backups
+    existentes; verificar revisão/CI, configuração GPT-6 Luna e smoke v2
+    abrir/carregar/continuar sem execução longa de IA. Harness GPT-6.1 Sol
+    depende de identificação do alvo, sem alterar chat/auditoria por inferência.
+    Entrega executada:57bdaff3 publicado na branch/main por fast-forward,
+    checkout VPS atualizado e build concluído. CI36806149981 passou Docker
+    e navegador. Medieval saudável em loopback8002/8123, namespace separado;
+    Xianxia parado, não removido. Smoke v2 abriu/salvou30/carregou/continuou31
+    sem IA. Perfil normal/rápido consumido pelo runtime é gpt-6-luna via OAuth.
+    Novo backup dispensado explicitamente. Sol6.1 não aplicado: coordenador
+    do jogo é código determinístico, não modelo LLM; lacuna comunicada.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

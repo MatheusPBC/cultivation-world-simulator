@@ -1,5 +1,64 @@
 # Estado atual — Medieval World Simulator
 
+## Entrega VPS — E363 — 30/09/2026
+
+Autorização direta de Matheus recebida por transcrição: publicar sem novo
+backup; pode parar o runtime Xianxia de testes, sem salvamento adicional.
+Não apagar backups, dados ou recursos existentes. Pedido de modelos refere-se
+ao jogo, não ao chat de desenvolvimento nem à auditoria.
+
+`57bdaff3649ea8461d583c94a507fb48c8e84db1` publicado na branch
+`codex/medieval-remote` e main por fast-forward. VPS atualizada por fetch/merge
+fast-forward; build remoto exit0. CI manual do mesmo commit
+[36806149981](https://github.com/MatheusPBC/cultivation-world-simulator/actions/runs/36806149981)
+terminou success: Docker runtime e frontend/browser. Não foi execução da suíte
+legada inteira nem prova de IA real. Warnings de chunk>500kB preservados.
+
+Runtime ativo: `medieval-backend-1`/`medieval-frontend-1`, ambos healthy,
+loopback8002/8123. Comando de instalação efetivo:
+`CWS_BIND_IP=127.0.0.1 docker compose -p medieval -f docker-compose.yml
+-f /opt/cultivation-world/medieval-compose.override.yml up -d --no-build --pull never`.
+Override usa imagens `app-backend:latest`/`app-frontend:latest` construídas e
+monta `/opt/cultivation-world/medieval-data:/data`. O novo settings.json tem
+permissão600, separado dos26MiB em `app/docker-data` do Xianxia, intocados.
+Containers Xianxia `cultivation-backend`/`cultivation-frontend` encerrados exit0,
+não removidos; imagens e dados antigos permanecem. Nenhum backup criado.
+
+Imagem nova backend:
+`sha256:e06ab153f6dc00cf4fff21655d60356c717a880a9dc00c0cf71f2a19f74790e6`;
+frontend:
+`sha256:fcd2b14a4f3bef4f15425a657732da20b1c61451d55ed7985652a94f56ef6a98`.
+Smoke `/tmp/cws-e363-vps-smoke.py`, executado por SSH na VPS, exit0:
+health identifica Medieval; HTML contém marcador do produto; create73/2
+personagens sem IA no dia0, save novo `deploy-smoke-20260930` no dia30,
+load preserva30 e step continua31, pausado. Não sobrescreveu saves reais.
+Logs mostram200 nesses comandos. Disco VPS após build:1.6GiB livres;
+não houve prune ou exclusão. Monitorar espaço antes de outro build.
+
+`LLMConfig.from_mode(NORMAL/FAST)` dentro do backend confirmou ambos
+`gpt-6-luna`, formato `codex_cli`; `provider_available()` é true por
+configuração. Catálogo oficial local confirma ID; cache VPS antigo só contém
+5.6. Nenhuma chamada real GPT-6 feita: seleção configurada não prova aceitação
+remota nem qualidade do modelo. Smoke manteve `ai_enabled=false`.
+
+**Pedido Sol6.1 pendente/não aplicável à arquitetura atual:**
+`MedievalSimulator.step` coordena owners deterministicamente;
+`ai_decider.select_option` chama `call_llm_json` NORMAL para atores.
+Não existe camada LLM orquestradora separada para receber `gpt-6.1-sol`.
+Não renomear o modelo normal como orquestrador, inventar nova arquitetura ou
+alterar chat/auditoria. Essa lacuna foi comunicada e requer decisão se houver
+intenção de criar um papel novo. A entrega de aplicação está executada;
+fechamento formal de E363/M8 aguarda essa reconciliação, sem abrir outra meta.
+
+Entrada para operador: túnel
+`ssh -N -L 8123:127.0.0.1:8123 -L 8002:127.0.0.1:8002 root@100.101.254.17`,
+depois `http://127.0.0.1:8123`. Para retomar Xianxia, parar projeto Medieval
+sem `-v` e iniciar os dois containers antigos preservados; nunca montar dados
+Medieval na versão antiga ou vice-versa. Health e saves devem ser rechecados.
+Nesta estação foi aberto um túnel separado em18123 (ExitOnForwardFailure),
+com health/status verificados: `http://127.0.0.1:18123`, Medieval pausado31,
+`last_error=null`. O túnel local não expõe a VPS publicamente.
+
 ## Situação vigente — E360 aprovado / E361 revisão local concluída — 30/09/2026
 
 ### E362 — Preparação operacional somente leitura
