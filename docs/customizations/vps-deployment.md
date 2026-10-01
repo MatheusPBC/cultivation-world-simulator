@@ -5,6 +5,21 @@ na porta 8002 e o frontend na 8123 por padrão; ajuste apenas
 `CWS_BACKEND_PORT`/`CWS_FRONTEND_PORT` quando necessário. Não amplie TrustedHost
 ou CORS para o endereço da VPS.
 
+## HTTPS privado no Tailscale
+
+A instalação Medieval usa `https://vps.tail9afb74.ts.net/` dentro da tailnet,
+via `tailscale serve --bg --https=443 http://127.0.0.1:8123`. Não é Funnel.
+O backend recebe `CWS_OBSERVER_ORIGINS=http://100.101.254.17:8123,https://vps.tail9afb74.ts.net`
+no override de produção; só esses hosts/origens adicionais são aceitos. O padrão
+continua local, e wildcard/origem externa/outro domínio ts.net são rejeitados.
+Não substituir outros handlers Serve/Funnel ao configurar esse endpoint.
+No Android, conectar Tailscale e abrir o link. Não requer túnel SSH no celular.
+O link antigo `http://100.101.254.17:8123` também é mantido: frontend ligado
+exatamente ao IP Tailscale e ao loopback, nunca0.0.0.0; backend apenas loopback.
+Origens HTTP adicionais só podem usar IPs CGNAT100.64/10 explicitamente
+configurados, não toda a faixa. HTTPS exige domínio ts.net exato, sem wildcard.
+Remover somente este endpoint: `tailscale serve --https=443 off`.
+
 Use um túnel SSH na estação do operador:
 
 ```bash

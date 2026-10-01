@@ -1,6 +1,8 @@
 """FastAPI assembly for the exclusively medieval observer contract."""
 
 from contextlib import asynccontextmanager
+import os
+from ipaddress import ip_address, ip_network
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Query, Request
@@ -19,6 +21,23 @@ from .save_files import list_save_files
 
 
 def create_app(*, save_dir=None, frontend_dir=None):
+    observer_origins = [value.strip().rstrip("/") for value in
+                        os.environ.get("CWS_OBSERVER_ORIGINS", "").split(",") if value.strip()]
+    observer_hosts = []
+    for observer_origin in observer_origins:
+        parts = urlsplit(observer_origin)
+        try:
+            tailnet_ip = ip_address(parts.hostname or "") in ip_network("100.64.0.0/10")
+        except ValueError:
+            tailnet_ip = False
+        private_endpoint = ((parts.scheme == "https" and (parts.hostname or "").endswith(".ts.net"))
+                            or (parts.scheme == "http" and tailnet_ip))
+        if (not private_endpoint or not parts.hostname
+                or "*" in parts.hostname
+                or parts.username or parts.password or parts.path
+                or parts.query or parts.fragment):
+            raise ValueError("CWS_OBSERVER_ORIGINS requires exact private Tailscale origins")
+        observer_hosts.append(parts.hostname)
     runtime = MedievalRuntime(save_dir=save_dir)
 
     @asynccontextmanager
@@ -31,8 +50,9 @@ def create_app(*, save_dir=None, frontend_dir=None):
 
     app = FastAPI(title="Medieval World Simulator", version="0.1.0", lifespan=lifespan)
     app.state.runtime = runtime
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]", "testserver"])
-    app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?",
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "[::1]", "testserver"] + observer_hosts)
+    app.add_middleware(CORSMiddleware, allow_origins=observer_origins,
+                       allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?",
                        allow_methods=["GET", "POST"], allow_headers=["Content-Type"], allow_credentials=False)
 
     def error(code, message, status):
@@ -43,7 +63,7 @@ def create_app(*, save_dir=None, frontend_dir=None):
     async def command_guard(request: Request, call_next):
         if request.method == "POST" and request.url.path.startswith("/api/v2/command/"):
             origin = request.headers.get("origin")
-            if origin:
+            if origin and origin not in observer_origins:
                 try:
                     parts = urlsplit(origin)
                     accepted = parts.scheme in {"http", "https"} and parts.hostname in {"localhost", "127.0.0.1", "::1", "testserver"}

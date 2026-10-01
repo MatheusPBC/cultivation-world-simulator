@@ -641,6 +641,10 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     sem IA. Perfil normal/rápido consumido pelo runtime é gpt-6-luna via OAuth.
     Novo backup dispensado explicitamente. Sol6.1 não aplicado: coordenador
     do jogo é código determinístico, não modelo LLM; lacuna comunicada.
+  - [ ] E364: HTTPS privado Tailscale autorizado para Android. Preservar
+    Serve/Funnel existentes, adicionar443 privado e aceitar somente domínio/
+    origem HTTPS exatos do Medieval; verificar página, API e comando, com
+    origem externa rejeitada. Sem credenciais novas ou consultas de IA.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.
