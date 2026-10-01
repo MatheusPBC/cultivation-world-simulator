@@ -9,12 +9,12 @@
 | Requisito do roadmap | Marco atual | Owners e integração exigida | Cobertura e evidência autoritativa |
 |---|---|---|---|
 | 0. Estabilizar fundação: autoria, affordances, causalidade, rollback, runtime | M0/M7/M8 | `material_execution`, `events`, owners canônicos e `MedievalSimulator`; decisão/causa, revalidação e publicação atômica | Base e limites em E265/E266; inventário e testes por família nas linhas Gate A. Cobertura global parcial; regressão final nas superfícies alteradas. |
-| 1. Economia e informação material: preço/demanda, mercado, tarifa, bloqueio, contrabando, escassez e propriedade | M1/M3/M7 | `economy`, `markets/procurement`, `logistics/routing`, `tariffs/embargo`, `society/demography`, `KnowledgeState` | M1 preparado aceito em E208/E277/E282; E356 prova adaptação natural focal por seis ciclos com emprego, renda e alimento conservados. Não demonstra estabilidade econômica global nem efeito exclusivo de um contrato. Gate final atual E360 em andamento. |
+| 1. Economia e informação material: preço/demanda, mercado, tarifa, bloqueio, contrabando, escassez e propriedade | M1/M3/M7 | `economy`, `markets/procurement`, `logistics/routing`, `tariffs/embargo`, `society/demography`, `KnowledgeState` | M1 preparado aceito em E208/E277/E282; E356 prova adaptação natural focal por seis ciclos com emprego, renda e alimento conservados. Não demonstra estabilidade econômica global nem efeito exclusivo de um contrato. Gate técnico final atual E360 aprovado. |
 | 2. Estratégia/diplomacia: objetivos, concessão, negociação, commitments, persuasão, espionagem, suborno e sabotagem | M2/M3/M6 | `StrategyState`, `AuthorityState`, `KnowledgeState`, `diplomacy*`, `commitments`, `espionage`, `bribery`, `sabotage` | Recortes controlados M2/E294, M3/E320 e M6/E332 aceitos; memória/decisões independentes e autoria verificadas nos recortes. Escolhas OAuth/Luna E257–E261 são situadas, não composição natural. Corpus atual e gates naturais em M8. |
 | 3. Conhecimento, produção e poder: pesquisa, conservação, aço/pólvora/artilharia/vapor/logística/barreiras/doutrina; difusão e aplicação | M3/M5 | `ResearchState`, `economy`, `workforce`, `KnowledgeState`, `technology_*`, `teaching/apprenticeship` | M3/E320 aceito pelos recortes materiais referenciados em seu checklist; E295–E318 conectam aquisição/aplicação, inclusive E300–E308 pólvora/artilharia. Catálogo sozinho não conta; generalização/naturalidade não são inferidas desses recortes. |
 | 4. Campanhas/território: força, recrutamento, manutenção, comando, reconhecimento, suprimento, combate, retirada, cerco, ocupação e solução política | M2/M7 | `StrategyState`, `AuthorityState`, `force*`, `campaign_*`, `siege_campaign`, `logistics`, `territorial_control`, owners de população/economia | M2/E294 e composição M7/E335 provam cenários controlados com autoridade/QG/comandante, interferência e consequência civil, sem escolha de ação pós-início pelo teste. Não extrapolar política stub para provider real ou emergência natural. |
 | 5. Magia, criaturas e ação individual | M4/M5/M6 | Society/Research owners e `rites`, `site_services`, `creature*`, `character_*`, `assembly_denial` | M4/E324.d, M5/E328 e M6/E332 aceitos em recortes controlados: trabalho dos quatro povos, elemental/evocação com custos e contramedidas, adesão independente e resposta social. Composição/navegabilidade E335; gates amplos continuam M8. |
-| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; corpus real limitado fechado em E336.h. E351 passou no código histórico; E357 falhou e E359 corrigiu seu receipt. E358 validou embalagem local e persistência após restart; E360 é o gate final atual, ainda não aprovado. |
+| 6. IA, observabilidade, save/load e calibração | M7/M8 | `ai_decider`, contexto de Knowledge, `queries`, API medieval, UI Atlas/Crônica/dossiers/`why()`, persistence/event chunks | Experiência integrada controlada M7/E333–E335 aceita, com navegador/retomada; corpus real limitado fechado em E336.h. E351 passou no código histórico; E357 falhou e E359 corrigiu seu receipt. E358 validou embalagem local e persistência após restart; E360 aprovou o gate técnico atual. E361 revisou o fechamento local; entrega operacional ainda aberta. |
 
 - [x] M0 crosswalk: mapear as sete seções (0–6) do roadmap a M0–M8,
   owners/integradores e evidência/limites acima. Os requisitos internos têm
@@ -603,11 +603,24 @@ prova natural; M5 é o próximo marco, sem abrir novas vertentes fora do contrat
     porta efêmera após restart. Save/load persistidos; cleanup só do projeto
     isolado. Sem deploy. Publicação condicionada à
     autorização operacional corrente solicitada, com backup e smoke próprios.
-  - [ ] E360: congelar candidato E358/E359 e executar uma única rodada final
+  - [x] E360: congelar candidato E358/E359 e executar uma única rodada final
     natural73/101/137×3600 sequencial, checkpoints360, budgets originais,
     conservação, auditorias e save/load com continuação. Sem alteração de
     código, provider ou simulações concorrentes. E351 histórico e E357 falho
-    não substituem o resultado deste candidato. Registrar progresso e saída.
+    não substituem o resultado deste candidato. Exit0/ok=true, fingerprint
+    22e14698 preservado:30 checkpoints e3 auditorias finais passaram,
+    conservação/save-load/continuação3601,120 meses e20why por seed.
+    P95 mensal25.2535/25.9828/27.7405s; budgets originais passaram.
+    Relatório SHA9944b619 e números no estado atual; offline,
+    não provider real ou prosperidade econômica global. Sem deploy.
+  - [x] E361: revisar o relatório terminal E360 e reconciliar os resumos atuais
+    do contrato/matriz/estado com os aceites M0–M7 já delimitados. Corrigir
+    referências históricas apresentadas como atuais, preservar falhas e limites,
+    registrar hashes e custos; não reabrir verticais nem alterar o candidato.
+    Publicação e deploy continuam separados da aprovação local.
+    Revisão local: M0–M7 mantêm provas delimitadas, revalidações posteriores
+    E339–E359 e naturalE360; referência antiga M1/E282 e escopo físico M4
+    corrigidos. Fonte inalterada e diff-check limpo. Próximo: entrega autorizada.
 - [x] M0/E332: preservar patch binário e arquivos não rastreados do checkpoint
   que fecha M6, com hashes verificáveis em /tmp, sem apagar/alterar os anteriores
   nem publicar dados. Registrar limites de commit/push e inventário do WIP.

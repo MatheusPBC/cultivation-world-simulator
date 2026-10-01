@@ -1,8 +1,13 @@
 # Contrato de conclusão do Medieval
 
-30/09/2026 — execução em andamento. Estado verificado nesta continuação: branch
+30/09/2026 — fechamento local validado; entrega operacional pendente. Branch
 `codex/medieval-remote`, código atual E358/E359 / fingerprint `22e14698`,
 avanço acumulado preservado; sem push/merge/deploy. M8 permanece aberto.
+E360 terminou exit0/ok=true nesse candidato: três seeds por3600 dias,30
+checkpoints anuais e3 auditorias finais, conservação, save/load/continuação3601
+e budgets originais passaram. E361 revisou os limites M0–M7 e reconciliou
+documentação. Relatório SHA9944b619, números e método no estado atual.
+Não certifica prosperidade global, provider real em dez anos ou deploy.
 E336.h encerrou o corpus real limitado com três novas tentativas sem retries;
 backup multipart verificado e E196–E199 removidos com autorização. E337 reprovou
 por performance; E339/E342 preservaram estado/história/RNG e E340 reprovou custo.
@@ -354,8 +359,10 @@ Inventário finito; não abrir nova caça irrestrita a owners.
   seeds; o Gate B natural permanece em M8.
 E283 (proposta anterior de diagnóstico por coorte) foi retirada antes da
 execução por correção de escopo do usuário. Nenhum teste ou resultado E283 existe;
-não retomar essa proposta como próxima tarefa. O registro E282 continua sendo a
-evidência mais recente de M1.
+não retomar essa proposta como próxima tarefa. E282 é a evidência histórica do
+aceite preparado de M1; a capacidade adaptativa natural focal foi posteriormente
+verificada em E356 por seis ciclos em Campomanso. Esse recorte não certifica
+equilíbrio econômico global nem isola o efeito de um único contrato.
 
 Aceite: resposta viável reduz pressão de forma sustentada no cenário elegível,
 sem criar riqueza nem esconder privação transferida a outra coorte. Um cenário
@@ -428,7 +435,9 @@ longos continuam nos marcos correspondentes.
   agora implementa maturação de coortes em 15/25/20/12 anos (humano/elfo/anão/orc),
   com duração e data persistidas, receipt causal, maturação agendada e explicação
   na UI. Society schema 22/save schema 81 rejeitam formatos anteriores. Evidência
-  focal no diário; catálogo físico além da maturação continua aberto.
+  focal no diário; maturação é a propriedade física contratada para esta V1.
+  Outras propriedades não fazem parte deste fechamento e não são declaradas
+  implementadas por este check.
 - [x] Separar povo, habilidade aprendida, personalidade, instituição e fé;
   nenhuma raça determina moralidade, profissão, lealdade ou religião. `Character`
   mantém `people`, `skills` e `personality` em campos distintos; afiliação
@@ -589,7 +598,8 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   `22e14698cba5f522dc6f357b718259fee8a582da65ca6ea9e294ad0a5e718c83`.
   E359 revalidou mortalidade/demografia/economia/auditoria (36 testes);
   E358 validou build, navegador real, 19 contratos e Docker com save/load após
-  restart. E360 em execução sequencial; não aprova o gate por antecipação.
+  restart. E360 terminou exit0 no mesmo candidato; conservação, persistência,
+  auditorias e budgets aprovados, conforme relatório e método no estado atual.
 - [x] Corpus real limitado cobre decisões novas e composição. Reutilizar provas
   recentes de contratos intactos; contar tentativas e saldo da autorização de
   consultas. Autorização anterior não vira orçamento ilimitado.
@@ -597,8 +607,12 @@ prompt anti-idle ou métrica causal inferida pela LLM como verdade do mundo.
   (elemental, evocação, composição); somam-se às duas adesões de E336.b3.
   Receipts LLM sem deltas, save original intacto. São decisões em forks
   preparados, não provider real durante dez anos nem emergência natural.
-- [ ] Três seeds naturais por 3.600 dias no mesmo checkout final, sequenciais, com
+- [x] Três seeds naturais por 3.600 dias no mesmo checkout final, sequenciais, com
   checkpoints, conservação, auditoria, save/load e continuação.
+  E360 exit0/ok=true no fingerprint22e14698:30 checkpoints anuais e3 auditorias
+  finais,120 meses/20why por seed e continuação equivalente3601. P95 mensal
+  25.2535/25.9828/27.7405s; budgets originais passaram. Relatório SHA9944b619
+  registrado no estado atual. Offline, não provider real longo.
   E351 exit0: seeds73/101/137,30 checkpoints anuais auditados,120 amostras
   mensais/20why por seed, continuação equivalente3601, todos os budgets
   originais passaram no fingerprint95543bab. P95 mensal29.4579/27.4409/31.6937s.
@@ -648,7 +662,9 @@ marketplace de plugins, povos adicionais e escolas além das quatro contratadas.
 Pólvora/artilharia são recorte do roadmap medieval fantástico, não autorização
 para guerra industrial. Não reescrever módulos por preferência arquitetural.
 
-Próximo trabalho imediato: M8/E360, executar o gate final no candidato congelado.
+Próximo trabalho imediato: entrega operacional autorizada de M8, com backup,
+publicação e smoke próprios. E360 aprovado e E361 revisão local concluída;
+não repetir o gate nem abrir novas verticais sem uma causa concreta.
 E358 fechou empacotamento local: build, navegador real, 19 contratos e Docker
 com save/load após restart passaram. Não aprova CI remoto ou deploy.
 E359 corrigiu a rejeição de receipt de mortalidade

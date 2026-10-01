@@ -1,15 +1,56 @@
 # Estado atual — Medieval World Simulator
 
-## Situação vigente — E360 em execução / E358 e E359 concluídos localmente — 30/09/2026
+## Situação vigente — E360 aprovado / E361 revisão local concluída — 30/09/2026
+
+E360 terminou com **exit0 / `ok=true`**, sem alterações do candidato abaixo.
+Relatório: `.tmp_codex/e360-final-eSYNUE/report.json`, SHA-256
+`9944b6199bb852c21fca6a8258c95d564964090ff28cf1b328e8e3a2b3151dad`.
+Saves finais preservados no mesmo diretório, SHA-256:
+`natural-73.mws`: `75f6e25d6145684a0e0c7c7ce65111101555fa410fe62ad7d7075ae65407a2f5`;
+`natural-101.mws`: `4faba4d357025c71fce43a3c0cd54ea32671ed62eb65a6d289cd101e6fe98663`;
+`natural-137.mws`: `ecf824f4fefdc47b1d009691b270c4f270795925899ae89cb9bc881ef7758036`.
+Host Linux7.0.0-34-generic, Intel Core i5-8500T,6 CPUs; execução sequencial,
+política offline `routine-rules`, zero consultas externas. Disco:9.0GiB livres.
+
+| Seed | Eventos3600 | Execução(s) | P95 mês(s) | Máximo mês(s) | RSS(bytes) | Save(bytes) | Save/load(s) | P95 why(s) |
+|---|---:|---:|---:|---:|---:|---:|---|---:|
+|73|149870|2050.80|25.2535|31.3143|2039463936|40083456|29.0764/26.1735|0.1972|
+|101|154577|2238.59|25.9828|29.9282|2096832512|40554496|26.5973/21.3183|0.2020|
+|137|160087|2282.46|27.7405|31.8092|2185875456|42090496|27.9503/22.6426|0.2144|
+
+Cada seed avançou3600 dias e continuou equivalentemente até3601 após save/load;
+10 checkpoints anuais conservaram matéria/moeda e estado/história ao recarregar.
+As30 auditorias anuais e3 finais passaram: nenhuma causa quebrada, Story ou
+interpretação material, erro de autoria/fonte de decisão, premissa inválida ou
+evento material sem raiz.120 amostras mensais/seed,20 consultas why/seed com
+links verificados; todos os budgets originais passaram, inclusive todos os
+máximos mensais abaixo35s. RSS é high-water do processo sequencial, não uma
+medição isolada de cada mundo. `run_s` inclui checkpoints e persistência/
+continuação do smoke, mas não o pós-processamento das auditorias.
+
+Economia: mortes por privação acumuladas1388/1668/2839; falta no último mês
+137/140/2684; população9542/9273/8102. Não confundir esses valores com
+`missing_food_total`34828/32838/104580, soma de leituras mensais, não falta final.
+O gate não certifica prosperidade global nem agência de provider real em dez
+anos. E356 permanece a prova de capacidade adaptativa natural focal.
+
+E361 revisou o fechamento finito: M0–M7 mantêm seus aceites e limites em
+E321/E356/E294/E320/E324.d/E328/E332/E333–E335; povos, magia, religião e UI
+não mudaram entre5b4b5227 e o candidatoe5089542. As mudanças compartilhadas
+posteriores têm revalidações específicas E339–E359, sem promover testes de
+um recorte a certificação universal. Corrigidas referências históricas de
+M1 e o limite do catálogo físico M4. **Próximo: entrega operacional autorizada**,
+com publicação, backup e smoke próprios. M8 não está concluído; sem push,
+merge ou deploy. Não iniciar outro gate ou vertical por antecipação.
 
 E360 iniciado no commit congelado `e5089542`, fingerprint
 `22e14698cba5f522dc6f357b718259fee8a582da65ca6ea9e294ad0a5e718c83`:
 `CWS_DATA_DIR=/tmp/cws-e360-final .venv/bin/python tools/medieval_release_gate.py
 --seeds 73,101,137 --days 3600 --checkpoint-days 360 --final-v1
 --output-dir .tmp_codex/e360-final-eSYNUE`.
-Saídas em `report.json` e `progress.log` nesse diretório; sequência natural,
-provider desligado, budgets originais. Em andamento não significa aprovado.
-Sem alterações de runtime durante a execução; M8 e entrega continuam abertos.
+Saídas preservadas em `report.json` e `progress.log` nesse diretório; sequência
+natural, provider desligado, budgets originais. Fingerprint rechecado idêntico
+após a saída terminal. Sem alterações de runtime; entrega continua aberta.
 
 - E357 terminou com exit1, não aprovado. A seed73 preservou checkpoint3240;
   o avanço posterior falhou em `mortality.py:60` com `deprivation requires the
